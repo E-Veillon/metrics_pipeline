@@ -7,10 +7,10 @@ A script that takes a .cif file containing crystal structures and returns a new 
 # SYSTEM I/O MODULES
 
 import sys
-from monty.io import zopen
 from time import perf_counter
 from typing import NamedTuple
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+import re
 
 ##################################################
 # OPTIMIZATION MODULES
@@ -30,8 +30,13 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 ##################################################
 
 
-def input_guardian(args: NamedTuple):
-    """Input arguments verification"""
+def assert_args(args: NamedTuple):
+    """
+    Input arguments verification
+
+    Args:
+        args (NamedTuple): namespace of the parsed arguments.
+    """
 
     assert args.filename.endswith(".cif") and args.output.endswith(
         ".cif"
@@ -52,16 +57,17 @@ def input_guardian(args: NamedTuple):
     assert args.workers >= 1, "the number of workers cannot be negative or zero"
 
 
-def is_rare_gas(string: str) -> bool:
-    """searches for rare gas symbols in structure formula"""
-    find_He = string.find("He") != -1
-    find_Ne = string.find("Ne") != -1
-    find_Ar = string.find("Ar") != -1
-    find_Kr = string.find("Kr") != -1
-    find_Xe = string.find("Xe") != -1
-    find_Rn = string.find("Rn") != -1
+def has_rare_gas(formula: str) -> bool:
+    """
+    searches for rare gas symbols in structural formula
 
-    return any((find_He, find_Ne, find_Ar, find_Kr, find_Xe, find_Rn))
+    Args:
+        formula (NamedTuple): namespace of the parsed arguments.
+    Returns
+        bool: True if the formula contains rare gases, False otherwise.
+    """
+
+    return re.search(r"(He|Ne|Ar|Kr|Xe|Rn)", formula) is not None
 
 
 def extract_from_cif_file(filename: str, keep_rare_gases: bool = False):
@@ -73,29 +79,13 @@ def extract_from_cif_file(filename: str, keep_rare_gases: bool = False):
     rare_gas_structures = 0
 
     with open(filename, "r") as input_file:
-        for line in input_file:
-            if line.startswith("#") or line == "" or line == "\n":
-                continue
+        data = input_file.read()
 
-            elif not line.startswith("data_"):
-                data_string_list.append(line)
-                continue
+    matcher = re.compile(r"^data.*?$(?=\ndata|\Z)", re.MULTILINE | re.DOTALL)
+    structs = matcher.findall(data)
 
-            elif data_string_list != [] and not containing_rare_gas:
-                full_struct_string = "\n".join(data_string_list)
-                full_structs_list.append(full_struct_string)
-
-            data_string_list = [line]
-
-            if not keep_rare_gases:
-                containing_rare_gas = is_rare_gas(line)
-
-                if containing_rare_gas:
-                    rare_gas_structures += 1
-
-    if data_string_list != []:
-        full_struct_string = "\n".join(data_string_list)
-        full_structs_list.append(full_struct_string)
+    rare_gas_structures = filter(has_rare_gas, structs)
+    full_structs_list = filter(lambda x: not has_rare_gas(x), structs)
 
     return full_structs_list, rare_gas_structures
 
@@ -241,7 +231,7 @@ if __name__ == "__main__":
 
     print(args)
 
-    input_guardian()
+    assert_args(args)
 
     if args.output == "[filename]_out.cif":
         args.output = args.filename.replace(".cif", "_out.cif")
