@@ -26,7 +26,7 @@ def assert_args(args: NamedTuple):
     ), "some arguments formats are not supported, please only use .cif format"
 
     assert (
-        0.0 <= args.precision >= 0.5
+        0.0 <= args.precision <= 0.5
     ), "precision must be between 0.0 and 0.5 Angstrom"
 
     assert (
