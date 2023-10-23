@@ -68,7 +68,7 @@ def cif_str_to_struct(
     Parses data from a cif formatted string and converts it to a structure object from pymatgen. This function uses a spacegroup analyser from pymatgen and spglib in the backend.
 
     Args:
-        cif_str (float): The string of a structure encoded in the cif format.
+        cif_str (str): The string of a structure encoded in the cif format.
         symprec (float): Distance tolerance for symmetry search.
         angle_tolerance (float): Angle tolerance for symmetry search.
     Returns
@@ -178,7 +178,7 @@ def write_cif(
 
     Args:
         filename (str): Name of the input file.
-        structures List[Structure]: The structures to encode.
+        structures (List[Structure]): The structures to encode.
         symprec (float): Distance tolerance for symmetry search.
         angle_tolerance (float): Angle tolerance for symmetry search.
         workers (int): Number of workers used.

@@ -110,12 +110,7 @@ def main():
 
     assert_args(args)
 
-    from screening_pipeline.utils import (
-        has_rare_gas,
-        read_cif,
-        write_cif,
-        remove_equivalent,
-    )
+    from screening_pipeline.utils import read_cif, write_cif, remove_equivalent
 
     if args.output == "[filename]_out.cif":
         args.output = args.filename.replace(".cif", "_out.cif")

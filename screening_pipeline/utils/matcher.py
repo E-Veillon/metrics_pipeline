@@ -37,9 +37,9 @@ def group_by_stoichiometry(structs: List[Structure]) -> List[List[Structure]]:
     ]
 
 
-def group_by_equivalance(structs: List[Structure]) -> List[List[Structure]]:
+def group_by_equivalence(structs: List[Structure]) -> List[List[Structure]]:
     """
-    Group structure by equivalance using the StructureMatcher object.
+    Group structure by equivalence using the StructureMatcher object.
 
     Args:
         structure (List[Structure]): The list of structure.
@@ -73,7 +73,7 @@ def remove_equivalent(
     grouped_structs = group_by_stoichiometry(structures)
 
     equivalent_struct = process_map(
-        group_by_equivalance,
+        group_by_equivalence,
         grouped_structs,
         max_workers=workers,
         chunksize=chunksize,
