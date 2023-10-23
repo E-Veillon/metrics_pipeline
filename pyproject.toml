@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "screening-pipeline"
+version = "0.1.0"
+description = "Screening pipeline for materials discovery"
+authors = [
+    "Elohan Veillon <elohan.veillon@univ-artois.fr>",
+    "Astrid Klipfel <astridklipfel@gmail.com>",
+]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pymatgen = ">=2023.10.11"
+spglib = ">=2.0.0"
+
+[tool.poetry.scripts]
+symmetrize = 'screening_pipeline.scripts.symmetrize:main'
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
