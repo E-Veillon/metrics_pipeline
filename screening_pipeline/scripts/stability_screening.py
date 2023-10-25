@@ -2,8 +2,12 @@
 A script using VASP DFT calculations to determine the relative stability of given structures in order to keep synthesizable structure and discard others.
 """
 
+import sys
+
+sys.path.append('../utils')
 
 from pymatgen.core.structure import SiteCollection
+from cif import read_cif
 from pymatgen.io.vasp.sets import MITRelaxSet
 from datetime import datetime
 from typing import Optional
@@ -56,12 +60,13 @@ def main():
 
     parser = ArgumentParser(prog=name, description=desc, epilog=footnote)
   
-    parser.add_argument('Structure',type=SiteCollection,help='The structure to write VASP input files for.')
-    parser.add_argument('-p', '--path', type=PathLike, default='./',help='Directory to write VASP input files in.')
+    parser.add_argument('datafile',type=str,help='The file conaining structure data to write VASP input files for. Only .cif format supported at the moment.')
+    parser.add_argument('-p', '--path', type=str, default='./',help='Directory to write VASP input files in.')
 
-    args   = parser.parse_args()
-    struct = args.Structure
-    path   = args.path
+    args        = parser.parse_args()
+    struct_list = read_cif(args.datafile)
+    struct      = struct_list[0]
+    path        = args.path
 
     Input_dict = vasp_input_files_generator(struct)
     Input_dict.write_input(path)
