@@ -96,12 +96,12 @@ def main():
     parser.add_argument(
         "--keep-rare-gases",
         action="store_true",
-        help="A flag to pass if data containing rare gases should not be automatically discarded",
+        help="Pass this flag to disable automatic elimination of structures containing rare gases"
     )
     parser.add_argument(
         "--keep-equivalent",
         action="store_true",
-        help="A flag to pass if data containing rare gases should not be automatically discarded",
+        help="Pass this flag to disable automatic structure matching and elimination of duplicates"
     )
 
     args = parser.parse_args()
