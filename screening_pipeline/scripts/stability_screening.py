@@ -6,6 +6,8 @@ A script using VASP DFT calculations to determine the relative stability of give
 from datetime import datetime
 from typing import Optional
 from argparse import ArgumentParser
+from pymatgen.core.structure import Structure
+from pymatgen.io.vasp.sets import MITRelaxSet
 
 
 def vasp_input_files_generator(structure: Structure, modified_incar: Optional[dict] = None, modified_kpoints: Optional[dict] = None, modified_potcar: Optional[dict] = None):
@@ -59,8 +61,6 @@ def main():
 
     args        = parser.parse_args()
 
-    from pymatgen.core.structure import Structure
-    from pymatgen.io.vasp.sets import MITRelaxSet
     from screening_pipeline.utils import read_cif
 
     struct_list = read_cif(args.datafile)
