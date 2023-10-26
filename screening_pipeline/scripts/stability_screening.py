@@ -1,15 +1,14 @@
+#!/usr/bin/python
 """
 A script using VASP DFT calculations to determine the relative stability of given structures in order to keep synthesizable structure and discard others.
 """
 
-
-from pymatgen.core.structure import SiteCollection
-from pymatgen.io.vasp.sets import MITRelaxSet
 from datetime import datetime
 from typing import Optional
 from argparse import ArgumentParser
 
-def vasp_input_files_generator(structure: SiteCollection, modified_incar: Optional[dict] = None, modified_kpoints: Optional[dict] = None, modified_potcar: Optional[dict] = None):
+
+def vasp_input_files_generator(structure: Structure, modified_incar: Optional[dict] = None, modified_kpoints: Optional[dict] = None, modified_potcar: Optional[dict] = None):
     '''
     Build a VASP input files generator with a standard preset corresponding to the MIT high throughput material screening project.
         
@@ -19,7 +18,7 @@ def vasp_input_files_generator(structure: SiteCollection, modified_incar: Option
             Computational Materials Science, 50, 2295–2310 (2011)
 
         Parameters:
-            structure (SiteCollection): The structure to write VASP input files for.
+            structure (Structure): The structure to write VASP input files for.
 
             modified_incar (dict):      User INCAR settings. It allows to override some of the standards INCAR tags if necessary.
                                         Defaults to None.
@@ -32,14 +31,13 @@ def vasp_input_files_generator(structure: SiteCollection, modified_incar: Option
         Returns:
             A DictSet object that uses the write_input method to write set input files in given directory, ready for calculation.
     '''
-    assert isinstance(structure, SiteCollection), 'Provided structure format is not supported. Please provide a PyMatGen SiteCollection object or one of its subclasses'
+    assert isinstance(structure, Structure), 'Provided structure format is not supported. Please provide a PyMatGen Structure object or one of its subclasses'
 
     if modified_incar is not None:
         assert isinstance(modified_incar, dict), 'Invalid format for INCAR modification. Please provide a dictionnary with INCAR tags as keys and respective value as values'
 
     if modified_kpoints is not None:
-        assert isinstance(modified_kpoints, dict), 'Invalid format for KPOINTS modification. Please provide a dictionnary with KPOINTS supported mode as key and correct mesh definition as value'
-
+        assert isinstance(modified_kpoints, dict), 'Invalid format for KPOINTS modification. Please provide a dictionnary with KPOINTS PyMatGen supported mode as key and correct mesh definition as value'
 
     if modified_potcar is not None:
         assert isinstance(modified_potcar, dict), 'Invalid format for POTCAR modification. Please provide a dictionnary with element symbols as keys and a dictionnary containing hash and PP symbol as values'
@@ -56,12 +54,18 @@ def main():
 
     parser = ArgumentParser(prog=name, description=desc, epilog=footnote)
   
-    parser.add_argument('Structure',type=SiteCollection,help='The structure to write VASP input files for.')
-    parser.add_argument('-p', '--path', type=PathLike, default='./',help='Directory to write VASP input files in.')
+    parser.add_argument('datafile',type=str,help='The structure data to write VASP input files for. CIF format only at the moment.')
+    parser.add_argument('-p', '--path', type=str, default='.',help='Directory to write VASP input files in.')
 
-    args   = parser.parse_args()
-    struct = args.Structure
-    path   = args.path
+    args        = parser.parse_args()
+
+    from pymatgen.core.structure import Structure
+    from pymatgen.io.vasp.sets import MITRelaxSet
+    from screening_pipeline.utils import read_cif
+
+    struct_list = read_cif(args.datafile)
+    struct      = struct_list[0]
+    path        = args.path
 
     Input_dict = vasp_input_files_generator(struct)
     Input_dict.write_input(path)
