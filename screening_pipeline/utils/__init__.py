@@ -1,5 +1,5 @@
 from .noble_gas import has_rare_gas
-from .cif import read_cif, write_cif
+from .cif import read_cif, write_cif, extract_cif_from_file, cif_str_to_struct
 from .matcher import remove_equivalent
 
 __all__ = ["has_rare_gas", "read_cif", "write_cif", "remove_equivalent"]

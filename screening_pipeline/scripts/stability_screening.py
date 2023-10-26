@@ -47,7 +47,6 @@ def vasp_input_files_generator(structure: Structure, modified_incar: Optional[di
     return MITRelaxSet(structure=structure, user_incar_settings=modified_incar, user_kpoints_settings=modified_kpoints, user_potcar_settings=modified_potcar) 
 
 def main():
-    
     start = datetime.now()
     
     name     = 'stability_screening.py'
@@ -61,15 +60,14 @@ def main():
 
     args        = parser.parse_args()
 
-    from screening_pipeline.utils import read_cif
+    from screening_pipeline.utils import extract_cif_from_file, cif_str_to_struct
 
-    struct_list = read_cif(args.datafile)
-    struct      = struct_list[0]
-    path        = args.path
-
+    cif_string, _  = extract_cif_from_file(args.datafile)
+    struct         = cif_str_to_struct(cif_string[0])
+    path           = args.path
+    
     Input_dict = vasp_input_files_generator(struct)
     Input_dict.write_input(path)
-
     end = datetime.now()
     print(end-start)
 
