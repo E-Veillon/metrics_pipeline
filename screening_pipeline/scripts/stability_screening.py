@@ -54,7 +54,7 @@ def main():
 
     parser = ArgumentParser(prog=name, description=desc, epilog=footnote)
   
-    parser.add_argument('datafile',type=str,help='The structure data to write VASP input files for. CIF format only at the moment.')
+    parser.add_argument('datafile',type=str,help='The file conaining structure data to write VASP input files for. Only .cif format supported at the moment.')
     parser.add_argument('-p', '--path', type=str, default='.',help='Directory to write VASP input files in.')
 
     args        = parser.parse_args()
