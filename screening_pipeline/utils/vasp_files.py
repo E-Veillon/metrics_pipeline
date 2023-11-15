@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from typing import Optional
+from typing import Optional, Dict
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.sets import DictSet, MITRelaxSet 
 
@@ -56,7 +56,15 @@ def _MITRelaxSet_INCAR_corrections(number_of_sites: int):
         }
     return corrected_INCAR
 
-def vasp_input_files_generator(structure: Structure, /, *, use_mit_set: bool = True, config_dict: Optional[dict] = None, modified_incar: Optional[dict] = None, modified_kpoints: Optional[dict] = None, modified_potcar: Optional[dict] = None):
+def vasp_input_files_settings(
+        structure: Structure, 
+        /, *, 
+        use_mit_set: bool = True, 
+        config_dict: Optional[dict] = None, 
+        modified_incar: Optional[dict] = None, 
+        modified_kpoints: Optional[dict] = None, 
+        modified_potcar: Optional[dict] = None
+        ):
     '''
     Builds a VASP input files generator object, with a standard preset possibility corresponding to the MIT high throughput material screening project.
         
@@ -74,10 +82,10 @@ def vasp_input_files_generator(structure: Structure, /, *, use_mit_set: bool = T
                                         If True, config_dict should be set to None, but input parameters can be ajusted with appropriate modifier arguments (default).
                                         If False, you need to provide a full config_dict.
 
-            modified_incar (dict):      User INCAR settings. It allows to override some of the standards INCAR tags if necessary.
+            modified_incar (dict):      User INCAR settings. It allows to override some of the standard INCAR tags if necessary.
                                         Defaults to None.
 
-            modifieed_kpoints (dict):   User KPOINTS settings. It allows to override the standard Kpoints mesh if necessary..
+            modifieed_kpoints (dict):   User KPOINTS settings. It allows to override the standard Kpoints mesh if necessary.
                                         Defaults to None.
 
             modified_potcar (dict):     User POTCAR settings. It allows to override the standard POTCAR settings, although it is not recommended.
@@ -110,3 +118,9 @@ def vasp_input_files_generator(structure: Structure, /, *, use_mit_set: bool = T
         assert isinstance(modified_potcar, dict), 'Invalid format for POTCAR modification. Please provide a dictionnary with element symbols as keys and a dictionnary containing hash and PP symbol as values'
 
     return MITRelaxSet(structure, user_incar_settings=modified_incar, user_kpoints_settings=modified_kpoints, user_potcar_settings=modified_potcar) 
+
+def vasp_input_files_generator(structure: Structure, path: str, kwargs: Optional[Dict] = None):
+    if kwargs is None:
+        vasp_input_files_settings(structure).write_input(path)
+    else:
+        vasp_input_files_settings(structure, **kwargs).write_input(path)
