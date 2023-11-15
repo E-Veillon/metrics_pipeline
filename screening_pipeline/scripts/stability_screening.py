@@ -72,14 +72,16 @@ def main():
         }}
     corrected_LDAUU = {
         'F': {
-            'Ag': 1.5, 'Co': 3.4, 'Cr': 3.5, 'Cu': 4.0, 'Fe': 4.0, #'Cu': 4 -> 4.0
-            'Mn': 3.9, 'Mo': 3.5, 'Nb': 1.5, 'Ni': 6.0, 'Re': 2.0, #'Mo': 4.38 -> 3.5, 'Ni': 6 -> 6.0, 'Re': 2 -> 2.0
-            'Ta': 2.0, 'V': 3.1, 'W': 4.0                          #'Ta': 2 -> 2.0
+            'Ag': 1.5, 'Co': 3.4, 'Cr': 3.5, 'Cu': 4.0, #'Cu': 4 -> 4.0
+            'Fe': 4.0, 'Mn': 3.9, 'Mo': 3.5, 'Nb': 1.5, #'Mo': 4.38 -> 3.5
+            'Ni': 6.0, 'Re': 2.0, 'Ta': 2.0, 'V': 3.1,  #'Ni': 6 -> 6.0, 'Re': 2 -> 2.0, 'Ta': 2 -> 2.0
+            'W': 4.0
         }, 
         'O': {
-            'Ag': 1.5, 'Co': 3.4, 'Cr': 3.5, 'Cu': 4.0, 'Fe': 4.0, #'Cu': 4 -> 4.0
-            'Mn': 3.9, 'Mo': 3.5, 'Nb': 1.5, 'Ni': 6.0, 'Re': 2.0, #'Mo': 4.38 -> 3.5, 'Ni': 6 -> 6.0, 'Re': 2 -> 2.0
-            'Ta': 2.0, 'V': 3.1, 'W': 4.0                          #'Ta': 2 -> 2.0
+            'Ag': 1.5, 'Co': 3.4, 'Cr': 3.5, 'Cu': 4.0, #'Cu': 4 -> 4.0
+            'Fe': 4.0, 'Mn': 3.9, 'Mo': 3.5, 'Nb': 1.5, #'Mo': 4.38 -> 3.5
+            'Ni': 6.0, 'Re': 2.0, 'Ta': 2.0, 'V': 3.1,  #'Ni': 6 -> 6.0, 'Re': 2 -> 2.0, 'Ta': 2 -> 2.0
+            'W': 4.0                          
         }, 
         'S': {
             'Fe': 1.9, 'Mn': 2.5
@@ -89,8 +91,8 @@ def main():
         "ENCUT": corrected_ENCUT,
         "LDAUL": corrected_LDAUL,
         "LDAUU": corrected_LDAUU, 
-        "LMAXMIX": 4 #Necessary to get reliable results with GGA + U framework
-    }
+        "LMAXMIX": 4 #Necessary to get reliable results with GGA + U framework on d-type orbitals
+        }
     Input_dict = vasp_input_files_generator(struct, modified_incar=corrected_INCAR)
     Input_dict.write_input(path)
     end = datetime.now()
