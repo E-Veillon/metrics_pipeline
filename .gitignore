@@ -4,3 +4,4 @@ dist
 poetry.lock
 *.cif
 vaspdir_*
+oqmd_poscar
