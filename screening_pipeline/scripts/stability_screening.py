@@ -4,8 +4,12 @@
 A script using VASP DFT calculations to determine the relative stability of given structures in order to keep synthesizable structure and discard others.
 """
 
+from typing import List
+from itertools import count
 from datetime import datetime
 from argparse import ArgumentParser
+from tqdm.contrib.concurrent import process_map
+from pymatgen.core.structure import Structure
 
 
 def main():
@@ -28,8 +32,8 @@ def main():
     parser.add_argument(
         '-p', '--path',
         type=str,
-        default='.',
-        help='Directory to write VASP input files in.',
+        default='./Vasp_input_sets/'
+        help='Directory to write VASP input files in (created if it does not exist).',
         metavar='str'
     )
     parser.add_argument(
@@ -51,10 +55,27 @@ def main():
 
     from screening_pipeline.utils import read_cif, vasp_input_files_generator
 
-    structs         = read_cif(filename=args.datafile, workers=args.workers, keep_rare_gases=args.keep_rare_gases)
-    path            = args.path
-    Input_dict = vasp_input_files_generator(struct)
-    Input_dict.write_input(path)
+    structures = read_cif(
+        filename=args.datafile, 
+        workers=args.workers, 
+        keep_rare_gases=args.keep_rare_gases
+        )
+    nbr_struct      = len(structures)
+    chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
+    generic_path    = args.path
+
+    def feed_args(structures: List[Structure], path: str):
+        if not path.endswith('/'):
+            path += '/'
+        struct_counter = count(0)
+        return [(struct, path + f"{next(struct_counter)}/") for struct in structures]
+    
+    process_map(
+        vasp_input_files_generator, 
+        feed_args(structures, generic_path),  
+        max_workers=args.workers, 
+        chunksize=chunksize
+    )
 
     end = datetime.now()
     print(end-start)

@@ -56,7 +56,7 @@ def _MITRelaxSet_INCAR_corrections(number_of_sites: int):
         }
     return corrected_INCAR
 
-def vasp_input_files_settings(
+def _vasp_input_files_settings(
         structure: Structure, 
         /, *, 
         use_mit_set: bool = True, 
@@ -121,6 +121,6 @@ def vasp_input_files_settings(
 
 def vasp_input_files_generator(structure: Structure, path: str, kwargs: Optional[Dict] = None):
     if kwargs is None:
-        vasp_input_files_settings(structure).write_input(path)
+        _vasp_input_files_settings(structure).write_input(path)
     else:
-        vasp_input_files_settings(structure, **kwargs).write_input(path)
+        _vasp_input_files_settings(structure, **kwargs).write_input(path)
