@@ -32,7 +32,7 @@ def main():
     parser.add_argument(
         '-p', '--path',
         type=str,
-        default='./Vasp_input_sets/'
+        default='./Vasp_input_sets/',
         help='Directory to write VASP input files in (created if it does not exist).',
         metavar='str'
     )
