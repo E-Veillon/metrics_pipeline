@@ -4,6 +4,58 @@ from typing import Optional
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.sets import DictSet, MITRelaxSet 
 
+def _MITRelaxSet_INCAR_corrections(number_of_sites: int):
+    '''
+    Corrects errors and imprecisions found in Pymatgen MITRelaxSet VASP preset's INCAR tags.
+    For example, some tags should depend on the number of atoms per unit cell of the structure.
+
+    parameters:
+        number_of_sites (int): number of atoms in a unit cell.
+    
+    Returns:
+        A dictionnary containing the INCAR tags corrections.
+    '''
+    corrected_EDIFF = float(5e-5)*number_of_sites
+    corrected_ENCUT = 520 # To be modified according to ENMAX value (ENCUT = 1.3*ENMAX)
+    corrected_LDAUL = {
+        'F': {
+            'Ag': 2, 'Co': 2, 'Cr': 2, 'Cu': 2, 'Fe': 2, 
+            'Mn': 2, 'Mo': 2, 'Nb': 2, 'Ni': 2, 'Re': 2, 
+            'Ta': 2, 'V': 2, 'W': 2
+        }, 
+        'O': {
+            'Ag': 2, 'Co': 2, 'Cr': 2, 'Cu': 2, 'Fe': 2, 
+            'Mn': 2, 'Mo': 2, 'Nb': 2, 'Ni': 2, 'Re': 2, 
+            'Ta': 2, 'V': 2, 'W': 2
+        }, 
+        'S': {
+            'Fe': 2, 'Mn': 2 #'Mn': 2.5 -> 2 (quantum number l have to be an integer)
+        }}
+    corrected_LDAUU = {
+        'F': {
+            'Ag': 1.5, 'Co': 3.4, 'Cr': 3.5, 'Cu': 4.0, #'Cu': 4 -> 4.0
+            'Fe': 4.0, 'Mn': 3.9, 'Mo': 3.5, 'Nb': 1.5, #'Mo': 4.38 -> 3.5 (according to the reference)
+            'Ni': 6.0, 'Re': 2.0, 'Ta': 2.0, 'V': 3.1,  #'Ni': 6 -> 6.0, 'Re': 2 -> 2.0, 'Ta': 2 -> 2.0
+            'W': 4.0
+        }, 
+        'O': {
+            'Ag': 1.5, 'Co': 3.4, 'Cr': 3.5, 'Cu': 4.0, #'Cu': 4 -> 4.0
+            'Fe': 4.0, 'Mn': 3.9, 'Mo': 3.5, 'Nb': 1.5, #'Mo': 4.38 -> 3.5
+            'Ni': 6.0, 'Re': 2.0, 'Ta': 2.0, 'V': 3.1,  #'Ni': 6 -> 6.0, 'Re': 2 -> 2.0, 'Ta': 2 -> 2.0
+            'W': 4.0                          
+        }, 
+        'S': {
+            'Fe': 1.9, 'Mn': 2.5
+        }}
+    corrected_INCAR = {
+        "EDIFF": corrected_EDIFF,
+        "ENCUT": corrected_ENCUT,
+        "LDAUL": corrected_LDAUL,
+        "LDAUU": corrected_LDAUU, 
+        "LMAXMIX": 4 #Necessary to get reliable results with GGA + U framework on d-type orbitals
+        }
+    return corrected_INCAR
+
 def vasp_input_files_generator(structure: Structure, /, *, use_mit_set: bool = True, config_dict: Optional[dict] = None, modified_incar: Optional[dict] = None, modified_kpoints: Optional[dict] = None, modified_potcar: Optional[dict] = None):
     '''
     Builds a VASP input files generator object, with a standard preset possibility corresponding to the MIT high throughput material screening project.
@@ -47,6 +99,9 @@ def vasp_input_files_generator(structure: Structure, /, *, use_mit_set: bool = T
 
     if modified_incar is not None:
         assert isinstance(modified_incar, dict), 'Invalid format for INCAR modification. Please provide a dictionnary with INCAR tags as keys and respective value as values'
+
+    else:
+        modified_incar = _MITRelaxSet_INCAR_corrections(structure.num_sites)
 
     if modified_kpoints is not None:
         assert isinstance(modified_kpoints, dict), 'Invalid format for KPOINTS modification. Please provide a dictionnary with KPOINTS PyMatGen supported mode as key and correct mesh definition as value'

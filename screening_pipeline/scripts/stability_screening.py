@@ -53,48 +53,9 @@ def main():
 
     structs         = read_cif(filename=args.datafile, workers=args.workers, keep_rare_gases=args.keep_rare_gases)
     path            = args.path
-    Natoms          = struct.num_sites #number of atoms in the unit cell (depending on the structure)
-    corrected_EDIFF = float(5e-5)*Natoms
-    corrected_ENCUT = 520 # To be modified according to ENMAX value (ENCUT = 1.3*ENMAX)
-    corrected_LDAUL = {
-        'F': {
-            'Ag': 2, 'Co': 2, 'Cr': 2, 'Cu': 2, 'Fe': 2, 
-            'Mn': 2, 'Mo': 2, 'Nb': 2, 'Ni': 2, 'Re': 2, 
-            'Ta': 2, 'V': 2, 'W': 2
-        }, 
-        'O': {
-            'Ag': 2, 'Co': 2, 'Cr': 2, 'Cu': 2, 'Fe': 2, 
-            'Mn': 2, 'Mo': 2, 'Nb': 2, 'Ni': 2, 'Re': 2, 
-            'Ta': 2, 'V': 2, 'W': 2
-        }, 
-        'S': {
-            'Fe': 2, 'Mn': 2 #'Mn': 2.5 -> 2 (quantum number l have to be an integer)
-        }}
-    corrected_LDAUU = {
-        'F': {
-            'Ag': 1.5, 'Co': 3.4, 'Cr': 3.5, 'Cu': 4.0, #'Cu': 4 -> 4.0
-            'Fe': 4.0, 'Mn': 3.9, 'Mo': 3.5, 'Nb': 1.5, #'Mo': 4.38 -> 3.5
-            'Ni': 6.0, 'Re': 2.0, 'Ta': 2.0, 'V': 3.1,  #'Ni': 6 -> 6.0, 'Re': 2 -> 2.0, 'Ta': 2 -> 2.0
-            'W': 4.0
-        }, 
-        'O': {
-            'Ag': 1.5, 'Co': 3.4, 'Cr': 3.5, 'Cu': 4.0, #'Cu': 4 -> 4.0
-            'Fe': 4.0, 'Mn': 3.9, 'Mo': 3.5, 'Nb': 1.5, #'Mo': 4.38 -> 3.5
-            'Ni': 6.0, 'Re': 2.0, 'Ta': 2.0, 'V': 3.1,  #'Ni': 6 -> 6.0, 'Re': 2 -> 2.0, 'Ta': 2 -> 2.0
-            'W': 4.0                          
-        }, 
-        'S': {
-            'Fe': 1.9, 'Mn': 2.5
-        }}
-    corrected_INCAR = {
-        "EDIFF": corrected_EDIFF,
-        "ENCUT": corrected_ENCUT,
-        "LDAUL": corrected_LDAUL,
-        "LDAUU": corrected_LDAUU, 
-        "LMAXMIX": 4 #Necessary to get reliable results with GGA + U framework on d-type orbitals
-        }
-    Input_dict = vasp_input_files_generator(struct, modified_incar=corrected_INCAR)
+    Input_dict = vasp_input_files_generator(struct)
     Input_dict.write_input(path)
+
     end = datetime.now()
     print(end-start)
 
