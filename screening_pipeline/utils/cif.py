@@ -72,7 +72,7 @@ def cif_str_to_struct(
         symprec (float): Distance tolerance for symmetry search.
         angle_tolerance (float): Angle tolerance for symmetry search.
     Returns
-        Tuple[List[str], List[str]]: Returns the list of filtered structures and the list of removed structures.
+        A Pymatgen Structure object if symprec is None, a Pymatgen SymmetrizedStructure object if not.
     """
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
