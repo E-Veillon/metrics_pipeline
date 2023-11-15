@@ -73,7 +73,7 @@ def main():
         "-p",
         "--precision",
         type=float,
-        default=0.5,
+        default=0.01,
         help="Fractional coordinates tolerance for symmetry finding",
         metavar="float",
     )

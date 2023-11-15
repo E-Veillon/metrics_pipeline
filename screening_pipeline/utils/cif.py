@@ -62,7 +62,7 @@ def extract_cif_from_file(
 
 def cif_str_to_struct(
     cif_str: str,
-    symprec: float = None,
+    symprec: Optional[float] = None,
     angle_tolerance: float = 5.0,
 ) -> Structure:
     """
@@ -97,7 +97,7 @@ def _cif_str_to_struct_fn(args):
 
 def struct_to_cif_str(
     struct: Structure,
-    symprec: float = 0.5,
+    symprec: Optional[float] = None,
     angle_tolerance: float = 5.0,
 ) -> str:
     """
@@ -124,7 +124,7 @@ def _struct_to_cif_str_fn(args):
 
 def read_cif(
     filename: str,
-    symprec: float = 0.01,
+    symprec: Optional[float] = None,
     angle_tolerance: float = 5.0,
     workers: int = 1,
     keep_rare_gases: bool = False,
@@ -167,7 +167,7 @@ def read_cif(
 def write_cif(
     filename: str,
     structures: List[Structure],
-    symprec: float = 0.01,
+    symprec: Optional[float] = None,
     angle_tolerance: float = 5.0,
     workers: int = 1,
 ):
