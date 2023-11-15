@@ -13,6 +13,7 @@ import re
 ##################################################
 # OPTIMIZATION MODULES
 
+from itertools import filterfalse
 from tqdm.contrib.concurrent import process_map
 
 ##################################################
@@ -23,7 +24,7 @@ from pymatgen.io.cif import CifParser, CifWriter
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from screening_pipeline.utils import has_rare_gas
-from .redirect import redirect_c_stdout, redirect_c_stderr
+from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stderr
 
 ##################################################
 
@@ -54,7 +55,7 @@ def extract_cif_from_file(
 
     # filter structures if they contain rare gases
     rare_gas_structures = list(filter(has_rare_gas, full_structs_list))
-    full_structs_list = list(filter(lambda x: not has_rare_gas(x), full_structs_list))
+    full_structs_list = list(filterfalse(has_rare_gas, full_structs_list))
 
     return full_structs_list, rare_gas_structures
 
@@ -77,17 +78,17 @@ def cif_str_to_struct(
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
         parsed_str = CifParser.from_str(cif_string=cif_str)
-        crystal_struct_list = parsed_str.get_structures()
-        crystal_struct = crystal_struct_list[0]
+        struct_list = parsed_str.get_structures()
+        struct = struct_list[0]
 
-        if symprec is not None:
-            structs = SpacegroupAnalyzer(
-                crystal_struct, symprec, angle_tolerance
+        if symprec is None:
+            return struct
+
+        sym_struct = SpacegroupAnalyzer(
+                struct, symprec, angle_tolerance
             ).get_symmetrized_structure()
-        else:
-            structs = crystal_struct
 
-    return structs
+    return sym_struct
 
 
 def _cif_str_to_struct_fn(args):
@@ -138,21 +139,18 @@ def read_cif(
         workers (int): Number of workers used.
         keep_rare_gases (bool): Whether the structures containing rare gases should be kept or not. Default is false.
     Returns
-        List[Structure]: Returns the structures as a list.
+        List[Structure]: Returns the structures in a list.
     """
 
     structures, _ = extract_cif_from_file(
-        filename=filename, keep_rare_gases=keep_rare_gases
+        filename, keep_rare_gases
     )
-
-    assert len(structures) > 0, "No structure data found in provided file"
+    nbr_struct = len(structures)
+    assert nbr_struct > 0, "No structure data found in provided file"
 
     # Obtention des structures PyMatGen à partir des données et calcul de la symétrie
 
-    if len(structures) >= 200:
-        chunksize = min(len(structures) // 100, 10)
-    else:
-        chunksize = 1
+    chunksize = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
     def feed_args(structures, symprec, angle_tolerance):
         return [(struct, symprec, angle_tolerance) for struct in structures]
@@ -183,11 +181,8 @@ def write_cif(
         angle_tolerance (float): Angle tolerance for symmetry search.
         workers (int): Number of workers used.
     """
-
-    if len(structures) >= 200:
-        chunksize = min(len(structures) // 100, 10)
-    else:
-        chunksize = 1
+    nbr_struct = len(structures)
+    chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
     def feed_args(structures, symprec, angle_tolerance):
         return [(struct, symprec, angle_tolerance) for struct in structures]
