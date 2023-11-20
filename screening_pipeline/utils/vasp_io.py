@@ -139,3 +139,9 @@ def vasp_input_files_settings(
         user_kpoints_settings=MITRelaxSet_corrections_dict['KPOINTS'], 
         user_potcar_settings=MITRelaxSet_corrections_dict['POTCAR']
         ).get_vasp_input()
+
+def vasp_launcher(vasp_input: VaspInput, path: str):
+    calc_dir = path
+    out_file = path + "vasp.out"
+    err_file = path + "vasp.err"
+    vasp_input.run_vasp(run_dir=calc_dir, output_file=out_file, err_file=err_file)
