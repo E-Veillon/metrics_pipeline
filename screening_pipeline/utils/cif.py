@@ -152,7 +152,7 @@ def read_cif(
 
     chunksize = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
-    def feed_args(structures, symprec, angle_tolerance):
+    def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
         return [(struct, symprec, angle_tolerance) for struct in structures]
 
     return process_map(
@@ -184,7 +184,7 @@ def write_cif(
     nbr_struct = len(structures)
     chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
-    def feed_args(structures, symprec, angle_tolerance):
+    def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
         return [(struct, symprec, angle_tolerance) for struct in structures]
 
     encoded_cif = process_map(

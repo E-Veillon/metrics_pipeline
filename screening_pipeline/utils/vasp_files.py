@@ -3,9 +3,10 @@
 from typing import Optional, Dict
 from itertools import cycle
 from pymatgen.core.structure import Structure
-from pymatgen.io.vasp.sets import DictSet, MITRelaxSet 
+from pymatgen.io.vasp import VaspInput
+from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 
-def _MITRelaxSet_INCAR_corrections(number_of_sites: int):
+def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
     '''
     Corrects errors and imprecisions found in Pymatgen MITRelaxSet VASP preset's INCAR tags.
     For example, some tags should depend on the number of atoms per unit cell of the structure.
@@ -65,7 +66,7 @@ def vasp_input_files_settings(
         modified_incar: Optional[dict] = None, 
         modified_kpoints: Optional[dict] = None, 
         modified_potcar: Optional[dict] = None
-        ):
+        ) -> VaspInput:
     '''
     Builds a VaspInput object, with a standard preset option corresponding to the MIT high throughput material screening project.
         
