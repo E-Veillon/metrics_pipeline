@@ -73,7 +73,7 @@ def main():
     
     vasp_calculations: List[VaspInput] = process_map(
         vasp_input_files_settings, 
-        feed_args(structures, generic_path),  
+        structures,  
         max_workers=args.workers, 
         chunksize=chunksize
     )
