@@ -10,6 +10,7 @@ from datetime import datetime
 from argparse import ArgumentParser
 from tqdm.contrib.concurrent import process_map
 from pymatgen.core.structure import Structure
+from pymatgen.io.vasp import VaspInput
 
 
 def main():
@@ -53,7 +54,7 @@ def main():
 
     # MAIN BLOCK
 
-    from screening_pipeline.utils import read_cif, vasp_input_files_generator
+    from screening_pipeline.utils import read_cif, vasp_input_files_settings
 
     structures = read_cif(
         filename=args.datafile, 
@@ -70,8 +71,8 @@ def main():
         struct_counter = count(0)
         return [(struct, path + f"{next(struct_counter)}/") for struct in structures]
     
-    process_map(
-        vasp_input_files_generator, 
+    vasp_calculations: List[VaspInput] = process_map(
+        vasp_input_files_settings, 
         feed_args(structures, generic_path),  
         max_workers=args.workers, 
         chunksize=chunksize

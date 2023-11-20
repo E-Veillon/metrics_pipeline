@@ -56,7 +56,7 @@ def _MITRelaxSet_INCAR_corrections(number_of_sites: int):
         }
     return corrected_INCAR
 
-def _vasp_input_files_settings(
+def vasp_input_files_settings(
         structure: Structure, 
         /, *, 
         use_mit_set: bool = True, 
@@ -66,7 +66,7 @@ def _vasp_input_files_settings(
         modified_potcar: Optional[dict] = None
         ):
     '''
-    Builds a VASP input files generator object, with a standard preset possibility corresponding to the MIT high throughput material screening project.
+    Builds a VaspInput object, with a standard preset option corresponding to the MIT high throughput material screening project.
         
         Reference of the preset:
             A. Jain, G. Hautier, C.J. Moore, S.P. Ong,
@@ -103,7 +103,7 @@ def _vasp_input_files_settings(
         assert ('KPOINTS' in config_dict.keys()) or ('KSPACING' in config_dict['INCAR']), 'No k-points configuration detected, either by a KPOINTS key in config_dict or by a KSPACING INCAR tag.'
         assert 'POTCAR' in config_dict.keys(), 'No POTCAR configuration detected in provided config_dict.'
 
-        return DictSet(structure, config_dict)
+        return DictSet(structure, config_dict).get_vasp_input()
 
     if modified_incar is not None:
         assert isinstance(modified_incar, dict), 'Invalid format for INCAR modification. Please provide a dictionnary with INCAR tags as keys and respective value as values'
@@ -117,10 +117,9 @@ def _vasp_input_files_settings(
     if modified_potcar is not None:
         assert isinstance(modified_potcar, dict), 'Invalid format for POTCAR modification. Please provide a dictionnary with element symbols as keys and a dictionnary containing hash and PP symbol as values'
 
-    return MITRelaxSet(structure, user_incar_settings=modified_incar, user_kpoints_settings=modified_kpoints, user_potcar_settings=modified_potcar) 
-
-def vasp_input_files_generator(structure: Structure, path: str, kwargs: Optional[Dict] = None):
-    if kwargs is None:
-        _vasp_input_files_settings(structure).write_input(path)
-    else:
-        _vasp_input_files_settings(structure, **kwargs).write_input(path)
+    return MITRelaxSet(
+        structure, 
+        user_incar_settings=modified_incar, 
+        user_kpoints_settings=modified_kpoints, 
+        user_potcar_settings=modified_potcar
+        ).get_vasp_input()
