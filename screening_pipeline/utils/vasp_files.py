@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from typing import Optional, Dict
+from itertools import cycle
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.sets import DictSet, MITRelaxSet 
 
@@ -105,21 +106,35 @@ def vasp_input_files_settings(
 
         return DictSet(structure, config_dict).get_vasp_input()
 
-    if modified_incar is not None:
-        assert isinstance(modified_incar, dict), 'Invalid format for INCAR modification. Please provide a dictionnary with INCAR tags as keys and respective value as values'
+    MITRelaxSet_corrections_dict = {'INCAR': _MITRelaxSet_INCAR_corrections(structure.num_sites)}
 
-    else:
-        modified_incar = _MITRelaxSet_INCAR_corrections(structure.num_sites)
+    def has_only_string_keys(dict: Dict) -> bool:
+        return all(map(isinstance,dict.keys(),cycle((str,))))
+
+    if modified_incar is not None:
+        assert isinstance(modified_incar, dict), 'INCAR modifications should be provided as a dict.'
+        assert has_only_string_keys(modified_incar), 'All provided INCAR tags should be strings.'
+
+        for incar_tag, tag_value in modified_incar:
+            MITRelaxSet_corrections_dict['INCAR'][incar_tag] = tag_value
 
     if modified_kpoints is not None:
-        assert isinstance(modified_kpoints, dict), 'Invalid format for KPOINTS modification. Please provide a dictionnary with KPOINTS PyMatGen supported mode as key and correct mesh definition as value'
+        assert isinstance(modified_kpoints, dict), 'KPOINTS modifications should be provided as a dict.'
+        assert has_only_string_keys(modified_kpoints), 'All provided KPOINTS modifications keys should be strings.'
+
+        for key, value in modified_kpoints:
+            MITRelaxSet_corrections_dict['KPOINTS'][key] = value
 
     if modified_potcar is not None:
-        assert isinstance(modified_potcar, dict), 'Invalid format for POTCAR modification. Please provide a dictionnary with element symbols as keys and a dictionnary containing hash and PP symbol as values'
+        assert isinstance(modified_potcar, dict), 'POTCAR modifications should be provided as a dict.'
+        assert has_only_string_keys(modified_potcar), 'All provided POTCAR modifications keys should be strings.'
+
+        for key, value in modified_potcar:
+            MITRelaxSet_corrections_dict['POTCAR'][key] = value
 
     return MITRelaxSet(
         structure, 
-        user_incar_settings=modified_incar, 
-        user_kpoints_settings=modified_kpoints, 
-        user_potcar_settings=modified_potcar
+        user_incar_settings=MITRelaxSet_corrections_dict['INCAR'], 
+        user_kpoints_settings=MITRelaxSet_corrections_dict['KPOINTS'], 
+        user_potcar_settings=MITRelaxSet_corrections_dict['POTCAR']
         ).get_vasp_input()
