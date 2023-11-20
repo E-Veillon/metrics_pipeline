@@ -4,7 +4,7 @@
 A script using VASP DFT calculations to determine the relative stability of given structures in order to keep synthesizable structure and discard others.
 """
 
-from typing import List
+from typing import List, Tuple
 from itertools import count
 from datetime import datetime
 from argparse import ArgumentParser
@@ -54,7 +54,7 @@ def main():
 
     # MAIN BLOCK
 
-    from screening_pipeline.utils import read_cif, vasp_input_files_settings
+    from screening_pipeline.utils import read_cif, vasp_input_files_settings, vasp_launcher
 
     structures = read_cif(
         filename=args.datafile, 
@@ -65,19 +65,26 @@ def main():
     chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
     generic_path    = args.path
 
-    def feed_args(structures: List[Structure], path: str):
+    def feed_args(vasp_inputs: List[VaspInput], path: str) -> List[Tuple]:
         if not path.endswith('/'):
             path += '/'
-        struct_counter = count(0)
-        return [(struct, path + f"{next(struct_counter)}/") for struct in structures]
+        calc_counter = count(0)
+        return [(input, path + f"{next(calc_counter)}/") for input in vasp_inputs]
     
     vasp_calculations: List[VaspInput] = process_map(
         vasp_input_files_settings, 
-        structures,  
+        structures, 
         max_workers=args.workers, 
         chunksize=chunksize
-    )
-
+        )
+    
+    process_map(
+        vasp_launcher, 
+        feed_args(vasp_calculations, generic_path), 
+        max_workers=args.workers, 
+        chunksize=chunksize
+        )
+    
     end = datetime.now()
     print(end-start)
 
