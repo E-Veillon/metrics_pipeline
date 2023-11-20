@@ -61,9 +61,9 @@ def main():
         workers=args.workers, 
         keep_rare_gases=args.keep_rare_gases
         )
-    nbr_struct      = len(structures)
-    chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
-    generic_path    = args.path
+    nbr_struct: int   = len(structures)
+    chunksize: int    = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
+    generic_path: str = args.path
 
     def feed_args(vasp_inputs: List[VaspInput], path: str) -> List[Tuple]:
         if not path.endswith('/'):
@@ -71,7 +71,7 @@ def main():
         calc_counter = count(0)
         return [(input, path + f"{next(calc_counter)}/") for input in vasp_inputs]
     
-    vasp_calculations: List[VaspInput] = process_map(
+    vasp_input_sets: List[VaspInput] = process_map(
         vasp_input_files_settings, 
         structures, 
         max_workers=args.workers, 
@@ -80,7 +80,7 @@ def main():
     
     process_map(
         vasp_launcher, 
-        feed_args(vasp_calculations, generic_path), 
+        feed_args(vasp_input_sets, generic_path), 
         max_workers=args.workers, 
         chunksize=chunksize
         )
