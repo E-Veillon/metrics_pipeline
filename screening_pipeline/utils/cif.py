@@ -85,8 +85,13 @@ def cif_str_to_struct(
             return struct
 
         sym_struct = SpacegroupAnalyzer(
-                struct, symprec, angle_tolerance
-            ).get_symmetrized_structure()
+            struct, symprec, angle_tolerance
+            )
+
+        try: sym_struct.get_symmetrized_structure()
+        except TypeError as TErr:
+            if sym_struct.get_symmetry_dataset() is None:
+                return struct
 
     return sym_struct
 

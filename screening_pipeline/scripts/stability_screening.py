@@ -76,7 +76,7 @@ def main():
         max_workers=args.workers, 
         chunksize=chunksize
         )
-    
+
     process_map(
         vasp_launcher, 
         feed_args(vasp_input_sets, generic_path), 
