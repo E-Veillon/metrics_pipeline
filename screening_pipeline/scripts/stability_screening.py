@@ -27,8 +27,7 @@ def main():
     parser.add_argument(
         'datafile',
         type=str,
-        help='The file conaining structure data to write VASP input files for. CIF format only.',
-        metavar='str'
+        help='The file conaining structure data to write VASP input files for. CIF format only.'
     )
     parser.add_argument(
         '-p', '--path',
