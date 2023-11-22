@@ -74,6 +74,7 @@ def vasp_input_files_settings(
             A. Jain, G. Hautier, C.J. Moore, S.P. Ong,
             C.C. Fischer, T. Mueller, K.A. Persson, and G. Ceder,
             Computational Materials Science, 50, 2295-2310 (2011)
+            (reference 14 in screening_pipeline/Bibliography/)
 
         Parameters:
             structure (Structure): The structure to write VASP input files for.
