@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 """
-A script using VASP DFT calculations to determine the relative stability of given structures in order to keep synthesizable structure and discard others.
+A script using VASP DFT calculations to determine the relative stability of given structures.
 """
 
 from typing import List, Tuple
@@ -19,7 +19,7 @@ def main():
     # ARGUMENTS PARSING BLOCK
 
     name     = 'stability_screening.py'
-    desc     = 'A script using VASP DFT calculations to determine the relative stability of given structures in order to keep synthesizable structure and discard others.'
+    desc     = 'A script using VASP DFT calculations to determine the relative stability of given structures.'
     footnote = '''
         étapes manquantes du script :
             - déterminer la réaction critique de formation de la structure
