@@ -6,3 +6,4 @@ poetry.lock
 vaspdir_*
 oqmd_poscar
 cif_counter.py
+*.swp
