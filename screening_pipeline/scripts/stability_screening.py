@@ -84,6 +84,12 @@ def main():
         chunksize=chunksize
         )
     
+    #étapes manquantes du script :
+    #   - déterminer la réaction critique de formation de la structure
+    #   - (relaxer les structures de références pour la consistence des calculs)
+    #   - comparer l'énergie de la structure avec la somme de celles de références
+    #   - Savoir que faire des structures qui doivent être écartées
+
     end = datetime.now()
     print(end-start)
 
