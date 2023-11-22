@@ -1,11 +1,11 @@
 #!/usr/bin/python
 
 '''
-A script to determine material fundamental band gap from VASP relaxations and Δ-Sol method.
+A script to determine material valence and conduction band edge positions.
 
-Reference for Δ-Sol method:
-    M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-    (reference 32 in screening_pipeline/Bibliography)
+Reference of the method:
+    Y. Wu, M.K.Y. Chan, and G. Ceder, Phys. Rev. B, 83, 235301 (2011)
+    (reference 27 in screening_pipeline/Bibliography)
 '''
 
 
@@ -17,13 +17,13 @@ def main():
 
     # ARGUMENTS PARSING BLOCK
     
-    prog_name = 'band_gap_screening'
+    prog_name = 'band_edge_pos_screening'
     prog_desc = '''
-        A script to determine material fundamental band gap from VASP energies and Δ-Sol method.
+        A script to determine material valence and conduction band edge positions.
 
-        Reference for Δ-Sol method:
-            M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-            (reference 32 in screening_pipeline/Bibliography)
+        Reference of the method:
+            Y. Wu, M.K.Y. Chan, and G. Ceder, Phys. Rev. B, 83, 235301 (2011)
+            (reference 27 in screening_pipeline/Bibliography)
         '''
     prog_missing_steps = '''
         Missing steps to complete this script:
@@ -42,7 +42,7 @@ def main():
     parser.add_argument(
         'filename', 
         type=str, 
-        help='The file conaining structure data to calculate band gap from. CIF format only.'
+        help='The file conaining structure data to calculate band edge positions from. CIF format only.'
     )
     parser.add_argument(
         '-p', '--path',
