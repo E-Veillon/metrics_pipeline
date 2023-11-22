@@ -88,8 +88,11 @@ def cif_str_to_struct(
             struct, symprec, angle_tolerance
             )
 
-        try: sym_struct.get_symmetrized_structure()
-        except TypeError as TErr:
+        try:
+            sym_struct = sym_struct.get_symmetrized_structure()
+
+        except TypeError:
+
             if sym_struct.get_symmetry_dataset() is None:
                 return struct
 
@@ -117,9 +120,16 @@ def struct_to_cif_str(
     """
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
-        cif_str = str(
-            CifWriter(struct=struct, symprec=symprec, angle_tolerance=angle_tolerance)
-        )
+
+        try:
+            cif_str = str(
+                CifWriter(struct=struct, symprec=symprec, angle_tolerance=angle_tolerance)
+            )
+        except TypeError:
+            cif_str = str(
+                CifWriter(struct=struct)
+            )
+
     return cif_str
 
 

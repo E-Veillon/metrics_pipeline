@@ -64,11 +64,8 @@ def remove_equivalent(
     Returns
         List[Structure]: The list of unique structures.
     """
-
-    if len(structures) >= 200:
-        chunksize = min(len(structures) // 100, 10)
-    else:
-        chunksize = 1
+    nbr_struct = len(structures)
+    chunksize = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
     grouped_structs = group_by_stoichiometry(structures)
 
