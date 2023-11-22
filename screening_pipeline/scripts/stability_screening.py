@@ -20,7 +20,12 @@ def main():
 
     name     = 'stability_screening.py'
     desc     = 'A script using VASP DFT calculations to determine the relative stability of given structures in order to keep synthesizable structure and discard others.'
-    footnote = 'A first try to writing cleaner code (unfinished).'
+    footnote = '''
+        étapes manquantes du script :
+            - déterminer la réaction critique de formation de la structure
+            - (relaxer les structures de références pour la consistence des calculs)
+            - comparer l'énergie de la structure avec la somme de celles de références
+            - Savoir que faire des structures qui doivent être écartées'''
 
     parser = ArgumentParser(prog=name, description=desc, epilog=footnote)
   
@@ -83,12 +88,6 @@ def main():
         max_workers=args.workers, 
         chunksize=chunksize
         )
-    
-    #étapes manquantes du script :
-    #   - déterminer la réaction critique de formation de la structure
-    #   - (relaxer les structures de références pour la consistence des calculs)
-    #   - comparer l'énergie de la structure avec la somme de celles de références
-    #   - Savoir que faire des structures qui doivent être écartées
 
     end = datetime.now()
     print(end-start)
