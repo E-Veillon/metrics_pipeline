@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
-"""
+'''
 A script using VASP DFT calculations to determine the relative stability of given structures.
-"""
+'''
 
 from typing import List, Tuple
 from itertools import count
@@ -34,12 +34,12 @@ def main():
         description=prog_description, 
         epilog=prog_missing_steps, 
         formatter_class=helper_format
-        )
+    )
   
     parser.add_argument(
-        'datafile',
+        'filename',
         type=str,
-        help='The file conaining structure data to write VASP input files for. CIF format only.'
+        help='The file conaining structure data to calculate relative instability from. CIF format only.'
     )
     parser.add_argument(
         '-p', '--path',
@@ -56,9 +56,9 @@ def main():
         metavar='int'
     )
     parser.add_argument(
-        "--keep-rare-gases",
-        action="store_true",
-        help="Pass this flag to disable automatic elimination of structures containing rare gases"
+        '--keep-rare-gases',
+        action='store_true',
+        help='Pass this flag to disable automatic elimination of structures containing rare gases'
     )
 
     args = parser.parse_args()
@@ -68,7 +68,7 @@ def main():
     from screening_pipeline.utils import read_cif, vasp_input_files_settings, vasp_launcher
 
     structures = read_cif(
-        filename=args.datafile, 
+        filename=args.filename, 
         workers=args.workers, 
         keep_rare_gases=args.keep_rare_gases
         )
@@ -80,7 +80,7 @@ def main():
         if not path.endswith('/'):
             path += '/'
         calc_counter = count(0)
-        return [(input, path + f"{next(calc_counter)}/") for input in vasp_inputs]
+        return [(input, path + f'{next(calc_counter)}/') for input in vasp_inputs]
     
     vasp_input_sets: List[VaspInput] = process_map(
         vasp_input_files_settings, 
@@ -96,8 +96,8 @@ def main():
         chunksize=chunksize
         )
 
-    end = datetime.now()
-    print(end-start)
+    stop = datetime.now()
+    print(f'elapsed time: {stop-start}')
 
 if __name__ == '__main__':
     main()

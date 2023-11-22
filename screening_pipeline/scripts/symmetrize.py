@@ -1,7 +1,7 @@
 #!/usr/bin/python
-"""
+'''
 A script that calculates symmetry spacegroup for structures in a CIF file using pymatgen.
-"""
+'''
 
 ##################################################
 # SYSTEM I/O MODULES
@@ -12,34 +12,34 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 
 def assert_args(args: NamedTuple):
-    """
+    '''
     Input arguments verification
 
     Args:
         args (NamedTuple): namespace of the parsed arguments.
-    """
+    '''
 
     assert (
-        args.filename.endswith(".cif")
-        and args.output.endswith(".cif")
-        and (args.equivalent is None or args.equivalent.endswith(".cif"))
-    ), "some arguments formats are not supported, please only use .cif format"
+        args.filename.endswith('.cif')
+        and args.output.endswith('.cif')
+        and (args.equivalent is None or args.equivalent.endswith('.cif'))
+    ), 'some arguments formats are not supported, please only use .cif format'
 
     assert (
         0.0 <= args.precision <= 0.5
-    ), "precision must be between 0.0 and 0.5 Angstrom"
+    ), 'precision must be between 0.0 and 0.5 Angstrom'
 
     assert (
         0.0 <= args.angleprec <= 20.0
-    ), "angle tolerance must be between 0.0 and 20.0 degree"
+    ), 'angle tolerance must be between 0.0 and 20.0 degree'
 
-    assert args.workers >= 1, "the number of workers cannot be negative or zero"
+    assert args.workers >= 1, 'the number of workers cannot be negative or zero'
 
 
 def main():
     start = datetime.now()
 
-    # Gestion des arguments en ligne de commande
+    # ARGUMENTS PARSING BLOCK
 
     prog_name = 'symmetrize'
     prog_description = 'A script that calculates symmetry spacegroup for structures in a CIF file using pymatgen.'
@@ -54,58 +54,57 @@ def main():
     )
 
     parser.add_argument(
-        "filename",
+        'filename',
         type=str,
-        help="name of the file containing the input structures",
-        default="filename.cif",
+        help='name of the file containing the input structures'
     )
     parser.add_argument(
-        "-o",
-        "--output",
+        '-o',
+        '--output',
         type=str,
-        default="[filename]_out.cif",
-        help="name of output file containing the unique structures",
+        default='[filename]_out.cif',
+        help='name of output file containing the unique structures',
     )
     parser.add_argument(
-        "-e",
-        "--equivalent",
+        '-e',
+        '--equivalent',
         type=str,
         default=None,
-        help="name of the output file containing the duplicated structures",
+        help='name of the output file containing the duplicated structures',
     )
     parser.add_argument(
-        "-p",
-        "--precision",
+        '-p',
+        '--precision',
         type=float,
         default=0.01,
-        help="Fractional coordinates tolerance for symmetry finding",
-        metavar="float",
+        help='Fractional coordinates tolerance for symmetry finding',
+        metavar='float',
     )
     parser.add_argument(
-        "-a",
-        "--angleprec",
+        '-a',
+        '--angleprec',
         type=float,
         default=5.0,
-        help="Angle tolerance for symmetry finding in degrees",
-        metavar="float",
+        help='Angle tolerance for symmetry finding in degrees',
+        metavar='float',
     )
     parser.add_argument(
-        "-w",
-        "--workers",
+        '-w',
+        '--workers',
         type=int,
         default=1,
-        help="Number of parallel processes to create",
-        metavar="int",
+        help='Number of parallel processes to create',
+        metavar='int',
     )
     parser.add_argument(
-        "--keep-rare-gases",
-        action="store_true",
-        help="Pass this flag to disable automatic elimination of structures containing rare gases"
+        '--keep-rare-gases',
+        action='store_true',
+        help='Pass this flag to disable automatic elimination of structures containing rare gases'
     )
     parser.add_argument(
-        "--keep-equivalent",
-        action="store_true",
-        help="Pass this flag to disable automatic structure matching and elimination of duplicates"
+        '--keep-equivalent',
+        action='store_true',
+        help='Pass this flag to disable automatic structure matching and elimination of duplicates'
     )
 
     args = parser.parse_args()
@@ -116,8 +115,8 @@ def main():
 
     from screening_pipeline.utils import read_cif, write_cif, remove_equivalent
 
-    if args.output == "[filename]_out.cif":
-        args.output = args.filename.replace(".cif", "_out.cif")
+    if args.output == '[filename]_out.cif':
+        args.output = args.filename.replace('.cif', '_out.cif')
 
     # Extraction des structures sous forme de strings
 
@@ -129,9 +128,9 @@ def main():
         keep_rare_gases=args.keep_rare_gases,
     )
 
-    assert len(symmetrized_structs) > 0, "No structure could be parsed from given data"
+    assert len(symmetrized_structs) > 0, 'No structure could be parsed from given data'
 
-    print(f"{len(symmetrized_structs)} structures loaded")
+    print(f'{len(symmetrized_structs)} structures loaded')
 
     # Comparaison des structures pour éliminer les doublons
 
@@ -143,7 +142,7 @@ def main():
             symmetrized_structs, workers=args.workers, keep_equivalent=False
         )
 
-        print(f"{len(kept_structs)} unique structures detected")
+        print(f'{len(kept_structs)} unique structures detected')
 
     #  Recalcul des symétries avec PyMatGen (pour prise en compte par CifWriter) et écriture du fichier de sortie
 
@@ -169,17 +168,17 @@ def main():
     stop = datetime.now()
     count_unique = len(kept_structs)
     count_duplicated = len(duplicated_struct)
-    print(" ")
-    print("------------------------------")
-    print(" ")
-    print("SUMMARY OF THE CALCULATION")
-    print(" ")
-    print(f"{count_duplicated+count_unique} structures detected in total, including:")
-    print(f"- {count_duplicated} duplicated structures")
-    print(f"- {count_unique} unique structures")
-    print(" ")
-    print(f"elapsed time: {stop-start}")
+    print(' ')
+    print('------------------------------')
+    print(' ')
+    print('SUMMARY OF THE CALCULATION')
+    print(' ')
+    print(f'{count_duplicated+count_unique} structures detected in total, including:')
+    print(f'- {count_duplicated} duplicated structures')
+    print(f'- {count_unique} unique structures')
+    print(' ')
+    print(f'elapsed time: {stop-start}')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
