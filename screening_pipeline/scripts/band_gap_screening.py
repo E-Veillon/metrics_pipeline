@@ -10,7 +10,19 @@ Reference for Δ-Sol method:
 
 
 from datetime import datetime
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
+
+
+def assert_args(args: Namespace):
+    '''
+    Input arguments verification.
+
+    Args:
+        args (NamedTuple): namespace of the parsed arguments.
+    '''
+
+    assert args.filename.endswith('.cif'), 'Input file must be in CIF format'
+    assert args.workers >= 1, 'the number of workers cannot be negative or zero'
 
 def main():
     start = datetime.now()
@@ -59,9 +71,24 @@ def main():
         metavar='int'
     )
 
+    args: Namespace = parser.parse_args()
+
+    assert_args(args)
+
+
     # MAIN BLOCK
 
-    
+    from screening_pipeline.utils import read_cif
+
+    structures = read_cif(
+        filename=args.filename, 
+        workers=args.workers, 
+        keep_rare_gases=args.keep_rare_gases
+    )
+
+    nbr_struct: int   = len(structures)
+    chunksize: int    = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
+    generic_path: str = args.path
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')

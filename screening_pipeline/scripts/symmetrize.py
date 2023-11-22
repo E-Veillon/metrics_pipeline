@@ -7,33 +7,51 @@ A script that calculates symmetry spacegroup for structures in a CIF file using 
 # SYSTEM I/O MODULES
 
 from datetime import datetime
-from typing import NamedTuple
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
 
 
-def assert_args(args: NamedTuple):
+def assert_args(args: Namespace):
     '''
-    Input arguments verification
+    Input arguments verification.
 
     Args:
         args (NamedTuple): namespace of the parsed arguments.
     '''
 
+    print(' - INPUT ARGUMENTS - ')
+    print(f'filename: {args.filename}')
+    print(f'output: {args.output}')
+    print(f'equivalent: {args.equivalent}')
+
     assert (
         args.filename.endswith('.cif')
         and args.output.endswith('.cif')
         and (args.equivalent is None or args.equivalent.endswith('.cif'))
-    ), 'some arguments formats are not supported, please only use .cif format'
+    ), 'some arguments formats are not supported, please only use CIF format'
+
+    print(f'Fractional coordiantes precision: {args.precision}')
 
     assert (
         0.0 <= args.precision <= 0.5
-    ), 'precision must be between 0.0 and 0.5 Angstrom'
+    ), 'Fractional coordinates precision must be between 0.0 and 0.5 to retain some reliability'
+
+    print(f'Angles tolerance: {args.angleprec}')
 
     assert (
         0.0 <= args.angleprec <= 20.0
-    ), 'angle tolerance must be between 0.0 and 20.0 degree'
+    ), 'Angles tolerance must be between 0.0 and 20.0 degrees to retain some reliability'
+
+    print(f'workers: {args.workers}')
 
     assert args.workers >= 1, 'the number of workers cannot be negative or zero'
+
+    print(' ')
+    print(' - OPTIONAL FLAGS - ')
+    print(f'keep_rare_gases: {args.keep_rare_gases}')
+    print(f'keep_equivalent: {args.keep_equivalent}')
+    print(' ')
+    print('----------------------------------------')
+    print(' ')
 
 
 def main():
@@ -97,26 +115,27 @@ def main():
         metavar='int',
     )
     parser.add_argument(
-        '--keep-rare-gases',
+        '--keep_rare_gases',
         action='store_true',
         help='Pass this flag to disable automatic elimination of structures containing rare gases'
     )
     parser.add_argument(
-        '--keep-equivalent',
+        '--keep_equivalent',
         action='store_true',
         help='Pass this flag to disable automatic structure matching and elimination of duplicates'
     )
 
-    args = parser.parse_args()
-
-    print(args)
-
-    assert_args(args)
-
-    from screening_pipeline.utils import read_cif, write_cif, remove_equivalent
+    args: Namespace = parser.parse_args()
 
     if args.output == '[filename]_out.cif':
         args.output = args.filename.replace('.cif', '_out.cif')
+
+    assert_args(args)
+
+
+    # MAIN BLOCK
+
+    from screening_pipeline.utils import read_cif, write_cif, remove_equivalent
 
     # Extraction des structures sous forme de strings
 
@@ -139,7 +158,9 @@ def main():
         duplicated_struct = []
     else:
         kept_structs, duplicated_struct = remove_equivalent(
-            symmetrized_structs, workers=args.workers, keep_equivalent=False
+            structures=symmetrized_structs, 
+            workers=args.workers, 
+            keep_equivalent=False
         )
 
         print(f'{len(kept_structs)} unique structures detected')

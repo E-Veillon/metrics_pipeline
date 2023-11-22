@@ -7,11 +7,21 @@ A script using VASP DFT calculations to determine the relative stability of give
 from typing import List, Tuple
 from itertools import count
 from datetime import datetime
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
 from tqdm.contrib.concurrent import process_map
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp import VaspInput
 
+def assert_args(args: Namespace):
+    '''
+    Input arguments verification.
+
+    Args:
+        args (NamedTuple): namespace of the parsed arguments.
+    '''
+
+    assert args.filename.endswith('.cif'), 'Input file must be in CIF format'
+    assert args.workers >= 1, 'the number of workers cannot be negative or zero'
 
 def main():
     start = datetime.now()
@@ -61,7 +71,10 @@ def main():
         help='Pass this flag to disable automatic elimination of structures containing rare gases'
     )
 
-    args = parser.parse_args()
+    args: Namespace = parser.parse_args()
+
+    assert_args(args)
+
 
     # MAIN BLOCK
 
@@ -71,7 +84,8 @@ def main():
         filename=args.filename, 
         workers=args.workers, 
         keep_rare_gases=args.keep_rare_gases
-        )
+    )
+
     nbr_struct: int   = len(structures)
     chunksize: int    = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
     generic_path: str = args.path
@@ -87,14 +101,14 @@ def main():
         structures, 
         max_workers=args.workers, 
         chunksize=chunksize
-        )
+    )
 
     process_map(
         vasp_launcher, 
         feed_args(vasp_input_sets, generic_path), 
         max_workers=args.workers, 
         chunksize=chunksize
-        )
+    )
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
