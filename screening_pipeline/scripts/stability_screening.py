@@ -7,7 +7,7 @@ A script using VASP DFT calculations to determine the relative stability of give
 from typing import List, Tuple
 from itertools import count
 from datetime import datetime
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from tqdm.contrib.concurrent import process_map
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp import VaspInput
@@ -18,16 +18,23 @@ def main():
 
     # ARGUMENTS PARSING BLOCK
 
-    name     = 'stability_screening.py'
-    desc     = 'A script using VASP DFT calculations to determine the relative stability of given structures.'
-    footnote = '''
-        étapes manquantes du script :
-            - déterminer la réaction critique de formation de la structure
-            - (relaxer les structures de références pour la consistence des calculs)
-            - comparer l'énergie de la structure avec la somme de celles de références
-            - Savoir que faire des structures qui doivent être écartées'''
+    prog_name          = 'stability_screening'
+    prog_description   = 'A script using VASP DFT calculations to determine the relative stability of given structures.'
+    prog_missing_steps = '''
+        Missing steps to complete the script:
+            - Determine the critical formation reaction of the structure
+            - (Relax reference structures for calculations consistency)
+            - Compare structure energy with the sum of reference structure energies
+            - Aknowledge what to do with unstable structures
+        '''
+    helper_format = ArgumentDefaultsHelpFormatter
 
-    parser = ArgumentParser(prog=name, description=desc, epilog=footnote)
+    parser = ArgumentParser(
+        prog=prog_name, 
+        description=prog_description, 
+        epilog=prog_missing_steps, 
+        formatter_class=helper_format
+        )
   
     parser.add_argument(
         'datafile',

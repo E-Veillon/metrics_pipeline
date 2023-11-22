@@ -1,6 +1,6 @@
 #!/usr/bin/python
 """
-A script that takes a .cif file containing crystal structures and returns a new .cif file with spacegroup symmetry calculated.
+A script that calculates symmetry spacegroup for structures in a CIF file using pymatgen.
 """
 
 ##################################################
@@ -41,12 +41,16 @@ def main():
 
     # Gestion des arguments en ligne de commande
 
-    prog_name = "symmetrize"
-    prog_description = "takes a .cif file containing crystal structures and returns a new .cif file with spacegroup symmetry calculated."
-    help_format = ArgumentDefaultsHelpFormatter
+    prog_name = 'symmetrize'
+    prog_description = 'A script that calculates symmetry spacegroup for structures in a CIF file using pymatgen.'
+    prog_missing_steps = ''''''
+    helper_format = ArgumentDefaultsHelpFormatter
 
     parser = ArgumentParser(
-        prog=prog_name, description=prog_description, formatter_class=help_format
+        prog=prog_name, 
+        description=prog_description, 
+        epilog=prog_missing_steps, 
+        formatter_class=helper_format
     )
 
     parser.add_argument(
