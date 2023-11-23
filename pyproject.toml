@@ -16,6 +16,8 @@ spglib = ">=2.0.0"
 [tool.poetry.scripts]
 symmetrize = 'screening_pipeline.scripts.symmetrize:main'
 stability_screening = 'screening_pipeline.scripts.stability_screening:main'
+band_gap_screening = 'screening_pipeline.scripts.band_gap_screening:main'
+band_edge_pos_screening = 'screening_pipeline.scripts.band_edge_pos_screening:main'
 
 [build-system]
 requires = ["poetry-core"]
