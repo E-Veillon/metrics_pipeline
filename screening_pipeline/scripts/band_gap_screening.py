@@ -39,8 +39,13 @@ def main():
         '''
     prog_missing_steps = '''
         Missing steps to complete this script:
-            - Aknowledge the steps of the method
-            - Add in-line command arguments
+            - Add necessary in-line command arguments
+            - Calculate N0, number of valence electrons in unit cell
+            - Choose right N* (PBE[sp] or PBE[spd])
+            - n = N0/N*
+            - Calculate E(N0), E(N0 + n), E(N0 - n) with VASP (static ionically)
+            - Calculate E(gap) = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n
+            - For photocatalysts article: keep materials with 1.3 < E(gap) < 3.6 eV
         '''
     helper_format = ArgumentDefaultsHelpFormatter
 
