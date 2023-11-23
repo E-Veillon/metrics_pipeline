@@ -13,7 +13,7 @@ import re
 ##################################################
 # OPTIMIZATION MODULES
 
-from itertools import filterfalse
+from itertools import filterfalse, count
 from tqdm.contrib.concurrent import process_map
 
 ##################################################
@@ -28,6 +28,33 @@ from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stde
 
 ##################################################
 
+
+def retry_get_symmetrized_structure(
+        structure: Structure,
+        symprec: Optional[float] = None,
+        angle_tolerance: float = 5.0,
+    ) -> Structure:
+    
+    for precision_factor in [2, 3, 5, 10]:
+
+        symmetrizer = SpacegroupAnalyzer(
+            structure=structure, 
+            symprec=precision_factor*symprec, 
+            angle_tolerance=precision_factor*angle_tolerance
+        )
+
+        try:
+            sym_struct = symmetrizer.get_symmetrized_structure()
+
+        except TypeError:
+
+            if symmetrizer.get_symmetry_dataset() is not None:
+                return structure
+            
+        else:
+            return sym_struct
+    
+    return structure
 
 def extract_cif_from_file(
     filename: str, keep_rare_gases: bool = False
@@ -94,10 +121,16 @@ def cif_str_to_struct(
         except TypeError:
 
             if sym_struct.get_symmetry_dataset() is None:
-                return struct
+                
+                return retry_get_symmetrized_structure(
+                    structure=struct, 
+                    symprec=symprec, 
+                    angle_tolerance=angle_tolerance
+                )
 
-    return sym_struct
+            return struct
 
+        return sym_struct
 
 def _cif_str_to_struct_fn(args):
     return cif_str_to_struct(*args)
