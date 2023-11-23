@@ -29,13 +29,13 @@ def assert_args(args: Namespace):
         and (args.equivalent is None or args.equivalent.endswith('.cif'))
     ), 'some arguments formats are not supported, please only use CIF format'
 
-    print(f'Fractional coordiantes precision: {args.precision}')
+    print(f'Fractional coordinates precision: {args.precision}')
 
     assert (
         0.0 <= args.precision <= 0.5
     ), 'Fractional coordinates precision must be between 0.0 and 0.5 to retain some reliability'
 
-    print(f'Angles tolerance: {args.angleprec}')
+    print(f'Angles tolerance: {args.angleprec} degrees')
 
     assert (
         0.0 <= args.angleprec <= 20.0
