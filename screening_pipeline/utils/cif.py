@@ -6,7 +6,7 @@ Functions to load and write cif structure with multiple workers.
 ##################################################
 # SYSTEM I/O MODULES
 
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Union
 from contextlib import redirect_stdout, redirect_stderr
 import re
 
@@ -21,40 +21,17 @@ from tqdm.contrib.concurrent import process_map
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.cif import CifParser, CifWriter
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from pymatgen.symmetry.analyzer import SymmetrizedStructure
 
-from screening_pipeline.utils import has_rare_gas, discard_rare_gas_structures
+##################################################
+# LOCAL MODULES
+
+from screening_pipeline.utils import discard_rare_gas_structures
+#from screening_pipeline.utils import structure_symmetrizer
 from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stderr
 
 ##################################################
 
-
-def retry_get_symmetrized_structure(
-        structure: Structure,
-        symprec: Optional[float] = None,
-        angle_tolerance: float = 5.0,
-    ) -> Structure:
-    
-    for precision_factor in [2, 3, 5, 10]:
-
-        symmetrizer = SpacegroupAnalyzer(
-            structure=structure, 
-            symprec=precision_factor*symprec, 
-            angle_tolerance=precision_factor*angle_tolerance
-        )
-
-        try:
-            sym_struct = symmetrizer.get_symmetrized_structure()
-
-        except TypeError:
-
-            if symmetrizer.get_symmetry_dataset() is not None:
-                return structure
-            
-        else:
-            return sym_struct
-    
-    return structure
 
 def extract_cif_from_file(filename: str) -> List[str]:
     """
@@ -78,57 +55,24 @@ def extract_cif_from_file(filename: str) -> List[str]:
     return full_structs_list
 
 
-def cif_str_to_struct(
-    cif_str: str,
-    symprec: Optional[float] = None,
-    angle_tolerance: float = 5.0,
-) -> Structure:
+def cif_str_to_struct(cif_str: str) -> Structure:
     """
-    Parses data from a cif formatted string and converts it to a structure object from pymatgen. This function uses a spacegroup analyser from pymatgen and spglib in the backend.
+    Parses data from a cif formatted string and converts it to a pymatgen Structure object.
 
-    Args:
+    Parameters:
         cif_str (str): The string of a structure encoded in the cif format.
-        symprec (float): Distance tolerance for symmetry search.
-        angle_tolerance (float): Angle tolerance for symmetry search.
-    Returns
-        A Pymatgen Structure object if symprec is None, a Pymatgen SymmetrizedStructure object if not.
+
+    Returns:
+        A Pymatgen Structure object.
     """
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
-        parsed_str = CifParser.from_str(cif_string=cif_str)
+        parsed_str  = CifParser.from_str(cif_string=cif_str)
         struct_list = parsed_str.parse_structures()
-        struct = struct_list[0]
+        structure   = struct_list[0]
+        return structure
 
-        if symprec is None:
-            return struct
-
-        sym_struct = SpacegroupAnalyzer(
-            struct, symprec, angle_tolerance
-            )
-
-        try:
-            sym_struct = sym_struct.get_symmetrized_structure()
-
-        except TypeError:
-            spglib_result = sym_struct.get_symmetry_dataset()
-
-            if spglib_result is None:
-
-                return retry_get_symmetrized_structure(
-                    structure=struct, 
-                    symprec=symprec, 
-                    angle_tolerance=angle_tolerance
-                )
-
-            return struct
-
-        return sym_struct
-
-def _cif_str_to_struct_fn(args):
-    return cif_str_to_struct(*args)
-
-
-def struct_to_cif_str(
+'''def struct_to_cif_str(
     struct: Structure,
     symprec: Optional[float] = None,
     angle_tolerance: float = 5.0,
@@ -155,30 +99,65 @@ def struct_to_cif_str(
                 CifWriter(struct=struct)
             )
 
-    return cif_str
+    return cif_str'''
 
+def struct_to_cif_str(
+        structure: Union[Structure, SymmetrizedStructure]
+    ) -> str:
+    '''
+    Converts a pymatgen Structure object into a CIF formatted string.
+
+    Parameters:
+        structure (Structure): Structure object to convert.
+    
+    Returns:
+        str: CIF formatted string.
+    '''
+    if not isinstance(structure, Structure):
+        raise TypeError('Cannot write CIF data for a non-structure object.')
+
+    cif_writer = CifWriter(structure)
+
+    if not isinstance(structure, SymmetrizedStructure):
+        cif_str = '# symmetrize.py: unable to find symmetry\n' + str(cif_writer)
+        return cif_str
+    
+    cif_block_list = list(cif_writer.cif_file.data.values())
+    cif_block      = cif_block_list[0]
+    data_dict      = cif_block.data
+    symm_ops       = structure.get_symmetry_operations()
+    str_ops        = [op.as_xyz_string() for op in symm_ops]
+
+    data_dict['_symmetry_space_group_name_H-M'] = structure.get_space_group_symbol()
+    data_dict['_symmetry_Int_Tables_number'] = structure.get_space_group_number()
+    data_dict['_symmetry_equiv_pos_site_id'] = [f'{i}' for i in range(1, len(str_ops) + 1)]
+    data_dict['_symmetry_equiv_pos_as_xyz'] = str_ops
+
+    cif_str = str(cif_block)
+
+    return cif_str
 
 def _struct_to_cif_str_fn(args):
     return struct_to_cif_str(*args)
 
-
 def read_cif(
     filename: str,
-    symprec: Optional[float] = None,
-    angle_tolerance: float = 5.0,
+    #symprec: Optional[float] = None,
+    #angle_tolerance: float = 5.0,
     workers: int = 1,
     keep_rare_gases: bool = False,
 ) -> List[Structure]:
     """
     Read multiple structures from a cif file and decode them using multiprocess.
 
-    Args:
-        filename (str): Name of the input file.
-        symprec (float): Distance tolerance for symmetry search.
-        angle_tolerance (float): Angle tolerance for symmetry search.
-        workers (int): Number of workers used.
-        keep_rare_gases (bool): Whether the structures containing rare gases should be kept or not. Default is false.
-    Returns
+    Parameters:
+        filename (str):         Name of the input CIF file.
+        
+        workers (int):          Number of processes to use in parallel.
+        
+        keep_rare_gases (bool): Whether structures containing rare gases should be kept. Defaults to false.
+    
+    Returns:
         List[Structure]: Returns the structures in a list.
     """
 
@@ -190,27 +169,24 @@ def read_cif(
     nbr_struct = len(struct_strings)
     assert nbr_struct > 0, "No structure data found in provided file"
 
-    # Obtention des structures PyMatGen à partir des données et calcul de la symétrie
-
     chunksize = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
-    def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
-        return [(struct, symprec, angle_tolerance) for struct in structures]
+    #def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
+    #    return [(struct, symprec, angle_tolerance) for struct in structures]
 
-    return process_map(
-        _cif_str_to_struct_fn,
-        feed_args(struct_strings, symprec, angle_tolerance),
+    return list(process_map(
+        cif_str_to_struct,
+        struct_strings,
         max_workers=workers,
         chunksize=chunksize,
-        desc="load and search symmetries",
-    )
-
+        desc="load and read data",
+    ))
 
 def write_cif(
     filename: str,
     structures: List[Structure],
-    symprec: Optional[float] = None,
-    angle_tolerance: float = 5.0,
+    #symprec: Optional[float] = None,
+    #angle_tolerance: float = 5.0,
     workers: int = 1,
 ):
     """
@@ -226,15 +202,16 @@ def write_cif(
     nbr_struct = len(structures)
     chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
-    def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
-        return [(struct, symprec, angle_tolerance) for struct in structures]
+    #def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
+    #    return [(struct, symprec, angle_tolerance) for struct in structures]
 
     encoded_cif = process_map(
-        _struct_to_cif_str_fn,
-        feed_args(structures, symprec, angle_tolerance),
-        max_workers=workers,
-        chunksize=chunksize,
-        desc="convert to cif format",
+        _struct_to_cif_str_fn, 
+        structures, 
+        #feed_args(structures, symprec, angle_tolerance),
+        max_workers=workers, 
+        chunksize=chunksize, 
+        desc="convert to cif format"
     )
 
     with open(filename, "wt") as out_file:

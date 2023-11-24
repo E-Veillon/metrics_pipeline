@@ -18,6 +18,7 @@ symmetrize = 'screening_pipeline.scripts.symmetrize:main'
 stability_screening = 'screening_pipeline.scripts.stability_screening:main'
 band_gap_screening = 'screening_pipeline.scripts.band_gap_screening:main'
 band_edge_pos_screening = 'screening_pipeline.scripts.band_edge_pos_screening:main'
+test_cif = 'screening_pipeline.scripts.test_cif_block:main'
 
 [build-system]
 requires = ["poetry-core"]
