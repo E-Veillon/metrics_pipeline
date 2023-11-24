@@ -129,10 +129,10 @@ def struct_to_cif_str(
     str_ops        = [op.as_xyz_string() for op in symm_ops]
 
     data_dict['_symmetry_space_group_name_H-M'] = structure.get_space_group_symbol()
-    data_dict['_symmetry_Int_Tables_number'] = structure.get_space_group_number()
-    data_dict['_symmetry_equiv_pos_site_id'] = [f'{i}' for i in range(1, len(str_ops) + 1)]
-    data_dict['_symmetry_equiv_pos_as_xyz'] = str_ops
-
+    data_dict['_symmetry_Int_Tables_number']    = structure.get_space_group_number()
+    data_dict['_symmetry_equiv_pos_site_id']    = [f'{idx}' for idx in range(1, len(str_ops) + 1)]
+    data_dict['_symmetry_equiv_pos_as_xyz']     = str_ops
+    #TODO: prendre en compte les équivalences entre sites pour réduire la matrice des coordonnées
     cif_str = str(cif_block)
 
     return cif_str
@@ -205,14 +205,15 @@ def write_cif(
     #def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
     #    return [(struct, symprec, angle_tolerance) for struct in structures]
 
-    encoded_cif = process_map(
-        _struct_to_cif_str_fn, 
-        structures, 
-        #feed_args(structures, symprec, angle_tolerance),
-        max_workers=workers, 
-        chunksize=chunksize, 
-        desc="convert to cif format"
-    )
+    encoded_cif = list(
+        process_map(
+            _struct_to_cif_str_fn, 
+            structures, 
+            #feed_args(structures, symprec, angle_tolerance),
+            max_workers=workers, 
+            chunksize=chunksize, 
+            desc="convert to cif format"
+        ))
 
     with open(filename, "wt") as out_file:
         out_file.write("\n".join(encoded_cif))
