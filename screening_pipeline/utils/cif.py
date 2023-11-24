@@ -96,7 +96,7 @@ def cif_str_to_struct(
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
         parsed_str = CifParser.from_str(cif_string=cif_str)
-        struct_list = parsed_str.get_structures()
+        struct_list = parsed_str.parse_structures()
         struct = struct_list[0]
 
         if symprec is None:
@@ -110,9 +110,10 @@ def cif_str_to_struct(
             sym_struct = sym_struct.get_symmetrized_structure()
 
         except TypeError:
+            spglib_result = sym_struct.get_symmetry_dataset()
 
-            if sym_struct.get_symmetry_dataset() is None:
-                
+            if spglib_result is None:
+
                 return retry_get_symmetrized_structure(
                     structure=struct, 
                     symprec=symprec, 
