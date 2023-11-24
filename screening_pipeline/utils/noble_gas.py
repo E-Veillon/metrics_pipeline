@@ -1,5 +1,6 @@
 import re
-from typing import Union
+from typing import Union, Iterable
+from itertools import filterfalse
 
 from pymatgen.core.structure import SiteCollection
 
@@ -20,3 +21,9 @@ def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
         return structure.composition.contains_element_type("noble_gas")
 
     return re.search(r"(He|Ne|Ar|Kr|Xe|Rn)", structure) is not None
+
+def discard_rare_gas_structures(
+        structures: Iterable[Union[SiteCollection, str]]
+        ) -> Iterable[Union[SiteCollection, str]]:
+
+    return list(filterfalse(has_rare_gas, structures))

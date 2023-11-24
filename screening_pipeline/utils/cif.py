@@ -23,7 +23,7 @@ from pymatgen.core.structure import Structure
 from pymatgen.io.cif import CifParser, CifWriter
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-from screening_pipeline.utils import has_rare_gas
+from screening_pipeline.utils import has_rare_gas, discard_rare_gas_structures
 from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stderr
 
 ##################################################
@@ -56,9 +56,7 @@ def retry_get_symmetrized_structure(
     
     return structure
 
-def extract_cif_from_file(
-    filename: str, keep_rare_gases: bool = False
-) -> Tuple[List[str], List[str]]:
+def extract_cif_from_file(filename: str) -> List[str]:
     """
     Separates concatenated structures from a cif file.
 
@@ -66,7 +64,7 @@ def extract_cif_from_file(
         filename (str): Path to a cif file.
         keep_rare_gases (bool): Whether the structures containing rare gases should be kept or not. Default is false.
     Returns
-        Tuple[List[str], List[str]]: Returns the list of filtered structures and the list of removed structures.
+        List[str]: List of CIF strings, each one representing a single structure.
     """
 
     # load file
@@ -77,14 +75,7 @@ def extract_cif_from_file(
     matcher = re.compile(r"^data.*?$(?=\ndata|\Z)", re.MULTILINE | re.DOTALL)
     full_structs_list = matcher.findall(data)
 
-    if keep_rare_gases:
-        return full_structs_list, []
-
-    # filter structures if they contain rare gases
-    rare_gas_structures = list(filter(has_rare_gas, full_structs_list))
-    full_structs_list = list(filterfalse(has_rare_gas, full_structs_list))
-
-    return full_structs_list, rare_gas_structures
+    return full_structs_list
 
 
 def cif_str_to_struct(
@@ -190,10 +181,12 @@ def read_cif(
         List[Structure]: Returns the structures in a list.
     """
 
-    structures, _ = extract_cif_from_file(
-        filename, keep_rare_gases
-    )
-    nbr_struct = len(structures)
+    struct_strings = extract_cif_from_file(filename)
+
+    if not keep_rare_gases:
+        struct_strings = discard_rare_gas_structures(struct_strings)
+
+    nbr_struct = len(struct_strings)
     assert nbr_struct > 0, "No structure data found in provided file"
 
     # Obtention des structures PyMatGen à partir des données et calcul de la symétrie
