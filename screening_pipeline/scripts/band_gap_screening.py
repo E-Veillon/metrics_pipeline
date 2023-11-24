@@ -10,7 +10,7 @@ Reference for Δ-Sol method:
 
 
 from datetime import datetime
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
+from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 
 
 def assert_args(args: Namespace):
@@ -52,7 +52,7 @@ def main():
                 * If E(gap) is outside the goal but uncertainty gets in ?
                 Possible options: keep, keep_aside, discard, auto (keep_aside if at least half the interval is in, else discard)
         '''
-    helper_format = ArgumentDefaultsHelpFormatter
+    helper_format = RawDescriptionHelpFormatter
 
     parser = ArgumentParser(
         prog=prog_name, 
@@ -70,14 +70,14 @@ def main():
         '-p', '--path',
         type=str,
         default='./Vasp_input_sets/',
-        help='Directory to write VASP input files in (created if it does not exist).',
+        help='Directory to write VASP input files in (created if it does not exist) (default = ./Vasp_input_sets/).',
         metavar='str'
     )
     parser.add_argument(
         '-w', '--workers',
         type=int,
         default=1,
-        help='Number of parallel processes to create',
+        help='Number of parallel processes to create (default = 1).',
         metavar='int'
     )
 

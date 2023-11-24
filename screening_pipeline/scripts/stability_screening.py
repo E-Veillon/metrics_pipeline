@@ -7,7 +7,7 @@ A script using VASP DFT calculations to determine the relative stability of give
 from typing import List, Tuple
 from itertools import count
 from datetime import datetime
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
+from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 from tqdm.contrib.concurrent import process_map
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp import VaspInput
@@ -37,7 +37,7 @@ def main():
             - Compare structure energy with the sum of reference structure energies
             - Aknowledge what to do with unstable structures
         '''
-    helper_format = ArgumentDefaultsHelpFormatter
+    helper_format = RawDescriptionHelpFormatter
 
     parser = ArgumentParser(
         prog=prog_name, 
@@ -55,20 +55,20 @@ def main():
         '-p', '--path',
         type=str,
         default='./Vasp_input_sets/',
-        help='Directory to write VASP input files in (created if it does not exist).',
+        help='Directory to write VASP input files in (created if it does not exist) (default = ./Vasp_input_sets/).',
         metavar='str'
     )
     parser.add_argument(
         '-w', '--workers',
         type=int,
         default=1,
-        help='Number of parallel processes to create',
+        help='Number of parallel processes to create (default = 1).',
         metavar='int'
     )
     parser.add_argument(
         '--keep-rare-gases',
         action='store_true',
-        help='Pass this flag to disable automatic elimination of structures containing rare gases'
+        help='Pass this flag to disable automatic elimination of structures containing rare gases.'
     )
 
     args: Namespace = parser.parse_args()

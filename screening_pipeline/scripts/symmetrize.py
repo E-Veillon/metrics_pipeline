@@ -61,7 +61,14 @@ def main():
 
     prog_name = 'symmetrize'
     prog_description = 'A script that calculates symmetry spacegroup for structures in a CIF file using pymatgen.'
-    prog_missing_steps = ''''''
+    prog_missing_steps = '''
+        Missing steps to complete this script:
+            - Refactor optional flags usage:
+                *keep_rare_gases should only enable/disable rare gas searching and elimination,
+                 no need for an alternate file production.
+                *keep_equivalent should only enable/disable structure matching and elimination,
+                 no need for an alternate file production.
+        '''
     helper_format = ArgumentDefaultsHelpFormatter
 
     parser = ArgumentParser(
