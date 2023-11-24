@@ -198,7 +198,7 @@ def read_cif(
 
     return process_map(
         _cif_str_to_struct_fn,
-        feed_args(structures, symprec, angle_tolerance),
+        feed_args(struct_strings, symprec, angle_tolerance),
         max_workers=workers,
         chunksize=chunksize,
         desc="load and search symmetries",
