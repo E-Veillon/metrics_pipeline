@@ -140,11 +140,13 @@ def main():
 
     # MAIN BLOCK
 
-    from screening_pipeline.utils import read_cif, write_cif, remove_equivalent
+    from screening_pipeline.utils import read_cif, write_cif
+    from screening_pipeline.utils import batch_symmetrizer
+    from screening_pipeline.utils import remove_equivalent
 
-    # Extraction des structures sous forme de strings
+    # Extraction des données CIF et conversion en structures
 
-    symmetrized_structs = read_cif(
+    structures = read_cif(
         args.filename,
         symprec=args.precision,
         angle_tolerance=args.angleprec,
@@ -152,9 +154,18 @@ def main():
         keep_rare_gases=args.keep_rare_gases,
     )
 
-    assert len(symmetrized_structs) > 0, 'No structure could be parsed from given data'
+    assert len(structures) > 0, 'No structure could be parsed from given data'
 
-    print(f'{len(symmetrized_structs)} structures loaded')
+    print(f'{len(structures)} structures loaded')
+
+    # Calcul de la symétrie d'espace des structures
+
+    symmetrized_structs = batch_symmetrizer(
+        structures=structures, 
+        symprec=args.precision, 
+        angle_tolerance=args.angleprec, 
+        workers=args.workers
+    )
 
     # Comparaison des structures pour éliminer les doublons
 
