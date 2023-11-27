@@ -1,17 +1,29 @@
+# TYPE HINTING
+
+from typing import Union, Iterable, List, Tuple
+
+########################################
+# OPTIMIZATION MODULES
+
 import re
-from typing import Union, Iterable
 from itertools import filterfalse
 
+########################################
+# PYTHON MATERIAL GENOMICS PACKAGE
+
 from pymatgen.core.structure import SiteCollection
+
+########################################
 
 
 def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
     """
-    searches for rare gas symbols in structural formula
+    Searches for rare gas symbols in structural formula
 
-    Args:
-        structure (Union[SiteCollection, str]): A pymatgen structure or a chemical formula
-    Returns
+    Parameters:
+        structure (Union[SiteCollection, str]): A pymatgen structure or a chemical formula.
+
+    Returns:
         bool: True if the formula contains rare gases, False otherwise.
     """
 
@@ -24,6 +36,18 @@ def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
 
 def discard_rare_gas_structures(
         structures: Iterable[Union[SiteCollection, str]]
-        ) -> Iterable[Union[SiteCollection, str]]:
+        ) -> Tuple[List[Union[SiteCollection, str]], int]:
+    '''
+    Eliminates structures containing rare gases and counts the number eliminated.
 
-    return list(filterfalse(has_rare_gas, structures))
+    Parameters:
+        structures (Iterable[SiteCollection | str]]): the structure data to scan.
+    
+    Returns:
+        List[Union[SiteCollection, str]]: The list of data not containing rare gases.
+        Int: The number of structures discarded.
+    '''
+
+    nbr_discarded = len(list(filter(has_rare_gas, structures)))
+    kept_structs  = list(filterfalse(has_rare_gas, structures))
+    return kept_structs, nbr_discarded

@@ -6,8 +6,8 @@ Functions to load and write CIF formatted data with multiple processes.
 ##################################################
 # SYSTEM I/O MODULES
 
-#from typing import Tuple, Optional
-from typing import List, Union
+#from typing import Optional
+from typing import Tuple, List, Union
 #from contextlib import redirect_stdout, redirect_stderr
 import re
 
@@ -142,16 +142,13 @@ def struct_to_cif_str(
 
     return cif_str
 
-def _struct_to_cif_str_fn(args):
-    return struct_to_cif_str(*args)
-
 def read_cif(
     filename: str,
     #symprec: Optional[float] = None,
     #angle_tolerance: float = 5.0,
     workers: int = 1,
     keep_rare_gases: bool = False,
-) -> List[Structure]:
+) -> Tuple[List[Structure], int]:
     """
     Reads a cif file containing concatenated structures data and decode them using multiprocess.
 
@@ -164,13 +161,14 @@ def read_cif(
                                 Defaults to false.
     
     Returns:
-        List[Structure]: Returns the structures in a list.
+        List[Structure]: Decoded Structure objects in a list.
+        Int: Number of structures containing rare gases discarded. 
     """
 
     struct_strings = extract_cif_from_file(filename)
 
     if not keep_rare_gases:
-        struct_strings = discard_rare_gas_structures(struct_strings)
+        struct_strings, nbr_rare_gas_structs = discard_rare_gas_structures(struct_strings)
 
     nbr_struct = len(struct_strings)
     assert nbr_struct > 0, "No structure data found in provided file"
@@ -180,13 +178,15 @@ def read_cif(
     #def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
     #    return [(struct, symprec, angle_tolerance) for struct in structures]
 
-    return list(process_map(
+    structs_list = list(process_map(
         cif_str_to_struct,
         struct_strings,
         max_workers=workers,
         chunksize=chunksize,
         desc="load and read data",
     ))
+
+    return structs_list, nbr_rare_gas_structs
 
 def write_cif(
     filename: str,
@@ -205,7 +205,7 @@ def write_cif(
 
         workers (int):                Number of parallel processes to use.
     """
-    
+
     nbr_struct = len(structures)
     chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 

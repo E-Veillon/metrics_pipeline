@@ -62,10 +62,7 @@ def main():
     prog_name = 'symmetrize'
     prog_description = 'A script that calculates symmetry spacegroup for structures in a CIF file using pymatgen.'
     prog_missing_steps = '''
-        Missing steps to complete this script:
-            - Refactor optional flags usage:
-                *keep_equivalent should only enable/disable structure matching and elimination,
-                 no need for an alternate file production.
+        Missing steps to complete this script: None
         '''
     helper_format = ArgumentDefaultsHelpFormatter
 
@@ -87,13 +84,6 @@ def main():
         type=str,
         default='[filename]_out.cif',
         help='name of output file containing the unique structures',
-    )
-    parser.add_argument(
-        '-e',
-        '--equivalent',
-        type=str,
-        default=None,
-        help='name of the output file containing the duplicated structures',
     )
     parser.add_argument(
         '-p',
@@ -146,7 +136,7 @@ def main():
 
     # Extraction des données CIF et conversion en structures
 
-    structures = read_cif(
+    structures, nbr_rare_gas_structs = read_cif(
         args.filename,
         symprec=args.precision,
         angle_tolerance=args.angleprec,
@@ -154,9 +144,11 @@ def main():
         keep_rare_gases=args.keep_rare_gases,
     )
 
-    assert len(structures) > 0, 'No structure could be parsed from given data'
+    nbr_structs = len(structures)
+    assert nbr_structs > 0, 'No structure could be parsed from given data'
 
-    print(f'{len(structures)} structures loaded')
+    print(f'{nbr_structs} structures loaded')
+    print(f'{nbr_rare_gas_structs} structures containing rare gases were discarded')
 
     # Calcul de la symétrie d'espace des structures
 
@@ -169,17 +161,16 @@ def main():
 
     # Comparaison des structures pour éliminer les doublons
 
-    if args.keep_equivalent:
-        kept_structs = symmetrized_structs
-        duplicated_struct = []
-    else:
-        kept_structs, duplicated_struct = remove_equivalent(
+    kept_structs, nbr_equivalent = remove_equivalent(
             structures=symmetrized_structs, 
             workers=args.workers, 
-            keep_equivalent=False
-        )
+            keep_equivalent=args.keep_equivalent
+    )
 
-        print(f'{len(kept_structs)} unique structures detected')
+    nbr_unique_structs = len(kept_structs)
+
+    if not args.keep_equivalent:
+        print(f'{nbr_unique_structs} unique structures detected')
 
     #  Recalcul des symétries avec PyMatGen (pour prise en compte par CifWriter) et écriture du fichier de sortie
 
@@ -191,28 +182,19 @@ def main():
         workers=args.workers,
     )
 
-    if args.equivalent is not None:
-        write_cif(
-            args.equivalent,
-            duplicated_struct,
-            symprec=args.precision,
-            angle_tolerance=args.angleprec,
-            workers=args.workers,
-        )
-
     # Calcul du temps total pris par la procédure
 
     stop = datetime.now()
-    count_unique = len(kept_structs)
-    count_duplicated = len(duplicated_struct)
+
     print(' ')
     print('------------------------------')
     print(' ')
     print('SUMMARY OF THE CALCULATION')
     print(' ')
-    print(f'{count_duplicated+count_unique} structures detected in total, including:')
-    print(f'- {count_duplicated} duplicated structures')
-    print(f'- {count_unique} unique structures')
+    print(f'{nbr_structs} structures detected in total, including:')
+    print(f'- {nbr_unique_structs} unique structures')
+    print(f'- {nbr_equivalent} duplicated structures')
+    print(f'- {nbr_rare_gas_structs} structures containing rare gases')
     print(' ')
     print(f'elapsed time: {stop-start}')
 
