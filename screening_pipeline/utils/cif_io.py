@@ -160,7 +160,8 @@ def read_cif(
         
         workers (int):          Number of processes to use in parallel.
         
-        keep_rare_gases (bool): Whether structures containing rare gases should be kept. Defaults to false.
+        keep_rare_gases (bool): Whether structures containing rare gases should be kept. 
+                                Defaults to false.
     
     Returns:
         List[Structure]: Returns the structures in a list.
@@ -204,6 +205,7 @@ def write_cif(
 
         workers (int):                Number of parallel processes to use.
     """
+    
     nbr_struct = len(structures)
     chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
