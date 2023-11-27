@@ -151,3 +151,67 @@ EXP_DELTA_H = { #TODO: Modify it when values are found
         'Fe': {}, 
         'Mn': {}
     }}
+
+########################################
+'''
+Number of valence electrons for each element of the Periodic Table.
+'''
+
+def get_element_group(atom: str) -> str:
+    if atom in {'H', 'Li', 'Na', 'K', 'Rb', 'Cs', 'Fr'}:
+        return 'S1'
+    if atom in {'He', 'Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra'}:
+        return 'S2'
+    #TODO: Add all f groups
+    if atom in {'Sc', 'Y', 'Lu', 'Lr'}:
+        return 'D1'
+    if atom in {'Ti', 'Zr', 'Hf', 'Rf'}:
+        return 'D2'
+    if atom in {'V', 'Nb', 'Ta', 'Db'}:
+        return 'D3'
+    if atom in {'Cr', 'Mo', 'W', 'Sg'}:
+        return 'D4'
+    if atom in {'Mn', 'Tc', 'Re', 'Bh'}:
+        return 'D5'
+    if atom in {'Fe', 'Ru', 'Os', 'Hs'}:
+        return 'D6'
+    if atom in {'Co', 'Rh', 'Ir', 'Mt'}:
+        return 'D7'
+    if atom in {'Ni', 'Pd', 'Pt', 'Ds'}:
+        return 'D8'
+    if atom in {'Cu', 'Ag', 'Au', 'Rg'}:
+        return 'D9'
+    if atom in {'Zn', 'Cd', 'Hg', 'Cn'}:
+        return 'D10'
+    if atom in {'B', 'Al', 'Ga', 'In', 'Tl', 'Nh'}:
+        return 'P1'
+    if atom in {'C', 'Si', 'Ge', 'Sn', 'Pb', 'Fl'}:
+        return 'P2'
+    if atom in {'N', 'P', 'As', 'Sb', 'Bi', 'Mc'}:
+        return 'P3'
+    if atom in {'O', 'S', 'Se', 'Te', 'Po', 'Lv'}:
+        return 'P4'
+    if atom in {'F', 'Cl', 'Br', 'I', 'At', 'Ts'}:
+        return 'P5'
+    if atom in {'Ne', 'Ar', 'Kr', 'Xe', 'Rn', 'Og'}:
+        return 'P6'
+    
+def get_element_valence(atom: str) -> int:
+    if atom in {'H', 'Li', 'Na', 'K', 'Rb', 'Cs'}:
+        return 1
+    if atom in {'He', 'Be', 'Mg', 'Ca', 'Sr', 'Ba'}:
+        return 2
+    if atom in {'B', 'Al', 'Sc', 'Y'}:
+        return 3
+    if atom in {'C', 'Si', 'Ti', 'Ge', 'Zr', 'Sn', 'Hf', 'Pb'}:
+        return 4
+
+def get_valence_electrons(structure):
+    nbr_val_elec = 0
+    
+VALENCE_E = {
+    'H': 1, 'He': 2, 
+    'Li': 1, 'Be': 2, 'B': 3, 'C': 4, 'N': 5, 'O': 6, 'F': 7, 'Ne': 8, 
+    'Na': 1, 'Mg': 2, 'Al': 3, 'Si': 4, 'P': 5, 'S': 6, 'Cl': 7, 'Ar': 8 
+    #'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Ga', 'Ge', 
+}
