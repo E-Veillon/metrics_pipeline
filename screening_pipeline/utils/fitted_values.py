@@ -1,4 +1,31 @@
-E_O2_FIT = 1 #To be modified when the calculation is done
+'''
+Global variables for storing experimental fits and values used in the pipeline.
+'''
+
+
+########################################
+'''
+O2 Energy as fitted with Wang et al. method.
+
+Reference: 
+   L. Wang, T. Maxisch, G. Ceder, 
+   Physical Review B 73 (2006) 195107.
+   (reference 14.57 in screening_pipeline/Bibliography)
+'''
+
+E_O2_FIT = 1 #TODO: Modify it when the calculation is done
+
+########################################
+'''
+Values of the Hubbard U correction in GGA + U framework.
+
+Reference:
+    A. Jain, G. Hautier, C.J. Moore, S.P. Ong, 
+    C.C. Fischer, T. Mueller, K.A. Persson, and G. Ceder, 
+    Computational Materials Science, 50, 2295-2310 (2011)
+    (reference 14 in screening_pipeline/Bibliography)
+'''
+
 U_VALUES = {
     'F': {
         'Ag': 1.5, 'Co': 3.4, 'Cr': 3.5, 'Cu': 4.0, #'Cu': 4 -> 4.0
@@ -15,7 +42,20 @@ U_VALUES = {
     'S': {
         'Fe': 1.9, 'Mn': 2.5
     }}
-DELTA_E_M = { #To be modified when values are fitted
+
+########################################
+'''
+Additional correction ΔE_M to consider on GGA + U calculations,
+when using the mixed GGA / GGA + U scheme proposed by Jain et al.
+
+Reference:
+    A. Jain, G. Hautier, S.P. Ong, C.J. Moore, 
+    C.C. Fischer, K.A. Persson, and G. Ceder, 
+    Phys. Rev. B, 84, 045115 (2011)
+    (reference 31 in screening_pipeline/Bibliography)
+'''
+
+DELTA_E_M = { #TODO: Modify it when values are fitted
     'F': {
         'Ag': 0.0, 'Co': 0.0, 'Cr': 0.0, 'Cu': 0.0, 
         'Fe': 0.0, 'Mn': 0.0, 'Mo': 0.0, 'Nb': 0.0, 
@@ -31,7 +71,33 @@ DELTA_E_M = { #To be modified when values are fitted
     'S': {
         'Fe': 0.0, 'Mn': 0.0
     }}
-EXP_DELTA_H = { #To be modified when values are found
+
+########################################
+'''
+Experimentally measured heats of formations at 298K,
+extracted from the Open Quantum Materials Database (OQMD).
+These values are used to fit the ΔE_M correction term mentionned above.
+
+NB: A value of 0.0 means the material exists in the database, 
+    but no experimental measurement was done yet.
+
+References:
+  - Saal, J. E., Kirklin, S., Aykol, M., Meredig, B., and Wolverton, C. 
+    "Materials Design and Discovery with High-Throughput Density Functional Theory: 
+    The Open Quantum Materials Database (OQMD)", JOM 65, 1501-1509 (2013). 
+    doi:10.1007/s11837-013-0755-4
+
+  - Kirklin, S., Saal, J.E., Meredig, B., Thompson, A., 
+    Doak, J.W., Aykol, M., Rühl, S. and Wolverton, C. 
+    "The Open Quantum Materials Database (OQMD): 
+    assessing the accuracy of DFT formation energies", 
+    npj Computational Materials 1, 15010 (2015). 
+    doi:10.1038/npjcompumats.2015.10
+
+Website: https://www.oqmd.org/
+'''
+
+EXP_DELTA_H = { #TODO: Modify it when values are found
     'F': {
         'Ag': {'Ag5F': 0.0, 'Ag2F': 0.0, 'AgF': -1.052, 'Ag2F3': 0.0, 
                'AgF2': 0.0, 'Ag2F5': 0.0, 'Ag3F8': 0.0, 'AgF3': 0.0}, 
@@ -70,41 +136,6 @@ EXP_DELTA_H = { #To be modified when values are found
         'Cr': {}, 
         'Cu': {}, 
         'Fe': {'FeO': -1.415, 'Fe3O4': -1.660, 'Fe2O3': -1.710}, 
-        'Mn': {}, 
-        'Mo': {}, 
-        'Nb': {}, 
-        'Ni': {}, 
-        'Re': {}, 
-        'Ta': {}, 
-        'V': {}, 
-        'W': {}                          
-    }, 
-    'S': {
-        'Fe': {}, 
-        'Mn': {}
-    }}
-SIM_DELTA_H = { #To be modified when values are found
-    'F': {
-        'Ag': {'Ag2F': 0.0, 'AgF': 0.0, 'AgF2': -1.386, 'Ag2F5': 0.0, 'Ag3F8': 0.0}, 
-        'Co': {}, 
-        'Cr': {}, 
-        'Cu': {}, 
-        'Fe': {}, 
-        'Mn': {}, 
-        'Mo': {}, 
-        'Nb': {}, 
-        'Ni': {}, 
-        'Re': {}, 
-        'Ta': {}, 
-        'V': {}, 
-        'W': {}
-    }, 
-    'O': {
-        'Ag': {}, 
-        'Co': {}, 
-        'Cr': {}, 
-        'Cu': {}, 
-        'Fe': {'FeO': 0.0, 'Fe3O4': 0.0, 'Fe2O3': 0.0}, 
         'Mn': {}, 
         'Mo': {}, 
         'Nb': {}, 
