@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 '''
-A script to determine material fundamental band gap from VASP relaxations and Δ-Sol method.
+A script to determine material fundamental band gap from VASP energies and Δ-Sol method.
 
 Reference for Δ-Sol method:
     M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
@@ -17,8 +17,8 @@ def assert_args(args: Namespace):
     '''
     Input arguments verification.
 
-    Args:
-        args (NamedTuple): namespace of the parsed arguments.
+    Parameters:
+        args (Namespace): namespace of the parsed arguments.
     '''
 
     assert args.filename.endswith('.cif'), 'Input file must be in CIF format'
