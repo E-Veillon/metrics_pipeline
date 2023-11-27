@@ -86,6 +86,7 @@ References:
     "Materials Design and Discovery with High-Throughput Density Functional Theory: 
     The Open Quantum Materials Database (OQMD)", JOM 65, 1501-1509 (2013). 
     doi:10.1007/s11837-013-0755-4
+    (reference OQMD1 in screening_pipeline/Bibliography)
 
   - Kirklin, S., Saal, J.E., Meredig, B., Thompson, A., 
     Doak, J.W., Aykol, M., Rühl, S. and Wolverton, C. 
@@ -93,6 +94,7 @@ References:
     assessing the accuracy of DFT formation energies", 
     npj Computational Materials 1, 15010 (2015). 
     doi:10.1038/npjcompumats.2015.10
+    (reference OQMD2 in screening_pipeline/Bibliography)
 
 Website: https://www.oqmd.org/
 '''
