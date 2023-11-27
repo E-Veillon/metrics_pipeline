@@ -1,19 +1,20 @@
 """
-Functions to load and write cif structure with multiple workers.
+Functions to load and write CIF formatted data with multiple processes.
 """
 
 
 ##################################################
 # SYSTEM I/O MODULES
 
-from typing import Tuple, List, Optional, Union
-from contextlib import redirect_stdout, redirect_stderr
+#from typing import Tuple, Optional
+from typing import List, Union
+#from contextlib import redirect_stdout, redirect_stderr
 import re
 
 ##################################################
 # OPTIMIZATION MODULES
 
-from itertools import filterfalse, count
+#from itertools import filterfalse, count
 from tqdm.contrib.concurrent import process_map
 
 ##################################################
@@ -37,10 +38,13 @@ def extract_cif_from_file(filename: str) -> List[str]:
     """
     Separates concatenated structures from a cif file.
 
-    Args:
-        filename (str): Path to a cif file.
-        keep_rare_gases (bool): Whether the structures containing rare gases should be kept or not. Default is false.
-    Returns
+    Parameters:
+        filename (str):         Path to a cif file.
+
+        keep_rare_gases (bool): Whether the structures containing rare gases should be kept or not. 
+                                Defaults to false.
+    
+    Returns:
         List[str]: List of CIF strings, each one representing a single structure.
     """
 
@@ -50,9 +54,9 @@ def extract_cif_from_file(filename: str) -> List[str]:
 
     # match structures data with regular expression
     matcher = re.compile(r"^data.*?$(?=\ndata|\Z)", re.MULTILINE | re.DOTALL)
-    full_structs_list = matcher.findall(data)
+    cif_str_structs = matcher.findall(data)
 
-    return full_structs_list
+    return cif_str_structs
 
 
 def cif_str_to_struct(cif_str: str) -> Structure:
@@ -113,6 +117,7 @@ def struct_to_cif_str(
     Returns:
         str: CIF formatted string.
     '''
+
     if not isinstance(structure, Structure):
         raise TypeError('Cannot write CIF data for a non-structure object.')
 
@@ -148,7 +153,7 @@ def read_cif(
     keep_rare_gases: bool = False,
 ) -> List[Structure]:
     """
-    Read multiple structures from a cif file and decode them using multiprocess.
+    Reads a cif file containing concatenated structures data and decode them using multiprocess.
 
     Parameters:
         filename (str):         Name of the input CIF file.
@@ -188,16 +193,16 @@ def write_cif(
     #symprec: Optional[float] = None,
     #angle_tolerance: float = 5.0,
     workers: int = 1,
-):
+) -> None:
     """
-    Write multiple structures to a cif file and encode them using multiprocess.
+    Encode multiple structures in CIF formatand write them in a file using multiprocess.
 
-    Args:
-        filename (str): Name of the input file.
+    Parameters:
+        filename (str):               Name of the input file.
+
         structures (List[Structure]): The structures to encode.
-        symprec (float): Distance tolerance for symmetry search.
-        angle_tolerance (float): Angle tolerance for symmetry search.
-        workers (int): Number of workers used.
+
+        workers (int):                Number of parallel processes to use.
     """
     nbr_struct = len(structures)
     chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
@@ -207,12 +212,12 @@ def write_cif(
 
     encoded_cif = list(
         process_map(
-            _struct_to_cif_str_fn, 
+            struct_to_cif_str, 
             structures, 
             #feed_args(structures, symprec, angle_tolerance),
             max_workers=workers, 
             chunksize=chunksize, 
-            desc="convert to cif format"
+            desc="converting to cif format"
         ))
 
     with open(filename, "wt") as out_file:
