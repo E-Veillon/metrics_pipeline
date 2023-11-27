@@ -1,3 +1,9 @@
+'''
+Functions to find and discard structures containing rare gases.
+'''
+
+
+########################################
 # TYPE HINTING
 
 from typing import Union, Iterable, List, Tuple

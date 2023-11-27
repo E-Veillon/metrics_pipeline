@@ -1,10 +1,27 @@
-#!/usr/bin/python
+'''
+Functions to write VASP input files, launch VASP calculations and manage VASP output files.
+'''
+
+
+########################################
+# TYPE HINTING
 
 from typing import Optional, Dict
+
+########################################
+# OPTIMIZATION MODULES
+
 from itertools import cycle
+
+########################################
+# PYTHON MATERIAL GENOMICS PACKAGE
+
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp import VaspInput
 from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
+
+########################################
+
 
 def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
     '''

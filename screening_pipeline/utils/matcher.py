@@ -1,6 +1,12 @@
+'''
+Functions to sort structures by stoichiometry and discard duplicates.
+'''
+
+
+########################################
 # TYPE HINTING
 
-from typing import Tuple, List, Union, Iterable
+from typing import Tuple, List, Iterable
 
 ########################################
 # OPTIMIZATION MODULES
@@ -9,7 +15,7 @@ import itertools
 from tqdm.contrib.concurrent import process_map
 
 ########################################
-# PYTHON MATERIAL GENOMICS
+# PYTHON MATERIAL GENOMICS PACKAGE
 
 from pymatgen.core.structure import Structure
 from pymatgen.analysis.structure_matcher import StructureMatcher

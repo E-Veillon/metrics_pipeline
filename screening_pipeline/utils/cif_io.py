@@ -1,9 +1,9 @@
-"""
+'''
 Functions to load and write CIF formatted data with multiple processes.
-"""
+'''
 
 
-##################################################
+########################################
 # SYSTEM I/O MODULES
 
 #from typing import Optional
@@ -11,20 +11,20 @@ from typing import Tuple, List, Union
 #from contextlib import redirect_stdout, redirect_stderr
 import re
 
-##################################################
+########################################
 # OPTIMIZATION MODULES
 
 #from itertools import filterfalse, count
 from tqdm.contrib.concurrent import process_map
 
-##################################################
-# PYTHON MATERIALS GENOMICS MODULE
+########################################
+# PYTHON MATERIALS GENOMICS PACKAGE
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.cif import CifParser, CifWriter
 from pymatgen.symmetry.analyzer import SymmetrizedStructure
 
-##################################################
+########################################
 # LOCAL MODULES
 
 from screening_pipeline.utils import discard_rare_gas_structures

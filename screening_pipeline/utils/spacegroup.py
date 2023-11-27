@@ -1,9 +1,25 @@
+'''
+Functions to find spacegroup symmetry on pymatgen Structure objects.
+'''
+
+
+########################################
+# TYPE HINTING
+
 from typing import Tuple, List
+
+########################################
+# OPTIMIZATION MODULES
+
 from tqdm.contrib.concurrent import process_map
+
+########################################
+# PYTHON MATERIAL GENOMICS PACKAGE
+
 from pymatgen.core.structure import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmetrizedStructure
 
-##################################################
+########################################
 
 
 def get_default_symmetry(structure: Structure) -> Structure:
