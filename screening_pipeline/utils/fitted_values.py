@@ -158,25 +158,25 @@ Website: https://www.oqmd.org/
 
 ########################################
 
-_EL_PER_XC_SPHERE_MIN = {
+_EL_PER_XC_VOL_MIN = {
     'LDA_spd': 50, 'PBE_spd': 59, 'AM05_spd': 60, 
     'LDA_sp': 43, 'PBE_sp': 52, 'AM05_sp': 52
 }
 
-_EL_PER_XC_SPHERE_BEST = {
+_EL_PER_XC_VOL_BEST = {
     'LDA_spd': 63, 'PBE_spd': 72, 'AM05_spd': 76, 
     'LDA_sp': 56, 'PBE_sp': 68, 'AM05_sp': 70
 }
 
-_EL_PER_XC_SPHERE_MAX = {
+_EL_PER_XC_VOL_MAX = {
     'LDA_spd': 80, 'PBE_spd': 88, 'AM05_spd': 91, 
     'LDA_sp': 78, 'PBE_sp': 87, 'AM05_sp': 92
 }
 
-EL_PER_XC_SPHERE = {
-    'MIN': _EL_PER_XC_SPHERE_MIN, 
-    'BEST': _EL_PER_XC_SPHERE_BEST, 
-    'MAX': _EL_PER_XC_SPHERE_MAX
+EL_PER_XC_VOL = {
+    'MIN': _EL_PER_XC_VOL_MIN, 
+    'BEST': _EL_PER_XC_VOL_BEST, 
+    'MAX': _EL_PER_XC_VOL_MAX
 }
 
 '''
