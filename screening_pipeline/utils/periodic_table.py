@@ -154,6 +154,8 @@ def get_all_valence_electrons(structure: SiteCollection) -> int:
     for elt, number in elts_dict.items():
         nbr_val_elec += get_element_valence_electrons(elt)*int(number)
     
+    nbr_val_elec -= structure.charge #e.g. a charge of +1 means there is 1 less electron
+    
     return nbr_val_elec
 
 def get_delta_sol_el_ratio(
@@ -172,18 +174,18 @@ def get_delta_sol_el_ratio(
     
     val_elec_type = 'sp'
 
-    for elt, _ in structure.composition.element_composition:
+    for elt, _ in structure.elements:
         match elt.block:
             case ('s'|'p'): continue
             case 'd': 
                 val_elec_type = 'spd'
                 break
             case 'f': raise NotImplementedError('f-block elements are not taken into accoount in Δ-Sol method.')
-            case _: raise ValueError('Something is wrong with Element objects "block" property.')
+            case _: raise ValueError('Something is wrong with this loop or Element objects "block" property.')
     
     N_0        = get_all_valence_electrons(structure)
     value_name = '_'.join(dft_functional, val_elec_type)
     N_star     = EL_PER_XC_VOL[n_star_type][value_name]
-    n          = N_0/N_star
+    n          = N_0 / N_star
 
     return n
