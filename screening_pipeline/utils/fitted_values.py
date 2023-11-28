@@ -4,6 +4,9 @@ Global variables for storing experimental fits and values used in the pipeline.
 
 
 ########################################
+
+E_O2_FIT = 1 #TODO: Modify it when the calculation is done
+
 '''
 O2 Energy as fitted with Wang et al. method.
 
@@ -13,18 +16,7 @@ Reference:
    (reference 14.57 in screening_pipeline/Bibliography)
 '''
 
-E_O2_FIT = 1 #TODO: Modify it when the calculation is done
-
 ########################################
-'''
-Values of the Hubbard U correction in GGA + U framework.
-
-Reference:
-    A. Jain, G. Hautier, C.J. Moore, S.P. Ong, 
-    C.C. Fischer, T. Mueller, K.A. Persson, and G. Ceder, 
-    Computational Materials Science, 50, 2295-2310 (2011)
-    (reference 14 in screening_pipeline/Bibliography)
-'''
 
 U_VALUES = {
     'F': {
@@ -43,17 +35,17 @@ U_VALUES = {
         'Fe': 1.9, 'Mn': 2.5
     }}
 
-########################################
 '''
-Additional correction ΔE_M to consider on GGA + U calculations,
-when using the mixed GGA / GGA + U scheme proposed by Jain et al.
+Values of the Hubbard U correction in GGA + U framework.
 
 Reference:
-    A. Jain, G. Hautier, S.P. Ong, C.J. Moore, 
-    C.C. Fischer, K.A. Persson, and G. Ceder, 
-    Phys. Rev. B, 84, 045115 (2011)
-    (reference 31 in screening_pipeline/Bibliography)
+    A. Jain, G. Hautier, C.J. Moore, S.P. Ong, 
+    C.C. Fischer, T. Mueller, K.A. Persson, and G. Ceder, 
+    Computational Materials Science, 50, 2295-2310 (2011)
+    (reference 14 in screening_pipeline/Bibliography)
 '''
+
+########################################
 
 DELTA_E_M = { #TODO: Modify it when values are fitted
     'F': {
@@ -72,32 +64,18 @@ DELTA_E_M = { #TODO: Modify it when values are fitted
         'Fe': 0.0, 'Mn': 0.0
     }}
 
+'''
+Additional correction ΔE_M to consider on GGA + U calculations,
+when using the mixed GGA / GGA + U scheme proposed by Jain et al.
+
+Reference:
+    A. Jain, G. Hautier, S.P. Ong, C.J. Moore, 
+    C.C. Fischer, K.A. Persson, and G. Ceder, 
+    Phys. Rev. B, 84, 045115 (2011)
+    (reference 31 in screening_pipeline/Bibliography)
+'''
+
 ########################################
-'''
-Experimentally measured heats of formations at 298K,
-extracted from the Open Quantum Materials Database (OQMD).
-These values are used to fit the ΔE_M correction term mentionned above.
-
-NB: A value of 0.0 means the material exists in the database, 
-    but no experimental measurement was done yet.
-
-References:
-  - Saal, J. E., Kirklin, S., Aykol, M., Meredig, B., and Wolverton, C. 
-    "Materials Design and Discovery with High-Throughput Density Functional Theory: 
-    The Open Quantum Materials Database (OQMD)", JOM 65, 1501-1509 (2013). 
-    doi:10.1007/s11837-013-0755-4
-    (reference OQMD1 in screening_pipeline/Bibliography)
-
-  - Kirklin, S., Saal, J.E., Meredig, B., Thompson, A., 
-    Doak, J.W., Aykol, M., Rühl, S. and Wolverton, C. 
-    "The Open Quantum Materials Database (OQMD): 
-    assessing the accuracy of DFT formation energies", 
-    npj Computational Materials 1, 15010 (2015). 
-    doi:10.1038/npjcompumats.2015.10
-    (reference OQMD2 in screening_pipeline/Bibliography)
-
-Website: https://www.oqmd.org/
-'''
 
 EXP_DELTA_H = { #TODO: Modify it when values are found
     'F': {
@@ -152,3 +130,30 @@ EXP_DELTA_H = { #TODO: Modify it when values are found
         'Mn': {}
     }}
 
+'''
+Experimentally measured heats of formations at 298K,
+extracted from the Open Quantum Materials Database (OQMD).
+These values are used to fit the ΔE_M correction term mentionned above.
+
+NB: A value of 0.0 means the material exists in the database, 
+    but no experimental measurement was done yet.
+
+References:
+  - Saal, J. E., Kirklin, S., Aykol, M., Meredig, B., and Wolverton, C. 
+    "Materials Design and Discovery with High-Throughput Density Functional Theory: 
+    The Open Quantum Materials Database (OQMD)", JOM 65, 1501-1509 (2013). 
+    doi:10.1007/s11837-013-0755-4
+    (reference OQMD1 in screening_pipeline/Bibliography)
+
+  - Kirklin, S., Saal, J.E., Meredig, B., Thompson, A., 
+    Doak, J.W., Aykol, M., Rühl, S. and Wolverton, C. 
+    "The Open Quantum Materials Database (OQMD): 
+    assessing the accuracy of DFT formation energies", 
+    npj Computational Materials 1, 15010 (2015). 
+    doi:10.1038/npjcompumats.2015.10
+    (reference OQMD2 in screening_pipeline/Bibliography)
+
+Website: https://www.oqmd.org/
+'''
+
+########################################
