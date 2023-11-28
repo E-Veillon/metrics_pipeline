@@ -133,12 +133,18 @@ EXP_DELTA_H = { #TODO: Modify it when values are found
 '''
 Experimentally measured heats of formations at 298K,
 extracted from the Open Quantum Materials Database (OQMD).
-These values are used to fit the ΔE_M correction term mentionned above.
+These values are used to fit the ΔE_M correction term for GGA + U values 
+in the mixed GGA / GGA + U scheme proposed by Jain et al.
 
 NB: A value of 0.0 means the material exists in the database, 
     but no experimental measurement was done yet.
 
 References:
+  - A. Jain, G. Hautier, S.P. Ong, C.J. Moore, 
+    C.C. Fischer, K.A. Persson, and G. Ceder, 
+    Phys. Rev. B, 84, 045115 (2011)
+    (reference 31 in screening_pipeline/Bibliography)
+
   - Saal, J. E., Kirklin, S., Aykol, M., Meredig, B., and Wolverton, C. 
     "Materials Design and Discovery with High-Throughput Density Functional Theory: 
     The Open Quantum Materials Database (OQMD)", JOM 65, 1501-1509 (2013). 
@@ -185,7 +191,7 @@ used by M.K.Y. Chan and G. Ceder in their presentation of Δ-Sol method.
 
 Reference:
     M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-    (reference 32 in screening_pipeline/Bibliography)
+    (reference 32 in screening_pipeline/Bibliography, values in Table I)
 '''
 
 ########################################
