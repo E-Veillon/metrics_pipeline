@@ -6,7 +6,7 @@ Functions relative to Periodic Table's (PT) elements properties.
 ########################################
 # TYPE HINTING
 
-from typing import Union, Iterable, List, Tuple
+from typing import Union, Iterable, List, Tuple, Literal
 
 ########################################
 # OPTIMIZATION MODULES
@@ -21,6 +21,9 @@ from pymatgen.core.structure import SiteCollection
 from pymatgen.core.periodic_table import Element
 
 ########################################
+# LOCAL MODULES
+
+from screening_pipeline.utils import EL_PER_XC_VOL
 
 
 def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
@@ -43,7 +46,7 @@ def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
 
 def discard_rare_gas_structures(
         structures: Iterable[Union[SiteCollection, str]]
-        ) -> Tuple[List[Union[SiteCollection, str]], int]:
+    ) -> Tuple[List[Union[SiteCollection, str]], int]:
     '''
     Eliminates structures containing rare gases and counts the number eliminated.
 
@@ -152,3 +155,35 @@ def get_all_valence_electrons(structure: SiteCollection) -> int:
         nbr_val_elec += get_element_valence_electrons(elt)*int(number)
     
     return nbr_val_elec
+
+def get_delta_sol_el_ratio(
+        structure: SiteCollection, 
+        dft_functional: Literal['LDA','PBE','AM05'] = 'PBE', 
+        n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
+    ) -> float:
+    '''
+    Computes n = N0/N* the electron ratio to add or remove from 
+    the structure in the Δ-Sol method developped by Chan et al.
+
+    Reference:
+        M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
+        (reference 32 in screening_pipeline/Bibliography)
+    '''
+    
+    val_elec_type = 'sp'
+
+    for elt, _ in structure.composition.element_composition:
+        match elt.block:
+            case ('s'|'p'): continue
+            case 'd': 
+                val_elec_type = 'spd'
+                break
+            case 'f': raise NotImplementedError('f-block elements are not taken into accoount in Δ-Sol method.')
+            case _: raise ValueError('Something is wrong with Element objects "block" property.')
+    
+    N_0        = get_all_valence_electrons(structure)
+    value_name = '_'.join(dft_functional, val_elec_type)
+    N_star     = EL_PER_XC_VOL[n_star_type][value_name]
+    n          = N_0/N_star
+
+    return n
