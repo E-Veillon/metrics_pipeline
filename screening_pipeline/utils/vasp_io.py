@@ -21,6 +21,9 @@ from pymatgen.io.vasp import VaspInput
 from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 
 ########################################
+# LOCAL MODULES
+
+from screening_pipeline.utils import U_VALUES
 
 
 def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
@@ -50,22 +53,7 @@ def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
         'S': {
             'Fe': 2, 'Mn': 2 #'Mn': 2.5 -> 2 (quantum number l have to be an integer)
         }}
-    corrected_LDAUU = {
-        'F': {
-            'Ag': 1.5, 'Co': 3.4, 'Cr': 3.5, 'Cu': 4.0, #'Cu': 4 -> 4.0
-            'Fe': 4.0, 'Mn': 3.9, 'Mo': 3.5, 'Nb': 1.5, #'Mo': 4.38 -> 3.5 (according to the reference)
-            'Ni': 6.0, 'Re': 2.0, 'Ta': 2.0, 'V': 3.1,  #'Ni': 6 -> 6.0, 'Re': 2 -> 2.0, 'Ta': 2 -> 2.0
-            'W': 4.0
-        }, 
-        'O': {
-            'Ag': 1.5, 'Co': 3.4, 'Cr': 3.5, 'Cu': 4.0, #'Cu': 4 -> 4.0
-            'Fe': 4.0, 'Mn': 3.9, 'Mo': 3.5, 'Nb': 1.5, #'Mo': 4.38 -> 3.5 (according to the reference)
-            'Ni': 6.0, 'Re': 2.0, 'Ta': 2.0, 'V': 3.1,  #'Ni': 6 -> 6.0, 'Re': 2 -> 2.0, 'Ta': 2 -> 2.0
-            'W': 4.0                          
-        }, 
-        'S': {
-            'Fe': 1.9, 'Mn': 2.5
-        }}
+    corrected_LDAUU = U_VALUES
     corrected_INCAR = {
         "EDIFF": corrected_EDIFF,
         "ENCUT": corrected_ENCUT,
