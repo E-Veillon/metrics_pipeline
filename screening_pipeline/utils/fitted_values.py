@@ -145,8 +145,17 @@ EXP_DELTA_H = { #TODO: Modify it when values are found
         }
     }, 
     'O': {
-        'Ag': {}, 
-        'Co': {}, 
+        'Ag': {
+            'Ag5O': 0.0, 'Ag3O': 0.0, 'Ag2O': -0.108, 'AgO': 0.0, 
+            'Ag4O5': 0.0, 'Ag3O4': 0.0, 'Ag2O3': 0.0, 'AgO2': 0.0, 
+            'AgO3': 0.0, 'AgO4': 0.0
+        }, 
+        'Co': {
+            'Co3O': 0.0, 'Co2O': 0.0, 'CoO': -1.233, 'Co6O7': 0.0, 
+            'Co4O5': 0.0, 'Co3O4': -1.356, 'Co2O3': 0.0, 'Co4O7': 0.0, 
+            'CoO2': 0.0, 'Co2O5': 0.0, 'Co4O11': 0.0, 'CoO3': 0.0, 
+            'CoO4': 0.0
+        }, 
         'Cr': {}, 
         'Cu': {}, 
         'Fe': {'FeO': -1.415, 'Fe3O4': -1.660, 'Fe2O3': -1.710}, 
@@ -193,7 +202,7 @@ References:
     doi:10.1038/npjcompumats.2015.10
     (reference OQMD2 in screening_pipeline/Bibliography)
 
-Website: https://www.oqmd.org/
+OQMD Website: https://www.oqmd.org/
 '''
 
 ########################################
