@@ -136,8 +136,6 @@ def main():
 
     structures, nbr_rare_gas_structs = read_cif(
         args.filename,
-        symprec=args.precision,
-        angle_tolerance=args.angleprec,
         workers=args.workers,
         keep_rare_gases=args.keep_rare_gases,
     )
@@ -173,10 +171,8 @@ def main():
     #  Recalcul des symétries avec PyMatGen (pour prise en compte par CifWriter) et écriture du fichier de sortie
 
     write_cif(
-        args.output,
-        kept_structs,
-        symprec=args.precision,
-        angle_tolerance=args.angleprec,
+        filename=args.output,
+        structures=kept_structs,
         workers=args.workers,
     )
 

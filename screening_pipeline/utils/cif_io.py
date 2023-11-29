@@ -141,8 +141,6 @@ def struct_to_cif_str(
 
 def read_cif(
     filename: str,
-    #symprec: Optional[float] = None,
-    #angle_tolerance: float = 5.0,
     workers: int = 1,
     keep_rare_gases: bool = False,
 ) -> Tuple[List[Structure], int]:
@@ -188,12 +186,10 @@ def read_cif(
 def write_cif(
     filename: str,
     structures: List[Structure],
-    #symprec: Optional[float] = None,
-    #angle_tolerance: float = 5.0,
     workers: int = 1,
 ) -> None:
     """
-    Encode multiple structures in CIF formatand write them in a file using multiprocess.
+    Encode multiple structures in CIF format and write them in a file using multiprocess.
 
     Parameters:
         filename (str):               Name of the input file.
