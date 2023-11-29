@@ -23,7 +23,7 @@ from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils import U_VALUES
+#from screening_pipeline.utils import U_VALUES
 
 
 def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
@@ -37,6 +37,8 @@ def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
     Returns:
         A dictionnary containing the INCAR tags corrections.
     '''
+    from screening_pipeline.utils import U_VALUES
+
     corrected_EDIFF = float(5e-5)*number_of_sites
     corrected_ENCUT = 520 # To be modified according to ENMAX value (ENCUT = 1.3*ENMAX)
     corrected_LDAUL = {

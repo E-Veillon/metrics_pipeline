@@ -23,7 +23,7 @@ from pymatgen.core.periodic_table import Element
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils import EL_PER_XC_VOL
+#from screening_pipeline.utils import EL_PER_XC_VOL
 
 
 def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
@@ -171,6 +171,7 @@ def get_delta_sol_el_ratio(
         M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
         (reference 32 in screening_pipeline/Bibliography)
     '''
+    from screening_pipeline.utils import EL_PER_XC_VOL
     
     val_elec_type = 'sp'
 
