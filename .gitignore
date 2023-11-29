@@ -7,3 +7,7 @@ vaspdir_*
 oqmd_poscar
 cif_counter.py
 *.swp
+*.incar
+*.potcar
+*.poscar
+*.kpoints
