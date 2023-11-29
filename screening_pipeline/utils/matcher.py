@@ -114,14 +114,15 @@ def remove_equivalent(
     chunksize     = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
     nbr_discarded = 0
 
-    grouped_structs = group_by_stoichiometry(structures)
+    grouped_structs     = group_by_stoichiometry(structures)
+    process_description = ('removing duplicates' if not keep_equivalent else 'sorting structures')
 
     equivalent_structs = process_map(
         group_by_equivalence,
         grouped_structs,
         max_workers=workers,
         chunksize=chunksize,
-        desc='removing equivalents',
+        desc=process_description
     )
 
     if keep_equivalent:
