@@ -138,16 +138,23 @@ def batch_symmetrizer(
         A list containing either pymatgen SymmetrizedStructure objects when symmetry detection worked properly,
         or Structure objects with default P1 spacegroup if detection could not detect any symmetry.
     '''
+    from functools import partial
+
     def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
         return [(struct, symprec, angle_tolerance) for struct in structures]
 
     nbr_structs = len(structures)
     chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
+    partial_structure_symmetrizer = partial(
+        structure_symmetrizer, 
+        symprec=symprec, 
+        angle_tolerance=angle_tolerance
+    )
     
     return list(
         process_map(
-            structure_symmetrizer, 
-            feed_args(structures, symprec, angle_tolerance), 
+            partial_structure_symmetrizer, 
+            structures, 
             max_workers=workers, 
             chunksize=chunksize
     ))
