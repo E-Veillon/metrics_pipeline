@@ -135,7 +135,7 @@ def main():
     # Extraction des données CIF et conversion en structures
 
     structures, nbr_rare_gas_structs = read_cif(
-        args.filename,
+        filename=args.filename,
         workers=args.workers,
         keep_rare_gases=args.keep_rare_gases,
     )
@@ -143,8 +143,11 @@ def main():
     nbr_structs = len(structures)
     assert nbr_structs > 0, 'No structure could be parsed from given data'
 
-    print(f'{nbr_structs} structures loaded')
-    print(f'{nbr_rare_gas_structs} structures containing rare gases were discarded')
+    print(f'{nbr_structs + nbr_rare_gas_structs} structures loaded in total')
+
+    if not args.keep_rare_gases:
+        print(f'{nbr_rare_gas_structs} structures containing rare gases were ignored')
+        print(f'Therefore, {nbr_structs} structures are kept for further processing')
 
     # Calcul de la symétrie d'espace des structures
 
@@ -154,6 +157,8 @@ def main():
         angle_tolerance=args.angleprec, 
         workers=args.workers
     )
+
+    print(f'{len(symmetrized_structs)} structures were symmetrized')
 
     # Comparaison des structures pour éliminer les doublons
 
@@ -167,6 +172,7 @@ def main():
 
     if not args.keep_equivalent:
         print(f'{nbr_unique_structs} unique structures detected')
+        print(f'{nbr_equivalent} duplicates were discarded')
 
     #  Recalcul des symétries avec PyMatGen (pour prise en compte par CifWriter) et écriture du fichier de sortie
 
