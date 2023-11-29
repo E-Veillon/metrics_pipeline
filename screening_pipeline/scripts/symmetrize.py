@@ -21,12 +21,10 @@ def assert_args(args: Namespace):
     print(' - INPUT ARGUMENTS - ')
     print(f'filename: {args.filename}')
     print(f'output: {args.output}')
-    print(f'equivalent: {args.equivalent}')
 
     assert (
         args.filename.endswith('.cif')
         and args.output.endswith('.cif')
-        and (args.equivalent is None or args.equivalent.endswith('.cif'))
     ), 'some arguments formats are not supported, please only use CIF format'
 
     print(f'Fractional coordinates precision: {args.precision}')
