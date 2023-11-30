@@ -107,7 +107,7 @@ def structure_symmetrizer(
             spglib_result = struct_analyzer.get_symmetry_dataset()
 
             if spglib_result is None:
-
+                #return structure
                 return _retry_get_symmetrized_structure(
                     structure=structure, 
                     symprec=symprec, 
