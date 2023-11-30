@@ -17,7 +17,7 @@ from itertools import filterfalse
 ########################################
 # PYTHON MATERIAL GENOMICS PACKAGE
 
-from pymatgen.core.structure import SiteCollection
+from pymatgen.core.structure import SiteCollection, Composition
 from pymatgen.core.periodic_table import Element
 
 ########################################
@@ -60,6 +60,44 @@ def discard_rare_gas_structures(
 
     nbr_discarded = len(list(filter(has_rare_gas, structures)))
     kept_structs  = list(filterfalse(has_rare_gas, structures))
+    return kept_structs, nbr_discarded
+
+def has_rare_earth(structure: Union[SiteCollection, str]) -> bool:
+    """
+    Searches for rare earth (f block elements) symbols in structural formula.
+
+    Parameters:
+        structure (Union[SiteCollection, str]): A pymatgen structure or a chemical formula.
+
+    Returns:
+        bool: True if the formula contains rare earth, False otherwise.
+    """
+
+    assert isinstance(structure, (SiteCollection, str))
+
+    if isinstance(structure, SiteCollection):
+        return structure.composition.contains_element_type("f-block")
+    
+    elts_grps_list = get_all_elements_groups(structure)
+
+    return 'L' in elts_grps_list or 'A' in elts_grps_list
+
+def discard_rare_earth_structures(
+        structures: Iterable[Union[SiteCollection, str]]
+    ) -> Tuple[List[Union[SiteCollection, str]], int]:
+    '''
+    Eliminates structures containing rare earth elements and counts the number eliminated.
+
+    Parameters:
+        structures (Iterable[SiteCollection | str]]): the structure data to scan.
+    
+    Returns:
+        List[Union[SiteCollection, str]]: The list of data not containing rare earth elements.
+        Int: The number of structures discarded.
+    '''
+
+    nbr_discarded = len(list(filter(has_rare_earth, structures)))
+    kept_structs  = list(filterfalse(has_rare_earth, structures))
     return kept_structs, nbr_discarded
 
 def get_element_group(atom: str|Element) -> str:
@@ -106,6 +144,30 @@ def get_element_group(atom: str|Element) -> str:
             return 'A'
         case str(): return None
         case _: raise TypeError(f'expected a str, got {type(atom)}.')
+
+def get_all_elements_groups(formula: str) -> List[str]:
+    '''
+    Finds PT group of each element in a formula string.
+
+    Parameters:
+        formula (str): The formula to search element groups in.
+    
+    Returns:
+        List[str]:  The group of each element in '[block][group number in block]' format,
+                    e.g. for Fe it will return 'D6', in a list.
+                    For f-block elements, a lone letter will be returned, as Δ-Sol method
+                    is not usable for these at the moment.
+    '''
+
+    assert isinstance(formula, str), 'Provided formula must be a string'
+    split_form = formula.split()
+
+    for string in split_form:
+        comp      = Composition(string, strict=True)
+        elts_list = list(comp.keys())
+        grps_list = list(map(get_element_group, elts_list))
+
+    return grps_list
 
 def get_element_valence_electrons(atom: str|Element) -> int:
     '''

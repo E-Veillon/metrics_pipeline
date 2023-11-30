@@ -26,7 +26,7 @@ from pymatgen.symmetry.analyzer import SymmetrizedStructure
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils import discard_rare_gas_structures
+from screening_pipeline.utils import discard_rare_gas_structures, discard_rare_earth_structures
 from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stderr
 
 ##################################################
@@ -193,8 +193,9 @@ def struct_to_cif_str(
 def read_cif(
     filename: str,
     workers: int = 1,
-    keep_rare_gases: bool = False,
-) -> Tuple[List[Structure], int]:
+    keep_rare_gases: bool = False, 
+    keep_rare_earths: bool = False
+) -> Tuple[List[Structure], int, int]:
     """
     Reads a cif file containing concatenated structures data and decode them using multiprocess.
 
@@ -208,13 +209,17 @@ def read_cif(
     
     Returns:
         List[Structure]: Decoded Structure objects in a list.
-        Int: Number of structures containing rare gases discarded. 
+        Int: Number of structures containing rare gases discarded.
+        Int: Number of structures containing rare earth elements discarded.
     """
 
     struct_strings = extract_cif_from_file(filename)
 
     if not keep_rare_gases:
         struct_strings, nbr_rare_gas_structs = discard_rare_gas_structures(struct_strings)
+    
+    if not keep_rare_earths:
+        struct_strings, nbr_rare_earth_structs = discard_rare_earth_structures(struct_strings)
 
     nbr_struct = len(struct_strings)
     assert nbr_struct > 0, "No structure data found in provided file"
@@ -232,7 +237,7 @@ def read_cif(
         desc="load and read data",
     ))
 
-    return structs_list, nbr_rare_gas_structs
+    return structs_list, nbr_rare_gas_structs, nbr_rare_earth_structs
 
 def write_cif(
     filename: str,

@@ -48,7 +48,7 @@ def assert_args(args: Namespace):
     print(f'keep_rare_gases: {args.keep_rare_gases}')
     print(f'keep_equivalent: {args.keep_equivalent}')
     print(' ')
-    print('----------------------------------------')
+    print('------------------------------')
     print(' ')
 
 
@@ -113,6 +113,11 @@ def main():
         help='Pass this flag to disable automatic elimination of structures containing rare gases'
     )
     parser.add_argument(
+        '--keep_rare_earths',
+        action='store_true',
+        help='Pass this flag to disable automatic elimination of structures containing rare earth elements'
+    )
+    parser.add_argument(
         '--keep_equivalent',
         action='store_true',
         help='Pass this flag to disable automatic structure matching and elimination of duplicates'
@@ -134,21 +139,27 @@ def main():
 
     # Extraction des données CIF et conversion en structures
 
-    structures, nbr_rare_gas_structs = read_cif(
+    structures, nbr_rare_gas_structs, nbr_rare_earth_structs = read_cif(
         filename=args.filename,
         workers=args.workers,
-        keep_rare_gases=args.keep_rare_gases,
+        keep_rare_gases=args.keep_rare_gases, 
+        keep_rare_earths=args.keep_rare_earths
     )
 
-    nbr_structs = len(structures)
-    assert nbr_structs > 0, 'No structure could be parsed from given data'
+    nbr_loaded_structs = len(structures)
+    nbr_total_structs  = nbr_loaded_structs + nbr_rare_gas_structs + nbr_rare_earth_structs
+    assert nbr_loaded_structs > 0, 'No structure could be parsed from given data'
 
-    print(f'{nbr_structs + nbr_rare_gas_structs} structures loaded in total')
+    print(f'{nbr_total_structs} structures loaded in total')
 
     if not args.keep_rare_gases:
         print(f'{nbr_rare_gas_structs} structures containing rare gases were ignored')
-        print(f'Therefore, {nbr_structs} structures are kept for further processing')
+    
+    if not args.keep_rare_earths:
+        print(f'{nbr_rare_earth_structs} structures containing rare earths were ignored')
 
+    print(f'{nbr_loaded_structs} structures are kept for further processing')
+    
     # Calcul de la symétrie d'espace des structures
 
     symmetrized_structs = batch_symmetrizer(
@@ -191,10 +202,11 @@ def main():
     print(' ')
     print('SUMMARY OF THE CALCULATION')
     print(' ')
-    print(f'{nbr_structs + nbr_rare_gas_structs} structures detected in total, including:')
+    print(f'{nbr_loaded_structs + nbr_rare_gas_structs} structures detected in total, including:')
     print(f'- {nbr_unique_structs} unique structures')
-    print(f'- {nbr_equivalent} duplicated structures')
     print(f'- {nbr_rare_gas_structs} structures containing rare gases')
+    print(f'- {nbr_rare_earth_structs} structures containing rare earths')
+    print(f'- {nbr_equivalent} structures that are duplicates')
     print(' ')
     print(f"Output results written in '{args.output}'")
     print(f'elapsed time: {stop-start}')
