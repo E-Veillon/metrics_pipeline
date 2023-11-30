@@ -20,7 +20,9 @@ from pymatgen.core.structure import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmetrizedStructure
 
 ########################################
+# LOCAL MODULES
 
+from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stderr
 
 def get_default_symmetry(structure: Structure) -> Structure:
     #TODO: modify CifBlock data dict to set it to P1 and spg number 1
@@ -96,23 +98,24 @@ def structure_symmetrizer(
         symprec=symprec, 
         angle_tolerance=angle_tolerance
     )
-    try:
-        sym_struct = struct_analyzer.get_symmetrized_structure()
+    with redirect_c_stdout(None), redirect_c_stderr(None):
+        try:
+            sym_struct = struct_analyzer.get_symmetrized_structure()
 
-    except TypeError as exc:
-        spglib_result = struct_analyzer.get_symmetry_dataset()
+        except TypeError as exc:
+            spglib_result = struct_analyzer.get_symmetry_dataset()
 
-        if spglib_result is None:
+            if spglib_result is None:
 
-            return _retry_get_symmetrized_structure(
-                structure=structure, 
-                symprec=symprec, 
-                angle_tolerance=angle_tolerance
-            )
+                return _retry_get_symmetrized_structure(
+                    structure=structure, 
+                    symprec=symprec, 
+                    angle_tolerance=angle_tolerance
+                )
 
-        raise exc
+            raise exc
 
-    return sym_struct
+        return sym_struct
 
 def batch_symmetrizer(
         structures: List[Structure], 

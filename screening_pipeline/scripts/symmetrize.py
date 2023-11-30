@@ -191,7 +191,7 @@ def main():
     print(' ')
     print('SUMMARY OF THE CALCULATION')
     print(' ')
-    print(f'{nbr_structs} structures detected in total, including:')
+    print(f'{nbr_structs + nbr_rare_gas_structs} structures detected in total, including:')
     print(f'- {nbr_unique_structs} unique structures')
     print(f'- {nbr_equivalent} duplicated structures')
     print(f'- {nbr_rare_gas_structs} structures containing rare gases')

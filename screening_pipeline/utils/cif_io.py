@@ -149,7 +149,7 @@ def struct_to_cif_str(
     # Between non-equivalent sites, we sort them firstly by ascending electronegativity, 
     # then by descending multiplicity, then by ascending frac coordinates
     electroneg_sorting_key = lambda t: (t[0].species.average_electroneg,-t[1],t[0].a,t[0].b,t[0].c)
-    sorted_unique_sites: List[Tuple[PeriodicSite, int]] = sorted(unique_sites, key = electroneg_sorting_key)
+    sorted_unique_sites: List[Tuple[PeriodicSite, int]] = sorted(unique_sites, key=electroneg_sorting_key)
 
     atom_site_type_symbol   = []
     atom_site_symmetry_mult = []
