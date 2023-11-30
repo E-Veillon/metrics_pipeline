@@ -196,6 +196,7 @@ def main():
     print(f'- {nbr_equivalent} duplicated structures')
     print(f'- {nbr_rare_gas_structs} structures containing rare gases')
     print(' ')
+    print(f"Output results written in '{args.output}'")
     print(f'elapsed time: {stop-start}')
 
 

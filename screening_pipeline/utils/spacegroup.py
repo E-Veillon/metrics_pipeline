@@ -93,12 +93,13 @@ def structure_symmetrizer(
         A Pymatgen SymmetrizedStructure object if symmetry detection worked properly,
         or a Structure object with default P1 spacegroup if it could not detect any.
     '''
-    struct_analyzer = SpacegroupAnalyzer(
-        structure=structure, 
-        symprec=symprec, 
-        angle_tolerance=angle_tolerance
-    )
     with redirect_c_stdout(None), redirect_c_stderr(None):
+
+        struct_analyzer = SpacegroupAnalyzer(
+            structure=structure, 
+            symprec=symprec, 
+            angle_tolerance=angle_tolerance
+        )
         try:
             sym_struct = struct_analyzer.get_symmetrized_structure()
 
