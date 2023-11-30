@@ -104,7 +104,8 @@ def cif_str_to_struct(cif_str: str) -> Structure:
     return cif_str'''
 
 def struct_to_cif_str(
-        structure: Union[Structure, SymmetrizedStructure]
+        structure: Union[Structure, SymmetrizedStructure], 
+        significant_figures: int = 8
     ) -> str:
     '''
     Converts a pymatgen Structure object into a CIF formatted string.
@@ -119,7 +120,10 @@ def struct_to_cif_str(
     if not isinstance(structure, Structure):
         raise TypeError('Cannot write CIF data for a non-structure object.')
 
-    cif_writer = CifWriter(structure)
+    cif_writer = CifWriter(
+        struct=structure, 
+        significant_figures=significant_figures
+    )
 
     if not isinstance(structure, SymmetrizedStructure):
         cif_str = '# symmetrize: unable to find symmetry\n' + str(cif_writer)
@@ -129,26 +133,39 @@ def struct_to_cif_str(
     cif_block_list      = list(cif_writer.cif_file.data.values())
     cif_block           = cif_block_list[0]
     data_dict           = cif_block.data
+
     # Extract symmetry infos from the SymmetrizedStructure object
     struct_spg          = structure.spacegroup
     xyz_ops             = [op.as_xyz_string() for op in struct_spg]
     equiv_sites         = structure.equivalent_sites
-    # Get the ordering for positions matrix
-    partial_sort        = partial(sorted, key=lambda s: tuple(abs(x) for x in s.frac_coords))
-    unique_sites        = [(partial_sort(sites)[0],len(sites)) for sites in equiv_sites]
-    partial_sort_2      = partial(sorted, key=lambda t: (t[0].species.average_electroneg,-t[1],t[0].a,t[0].b,t[0].c))
-    sorted_unique_sites = partial_sort_2(unique_sites)
 
+    # Get the ordering for species listing
 
-    data_dict['_symmetry_space_group_name_H-M'] = struct_spg.int_symbol
-    data_dict['_symmetry_Int_Tables_number']    = struct_spg.int_number
-    data_dict['_symmetry_equiv_pos_site_id']    = [f'{idx}' for idx in range(1, len(xyz_ops) + 1)]
-    data_dict['_symmetry_equiv_pos_as_xyz']     = xyz_ops
-    #TODO: prendre en compte les équivalences entre sites pour réduire la matrice des coordonnées
+    # Inside a list of equivalent sites, we only keep the one with minimal fractional coordinates, 
+    # and take the number of equivalent sites as the multiplicity
+    frac_coord_sorting_key = lambda s: tuple(abs(x) for x in s.frac_coords)
+    unique_sites: List[Tuple[PeriodicSite, int]] = [(sorted(sites, key=frac_coord_sorting_key)[0],len(sites)) for sites in equiv_sites]
+    
+    # Between non-equivalent sites, we sort them firstly by ascending electronegativity, 
+    # then by descending multiplicity, then by ascending frac coordinates
+    electroneg_sorting_key = lambda t: (t[0].species.average_electroneg,-t[1],t[0].a,t[0].b,t[0].c)
+    sorted_unique_sites: List[Tuple[PeriodicSite, int]] = sorted(unique_sites, key = electroneg_sorting_key)
+
+    atom_site_type_symbol   = []
+    atom_site_symmetry_mult = []
+    atom_site_fract_x       = []
+    atom_site_fract_y       = []
+    atom_site_fract_z       = []
+    atom_site_label         = []
+    atom_site_occupancy     = []
+
+    format_str = f"{{:.{significant_figures}f}}"
+    count      = 0
+
     for site, mult in sorted_unique_sites:
         for specie, occupancy in site.species.items():
             atom_site_type_symbol.append(str(specie))
-            atom_site_symmetry_multiplicity.append(f"{mult}")
+            atom_site_symmetry_mult.append(f"{mult}")
             atom_site_fract_x.append(format_str.format(site.a))
             atom_site_fract_y.append(format_str.format(site.b))
             atom_site_fract_z.append(format_str.format(site.c))
@@ -156,14 +173,18 @@ def struct_to_cif_str(
             atom_site_label.append(site_label)
             atom_site_occupancy.append(str(occupancy))
             count += 1
-    # Ajout des variables au dictionnaire de données
-    block["_atom_site_type_symbol"] = atom_site_type_symbol
-    block["_atom_site_label"] = atom_site_label
-    block["_atom_site_symmetry_multiplicity"] = atom_site_symmetry_multiplicity
-    block["_atom_site_fract_x"] = atom_site_fract_x
-    block["_atom_site_fract_y"] = atom_site_fract_y
-    block["_atom_site_fract_z"] = atom_site_fract_z
-    block["_atom_site_occupancy"] = atom_site_occupancy
+
+    data_dict['_symmetry_space_group_name_H-M']   = struct_spg.int_symbol
+    data_dict['_symmetry_Int_Tables_number']      = struct_spg.int_number
+    data_dict['_symmetry_equiv_pos_site_id']      = [f'{idx}' for idx in range(1, len(xyz_ops) + 1)]
+    data_dict['_symmetry_equiv_pos_as_xyz']       = xyz_ops
+    data_dict["_atom_site_type_symbol"]           = atom_site_type_symbol
+    data_dict["_atom_site_label"]                 = atom_site_label
+    data_dict["_atom_site_symmetry_multiplicity"] = atom_site_symmetry_mult
+    data_dict["_atom_site_fract_x"]               = atom_site_fract_x
+    data_dict["_atom_site_fract_y"]               = atom_site_fract_y
+    data_dict["_atom_site_fract_z"]               = atom_site_fract_z
+    data_dict["_atom_site_occupancy"]             = atom_site_occupancy
 
     cif_str = str(cif_block)
 
