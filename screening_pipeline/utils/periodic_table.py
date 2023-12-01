@@ -19,6 +19,7 @@ from itertools import filterfalse
 
 from pymatgen.core.structure import SiteCollection, Composition
 from pymatgen.core.periodic_table import Element
+from pymatgen.io.cif import CifBlock
 
 ########################################
 # LOCAL MODULES
@@ -42,7 +43,7 @@ def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
     if isinstance(structure, SiteCollection):
         return structure.composition.contains_element_type("noble_gas")
 
-    return re.search(r"(He|Ne|Ar|Kr|Xe|Rn)", structure) is not None
+    return re.search(r"(He|Ne|Ar|Kr|Xe|Rn|Og)", structure) is not None
 
 def discard_rare_gas_structures(
         structures: Iterable[Union[SiteCollection, str]]
@@ -79,8 +80,10 @@ def has_rare_earth(structure: Union[SiteCollection, str]) -> bool:
         return structure.composition.contains_element_type("f-block")
     
     elts_grps_list = get_all_elements_groups(structure)
+    has_lanthanoid = 'L' in elts_grps_list
+    has_actinoid   = 'A' in elts_grps_list
 
-    return 'L' in elts_grps_list or 'A' in elts_grps_list
+    return has_lanthanoid or has_actinoid
 
 def discard_rare_earth_structures(
         structures: Iterable[Union[SiteCollection, str]]
@@ -100,7 +103,7 @@ def discard_rare_earth_structures(
     kept_structs  = list(filterfalse(has_rare_earth, structures))
     return kept_structs, nbr_discarded
 
-def get_element_group(atom: str|Element) -> str:
+def get_element_group(atom: Union[Element, str]) -> str:
     '''
     Finds PT group of a given element as string or Element object.
 
@@ -143,14 +146,16 @@ def get_element_group(atom: str|Element) -> str:
         case ('Ac'|'Th'|'Pa'|'U'|'Np'|'Pu'|'Am'|'Cm'|'Bk'|'Cf'|'Es'|'Fm'|'Md'|'No'):
             return 'A'
         case str(): return None
-        case _: raise TypeError(f'expected a str, got {type(atom)}.')
+        case _: raise TypeError(f'expected a Element or str, got {type(atom)}.')
 
-def get_all_elements_groups(formula: str) -> List[str]:
+def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
     '''
-    Finds PT group of each element in a formula string.
+    Finds PT group of each element contained in a structure.
+    Provided structure can either be a pymatgen SiteCollection object,
+    or a CIF formatted string containing a structural formula.
 
     Parameters:
-        formula (str): The formula to search element groups in.
+        formula (SiteCollection|str): The structure to search element groups in.
     
     Returns:
         List[str]:  The group of each element in '[block][group number in block]' format,
@@ -159,14 +164,18 @@ def get_all_elements_groups(formula: str) -> List[str]:
                     is not usable for these at the moment.
     '''
 
-    assert isinstance(formula, str), 'Provided formula must be a string'
-    split_form = formula.split()
+    assert isinstance(structure, (SiteCollection, str)), \
+    'Provided structure must be a SiteCollection object or a CIF string'
 
-    for string in split_form:
-        comp      = Composition(string, strict=True)
+    if isinstance(structure, SiteCollection):
+        elts_list = list(structure.composition.keys())
+    
+    if isinstance(structure, str):
+        formula   = CifBlock.from_str(structure).data["_chemical_formula_structural"]
+        comp      = Composition(formula)
         elts_list = list(comp.keys())
-        grps_list = list(map(get_element_group, elts_list))
 
+    grps_list = list(map(get_element_group, elts_list))
     return grps_list
 
 def get_element_valence_electrons(atom: str|Element) -> int:

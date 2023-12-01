@@ -126,7 +126,7 @@ def struct_to_cif_str(
     )
 
     if not isinstance(structure, SymmetrizedStructure):
-        cif_str = '# symmetrize: unable to find symmetry\n' + str(cif_writer)
+        cif_str = str(cif_writer)
         return cif_str
     
     # Extract the data dict from CifWriter
