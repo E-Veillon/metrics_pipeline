@@ -88,7 +88,9 @@ def main():
 
     # MAIN BLOCK
 
-    from screening_pipeline.utils import read_cif
+    from screening_pipeline.utils.cif_io import read_cif
+    from screening_pipeline.utils.periodic_table import get_all_valence_electrons, get_delta_sol_el_ratio
+    from screening_pipeline.utils.vasp_io import vasp_input_files_settings, vasp_launcher
 
     structures = read_cif(
         filename=args.filename, 
@@ -99,6 +101,17 @@ def main():
     nbr_struct: int   = len(structures)
     chunksize: int    = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
     generic_path: str = args.path
+
+    for struct in structures:
+        N_0 = get_all_valence_electrons(struct)
+        n   = get_delta_sol_el_ratio(struct, 'PBE', 'BEST')
+        vasp_input = vasp_input_files_settings(struct)
+        vasp_launcher(vasp_input, generic_path) # Relaxation -> E(N0)
+        # Changer la valeur de la densité de charge dans CHGCAR :
+        # Densité de charge ponctuelle n(r) = densité électronique ponctuelle rhô(r) x charge élémentaire e
+        # Densité de charge CHGCAR nc(r) = densité de charge ponctuelle n(r) x Vol. maille V(maille)
+        # Ccl: nc(r) représente la densité de charge par maille, on peut donc enlever/ajouter
+        # une densité de charge n x e directement à nc(r) pour faire les calculs statiques E(N0 - n) et E(N0 + n)
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
