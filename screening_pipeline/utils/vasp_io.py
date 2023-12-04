@@ -6,24 +6,26 @@ Functions to write VASP input files, launch VASP calculations and manage VASP ou
 ########################################
 # TYPE HINTING
 
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 ########################################
 # OPTIMIZATION MODULES
 
 from itertools import cycle
+from functools import partial
+from tqdm.contrib.concurrent import process_map
 
 ########################################
 # PYTHON MATERIAL GENOMICS PACKAGE
 
-from pymatgen.core.structure import Structure
+from pymatgen.core.structure import Structure, SiteCollection
 from pymatgen.io.vasp import VaspInput
 from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 
 ########################################
 # LOCAL MODULES
 
-#from screening_pipeline.utils import U_VALUES
+from screening_pipeline.utils.fitted_values import U_VALUES
 
 
 def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
@@ -37,7 +39,6 @@ def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
     Returns:
         A dictionnary containing the INCAR tags corrections.
     '''
-    from screening_pipeline.utils import U_VALUES
 
     corrected_EDIFF = float(5e-5)*number_of_sites
     corrected_ENCUT = 520 # To be modified according to ENMAX value (ENCUT = 1.3*ENMAX)
@@ -69,39 +70,41 @@ def vasp_input_files_settings(
         structure: Structure, 
         /, *, 
         use_mit_set: bool = True, 
+        corrected: bool = True, 
         config_dict: Optional[dict] = None, 
-        modified_incar: Optional[dict] = None, 
-        modified_kpoints: Optional[dict] = None, 
-        modified_potcar: Optional[dict] = None
-        ) -> VaspInput:
+        user_incar_settings: Optional[dict] = None, 
+        user_kpoints_settings: Optional[dict] = None, 
+        user_potcar_settings: Optional[dict] = None
+    ) -> VaspInput:
     '''
     Builds a VaspInput object, with a standard preset option corresponding to the MIT high throughput material screening project.
         
-        Reference of the preset:
-            A. Jain, G. Hautier, C.J. Moore, S.P. Ong,
-            C.C. Fischer, T. Mueller, K.A. Persson, and G. Ceder,
-            Computational Materials Science, 50, 2295-2310 (2011)
-            (reference 14 in screening_pipeline/Bibliography/)
+    Reference of the preset:
+        A. Jain, G. Hautier, C.J. Moore, S.P. Ong,
+        C.C. Fischer, T. Mueller, K.A. Persson, and G. Ceder,
+        Computational Materials Science, 50, 2295-2310 (2011)
+        (reference 14 in screening_pipeline/Bibliography/)
 
-        Parameters:
-            structure (Structure): The structure to write VASP input files for.
+    Parameters:
+        structure (Structure): The structure to write VASP input files for.
 
-            config_dict (dict):         VASP input parameters provided as a dictionnary with input file names as keys and dicts containing file specific parameters as values.
+        config_dict (dict):             VASP input parameters provided as a dict.
+                                        Input file names are the keys and dicts containing file specific parameters are the values.
 
-            use_mit_set (bool):         Whether to use the MIT high throughput project's preset or not.
+        use_mit_set (bool):             Whether to use the MIT high throughput project's preset or not.
                                         If True, config_dict should be set to None, but input parameters can be ajusted with appropriate modifier arguments (default).
                                         If False, you need to provide a full config_dict.
 
-            modified_incar (dict):      User INCAR settings. It allows to override some of the standard INCAR tags if necessary.
+        user_incar_settings (dict):     User INCAR settings. It allows to override some of the standard INCAR tags if necessary.
                                         Defaults to None.
 
-            modifieed_kpoints (dict):   User KPOINTS settings. It allows to override the standard Kpoints mesh if necessary.
+        user_kpoints_settings (dict):   User KPOINTS settings. It allows to override the standard Kpoints mesh if necessary.
                                         Defaults to None.
 
-            modified_potcar (dict):     User POTCAR settings. It allows to override the standard POTCAR settings, although it is not recommended.
+        user_potcar_settings (dict):    User POTCAR settings. It allows to override the standard POTCAR settings, although it is not recommended.
                                         Defaults to None.
-        Returns:
-            A DictSet object that uses the write_input method to write set input files in given directory, ready for calculation.
+    Returns:
+        A DictSet object that uses the write_input method to write set input files in given directory, ready for calculation.
     '''
 
     assert isinstance(structure, Structure), 'Provided structure format is not supported. Please provide a PyMatGen Structure object or one of its subclasses'
@@ -115,31 +118,32 @@ def vasp_input_files_settings(
 
         return DictSet(structure, config_dict).get_vasp_input()
 
-    MITRelaxSet_corrections_dict = {'INCAR': _MITRelaxSet_INCAR_corrections(structure.num_sites)}
+    MITRelaxSet_corrections_dict = {}
+
+    if corrected:
+        MITRelaxSet_corrections_dict = {'INCAR': _MITRelaxSet_INCAR_corrections(structure.num_sites)}
 
     def has_only_string_keys(dict: Dict) -> bool:
         return all(map(isinstance,dict.keys(),cycle((str,))))
 
-    if modified_incar is not None:
-        assert isinstance(modified_incar, dict), 'INCAR modifications should be provided as a dict.'
-        assert has_only_string_keys(modified_incar), 'All provided INCAR tags should be strings.'
+    if user_incar_settings is not None:
+        assert isinstance(user_incar_settings, dict), 'INCAR modifications should be provided as a dict.'
+        assert has_only_string_keys(user_incar_settings), 'All provided INCAR tags should be strings.'
 
-        for incar_tag, tag_value in modified_incar:
+        for incar_tag, tag_value in user_incar_settings:
             MITRelaxSet_corrections_dict['INCAR'][incar_tag] = tag_value
 
-    if modified_kpoints is not None:
-        assert isinstance(modified_kpoints, dict), 'KPOINTS modifications should be provided as a dict.'
-        assert has_only_string_keys(modified_kpoints), 'All provided KPOINTS modifications keys should be strings.'
+    if user_kpoints_settings is not None:
+        assert isinstance(user_kpoints_settings, dict), 'KPOINTS modifications should be provided as a dict.'
+        assert has_only_string_keys(user_kpoints_settings), 'All provided KPOINTS modifications keys should be strings.'
 
-        for key, value in modified_kpoints:
-            MITRelaxSet_corrections_dict['KPOINTS'][key] = value
+        MITRelaxSet_corrections_dict['KPOINTS'] = user_kpoints_settings
 
-    if modified_potcar is not None:
-        assert isinstance(modified_potcar, dict), 'POTCAR modifications should be provided as a dict.'
-        assert has_only_string_keys(modified_potcar), 'All provided POTCAR modifications keys should be strings.'
+    if user_potcar_settings is not None:
+        assert isinstance(user_potcar_settings, dict), 'POTCAR modifications should be provided as a dict.'
+        assert has_only_string_keys(user_potcar_settings), 'All provided POTCAR modifications keys should be strings.'
 
-        for key, value in modified_potcar:
-            MITRelaxSet_corrections_dict['POTCAR'][key] = value
+        MITRelaxSet_corrections_dict['POTCAR'] = user_potcar_settings
 
     return MITRelaxSet(
         structure, 
@@ -148,7 +152,73 @@ def vasp_input_files_settings(
         user_potcar_settings=MITRelaxSet_corrections_dict['POTCAR']
         ).get_vasp_input()
 
+def batch_write_MITRelaxSet_inputs(
+        structures: List[Structure], 
+        corrected: bool = True, 
+        workers: int = 1, 
+        **kwargs
+    ) -> List[VaspInput]:
+    '''
+    Creates VaspInput objects for several structures.
+    Uses the MITRelaxSet preset from pymatgen.
+
+    Reference of the preset:
+        A. Jain, G. Hautier, C.J. Moore, S.P. Ong,
+        C.C. Fischer, T. Mueller, K.A. Persson, and G. Ceder,
+        Computational Materials Science, 50, 2295-2310 (2011)
+        (reference 14 in screening_pipeline/Bibliography/)
+
+    Parameters:
+        structures (List[Structure]):   The structures to write VASP inputs for.
+        
+        corrected (bool):               The preset implemented in pymatgen uses slightly different parameters
+                                        compared to the ones cited in the reference article. Setting this to True
+                                        corrects the preset to better fit the reference. Defaults to True.
+        
+        kwargs:                         Any user settings supported by MITRelaxSet.
+    '''
+    
+    assert all(map(isinstance, structures, cycle((Structure,)))), \
+    'Some of the structures provied are not Structure objects'
+
+    user_incar_settings   = kwargs.get('user_incar_settings', None)
+    user_kpoints_settings = kwargs.get('user_kpoints_settings', None)
+    user_potcar_settings  = kwargs.get('user_potcar_settings', None)
+
+    assert isinstance(user_incar_settings, (dict, None)), \
+    'user_incar_settings must be a dict or None'
+    assert isinstance(user_kpoints_settings, (dict, None)), \
+    'user_kpoints_settings must be a dict or None'
+    assert isinstance(user_potcar_settings, (dict, None)), \
+    'user_potcar_settings must be a dict or None'
+
+    vasp_input_files_settings_part = partial(
+        vasp_input_files_settings, 
+        use_mit_set = True, 
+        corrected=corrected, 
+        user_incar_settings=user_incar_settings, 
+        user_kpoints_settings=user_kpoints_settings, 
+        user_potcar_settings=user_potcar_settings
+    )
+    
+    nbr_struct = len(structures)
+    chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
+
+    vasp_inputs = list(
+        process_map(
+            vasp_input_files_settings_part,
+            structures, 
+            workers=workers, 
+            chunksize=chunksize
+        )
+    )
+    return vasp_inputs
+
 def vasp_launcher(vasp_input: VaspInput, path: str):
+
+    if not path.endswith("/"):
+        path = path + "/"
+
     calc_dir = path
     out_file = path + "vasp.out"
     err_file = path + "vasp.err"
