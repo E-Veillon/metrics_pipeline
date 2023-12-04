@@ -145,12 +145,14 @@ def vasp_input_files_settings(
 
         MITRelaxSet_corrections_dict['POTCAR'] = user_potcar_settings
 
-    return MITRelaxSet(
+    vasp_input = MITRelaxSet(
         structure, 
         user_incar_settings=MITRelaxSet_corrections_dict['INCAR'], 
         user_kpoints_settings=MITRelaxSet_corrections_dict['KPOINTS'], 
         user_potcar_settings=MITRelaxSet_corrections_dict['POTCAR']
-        ).get_vasp_input()
+    ).get_vasp_input()
+
+    return vasp_input
 
 def batch_write_MITRelaxSet_inputs(
         structures: List[Structure], 
@@ -209,7 +211,8 @@ def batch_write_MITRelaxSet_inputs(
             vasp_input_files_settings_part,
             structures, 
             workers=workers, 
-            chunksize=chunksize
+            chunksize=chunksize, 
+            desc='Converting structures to VASP inputs'
         )
     )
     return vasp_inputs
