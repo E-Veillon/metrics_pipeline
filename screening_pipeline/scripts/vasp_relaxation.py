@@ -12,16 +12,21 @@ from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
 ########################################
+# OPTIMIZATION MODULES
+
+from functools import partial
+from tqdm.contrib.concurrent import process_map
+
+########################################
 # PYTHON MATERIALS GENOMICS PACKAGE
 
-from pymatgen.core.structure import Structure
-from pymatgen.io.vasp.sets import MITRelaxSet, MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet
+from pymatgen.core.structure import Structure, SiteCollection
 
 ########################################
 # LOCAL MODULES
 
 from screening_pipeline.utils.cif_io import read_cif
-from screening_pipeline.utils.vasp_io import vasp_input_files_settings, vasp_launcher
+from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_launcher
 
 ########################################
 # LOCAL FUNCTIONS
@@ -30,7 +35,17 @@ def assert_args(args: Namespace) -> None:
     assert args.filename.endswith('.cif'), \
     'Input structure data must be in CIF format.'
 
-    assert args.method in {'MITRelaxSet', 'MPRelaxSet', 'MPScanRelaxSet', 'MPHSERelaxSet'}, '''
+    allowed_presets = {(
+        'MITRelaxSet', 
+        'MPRelaxSet', 
+        'MPScanRelaxSet', 
+        'MPHSERelaxSet', 
+        'MPMetalRelaxSet', 
+        'MVLRelax52Set', 
+        'MVLScanRelaxSet'
+    )}
+
+    assert args.method in allowed_presets, '''
     The relaxation method must be one of the following pymatgen relaxation presets:
     MITRelaxSet, MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet.'''
 
@@ -50,7 +65,7 @@ def main():
     '''
     prog_missing_steps = '''
         Missing steps to complete this script: 
-            - Read cif, transform to structures
+            - Read cif, transform to structures - OK
             - Setup VASP calculation
             - Write VASP input files
             - Run VASP on written directories
@@ -90,6 +105,14 @@ def main():
                 https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets.''', 
         metavar='RelaxSet'
     )
+    parser.add_argument(
+        '-w',
+        '--workers',
+        type=int,
+        default=1,
+        help='Number of parallel processes to create',
+        metavar='int',
+    )
     args: Namespace = parser.parse_args()
 
     assert_args(args)
@@ -99,14 +122,28 @@ def main():
     if not args.output.endswith('/'):
         args.output = args.output + '/'
 
-    outdir = args.output
-    method = args.method
+    outdir  = args.output
+    method  = args.method
+    workers = args.workers
 
 
     # MAIN BLOCK
 
-
-
+    structures, _, _ = read_cif(filename=filename)
+    
+    nbr_struct = len(structures)
+    chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
+    vasp_setup = partial(
+        vasp_relaxation_settings, 
+        method=method, 
+    )
+    
+    vasp_inputs = list(process_map(
+        vasp_setup, 
+        structures, 
+        workers=workers, 
+        chunksize=chunksize
+    ))
 
     stop = datetime.now()
     print(f'Elapsed time: {stop-start}')
