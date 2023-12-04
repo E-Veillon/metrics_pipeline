@@ -3,7 +3,7 @@
 A script that calculates symmetry spacegroup for structures in a CIF file using pymatgen.
 '''
 
-##################################################
+########################################
 # SYSTEM I/O MODULES
 
 from datetime import datetime
