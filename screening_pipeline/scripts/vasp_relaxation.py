@@ -118,25 +118,19 @@ def main():
     assert_args(args)
     
     filename = args.filename
-
-    if not args.output.endswith('/'):
-        args.output = args.output + '/'
-
-    outdir  = args.output
-    method  = args.method
-    workers = args.workers
+    outdir   = (args.output if args.output.endswith('/') else args.output + '/')
+    method   = args.method
+    workers  = args.workers
 
 
     # MAIN BLOCK
 
     structures, _, _ = read_cif(filename=filename)
     
-    nbr_struct = len(structures)
-    chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
-    vasp_setup = partial(
-        vasp_relaxation_settings, 
-        method=method, 
-    )
+    nbr_struct      = len(structures)
+    chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
+    vasp_setup      = partial(vasp_relaxation_settings, preset=method)
+    fixed_path_calc = partial(vasp_launcher, path=outdir)
     
     vasp_inputs = list(process_map(
         vasp_setup, 
@@ -144,6 +138,14 @@ def main():
         workers=workers, 
         chunksize=chunksize
     ))
+
+    process_map(
+        fixed_path_calc, 
+        vasp_inputs, 
+        workers=workers, 
+        chunksize=chunksize, 
+        desc='Relaxation of structures'
+    )
 
     stop = datetime.now()
     print(f'Elapsed time: {stop-start}')
