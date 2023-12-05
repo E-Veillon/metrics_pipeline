@@ -227,19 +227,9 @@ def vasp_launcher(vasp_input: VaspInput, path: str):
     err_file = path + "vasp.err"
     vasp_input.run_vasp(run_dir=calc_dir, output_file=out_file, err_file=err_file)
 
-PMGPreset = Literal[
-        'MITRelaxSet', 
-        'MPRelaxSet', 
-        'MPScanRelaxSet', 
-        'MPHSERelaxSet', 
-        'MPMetalRelaxSet', 
-        'MVLRelax52Set', 
-        'MVLScanRelaxSet'
-]
-
 def vasp_relaxation_settings(
         structure: SiteCollection, 
-        method: PMGPreset = 'MITRelaxSet', 
+        preset: str = 'MITRelaxSet', 
         user_incar_settings: Optional[dict] = None, 
         user_kpoints_settings: Optional[dict] = None, 
         user_potcar_settings: Optional[dict] = None
@@ -248,9 +238,9 @@ def vasp_relaxation_settings(
     Setup VASP inputs for a given structure using one of the pymatgen relaxation presets.
 
     Parameters:
-        structure (SiteCollection): The structure to write VASP inputs for.
+        structure (SiteCollection):     The structure to write VASP inputs for.
 
-        method (str): The pymatgen preset to use for VASP inputs initialization.
+        preset (str):                   The pymatgen preset to use for VASP inputs initialization.
 
         user_incar_settings (dict):     User INCAR settings. It allows to override some of the standard INCAR tags if necessary.
                                         Defaults to None.
@@ -261,79 +251,52 @@ def vasp_relaxation_settings(
         user_potcar_settings (dict):    User POTCAR settings. It allows to override the standard POTCAR settings, although it is not recommended.
                                         Defaults to None.
     '''
-
-    assert isinstance(structure, SiteCollection), \
-    'structure argument format not supported. \
-    It must be an instance of the SiteCollection class or one of its subclasses.'
     
-
-    match method:
-
-        case 'MITRelaxSet':
-            from pymatgen.io.vasp.sets import MITRelaxSet
-            MIT_INCAR_corrections = _MITRelaxSet_INCAR_corrections(structure.num_sites)
-            MIT_INCAR_corrections.update(user_incar_settings)
-            vasp_input = MITRelaxSet(
-                structure=structure, 
-                user_incar_settings=MIT_INCAR_corrections, 
-                user_kpoints_settings=user_kpoints_settings, 
-                user_potcar_settings=user_potcar_settings
-            ).get_vasp_input()
-
-        case 'MPRelaxSet':
-            from pymatgen.io.vasp.sets import MPRelaxSet
-            vasp_input = MPRelaxSet(
-                structure=structure, 
-                user_incar_settings=user_incar_settings, 
-                user_kpoints_settings=user_kpoints_settings, 
-                user_potcar_settings=user_potcar_settings
-            ).get_vasp_input()
-
-        case 'MPScanRelaxSet':
-            from pymatgen.io.vasp.sets import MPScanRelaxSet
-            vasp_input = MPScanRelaxSet(
-                structure=structure, 
-                user_incar_settings=user_incar_settings, 
-                user_kpoints_settings=user_kpoints_settings, 
-                user_potcar_settings=user_potcar_settings
-            ).get_vasp_input()
-
-        case 'MPHSERelaxSet':
-            from pymatgen.io.vasp.sets import MPHSERelaxSet
-            vasp_input = MPHSERelaxSet(
-                structure=structure, 
-                user_incar_settings=user_incar_settings, 
-                user_kpoints_settings=user_kpoints_settings, 
-                user_potcar_settings=user_potcar_settings
-            ).get_vasp_input()
-
-        case 'MPMetalRelaxSet':
-            from pymatgen.io.vasp.sets import MPMetalRelaxSet
-            vasp_input = MPMetalRelaxSet(
-                structure=structure, 
-                user_incar_settings=user_incar_settings, 
-                user_kpoints_settings=user_kpoints_settings, 
-                user_potcar_settings=user_potcar_settings
-            ).get_vasp_input()
-        
-        case 'MVLRelax52Set':
-            from pymatgen.io.vasp.sets import MVLRelax52Set
-            vasp_input = MVLRelax52Set(
-                structure=structure, 
-                user_incar_settings=user_incar_settings, 
-                user_kpoints_settings=user_kpoints_settings, 
-                user_potcar_settings=user_potcar_settings
-            ).get_vasp_input()
-        
-        case 'MVLScanRelaxSet':
-            from pymatgen.io.vasp.sets import MVLScanRelaxSet
-            vasp_input = MVLScanRelaxSet(
-                structure=structure, 
-                user_incar_settings=user_incar_settings, 
-                user_kpoints_settings=user_kpoints_settings, 
-                user_potcar_settings=user_potcar_settings
-            ).get_vasp_input()
-        
-        case _: raise ValueError(f"{method} is not a valid pymatgen relaxation set.")
+    from pymatgen.io.vasp.sets import   MITRelaxSet, MPRelaxSet, MPScanRelaxSet, \
+                                        MPHSERelaxSet, MPMetalRelaxSet, MVLRelax52Set, \
+                                        MVLScanRelaxSet
     
+    allowed_presets = {
+        'MITRelaxSet': MITRelaxSet, 
+        'MPRelaxSet': MPRelaxSet, 
+        'MPScanRelaxSet': MPScanRelaxSet, 
+        'MPHSERelaxSet': MPHSERelaxSet, 
+        'MPMetalRelaxSet': MPMetalRelaxSet, 
+        'MVLRelax52Set': MVLRelax52Set, 
+        'MVLScanRelaxSet': MVLScanRelaxSet
+    }
+
+    assert isinstance(structure, SiteCollection), '''
+    "structure" argument format not supported.
+    It must be an instance of the SiteCollection class or one of its subclasses.'''
+    
+    assert preset in allowed_presets.keys(), '''
+    "preset" argument not recognized.
+    It must be one of the allowed pymatgen relaxation presets.'''
+
+    assert isinstance(user_incar_settings, (dict, None)), \
+    'user_incar_settings must be a dict or None'
+
+    assert isinstance(user_kpoints_settings, (dict, None)), \
+    'user_kpoints_settings must be a dict or None'
+
+    assert isinstance(user_potcar_settings, (dict, None)), \
+    'user_potcar_settings must be a dict or None'
+
+    if user_incar_settings is None: user_incar_settings = {}
+    if user_kpoints_settings is None: user_kpoints_settings = {}
+    if user_potcar_settings is None: user_potcar_settings = {}
+
+    if preset == 'MITRelaxSet':
+        MIT_INCAR_corrections = _MITRelaxSet_INCAR_corrections(structure.num_sites)
+        MIT_INCAR_corrections.update(user_incar_settings)
+        user_incar_settings.update(MIT_INCAR_corrections)
+
+    vasp_input = allowed_presets[preset](
+        structure=structure, 
+        user_incar_settings=user_incar_settings, 
+        user_kpoints_settings=user_kpoints_settings, 
+        user_potcar_settings=user_potcar_settings
+    ).get_vasp_input()
+
     return vasp_input
