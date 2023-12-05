@@ -14,6 +14,18 @@ from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 
 ########################################
+# PYTHON MATERIALS GENOMICS PACKAGE
+
+from pymatgen.io.vasp.outputs import Oszicar, Chgcar
+
+########################################
+# LOCAL MODULES
+
+from screening_pipeline.utils.cif_io import read_cif
+from screening_pipeline.utils.periodic_table import get_all_valence_electrons, get_delta_sol_el_ratio
+from screening_pipeline.utils.vasp_io import vasp_input_files_settings, vasp_launcher
+
+########################################
 # LOCAL FUNCTIONS
 
 def assert_args(args: Namespace):
@@ -24,7 +36,6 @@ def assert_args(args: Namespace):
         args (Namespace): namespace of the parsed arguments.
     '''
 
-    assert args.filename.endswith('.cif'), 'Input file must be in CIF format'
     assert args.workers >= 1, 'the number of workers cannot be negative or zero'
 
 ########################################
@@ -68,17 +79,16 @@ def main():
     )
 
     parser.add_argument(
-        'filename', 
+        'path', 
         type=str, 
-        help='The file conaining structure data to calculate band gap from. CIF format only.', 
-        metavar='file.cif'
+        help='Path to the VASP files to get data from.', 
+        metavar='input_path'
     )
     parser.add_argument(
-        '-p', '--path',
+        'output',
         type=str,
-        default='./Vasp_input_sets/',
-        help='Directory to write VASP input files in (created if it does not exist) (default = ./Vasp_input_sets/).',
-        metavar='path'
+        help='Directory to write VASP input files in (created if it does not exist).',
+        metavar='output_path'
     )
     parser.add_argument(
         '-w', '--workers',
@@ -92,33 +102,37 @@ def main():
 
     assert_args(args)
 
+    input_path  = args.path
+    output_path = args.output
+    workers     = args.workers
+
 
     # MAIN BLOCK
 
-    from screening_pipeline.utils.cif_io import read_cif
-    from screening_pipeline.utils.periodic_table import get_all_valence_electrons, get_delta_sol_el_ratio
-    from screening_pipeline.utils.vasp_io import vasp_input_files_settings, vasp_launcher
+    # Créer une fonction qui va chercher les fichiers OSZICAR dans input_path, 
+    # puis qui les convertit en objets OSZICAR dont on peut tirer l'énergie E(N0).
+    # Attention, il faut garder l'ordre des structures à l'aide d'un dict {num_struct: E(N0)}.
 
-    structures = read_cif(
-        filename=args.filename, 
-        workers=args.workers, 
-        keep_rare_gases=args.keep_rare_gases
-    )
+    # Créer une fonction qui récupère les fichiers CHGCAR dans input_path, 
+    # puis qui les convertit en objets CHGCAR dont on peut modifier la densité de charge
+    # afin de les réécrire dans output_path avec les fichiers INCAR, POSCAR, POTCAR, KPOINTS.
 
-    nbr_struct: int   = len(structures)
-    chunksize: int    = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
-    generic_path: str = args.path
+    # Réaliser les calculs VASP de E(N0 - n) et E(N0 + n).
+
+    # Réutiliser la 1ère fonction pour récupérer les énergies des OSZICAR résultants.
 
     for struct in structures:
         N_0 = get_all_valence_electrons(struct)
         n   = get_delta_sol_el_ratio(struct, 'PBE', 'BEST')
-        vasp_input = vasp_input_files_settings(struct)
-        vasp_launcher(vasp_input, generic_path) # Relaxation -> E(N0)
+        # E(N0) est à lire directement dans le fichier OSZICAR (dernier E0) de la relaxation.
         # Changer la valeur de la densité de charge dans CHGCAR :
         # Densité de charge ponctuelle n(r) = densité électronique ponctuelle rhô(r) x charge élémentaire e
         # Densité de charge CHGCAR nc(r) = densité de charge ponctuelle n(r) x Vol. maille V(maille)
-        # Ccl: nc(r) représente la densité de charge par maille, on peut donc enlever/ajouter
-        # une densité de charge n x e directement à nc(r) pour faire les calculs statiques E(N0 - n) et E(N0 + n)
+        # Ccl: nc(r) = n(maille) représente la densité de charge par maille, on peut donc enlever/ajouter
+        # une densité de charge n x e directement à nc(r) pour faire les calculs 
+        # de minimization électronique, ioniquement statiques E(N0 - n) et E(N0 + n).
+        # Les énergies seront également à récupérer dans le fichier OSZICAR.
+        # Enfin, on pourra faire le calcul EFG = [E(N0 + n) + E(N0 - n) - 2E(N0)]/n.
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
