@@ -64,11 +64,7 @@ def main():
     The relaxation results then may be used in other scripts for material properties analysis.
     '''
     prog_missing_steps = '''
-        Missing steps to complete this script: 
-            - Read cif, transform to structures - OK
-            - Setup VASP calculation
-            - Write VASP input files
-            - Run VASP on written directories
+        Missing steps to complete this script: None
         '''
     helper_format = RawTextHelpFormatter
 
@@ -125,20 +121,25 @@ def main():
 
     # MAIN BLOCK
 
-    structures, _, _ = read_cif(filename=filename)
+    # Convert CIF data into Structure objects
+    structures, *_ = read_cif(filename=filename)
     
+    # Setup parallel processing
     nbr_struct      = len(structures)
     chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
     vasp_setup      = partial(vasp_relaxation_settings, preset=method)
     fixed_path_calc = partial(vasp_launcher, path=outdir)
-    
+
+    # Write VaspInput objects from structures and chosen preset
     vasp_inputs = list(process_map(
         vasp_setup, 
         structures, 
         workers=workers, 
-        chunksize=chunksize
+        chunksize=chunksize, 
+        desc='Writing VASP input files'
     ))
 
+    # Use written VaspInput objects to write input files and run VASP
     process_map(
         fixed_path_calc, 
         vasp_inputs, 
