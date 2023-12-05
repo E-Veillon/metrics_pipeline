@@ -1,5 +1,4 @@
 #!/usr/bin/python
-
 '''
 A script to determine material fundamental band gap from VASP energies and Δ-Sol method.
 
@@ -8,10 +7,14 @@ Reference for Δ-Sol method:
     (reference 32 in screening_pipeline/Bibliography)
 '''
 
+########################################
+# SYSTEM I/O MODULES
 
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 
+########################################
+# LOCAL FUNCTIONS
 
 def assert_args(args: Namespace):
     '''
@@ -23,6 +26,9 @@ def assert_args(args: Namespace):
 
     assert args.filename.endswith('.cif'), 'Input file must be in CIF format'
     assert args.workers >= 1, 'the number of workers cannot be negative or zero'
+
+########################################
+# MAIN FUNCTION
 
 def main():
     start = datetime.now()
@@ -64,14 +70,15 @@ def main():
     parser.add_argument(
         'filename', 
         type=str, 
-        help='The file conaining structure data to calculate band gap from. CIF format only.'
+        help='The file conaining structure data to calculate band gap from. CIF format only.', 
+        metavar='file.cif'
     )
     parser.add_argument(
         '-p', '--path',
         type=str,
         default='./Vasp_input_sets/',
         help='Directory to write VASP input files in (created if it does not exist) (default = ./Vasp_input_sets/).',
-        metavar='str'
+        metavar='path'
     )
     parser.add_argument(
         '-w', '--workers',

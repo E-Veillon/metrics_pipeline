@@ -9,13 +9,15 @@ A script that calculates symmetry spacegroup for structures in a CIF file using 
 from datetime import datetime
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
 
+########################################
+# LOCAL FUNCTIONS
 
 def assert_args(args: Namespace):
     '''
     Input arguments verification.
 
-    Args:
-        args (NamedTuple): namespace of the parsed arguments.
+    Parameters:
+        args (Namespace): namespace of the parsed arguments.
     '''
 
     print(' - INPUT ARGUMENTS - ')
@@ -51,6 +53,8 @@ def assert_args(args: Namespace):
     print('------------------------------')
     print(' ')
 
+########################################
+# MAIN FUNCTION
 
 def main():
     start = datetime.now()
@@ -185,8 +189,7 @@ def main():
         print(f'{nbr_unique_structs} unique structures detected')
         print(f'{nbr_equivalent} duplicates were discarded')
 
-    #  Recalcul des symétries avec PyMatGen (pour prise en compte par CifWriter) et écriture du fichier de sortie
-
+    # Ecriture du fichier CIF symétrisé et épuré des structures indésirables
     write_cif(
         filename=args.output,
         structures=kept_structs,

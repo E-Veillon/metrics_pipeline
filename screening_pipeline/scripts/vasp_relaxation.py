@@ -18,11 +18,6 @@ from functools import partial
 from tqdm.contrib.concurrent import process_map
 
 ########################################
-# PYTHON MATERIALS GENOMICS PACKAGE
-
-from pymatgen.core.structure import Structure, SiteCollection
-
-########################################
 # LOCAL MODULES
 
 from screening_pipeline.utils.cif_io import read_cif

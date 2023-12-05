@@ -1,16 +1,29 @@
 #!/usr/bin/python
-
 '''
 A script using VASP DFT calculations to determine the relative stability of given structures.
 '''
 
+########################################
+# SYSTEM I/O MODULES
+
 from typing import List, Tuple
-from itertools import count
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
+
+########################################
+# OPTIMIZATION MODULES
+
+from itertools import count
 from tqdm.contrib.concurrent import process_map
+
+########################################
+# PYTON MATERIALS GENOMICS PACKAGE
+
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp import VaspInput
+
+########################################
+# LOCAL FUNCTIONS
 
 def assert_args(args: Namespace):
     '''
@@ -22,6 +35,9 @@ def assert_args(args: Namespace):
 
     assert args.filename.endswith('.cif'), 'Input file must be in CIF format'
     assert args.workers >= 1, 'the number of workers cannot be negative or zero'
+
+########################################
+# MAIN FUNCTION
 
 def main():
     start = datetime.now()
