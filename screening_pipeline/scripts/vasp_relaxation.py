@@ -23,7 +23,7 @@ from tqdm.contrib.concurrent import process_map
 # LOCAL MODULES
 
 from screening_pipeline.utils.cif_io import read_cif
-from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_launcher
+from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_batch_launch
 
 ########################################
 # LOCAL FUNCTIONS
@@ -138,7 +138,11 @@ def main():
     nbr_struct      = len(structures)
     chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
     vasp_setup      = partial(vasp_relaxation_settings, preset=method)
-    fixed_path_calc = partial(vasp_launcher, path=outdir)
+    
+    dir_names_list = []
+    for idx, structure in enumerate(structures):
+        struct_dir_name = f'{idx}_{structure.formula}'
+        dir_names_list.append(struct_dir_name)
 
     # Write VaspInput objects from structures and chosen preset
     vasp_inputs = list(process_map(
@@ -150,12 +154,11 @@ def main():
     ))
 
     # Use written VaspInput objects to write input files and run VASP
-    process_map(
-        fixed_path_calc, 
-        vasp_inputs, 
-        workers=workers, 
-        chunksize=chunksize, 
-        desc='Relaxation of structures'
+    vasp_batch_launch(
+        vasp_input=vasp_inputs, 
+        base_dir=outdir, 
+        subdir_names=dir_names_list, 
+        workers=workers
     )
 
     stop = datetime.now()
