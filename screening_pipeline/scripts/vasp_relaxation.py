@@ -138,8 +138,8 @@ def main():
     nbr_struct      = len(structures)
     chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
     vasp_setup      = partial(vasp_relaxation_settings, preset=method)
+    dir_names_list  = []
     
-    dir_names_list = []
     for idx, structure in enumerate(structures):
         struct_dir_name = f'{idx}_{structure.formula}'
         dir_names_list.append(struct_dir_name)

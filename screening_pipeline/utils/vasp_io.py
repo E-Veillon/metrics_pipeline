@@ -72,6 +72,7 @@ def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
         }
     return corrected_INCAR
 
+#TODO: This function might be useless, delete it if no use at the end of pipeline devpt
 def vasp_input_files_settings(
         structure: Structure, 
         /, *, 
@@ -160,6 +161,7 @@ def vasp_input_files_settings(
 
     return vasp_input
 
+#TODO: This function might be useless, delete it if no use at the end of pipeline devpt
 def batch_write_MITRelaxSet_inputs(
         structures: List[Structure], 
         corrected: bool = True, 
@@ -275,7 +277,6 @@ def vasp_batch_launch(
         workers=workers, 
         chunksize=1
     )
-
 
 def vasp_relaxation_settings(
         structure: SiteCollection, 
