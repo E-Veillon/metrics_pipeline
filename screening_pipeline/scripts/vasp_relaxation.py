@@ -10,10 +10,12 @@ The relaxation results then may be used in other scripts for material properties
 
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
+from pathlib import Path
 
 ########################################
 # OPTIMIZATION MODULES
 
+from itertools import count
 from functools import partial
 from tqdm.contrib.concurrent import process_map
 
@@ -27,8 +29,21 @@ from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_laun
 # LOCAL FUNCTIONS
 
 def assert_args(args: Namespace) -> None:
+    
+    assert Path(args.filename).exists(), \
+    f'{args.filename}: path to input file not found.'
+    
+    assert Path(args.filename).is_file(), \
+    f'{args.filename} found but it is not a file.'
+
     assert args.filename.endswith('.cif'), \
     'Input structure data must be in CIF format.'
+
+    assert Path(args.output).exists(), \
+    f'{args.output}: path to output directory not found.'
+
+    assert Path(args.output).is_dir(), \
+    f'{args.output} found but it is not a directory.'
 
     allowed_presets = {(
         'MITRelaxSet', 
@@ -73,15 +88,15 @@ def main():
     parser.add_argument(
         'filename',
         type=str,
-        help='The CIF file containing structure data to read.', 
-        metavar='file.cif'
+        help='Path to the CIF file containing structure data to read.', 
+        metavar='input_file'
     )
     parser.add_argument(
         '-o',
         '--output',
         type=str,
         default='./',
-        help='''Output directory where VASP files will be written.
+        help='''Path to the output directory where VASP files will be written.
                 A subdirectory will be created in output directory
                 for each structure found in file.cif.''', 
         metavar='outdir'
@@ -108,16 +123,16 @@ def main():
 
     assert_args(args)
     
-    filename = args.filename
-    outdir   = (args.output if args.output.endswith('/') else args.output + '/')
-    method   = args.method
-    workers  = args.workers
+    input_file = Path(args.filename)
+    outdir     = Path(args.output)
+    method     = args.method
+    workers    = args.workers
 
 
     # MAIN BLOCK
 
     # Convert CIF data into Structure objects
-    structures, *_ = read_cif(filename=filename)
+    structures, *_ = read_cif(filename=input_file)
     
     # Setup parallel processing
     nbr_struct      = len(structures)

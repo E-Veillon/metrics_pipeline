@@ -4,9 +4,10 @@ Functions to write VASP input files, launch VASP calculations and manage VASP ou
 
 
 ########################################
-# TYPE HINTING
+# SYSTEM I/O MODULES
 
-from typing import Optional, Dict, List, Literal
+from typing import Optional, Dict, List, Union, Sequence
+from pathlib import Path
 
 ########################################
 # OPTIMIZATION MODULES
@@ -26,7 +27,12 @@ from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 # LOCAL MODULES
 
 from screening_pipeline.utils.fitted_values import U_VALUES
+from screening_pipeline.utils.paths import batch_add_new_dirs
 
+PathLike = Union[str, Path]
+
+########################################
+# LOCAL FUNCTIONS
 
 def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
     '''
@@ -217,15 +223,59 @@ def batch_write_MITRelaxSet_inputs(
     )
     return vasp_inputs
 
-def vasp_launcher(vasp_input: VaspInput, path: str):
+def vasp_launcher(vasp_input: VaspInput, path: PathLike) -> None:
 
-    if not path.endswith("/"):
-        path = path + "/"
-
+    assert isinstance(vasp_input, VaspInput)
+    assert isinstance(path, PathLike)
+    path     = Path(path)
     calc_dir = path
-    out_file = path + "vasp.out"
-    err_file = path + "vasp.err"
+    out_file = path / "vasp.out"
+    err_file = path / "vasp.err"
     vasp_input.run_vasp(run_dir=calc_dir, output_file=out_file, err_file=err_file)
+
+def vasp_batch_launch(
+        vasp_inputs: Sequence[VaspInput], 
+        base_dir: PathLike, 
+        subdir_names: Sequence[str], 
+        workers: int = 1
+    ) -> None:
+    '''
+    Creates a subdirectory with given names for each provided VaspInput object, 
+    writes VASP input files in those subdirectories, then runs VASP inside each one.
+    As this process can be very expensive as it actually does the VASP computations, 
+    it is recommended to parallelize it by setting workers > 1.
+
+    Parameters:
+        vasp_inputs ([VaspInput]):  The objects defining how to write VASP input files in each subdirectory.
+
+        base_dir (str|Path):        The directory where the subdirs should be created.
+
+        subdir_names ([str]):       The names of created subdirectories.
+                                    Note that its length must match the length of vasp_inputs.
+
+        workers (int):              The number of parallel processes to spawn.
+                                    Defaults to 1.
+    '''
+
+    assert all(isinstance(vasp_input, VaspInput) for vasp_input in vasp_inputs)
+    assert isinstance(base_dir, PathLike)
+    
+    base_dir = Path(base_dir)
+
+    assert base_dir.is_dir()
+    assert all(isinstance(subdir_name, str) for subdir_name in subdir_names)
+    assert len(vasp_inputs) == len(subdir_names)
+    assert isinstance(workers, int) and workers >= 1
+
+    subpaths_list = batch_add_new_dirs(base_dir=base_dir, new_subdirs=subdir_names)
+
+    process_map(
+        vasp_launcher, 
+        zip(vasp_inputs, subpaths_list), 
+        workers=workers, 
+        chunksize=1
+    )
+
 
 def vasp_relaxation_settings(
         structure: SiteCollection, 
