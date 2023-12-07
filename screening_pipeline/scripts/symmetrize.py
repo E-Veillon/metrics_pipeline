@@ -7,7 +7,7 @@ A script that calculates symmetry spacegroup for structures in a CIF file using 
 # SYSTEM I/O MODULES
 
 from datetime import datetime
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace
+from argparse import ArgumentParser, RawTextHelpFormatter, Namespace
 
 ########################################
 # LOCAL FUNCTIONS
@@ -28,6 +28,11 @@ def assert_args(args: Namespace):
         args.filename.endswith('.cif')
         and args.output.endswith('.cif')
     ), 'some arguments formats are not supported, please only use CIF format'
+
+    print(f'Tolerance in relative atomic distances check: {args.valid_tol}')
+
+    assert args.valid_tol >= 0.0, \
+    'relative atomic positions tolerance cannot be negative.'
 
     print(f'Fractional coordinates precision: {args.precision}')
 
@@ -66,7 +71,7 @@ def main():
     prog_missing_steps = '''
         Missing steps to complete this script: None
         '''
-    helper_format = ArgumentDefaultsHelpFormatter
+    helper_format = RawTextHelpFormatter
 
     parser = ArgumentParser(
         prog=prog_name, 
@@ -78,21 +83,32 @@ def main():
     parser.add_argument(
         'filename',
         type=str,
-        help='name of the file containing the input structures'
+        help='name of the file containing the input structures.'
     )
     parser.add_argument(
         '-o',
         '--output',
         type=str,
         default='[filename]_out.cif',
-        help='name of output file containing the unique structures',
+        help='name of output file containing filtered and symmetrized structures.',
+    )
+    parser.add_argument(
+        '-t', 
+        '--pos-tolerance', 
+        type=float, 
+        default=0.0, 
+        help='''Tolerance for checking atoms relative positions in Angstroms.
+                Structures containing atoms that are closer than this value will be discarded.
+                The default value of 0.0 disables this feature.''', 
+        metavar='float', 
+        dest='valid_tol'
     )
     parser.add_argument(
         '-p',
         '--precision',
         type=float,
         default=0.01,
-        help='Fractional coordinates tolerance for symmetry finding',
+        help='Fractional coordinates tolerance for symmetry finding.',
         metavar='float',
     )
     parser.add_argument(
@@ -100,7 +116,7 @@ def main():
         '--angleprec',
         type=float,
         default=5.0,
-        help='Angle tolerance for symmetry finding in degrees',
+        help='Angle tolerance for symmetry finding in degrees.',
         metavar='float',
     )
     parser.add_argument(
@@ -108,23 +124,23 @@ def main():
         '--workers',
         type=int,
         default=1,
-        help='Number of parallel processes to create',
+        help='Number of parallel processes to spawn.',
         metavar='int',
     )
     parser.add_argument(
         '--keep_rare_gases',
         action='store_true',
-        help='Pass this flag to disable automatic elimination of structures containing rare gases'
+        help='A flag to disable automatic elimination of structures containing rare gases.'
     )
     parser.add_argument(
         '--keep_rare_earths',
         action='store_true',
-        help='Pass this flag to disable automatic elimination of structures containing rare earth elements'
+        help='A flag to disable automatic elimination of structures containing rare earth elements.'
     )
     parser.add_argument(
         '--keep_equivalent',
         action='store_true',
-        help='Pass this flag to disable automatic structure matching and elimination of duplicates'
+        help='A flag to disable automatic structure matching and elimination of duplicates.'
     )
 
     args: Namespace = parser.parse_args()
@@ -154,7 +170,7 @@ def main():
     nbr_total_structs  = nbr_loaded_structs + nbr_rare_gas_structs + nbr_rare_earth_structs
     assert nbr_loaded_structs > 0, 'No structure could be parsed from given data'
 
-    print(f'{nbr_total_structs} structures loaded in total')
+    print(f'{nbr_total_structs} structures detected in total')
 
     if not args.keep_rare_gases:
         print(f'{nbr_rare_gas_structs} structures containing rare gases were ignored')

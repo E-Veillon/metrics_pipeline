@@ -24,9 +24,6 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmetrizedStructure
 
 from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stderr
 
-def get_default_symmetry(structure: Structure) -> Structure:
-    #TODO: modify CifBlock data dict to set it to P1 and spg number 1
-    return structure
 
 def _retry_get_symmetrized_structure(
         structure: Structure,
@@ -69,10 +66,11 @@ def _retry_get_symmetrized_structure(
         else:
             return sym_struct
     
-    return get_default_symmetry(structure)
+    return structure
 
 def structure_symmetrizer(
         structure: Structure, 
+        valid_tol: float = 0.0, 
         symprec: float = 0.01, 
         angle_tolerance: float = 5.0
     ) -> Structure | SymmetrizedStructure:
@@ -82,6 +80,11 @@ def structure_symmetrizer(
 
     Parameters:
         structure (Structure):      Pymatgen Structure object to symmetrize.
+
+        valid_tol (float):          Tolerance in relative atomic positions checking in Angstroms.
+                                    If the structure contains atoms that are closer than valid_tol, 
+                                    the function returns None. If valid_tol = 0.0, distance checking
+                                    is disabled. Defaults to 0.0.
 
         symprec (float):            Initial position tolerance for symmetry detection in fractional coordinate.
                                     Defaults to 0.01, which works nicely in most cases.
@@ -93,7 +96,15 @@ def structure_symmetrizer(
         A Pymatgen SymmetrizedStructure object if symmetry detection worked properly,
         or a Structure object with default P1 spacegroup if it could not detect any.
     '''
+    assert isinstance(structure, Structure)
+    assert isinstance(valid_tol, float) and (valid_tol >= 0)
+    assert isinstance(symprec, float)
+    assert isinstance(angle_tolerance, float)
+
     with redirect_c_stdout(None), redirect_c_stderr(None):
+
+        if (valid_tol > 0) and not structure.is_valid(tol=valid_tol):
+            return None
 
         struct_analyzer = SpacegroupAnalyzer(
             structure=structure, 
@@ -107,7 +118,7 @@ def structure_symmetrizer(
             spglib_result = struct_analyzer.get_symmetry_dataset()
 
             if spglib_result is None:
-                #return structure
+
                 return _retry_get_symmetrized_structure(
                     structure=structure, 
                     symprec=symprec, 
@@ -120,6 +131,7 @@ def structure_symmetrizer(
 
 def batch_symmetrizer(
         structures: List[Structure], 
+        valid_tol: float = 0.0, 
         symprec: float = 0.01, 
         angle_tolerance: float = 5.0, 
         workers: int = 1
@@ -129,6 +141,11 @@ def batch_symmetrizer(
 
     Parameters:
         structures (List[Structure]):   A list of all structures that need a symmetry analysis.
+
+        valid_tol (float):              Tolerance in relative atomic positions checking in Angstroms.
+                                        If a structure contains atoms that are closer than valid_tol, 
+                                        the function returns None for it. If valid_tol = 0.0, distance 
+                                        checking is disabled. Defaults to 0.0.
 
         symprec (float):                Initial position tolerance for symmetry detection in fractional coordinate.
                                         Defaults to 0.01, which works nicely in most cases.
@@ -149,15 +166,16 @@ def batch_symmetrizer(
 
     nbr_structs = len(structures)
     chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
-    partial_structure_symmetrizer = partial(
+    set_structure_symmetrizer = partial(
         structure_symmetrizer, 
+        valid_tol=valid_tol, 
         symprec=symprec, 
         angle_tolerance=angle_tolerance
     )
     
     return list(
         process_map(
-            partial_structure_symmetrizer, 
+            set_structure_symmetrizer, 
             structures, 
             max_workers=workers, 
             chunksize=chunksize
