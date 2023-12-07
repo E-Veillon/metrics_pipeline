@@ -149,7 +149,7 @@ def main():
 
     # Réutiliser la 1ère fonction pour récupérer les énergies des OSZICAR résultants.
 
-    for struct in structures:
+    '''for struct in structures:
         N_0 = get_all_valence_electrons(struct)
         n   = get_delta_sol_el_ratio(struct, 'PBE', 'BEST')
         # E(N0) est à lire directement dans le fichier OSZICAR (dernier E0) de la relaxation.
@@ -160,7 +160,7 @@ def main():
         # une densité de charge n x e directement à nc(r) pour faire les calculs 
         # de minimization électronique, ioniquement statiques E(N0 - n) et E(N0 + n).
         # Les énergies seront également à récupérer dans le fichier OSZICAR.
-        # Enfin, on pourra faire le calcul EFG = [E(N0 + n) + E(N0 - n) - 2E(N0)]/n.
+        # Enfin, on pourra faire le calcul EFG = [E(N0 + n) + E(N0 - n) - 2E(N0)]/n.'''
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
