@@ -117,22 +117,118 @@ def main():
     # Créer une fonction qui va chercher les fichiers OSZICAR dans input_path, 
     # puis qui les convertit en objets OSZICAR dont on peut tirer l'énergie E(N0).
     # Attention, il faut garder l'ordre des structures à l'aide d'un dict {num_struct: E(N0)}.
-    from typing import Union
+    from typing import Union, Dict, Tuple
+    from functools import partial
+    from tqdm.contrib.concurrent import process_map
+    from pymatgen.core.structure import Structure
     from pymatgen.io.vasp import Poscar, Chgcar, Oszicar
     PathLike = Union[str, Path]
-    def extract_vasp_files(base_dir: PathLike):
+
+    def extract_vasp_data(
+            struct_dir: PathLike = '.', 
+            ignore_file: str = 'rejected.txt'
+    ) -> Tuple[str, Dict[Structure, Chgcar, float]]:
+        '''
+        Extracts VASP data from a previous run for one structure. 
+        Keeps only relevant data for Δ-Sol method.
+
+        Parameters:
+            struct_dir (str|Path):  Directory containing a finished VASP calculation on a structure.
+
+            ignore_file (str):      Checks whether the provided file name exists in structure directory.
+                                    Structure directories containing this file will return None.
+                                    This parameter permits the filtration of structures that did not pass
+                                    previous screening steps.
+        
+        Returns:
+            Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict, 
+                                    containing following useful data:
+                                        - structure itself, 
+                                        - its CHGCAR file (to modify charge density), 
+                                        - its final energy (in eV/atom), used as E(N0).
+        '''
+        assert isinstance(struct_dir, PathLike)
+        
+        struct_dir: Path = Path(struct_dir)
+        
+        assert struct_dir.is_dir()
+
+        files = set(file.name for file in struct_dir.iterdir())
+        
+        if ignore_file in files:
+            return None
+
+        struct_name  = struct_dir.name
+        contcar_path = Path(struct_dir / 'CONTCAR')
+        chgcar_path  = Path(struct_dir / 'CHGCAR')
+        oszicar_path = Path(struct_dir / 'OSZICAR')
+            
+        structure    = Poscar.from_file(contcar_path).structure
+        chgcar       = Chgcar.from_file(chgcar_path)
+        final_energy_eV = Oszicar(oszicar_path).final_energy
+        final_energy_eV_per_at = final_energy_eV / structure.num_sites
+
+        struct_data = tuple(
+            struct_name, 
+            {
+            'structure': structure, 
+            'CHGCAR': chgcar, 
+            'final_energy': final_energy_eV_per_at
+            }
+        )
+
+        return struct_data
+
+    def extract_all_vasp_data(
+            base_dir: PathLike = '.', 
+            ignore_file: str = 'rejected.txt', 
+            workers: int = 1
+    ) -> Dict[Dict[Structure, Chgcar, float]]:
+        '''
+        Extracts VASP data from a previous run for each structure directory in given directory.
+        Keeps only data that are useful for Δ-Sol method.
+
+        Parameters:
+            base_dir (str|Path):    Directory containing structures subdirs to extract data from.
+
+            ignore_file (str):      Checks whether the provided file name exists in each subdirectory.
+                                    Structure directories containing this file will not be taken into account.
+                                    This parameter permits the filtration of structures that did not pass
+                                    previous steps.
+        
+        Returns:
+            dict[dict]:             Dict with structure directory names as keys, 
+                                    and a dict containing following data for corresponding structure as values:
+                                        - structure itself, 
+                                        - its CHGCAR file (to modify charge density), 
+                                        - its final energy (in eV/atom), used as E(N0).
+        '''
+
         assert isinstance(base_dir, PathLike)
+        
         base_dir: Path = Path(base_dir)
+        
         assert base_dir.is_dir()
-        contcar_pathlist = base_dir.glob('*/CONTCAR')
-        chgcar_pathlist  = base_dir.glob('*/CHGCAR')
-        oszicar_pathlist = base_dir.glob('*/OSZICAR')
-        structs_data     = []
-        for cont, chg, osz in zip(contcar_pathlist, chgcar_pathlist, oszicar_pathlist):
-            structure    = Poscar.from_file(cont).structure
-            chgcar       = Chgcar.from_file(chg)
-            final_energy = Oszicar(osz).final_energy
-            structs_data.append((structure, chgcar, final_energy))
+        
+        def is_directory(path: Path) -> bool:
+            return path.is_dir()
+        
+        set_vasp_extractor = partial(extract_vasp_data, ignore_file=ignore_file)
+        structs_dir_list   = list(filter(is_directory, base_dir.iterdir()))
+        nbr_structs        = len(structs_dir_list)
+        chunksize          = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
+
+        structs_data_list  = list(filter(
+            process_map(
+                set_vasp_extractor, 
+                structs_dir_list, 
+                workers=workers, 
+                chunksize=chunksize, 
+                desc='Extracting previous VASP outputs'
+            )
+        ))
+        structs_data = dict(structs_data_list)
+
         return structs_data
 
 
@@ -140,11 +236,26 @@ def main():
     # puis qui les convertit en objets CHGCAR dont on peut modifier la densité de charge
     # afin de les réécrire dans output_path avec les fichiers INCAR, POSCAR, POTCAR, KPOINTS.
     def chgcar_density_switch(chgcar: Chgcar, delta: float):
-        e = 1.60217663e-19 # Coulomb. Il peut être nécessaire de convertir.
+        '''
+        Modifies provided Chgcar object's charge density by +/- delta, 
+        then returns the two resulting Chgcar objects.
+        '''
+        e = 1.60217663e-19 # Coulomb.
         chgcar_plus, chgcar_minus = chgcar.copy(), chgcar.copy()
         chgcar_plus.data['total'] += delta*e
         chgcar_minus.data['total'] -= delta*e
         return chgcar_plus, chgcar_minus
+    
+    def struct_charge_switch(structure: Structure, delta: float):
+        '''
+        Modifies overall charge of provided structure by +/- delta, 
+        then returns the two resulting structures.
+        '''
+        cation_struct, anion_struct = structure.copy(), structure.copy()
+        cation_struct.set_charge(structure.charge + delta)
+        anion_struct.set_charge(structure.charge - delta)
+        return cation_struct, anion_struct
+
     # Réaliser les calculs VASP de E(N0 - n) et E(N0 + n).
 
     # Réutiliser la 1ère fonction pour récupérer les énergies des OSZICAR résultants.
