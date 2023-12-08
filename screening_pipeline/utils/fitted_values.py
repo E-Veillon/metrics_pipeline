@@ -77,7 +77,7 @@ Reference:
 
 ########################################
 
-EXP_DELTA_H = { #TODO: Modify it when values are found
+EXP_DELTA_H = {
     'F': {
         'Ag': {
             'Ag5F': 0.0, 'Ag2F': 0.0, 'AgF': -1.052, 'Ag2F3': 0.0, 
@@ -169,23 +169,79 @@ EXP_DELTA_H = { #TODO: Modify it when values are found
             'CuO4': 0.0
         }, 
         'Fe': {
-            'Fe5O': 0.0, 'Fe5O8': 0.0, 'Fe4O5': 0.0, 'Fe4O11': 0.0, 'Fe3O': 0.0, 
-            'Fe2O5': 0.0, 'Fe2O': 0.0, 'FeO4': 0.0, 'FeO3': 0.0, 'FeO2': 0.0, 
-            'FeO': -1.415, 'Fe3O4': -1.660, 'Fe2O3': -1.710
+            'Fe5O': 0.0, 'Fe3O': 0.0, 'Fe2O': 0.0, 'FeO': -1.415, 
+            'Fe4O5': 0.0, 'Fe3O4': -1.660, 'Fe2O3': -1.710, 'Fe5O8': 0.0, 
+            'FeO2': 0.0, 'Fe2O5': 0.0, 'Fe4O11': 0.0, 'FeO3': 0.0, 
+            'FeO4': 0.0
         }, 
-        'Mn': {}, 
-        'Mo': {}, 
-        'Nb': {}, 
-        'Ni': {}, 
-        'Re': {}, 
-        'Ta': {}, 
-        'V': {}, 
-        'W': {}                          
+        'Mn': {
+            'Mn8O': 0.0, 'Mn5O': 0.0, 'Mn3O': 0.0, 'Mn2O': 0.0, 
+            'MnO': -1.996, 'Mn7O8': 0.0, 'Mn4O5': 0.0, 'M3O4': -2.053, 
+            'Mn2O3': -1.983, 'Mn4O7': 0.0, 'Mn5O8': 0.0, 'MnO2': -1.797, 
+            'Mn5O12': 0.0, 'Mn2O5': 0.0, 'Mn4O11': 0.0, 'MnO3': 0.0, 
+            'MnO4': 0.0
+        }, 
+        'Mo': {
+            'Mo5O': 0.0, 'Mo3O': 0.0, 'Mo2O': 0.0, 'MoO': 0.0, 
+            'Mo4O5': 0.0, 'Mo3O4': 0.0, 'Mo2O3': 0.0, 'MoO2': -2.036, 
+            'Mo2O5': 0.0, 'Mo4O11': 0.0, 'Mo9O26': 0.0, 'MoO3': -1.929, 
+            'MoO4': 0.0
+        }, 
+        'Nb': {
+            'Nb3O': 0.0, 'Nb2O': 0.0, 'Nb6O5': 0.0, 'NbO': -2.175, 
+            'Nb4O5': 0.0, 'Nb3O4': 0.0, 'Nb2O3': 0.0, 'NB3O5': 0.0, 
+            'Nb4O7': 0.0, 'NbO2': -2.746, 'Nb12O29': 0.0, 'Nb2O5': -2.812, 
+            'NbO3': 0.0, 'NbO4': 0.0
+        }, 
+        'Ni': {
+            'Ni5O': 0.0, 'Ni3O': 0.0, 'Ni2O': 0.0, 'Ni3O2': 0.0, 
+            'NiO': -1.242, 'Ni7O8': 0.0, 'Ni3O4': 0.0, 'Ni2O3': 0.0, 
+            'Ni5O8': 0.0, 'Ni4O7': 0.0, 'NiO2': 0.0, 'Ni4O11': 0.0, 
+            'Ni3O8': 0.0, 'NiO3': 0.0, 'NiO4': 0.0
+        }, 
+        'Re': {
+            'Re5O': 0.0, 'Re3O': 0.0, 'Re2O': 0.0, 'Re3O2': 0.0, 
+            'ReO': 0.0, 'Re4O5': 0.0, 'Re2O3': 0.0, 'Re4O7': 0.0, 
+            'ReO2': -1.523, 'Re2O5': 0.0, 'ReO3': -1.526, 'Re2O7': -1.455, 
+            'ReO4': 0.0
+        }, 
+        'Ta': {
+            'Ta6O': 0.0, 'Ta5O': 0.0, 'Ta4O': 0.0, 'Ta3O': 0.0, 
+            'Ta2O': 0.0, 'Ta3O2': 0.0, 'TaO': 0.0, 'Ta4O5': 0.0, 
+            'Ta2O3': 0.0, 'Ta4O7': 0.0, 'TaO2': 0.0, 'Ta2O5': -3.034, 
+            'TaO3': 0.0, 'TaO4': 0.0
+        }, 
+        'V': {
+            'V8O': 0.0, 'V16O3': 0.0, 'V5O': 0.0, 'V3O': 0.0, 
+            'V7O3': 0.0, 'V2O': 0.0, 'V3O2': 0.0, 'V5O4': 0.0, 
+            'VO': -2.232, 'V7O8': 0.0, 'V4O5': 0.0, 'V3O4': 0.0, 
+            'V2O3': -2.522, 'V5O8': 0.0, 'V3O5': 0.0, 'V4O7': 0.0, 
+            'V5O9': 0.0, 'V6O11': 0.0, 'V7O13': 0.0, 'V8O15': 0.0, 
+            'VO2': -2.475, 'V6O13': 0.0, 'V4O9': 0.0, 'V3O7': 0.0, 
+            'V2O5': -2.296, 'V3O8': 0.0, 'V4O11': 0.0, 'VO3': 0.0, 
+            'VO4': 0.0
+        }, 
+        'W': {
+            'W5O': 0.0, 'W3O': 0.0, 'W2O': 0.0, 'W3O2': 0.0, 
+            'WO': 0.0, 'W11O12': 0.0, 'W4O5': 0.0, 'W2O3': 0.0, 
+            'WO2': -2.038, 'W3O8': 0.0, 'W18O49': 0.0, 'WO3': -2.184, 
+            'WO4': 0.0
+        }                          
     }, 
     'S': {
-        'Fe': {}, 
-        'Mn': {}
-    }}
+        'Fe': {
+            'Fe8S': 0.0, 'Fe3S': 0.0, 'Fe2S': 0.0, 'Fe5S4': 0.0, 
+            'Fe9S8': 0.0, 'FeS': -0.525, 'Fe7S8': 0.0, 'Fe3S4': 0.0, 
+            'Fe2S3': 0.0, 'FeS2': -0.588, 'Fe3S8': 0.0, 'FeS3': 0.0, 
+            'FeS13': 0.0
+        }, 
+        'Mn': {
+            'Mn6S': 0.0, 'Mn3S': 0.0, 'Mn2S': 0.0, 'Mn9S8': 0.0, 
+            'MnS': -1.110, 'Mn3S4': 0.0, 'Mn2S3': 0.0, 'MnS2': -0.773, 
+            'MnS3': 0.0, 'MnS5': 0.0
+        }
+    }
+}
 
 '''
 Experimentally measured heats of formations at 298K,
@@ -194,7 +250,7 @@ These values are used to fit the ΔE_M correction term for GGA + U values
 in the mixed GGA / GGA + U scheme proposed by Jain et al.
 
 NB: A value of 0.0 means the material exists in the database, 
-    but no experimental measurement was done yet.
+    but no experimental measurement was provided.
 
 References:
   - A. Jain, G. Hautier, S.P. Ong, C.J. Moore, 
