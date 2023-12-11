@@ -124,7 +124,7 @@ def main():
         '--workers',
         type=int,
         default=1,
-        help='Number of parallel processes to spawn.',
+        help='Number of parallel processes to spawn for parallelized steps.',
         metavar='int',
     )
     parser.add_argument(
