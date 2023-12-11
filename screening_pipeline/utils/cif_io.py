@@ -206,6 +206,9 @@ def read_cif(
         
         keep_rare_gases (bool): Whether structures containing rare gases should be kept. 
                                 Defaults to false.
+        
+        keep_rare_earths (bool): Whether structures containing f-block elements should be kept.
+                                Defaults to False.
     
     Returns:
         List[Structure]: Decoded Structure objects in a list.
