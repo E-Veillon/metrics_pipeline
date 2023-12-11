@@ -11,7 +11,7 @@ Reference for Δ-Sol method:
 # SYSTEM I/O MODULES
 
 from datetime import datetime
-from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
+from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from pathlib import Path
 
 ########################################
@@ -71,7 +71,7 @@ def main():
                 * If E(gap) is outside the goal but uncertainty gets in ?
                 Possible options: keep, keep_aside, discard, auto (keep_aside if at least half the interval is in, else discard)
         '''
-    helper_format = RawDescriptionHelpFormatter
+    helper_format = RawTextHelpFormatter
 
     parser = ArgumentParser(
         prog=prog_name, 
@@ -96,20 +96,34 @@ def main():
         metavar='outdir'
     )
     parser.add_argument(
+        '-i', 
+        '--ignore', 
+        type=str, 
+        default='rejected.txt', 
+        help='''Defines a file whose presence in a structure directory means it did not pass
+        previous screening steps and should not be used in this calculation. 
+        This file will also be written in structure directories that did not pass this step.
+        WARNING: 
+        If the name of this file is overwritten, care must be taken that it is the same file
+        throughout every used screening steps to make sure rejected structures don't go further.''', 
+        metavar='ignore_file.txt'
+    )
+    parser.add_argument(
         '-w',
         '--workers',
         type=int,
         default=1,
-        help='Number of parallel processes to create',
+        help='Number of parallel processes to spawn for parallelized steps.',
         metavar='int',
     )
     args: Namespace = parser.parse_args()
 
     assert_args(args)
     
-    input_dir  = Path(args.input_dir)
-    outdir     = Path(args.output)
-    workers    = args.workers
+    input_dir   = Path(args.input_dir)
+    outdir      = Path(args.output)
+    ignore_file = args.ignore
+    workers     = args.workers
 
 
     # MAIN BLOCK
@@ -118,10 +132,12 @@ def main():
     # puis qui les convertit en objets OSZICAR dont on peut tirer l'énergie E(N0).
     # Attention, il faut garder l'ordre des structures à l'aide d'un dict {num_struct: E(N0)}.
     from typing import Union, Dict, Tuple
+    from scipy.constants import elementary_charge
     from functools import partial
     from tqdm.contrib.concurrent import process_map
     from pymatgen.core.structure import Structure
     from pymatgen.io.vasp import Poscar, Chgcar, Oszicar
+    from screening_pipeline.utils.vasp_io import vasp_static_settings
     PathLike = Union[str, Path]
 
     def extract_vasp_data(
@@ -165,17 +181,14 @@ def main():
             
         structure    = Poscar.from_file(contcar_path).structure
         chgcar       = Chgcar.from_file(chgcar_path)
-        final_energy_eV = Oszicar(oszicar_path).final_energy
-        final_energy_eV_per_at = final_energy_eV / structure.num_sites
-
-        struct_data = tuple(
-            struct_name, 
-            {
+        final_energy_eV: float = Oszicar(oszicar_path).final_energy
+        final_energy_eV_per_at = final_energy_eV / float(structure.num_sites)
+        struct_dict = {
             'structure': structure, 
             'CHGCAR': chgcar, 
             'final_energy': final_energy_eV_per_at
-            }
-        )
+        }
+        struct_data = (struct_name, struct_dict)
 
         return struct_data
 
@@ -183,7 +196,7 @@ def main():
             base_dir: PathLike = '.', 
             ignore_file: str = 'rejected.txt', 
             workers: int = 1
-    ) -> Dict[Dict[Structure, Chgcar, float]]:
+    ) -> Dict[str, Dict[str, Union[Structure, Chgcar, float]]]:
         '''
         Extracts VASP data from a previous run for each structure directory in given directory.
         Keeps only data that are useful for Δ-Sol method.
@@ -224,13 +237,12 @@ def main():
                 structs_dir_list, 
                 workers=workers, 
                 chunksize=chunksize, 
-                desc='Extracting previous VASP outputs'
+                desc='Extracting infos from previous VASP output'
             )
         ))
         structs_data = dict(structs_data_list)
 
         return structs_data
-
 
     # Créer une fonction qui récupère les fichiers CHGCAR dans input_path, 
     # puis qui les convertit en objets CHGCAR dont on peut modifier la densité de charge
@@ -240,10 +252,12 @@ def main():
         Modifies provided Chgcar object's charge density by +/- delta, 
         then returns the two resulting Chgcar objects.
         '''
-        e = 1.60217663e-19 # Coulomb.
+
+        e = elementary_charge # Exact value in Coulomb
         chgcar_plus, chgcar_minus = chgcar.copy(), chgcar.copy()
         chgcar_plus.data['total'] += delta*e
         chgcar_minus.data['total'] -= delta*e
+
         return chgcar_plus, chgcar_minus
     
     def struct_charge_switch(structure: Structure, delta: float):
@@ -257,6 +271,29 @@ def main():
         return cation_struct, anion_struct
 
     # Réaliser les calculs VASP de E(N0 - n) et E(N0 + n).
+    structs_data = extract_all_vasp_data(
+        base_dir=input_dir, 
+        ignore_file=ignore_file, 
+        workers=workers
+    )
+
+    # TODO: Le bloc ci-dessous montre ce qu'il reste à paralléliser
+    for name, data in structs_data.items():
+        # Bloc de data-splitting
+        structure = data['structure']
+        chgcar    = data['CHGCAR']
+        delta     = get_delta_sol_el_ratio(structure)
+        data['CHGCAR_plus'], data['CHGCAR_minus'] = chgcar_density_switch(chgcar, delta)
+        # Bloc de calcul 'densité plus'
+        run_plus  = vasp_static_settings(structure)
+        run_plus.update({'CHGCAR': data['CHGCAR_plus']})
+        run_path  = Path(outdir / name / 'CHGplus')
+        vasp_launcher(vasp_input=run_plus, path=run_path)
+        # Bloc de calcul 'densité moins'
+        run_minus = vasp_static_settings(structure)
+        run_minus.update({'CHGCAR': data['CHGCAR_minus']})
+        run_path  = Path(outdir / name / 'CHGminus')
+        vasp_launcher(vasp_input=run_minus, path=run_path)
 
     # Réutiliser la 1ère fonction pour récupérer les énergies des OSZICAR résultants.
 
