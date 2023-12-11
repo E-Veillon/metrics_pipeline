@@ -270,10 +270,11 @@ def vasp_batch_launch(
     assert isinstance(workers, int) and workers >= 1
 
     subpaths_list = batch_add_new_dirs(base_dir=base_dir, new_subdirs=subdir_names)
+    inputs_list   = list(zip(vasp_inputs, subpaths_list))
 
     process_map(
         vasp_launcher, 
-        zip(vasp_inputs, subpaths_list), 
+        inputs_list, 
         workers=workers, 
         chunksize=1
     )
@@ -334,20 +335,109 @@ def vasp_relaxation_settings(
     assert isinstance(user_potcar_settings, (dict, None)), \
     'user_potcar_settings must be a dict or None'
 
-    if user_incar_settings is None: user_incar_settings = {}
-    if user_kpoints_settings is None: user_kpoints_settings = {}
-    if user_potcar_settings is None: user_potcar_settings = {}
-
     if preset == 'MITRelaxSet':
         MIT_INCAR_corrections = _MITRelaxSet_INCAR_corrections(structure.num_sites)
-        MIT_INCAR_corrections.update(user_incar_settings)
-        user_incar_settings.update(MIT_INCAR_corrections)
 
-    vasp_input = allowed_presets[preset](
+        if user_incar_settings is not None:
+            MIT_INCAR_corrections.update(user_incar_settings)
+            user_incar_settings.update(MIT_INCAR_corrections)
+
+    preset_obj: DictSet = allowed_presets[preset]
+
+    vasp_input = preset_obj(
         structure=structure, 
         user_incar_settings=user_incar_settings, 
         user_kpoints_settings=user_kpoints_settings, 
         user_potcar_settings=user_potcar_settings
     ).get_vasp_input()
+
+    return vasp_input
+
+def vasp_static_settings(
+        structure: SiteCollection, 
+        preset: str = 'MPStaticSet', 
+        from_prev_calc: bool = False, 
+        prev_calc_dir: Optional[PathLike] = None, 
+        user_incar_settings: Optional[dict] = None, 
+        user_kpoints_settings: Optional[dict] = None, 
+        user_potcar_settings: Optional[dict] = None
+    ) -> VaspInput:
+    '''
+    Setup VASP inputs for a given structure using one of the pymatgen static presets.
+
+    Parameters:
+        structure (SiteCollection):     The structure to write VASP inputs for.
+
+        preset (str):                   The pymatgen preset to use for VASP inputs initialization.
+
+        from_prev_calc (bool):          Whether to get final structure, INCAR and KPOINTS settings from a previous VASP run.
+                                        INCAR tags will still be managed to fit a static calculation if previous run is a relaxation.
+                                        For the sake of consistency, it is recommended to use the static preset corresponding to
+                                        previous relaxation preset in this case (e.g. MPStaticSet for a relaxation with MPRelaxSet).
+                                        If set to True, a directory to extract data from must be provided. Defaults to False.
+
+        prev_calc_dir (str|Path):       Directory to extract previous VASP run data from when from_prev_calc is True.
+                                        If from_prev_calc is False, this argument is ignored.
+
+        user_incar_settings (dict):     User INCAR settings. It allows to override some of the standard INCAR tags if necessary.
+                                        Defaults to None.
+
+        user_kpoints_settings (dict):   User KPOINTS settings. It allows to override the standard Kpoints setup if necessary.
+                                        Defaults to None.
+
+        user_potcar_settings (dict):    User POTCAR settings. It allows to override the standard POTCAR settings, although it is not recommended.
+                                        Defaults to None.
+    '''
+
+    from pymatgen.io.vasp.sets import MPStaticSet, MatPESStaticSet, MPScanStaticSet
+
+    allowed_presets = {
+        'MPStaticSet': MPStaticSet, 
+        'MatPESStaticSet': MatPESStaticSet, 
+        'MPScanStaticSet': MPScanStaticSet
+    }
+
+    assert isinstance(structure, SiteCollection), '''
+    "structure" argument format not supported.
+    It must be an instance of the SiteCollection class or one of its subclasses.'''
+    
+    assert preset in allowed_presets.keys(), '''
+    "preset" argument not recognized.
+    It must be one of the allowed pymatgen static presets.'''
+
+    assert isinstance(user_incar_settings, (dict, None)), \
+    'user_incar_settings must be a dict or None'
+
+    assert isinstance(user_kpoints_settings, (dict, None)), \
+    'user_kpoints_settings must be a dict or None'
+
+    assert isinstance(user_potcar_settings, (dict, None)), \
+    'user_potcar_settings must be a dict or None'
+
+    preset_obj: DictSet = allowed_presets[preset]
+
+    if not from_prev_calc:
+        vasp_input = preset_obj(
+            structure=structure, 
+            user_incar_settings=user_incar_settings, 
+            user_kpoints_settings=user_kpoints_settings, 
+            user_potcar_settings=user_potcar_settings
+        ).get_vasp_input()
+    
+    else:
+        assert isinstance(prev_calc_dir, PathLike), \
+        'from_prev_calc was set to True, prev_calc_dir must be provided as str or Path object'
+
+        prev_calc_dir = Path(prev_calc_dir)
+
+        assert prev_calc_dir.is_dir(), \
+        'Provided prev_calc_dir is not a valid directory'
+
+        vasp_input = preset_obj.from_prev_calc(
+            prev_calc_dir=prev_calc_dir, 
+            user_incar_settings=user_incar_settings, 
+            user_kpoints_settings=user_kpoints_settings, 
+            user_potcar_settings=user_potcar_settings
+        ).get_vasp_input()
 
     return vasp_input
