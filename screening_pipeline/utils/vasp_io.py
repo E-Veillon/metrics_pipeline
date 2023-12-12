@@ -6,12 +6,13 @@ Functions to write VASP input files, launch VASP calculations and manage VASP ou
 ########################################
 # SYSTEM I/O MODULES
 
-from typing import Optional, Dict, List, Union, Sequence
+from typing import Optional, Dict, List, Union, Sequence, Tuple
 from pathlib import Path
 
 ########################################
 # OPTIMIZATION MODULES
 
+from scipy.constants import elementary_charge
 from itertools import cycle
 from functools import partial
 from tqdm.contrib.concurrent import process_map
@@ -21,6 +22,9 @@ from tqdm.contrib.concurrent import process_map
 
 from pymatgen.core.structure import Structure, SiteCollection
 from pymatgen.io.vasp import VaspInput
+from pymatgen.io.vasp.inputs import Poscar
+from pymatgen.io.vasp.outputs import Chgcar, Oszicar
+#TODO: The next import might be useless. Delete it if related functions are not used until end of pipeline devpt.
 from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 
 ########################################
@@ -29,7 +33,7 @@ from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 from screening_pipeline.utils.fitted_values import U_VALUES
 from screening_pipeline.utils.paths import batch_add_new_dirs
 
-PathLike = Union[str, Path]
+PathLike = Union[str, Path] # Type Alias
 
 ########################################
 # LOCAL FUNCTIONS
@@ -72,6 +76,7 @@ def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
         }
     return corrected_INCAR
 
+########################################
 #TODO: This function might be useless, delete it if no use at the end of pipeline devpt
 def vasp_input_files_settings(
         structure: Structure, 
@@ -161,6 +166,7 @@ def vasp_input_files_settings(
 
     return vasp_input
 
+########################################
 #TODO: This function might be useless, delete it if no use at the end of pipeline devpt
 def batch_write_MITRelaxSet_inputs(
         structures: List[Structure], 
@@ -225,6 +231,8 @@ def batch_write_MITRelaxSet_inputs(
     )
     return vasp_inputs
 
+########################################
+
 def vasp_launcher(vasp_input: VaspInput, path: PathLike) -> None:
 
     assert isinstance(vasp_input, VaspInput)
@@ -234,6 +242,8 @@ def vasp_launcher(vasp_input: VaspInput, path: PathLike) -> None:
     out_file = path / "vasp.out"
     err_file = path / "vasp.err"
     vasp_input.run_vasp(run_dir=calc_dir, output_file=out_file, err_file=err_file)
+
+########################################
 
 def vasp_batch_launch(
         vasp_inputs: Sequence[VaspInput], 
@@ -278,6 +288,8 @@ def vasp_batch_launch(
         workers=workers, 
         chunksize=1
     )
+
+########################################
 
 def vasp_relaxation_settings(
         structure: SiteCollection, 
@@ -352,6 +364,8 @@ def vasp_relaxation_settings(
     ).get_vasp_input()
 
     return vasp_input
+
+########################################
 
 def vasp_static_settings(
         structure: SiteCollection, 
@@ -441,3 +455,143 @@ def vasp_static_settings(
         ).get_vasp_input()
 
     return vasp_input
+
+########################################
+
+def extract_vasp_data_from_prev_calc(
+        struct_dir: PathLike = '.', 
+        ignore_file: str = 'rejected.txt'
+) -> Tuple[str, Dict[Structure, Chgcar, float]]:
+    '''
+    Extracts VASP data from a previous run for one structure. 
+    Keeps only relevant data for Δ-Sol method.
+
+    Parameters:
+        struct_dir (str|Path):  Directory containing a finished VASP calculation on a structure.
+
+        ignore_file (str):      Checks whether the provided file name exists in structure directory.
+                                Structure directories containing this file will return None.
+                                This parameter permits the filtration of structures that did not pass
+                                previous screening steps.
+        
+    Returns:
+        Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict, 
+                                containing following useful data:
+                                    - structure itself, 
+                                    - its CHGCAR file (to modify charge density), 
+                                    - its final energy (in eV), used as E(N0).
+    '''
+    assert isinstance(struct_dir, PathLike)
+
+    struct_dir: Path = Path(struct_dir)
+
+    assert struct_dir.is_dir()
+
+    files = set(file.name for file in struct_dir.iterdir())
+
+    if ignore_file in files:
+        return None
+
+    struct_name  = struct_dir.name
+    contcar_path = Path(struct_dir / 'CONTCAR')
+    chgcar_path  = Path(struct_dir / 'CHGCAR')
+    oszicar_path = Path(struct_dir / 'OSZICAR')
+
+    structure    = Poscar.from_file(contcar_path).structure
+    chgcar       = Chgcar.from_file(chgcar_path)
+    final_energy_eV: float = Oszicar(oszicar_path).final_energy
+    #final_energy_eV_per_at = final_energy_eV / float(structure.num_sites)
+    struct_dict = {
+        'structure': structure, 
+        'CHGCAR': chgcar, 
+        'final_energy': final_energy_eV
+    }
+    struct_data = (struct_name, struct_dict)
+
+    return struct_data
+
+########################################
+
+def batch_extract_vasp_data(
+        base_dir: PathLike = '.', 
+        ignore_file: str = 'rejected.txt', 
+        workers: int = 1
+) -> Dict[str, Dict[str, Union[Structure, Chgcar, float]]]:
+    '''
+    Extracts VASP data from a previous run for each structure directory in given directory.
+    Keeps only data that are useful for Δ-Sol method.
+
+    Parameters:
+        base_dir (str|Path):    Directory containing structures subdirs to extract data from.
+
+        ignore_file (str):      Checks whether the provided file name exists in each subdirectory.
+                                Structure directories containing this file will not be taken into account.
+                                This parameter permits the filtration of structures that did not pass
+                                previous steps.
+
+        workers (int):          Number of parallel processes to spawn.
+
+    Returns:
+        Dict[str: Dict]:        Dict with structure directory names as keys, 
+                                and a dict containing following data for corresponding structure as values:
+                                    - structure itself, 
+                                    - its CHGCAR file (to modify charge density), 
+                                    - its final energy (in eV), used as E(N0).
+    '''
+
+    assert isinstance(base_dir, PathLike)
+
+    base_dir: Path = Path(base_dir)
+
+    assert base_dir.is_dir()
+
+    def is_directory(path: Path) -> bool:
+        return path.is_dir()
+
+    set_vasp_extractor = partial(extract_vasp_data_from_prev_calc, ignore_file=ignore_file)
+    structs_dir_list   = list(filter(is_directory, base_dir.iterdir()))
+    nbr_structs        = len(structs_dir_list)
+    chunksize          = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
+
+    structs_data_list  = list(filter(
+        process_map(
+            set_vasp_extractor, 
+            structs_dir_list, 
+            workers=workers, 
+            chunksize=chunksize, 
+            desc='Extracting infos from previous VASP output'
+        )
+    ))
+    structs_data = dict(structs_data_list)
+
+    return structs_data
+
+########################################
+
+def chgcar_density_switch(chgcar: Chgcar, delta: float):
+    '''
+    Modifies provided Chgcar object's charge density by +/- delta, 
+    then returns the two resulting Chgcar objects.
+    '''
+
+    e = elementary_charge # Exact value in Coulomb
+    chgcar_plus, chgcar_minus = chgcar.copy(), chgcar.copy()
+    chgcar_plus.data['total'] += delta*e
+    chgcar_minus.data['total'] -= delta*e
+
+    return chgcar_plus, chgcar_minus
+
+########################################
+
+def struct_charge_switch(structure: Structure, delta: float):
+    '''
+    Modifies overall charge of provided structure by +/- delta, 
+    then returns the two resulting structures.
+    '''
+
+    cation_struct, anion_struct = structure.copy(), structure.copy()
+    cation_struct.set_charge(structure.charge + delta)
+    anion_struct.set_charge(structure.charge - delta)
+    return cation_struct, anion_struct
+
+########################################

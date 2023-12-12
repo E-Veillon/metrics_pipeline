@@ -22,9 +22,10 @@ from pathlib import Path
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils.cif_io import read_cif
-from screening_pipeline.utils.periodic_table import get_all_valence_electrons, get_delta_sol_el_ratio
-from screening_pipeline.utils.vasp_io import vasp_input_files_settings, vasp_launcher
+# from screening_pipeline.utils.cif_io import read_cif
+from screening_pipeline.utils.periodic_table import get_delta_sol_el_ratio
+from screening_pipeline.utils.vasp_io import vasp_static_settings, vasp_batch_launch, \
+                                             batch_extract_vasp_data, chgcar_density_switch
 
 ########################################
 # LOCAL FUNCTIONS
@@ -151,159 +152,14 @@ def main():
 
     # MAIN BLOCK
 
-    # Créer une fonction qui va chercher les fichiers OSZICAR dans input_path, 
-    # puis qui les convertit en objets OSZICAR dont on peut tirer l'énergie E(N0).
-    # Attention, il faut garder l'ordre des structures à l'aide d'un dict {num_struct: E(N0)}.
-    from typing import Union, Dict, Tuple
-    from scipy.constants import elementary_charge
-    from functools import partial
-    from tqdm.contrib.concurrent import process_map
-    from pymatgen.core.structure import Structure
-    from pymatgen.io.vasp.inputs import Poscar
-    from pymatgen.io.vasp.outputs import Chgcar, Oszicar, Vasprun, Outcar, VaspParseError
-    from screening_pipeline.utils.vasp_io import vasp_static_settings, vasp_batch_launch
-    PathLike = Union[str, Path]
-
-    def extract_vasp_data_from_prev_calc(
-            struct_dir: PathLike = '.', 
-            ignore_file: str = 'rejected.txt'
-    ) -> Tuple[str, Dict[Structure, Chgcar, float]]:
-        '''
-        Extracts VASP data from a previous run for one structure. 
-        Keeps only relevant data for Δ-Sol method.
-
-        Parameters:
-            struct_dir (str|Path):  Directory containing a finished VASP calculation on a structure.
-
-            ignore_file (str):      Checks whether the provided file name exists in structure directory.
-                                    Structure directories containing this file will return None.
-                                    This parameter permits the filtration of structures that did not pass
-                                    previous screening steps.
-        
-        Returns:
-            Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict, 
-                                    containing following useful data:
-                                        - structure itself, 
-                                        - its CHGCAR file (to modify charge density), 
-                                        - its final energy (in eV), used as E(N0).
-        '''
-        assert isinstance(struct_dir, PathLike)
-        
-        struct_dir: Path = Path(struct_dir)
-        
-        assert struct_dir.is_dir()
-
-        files = set(file.name for file in struct_dir.iterdir())
-        
-        if ignore_file in files:
-            return None
-
-        struct_name  = struct_dir.name
-        contcar_path = Path(struct_dir / 'CONTCAR')
-        chgcar_path  = Path(struct_dir / 'CHGCAR')
-        oszicar_path = Path(struct_dir / 'OSZICAR')
-            
-        structure    = Poscar.from_file(contcar_path).structure
-        chgcar       = Chgcar.from_file(chgcar_path)
-        final_energy_eV: float = Oszicar(oszicar_path).final_energy
-        #final_energy_eV_per_at = final_energy_eV / float(structure.num_sites)
-        struct_dict = {
-            'structure': structure, 
-            'CHGCAR': chgcar, 
-            'final_energy': final_energy_eV
-        }
-        struct_data = (struct_name, struct_dict)
-
-        return struct_data
-
-    def batch_extract_vasp_data(
-            base_dir: PathLike = '.', 
-            ignore_file: str = 'rejected.txt', 
-            workers: int = 1
-    ) -> Dict[str, Dict[str, Union[Structure, Chgcar, float]]]:
-        '''
-        Extracts VASP data from a previous run for each structure directory in given directory.
-        Keeps only data that are useful for Δ-Sol method.
-
-        Parameters:
-            base_dir (str|Path):    Directory containing structures subdirs to extract data from.
-
-            ignore_file (str):      Checks whether the provided file name exists in each subdirectory.
-                                    Structure directories containing this file will not be taken into account.
-                                    This parameter permits the filtration of structures that did not pass
-                                    previous steps.
-            
-            workers (int):          Number of parallel processes to spawn.
-        
-        Returns:
-            dict[dict]:             Dict with structure directory names as keys, 
-                                    and a dict containing following data for corresponding structure as values:
-                                        - structure itself, 
-                                        - its CHGCAR file (to modify charge density), 
-                                        - its final energy (in eV), used as E(N0).
-        '''
-
-        assert isinstance(base_dir, PathLike)
-        
-        base_dir: Path = Path(base_dir)
-        
-        assert base_dir.is_dir()
-        
-        def is_directory(path: Path) -> bool:
-            return path.is_dir()
-        
-        set_vasp_extractor = partial(extract_vasp_data_from_prev_calc, ignore_file=ignore_file)
-        structs_dir_list   = list(filter(is_directory, base_dir.iterdir()))
-        nbr_structs        = len(structs_dir_list)
-        chunksize          = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
-
-        structs_data_list  = list(filter(
-            process_map(
-                set_vasp_extractor, 
-                structs_dir_list, 
-                workers=workers, 
-                chunksize=chunksize, 
-                desc='Extracting infos from previous VASP output'
-            )
-        ))
-        structs_data = dict(structs_data_list)
-
-        return structs_data
-
-    # Créer une fonction qui récupère les fichiers CHGCAR dans input_path, 
-    # puis qui les convertit en objets CHGCAR dont on peut modifier la densité de charge
-    # afin de les réécrire dans output_path avec les fichiers INCAR, POSCAR, POTCAR, KPOINTS.
-    def chgcar_density_switch(chgcar: Chgcar, delta: float):
-        '''
-        Modifies provided Chgcar object's charge density by +/- delta, 
-        then returns the two resulting Chgcar objects.
-        '''
-
-        e = elementary_charge # Exact value in Coulomb
-        chgcar_plus, chgcar_minus = chgcar.copy(), chgcar.copy()
-        chgcar_plus.data['total'] += delta*e
-        chgcar_minus.data['total'] -= delta*e
-
-        return chgcar_plus, chgcar_minus
-    
-    def struct_charge_switch(structure: Structure, delta: float):
-        '''
-        Modifies overall charge of provided structure by +/- delta, 
-        then returns the two resulting structures.
-        '''
-        cation_struct, anion_struct = structure.copy(), structure.copy()
-        cation_struct.set_charge(structure.charge + delta)
-        anion_struct.set_charge(structure.charge - delta)
-        return cation_struct, anion_struct
-
-    # Réaliser les calculs VASP de E(N0 - n) et E(N0 + n).
+    # Extract relevant previous VASP outputs
     structs_data = batch_extract_vasp_data(
         base_dir=input_dir, 
         ignore_file=ignore_file, 
         workers=workers
     )
 
-    # TODO: Le bloc ci-dessous montre ce qu'il reste à paralléliser
+    # TODO: Le bloc ci-dessous reste à paralléliser
     inputs_list  = []
     subdirs_list = []
     for name, data in structs_data.items():
@@ -323,6 +179,7 @@ def main():
         inputs_list.extend([run_plus, run_minus])
         subdirs_list.extend([run_plus_path, run_minus_path])
     
+    # Launch static calculations
     vasp_batch_launch(
         vasp_inputs=inputs_list, 
         base_dir=outdir, 
@@ -330,7 +187,7 @@ def main():
         worker=workers
     )
 
-    # Réutiliser la 1ère fonction pour récupérer les énergies des OSZICAR résultants.
+    # Extract resulting energies
     bg_structs_data = batch_extract_vasp_data(
         base_dir=outdir, 
         workers=workers
@@ -338,7 +195,9 @@ def main():
 
     final_energies = {name: data['final_energy'] for name, data in bg_structs_data.items()}
 
-    # Calcul de E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n
+    # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap 
+    # (Ref 32 in screening_pipeline/Bibliography))
+    # TODO: Reste à paralléliser
     for name, data in structs_data.items():
         name_plus    = '_'.join(name, 'plus')
         name_minus   = '_'.join(name, 'minus')
@@ -348,16 +207,18 @@ def main():
         n            = data['n_ratio']
         E_band_gap   = (E_N0_plus_n + E_N0_minus_n - 2*E_N0)/n
         bg_too_small = E_band_gap < 1.3
-        bg_too_big  = E_band_gap > 3.6
+        bg_too_big   = E_band_gap > 3.6
 
         # Reject unsuitable structures
         if bg_too_small or bg_too_big:
             reject_str = f'Δ-Sol band gap was estimated to {E_band_gap} eV, which is not inside the interval [1.3, 3.6].\n \
             Therefore, it is not suitable for wanted application and should not be considered in further screening steps.'
+            
             path_plus  = Path(outdir / name_plus / ignore_file)
-            path_minus = Path(outdir / name_minus / ignore_file)
             path_plus.touch()
             path_plus.write_text(reject_str)
+            
+            path_minus = Path(outdir / name_minus / ignore_file)
             path_minus.touch()
             path_minus.write_text(reject_str)
 
