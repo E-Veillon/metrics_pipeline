@@ -159,11 +159,12 @@ def main():
     from functools import partial
     from tqdm.contrib.concurrent import process_map
     from pymatgen.core.structure import Structure
-    from pymatgen.io.vasp import Poscar, Chgcar, Oszicar
+    from pymatgen.io.vasp.inputs import Poscar
+    from pymatgen.io.vasp.outputs import Chgcar, Oszicar, Vasprun, Outcar, VaspParseError
     from screening_pipeline.utils.vasp_io import vasp_static_settings, vasp_batch_launch
     PathLike = Union[str, Path]
 
-    def extract_vasp_data(
+    def extract_vasp_data_from_prev_calc(
             struct_dir: PathLike = '.', 
             ignore_file: str = 'rejected.txt'
     ) -> Tuple[str, Dict[Structure, Chgcar, float]]:
@@ -184,7 +185,7 @@ def main():
                                     containing following useful data:
                                         - structure itself, 
                                         - its CHGCAR file (to modify charge density), 
-                                        - its final energy (in eV/atom), used as E(N0).
+                                        - its final energy (in eV), used as E(N0).
         '''
         assert isinstance(struct_dir, PathLike)
         
@@ -205,17 +206,17 @@ def main():
         structure    = Poscar.from_file(contcar_path).structure
         chgcar       = Chgcar.from_file(chgcar_path)
         final_energy_eV: float = Oszicar(oszicar_path).final_energy
-        final_energy_eV_per_at = final_energy_eV / float(structure.num_sites)
+        #final_energy_eV_per_at = final_energy_eV / float(structure.num_sites)
         struct_dict = {
             'structure': structure, 
             'CHGCAR': chgcar, 
-            'final_energy': final_energy_eV_per_at
+            'final_energy': final_energy_eV
         }
         struct_data = (struct_name, struct_dict)
 
         return struct_data
 
-    def extract_all_vasp_data(
+    def batch_extract_vasp_data(
             base_dir: PathLike = '.', 
             ignore_file: str = 'rejected.txt', 
             workers: int = 1
@@ -231,13 +232,15 @@ def main():
                                     Structure directories containing this file will not be taken into account.
                                     This parameter permits the filtration of structures that did not pass
                                     previous steps.
+            
+            workers (int):          Number of parallel processes to spawn.
         
         Returns:
             dict[dict]:             Dict with structure directory names as keys, 
                                     and a dict containing following data for corresponding structure as values:
                                         - structure itself, 
                                         - its CHGCAR file (to modify charge density), 
-                                        - its final energy (in eV/atom), used as E(N0).
+                                        - its final energy (in eV), used as E(N0).
         '''
 
         assert isinstance(base_dir, PathLike)
@@ -249,7 +252,7 @@ def main():
         def is_directory(path: Path) -> bool:
             return path.is_dir()
         
-        set_vasp_extractor = partial(extract_vasp_data, ignore_file=ignore_file)
+        set_vasp_extractor = partial(extract_vasp_data_from_prev_calc, ignore_file=ignore_file)
         structs_dir_list   = list(filter(is_directory, base_dir.iterdir()))
         nbr_structs        = len(structs_dir_list)
         chunksize          = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
@@ -294,7 +297,7 @@ def main():
         return cation_struct, anion_struct
 
     # Réaliser les calculs VASP de E(N0 - n) et E(N0 + n).
-    structs_data = extract_all_vasp_data(
+    structs_data = batch_extract_vasp_data(
         base_dir=input_dir, 
         ignore_file=ignore_file, 
         workers=workers
@@ -308,14 +311,15 @@ def main():
         structure = data['structure']
         chgcar    = data['CHGCAR']
         delta     = get_delta_sol_el_ratio(structure)
+        data['n_ratio'] = delta
         data['CHGCAR_plus'], data['CHGCAR_minus'] = chgcar_density_switch(chgcar, delta)
         # Bloc de préparation des calculs
         run_plus  = vasp_static_settings(structure)
         run_plus.update({'CHGCAR': data['CHGCAR_plus']})
-        run_plus_path  = Path(name / 'CHGplus')
+        run_plus_path  = Path('_'.join(name , 'plus'))
         run_minus = vasp_static_settings(structure)
         run_minus.update({'CHGCAR': data['CHGCAR_minus']})
-        run_minus_path  = Path(name / 'CHGminus')
+        run_minus_path = Path('_'.join(name , 'minus'))
         inputs_list.extend([run_plus, run_minus])
         subdirs_list.extend([run_plus_path, run_minus_path])
     
@@ -327,19 +331,35 @@ def main():
     )
 
     # Réutiliser la 1ère fonction pour récupérer les énergies des OSZICAR résultants.
+    bg_structs_data = batch_extract_vasp_data(
+        base_dir=outdir, 
+        workers=workers
+    )
 
-    '''for struct in structures:
-        N_0 = get_all_valence_electrons(struct)
-        n   = get_delta_sol_el_ratio(struct, 'PBE', 'BEST')
-        # E(N0) est à lire directement dans le fichier OSZICAR (dernier E0) de la relaxation.
-        # Changer la valeur de la densité de charge dans CHGCAR :
-        # Densité de charge ponctuelle n(r) = densité électronique ponctuelle rhô(r) x charge élémentaire e
-        # Densité de charge CHGCAR nc(r) = densité de charge ponctuelle n(r) x Vol. maille V(maille)
-        # Ccl: nc(r) = n(maille) représente la densité de charge par maille, on peut donc enlever/ajouter
-        # une densité de charge n x e directement à nc(r) pour faire les calculs 
-        # de minimization électronique, ioniquement statiques E(N0 - n) et E(N0 + n).
-        # Les énergies seront également à récupérer dans le fichier OSZICAR.
-        # Enfin, on pourra faire le calcul EFG = [E(N0 + n) + E(N0 - n) - 2E(N0)]/n.'''
+    final_energies = {name: data['final_energy'] for name, data in bg_structs_data.items()}
+
+    # Calcul de E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n
+    for name, data in structs_data.items():
+        name_plus    = '_'.join(name, 'plus')
+        name_minus   = '_'.join(name, 'minus')
+        E_N0         = data['final_energy']
+        E_N0_plus_n  = final_energies[name_plus]['final_energy']
+        E_N0_minus_n = final_energies[name_minus]['final_energy']
+        n            = data['n_ratio']
+        E_band_gap   = (E_N0_plus_n + E_N0_minus_n - 2*E_N0)/n
+        bg_too_small = E_band_gap < 1.3
+        bg_too_big  = E_band_gap > 3.6
+
+        # Reject unsuitable structures
+        if bg_too_small or bg_too_big:
+            reject_str = f'Δ-Sol band gap was estimated to {E_band_gap} eV, which is not inside the interval [1.3, 3.6].\n \
+            Therefore, it is not suitable for wanted application and should not be considered in further screening steps.'
+            path_plus  = Path(outdir / name_plus / ignore_file)
+            path_minus = Path(outdir / name_minus / ignore_file)
+            path_plus.touch()
+            path_plus.write_text(reject_str)
+            path_minus.touch()
+            path_minus.write_text(reject_str)
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
