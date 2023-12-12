@@ -31,11 +31,24 @@ from screening_pipeline.utils.vasp_io import vasp_input_files_settings, vasp_lau
 
 def assert_args(args: Namespace) -> None:
     
+    allowed_presets = [
+        'MPStaticSet', 
+        'MatPESStaticSet', 
+        'MPScanStaticSet'
+    ]
+
     assert Path(args.input_dir).is_dir(), \
     f'{args.input_dir}: No directory found.'
 
     assert Path(args.output).is_dir(), \
     f'{args.output}: No directory found.'
+
+    assert args.method in allowed_presets, \
+    f'Provided static preset must be one of the following:\n \
+    {allowed_presets}'
+
+    assert args.ignore.endswith('.txt'), \
+    'Structure ignoring file must be a plain text file type (.txt).'
 
     assert args.workers >= 1, \
     'The number of workers cannot be negative or zero.'
@@ -96,6 +109,16 @@ def main():
         metavar='outdir'
     )
     parser.add_argument(
+        '-m', 
+        '--method', 
+        type=str, 
+        default='MPStaticSet', 
+        help='''The pymatgen preset to use for VASP static calculations.
+                More info on possible presets in pymatgen documentation:
+                https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets.''', 
+        metavar='StaticSet'
+    )
+    parser.add_argument(
         '-i', 
         '--ignore', 
         type=str, 
@@ -137,7 +160,7 @@ def main():
     from tqdm.contrib.concurrent import process_map
     from pymatgen.core.structure import Structure
     from pymatgen.io.vasp import Poscar, Chgcar, Oszicar
-    from screening_pipeline.utils.vasp_io import vasp_static_settings
+    from screening_pipeline.utils.vasp_io import vasp_static_settings, vasp_batch_launch
     PathLike = Union[str, Path]
 
     def extract_vasp_data(
@@ -278,22 +301,30 @@ def main():
     )
 
     # TODO: Le bloc ci-dessous montre ce qu'il reste à paralléliser
+    inputs_list  = []
+    subdirs_list = []
     for name, data in structs_data.items():
         # Bloc de data-splitting
         structure = data['structure']
         chgcar    = data['CHGCAR']
         delta     = get_delta_sol_el_ratio(structure)
         data['CHGCAR_plus'], data['CHGCAR_minus'] = chgcar_density_switch(chgcar, delta)
-        # Bloc de calcul 'densité plus'
+        # Bloc de préparation des calculs
         run_plus  = vasp_static_settings(structure)
         run_plus.update({'CHGCAR': data['CHGCAR_plus']})
-        run_path  = Path(outdir / name / 'CHGplus')
-        vasp_launcher(vasp_input=run_plus, path=run_path)
-        # Bloc de calcul 'densité moins'
+        run_plus_path  = Path(name / 'CHGplus')
         run_minus = vasp_static_settings(structure)
         run_minus.update({'CHGCAR': data['CHGCAR_minus']})
-        run_path  = Path(outdir / name / 'CHGminus')
-        vasp_launcher(vasp_input=run_minus, path=run_path)
+        run_minus_path  = Path(name / 'CHGminus')
+        inputs_list.extend([run_plus, run_minus])
+        subdirs_list.extend([run_plus_path, run_minus_path])
+    
+    vasp_batch_launch(
+        vasp_inputs=inputs_list, 
+        base_dir=outdir, 
+        subdir_names=subdirs_list, 
+        worker=workers
+    )
 
     # Réutiliser la 1ère fonction pour récupérer les énergies des OSZICAR résultants.
 
