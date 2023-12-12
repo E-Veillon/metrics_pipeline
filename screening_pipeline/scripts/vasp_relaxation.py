@@ -55,9 +55,9 @@ def assert_args(args: Namespace) -> None:
         'MVLScanRelaxSet'
     )}
 
-    assert args.method in allowed_presets, '''
-    The relaxation method must be one of the following pymatgen relaxation presets:
-    MITRelaxSet, MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet.'''
+    assert args.method in allowed_presets, \
+    f'Provided relaxation preset must be one of the following:\n \
+    {allowed_presets}'
 
 ########################################
 # MAIN FUNCTION
