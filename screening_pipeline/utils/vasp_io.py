@@ -238,7 +238,7 @@ def vasp_launcher(vasp_input: VaspInput, path: PathLike) -> None:
 def vasp_batch_launch(
         vasp_inputs: Sequence[VaspInput], 
         base_dir: PathLike, 
-        subdir_names: Sequence[str], 
+        subdir_names: Sequence[PathLike], 
         workers: int = 1
     ) -> None:
     '''
@@ -252,7 +252,7 @@ def vasp_batch_launch(
 
         base_dir (str|Path):        The directory where the subdirs should be created.
 
-        subdir_names ([str]):       The names of created subdirectories.
+        subdir_names ([str|Path]):  The names or subpaths for created subdirectories.
                                     Note that its length must match the length of vasp_inputs.
 
         workers (int):              The number of parallel processes to spawn.
@@ -265,7 +265,7 @@ def vasp_batch_launch(
     base_dir = Path(base_dir)
 
     assert base_dir.is_dir()
-    assert all(isinstance(subdir_name, str) for subdir_name in subdir_names)
+    assert all(isinstance(subdir_name, PathLike) for subdir_name in subdir_names)
     assert len(vasp_inputs) == len(subdir_names)
     assert isinstance(workers, int) and workers >= 1
 
