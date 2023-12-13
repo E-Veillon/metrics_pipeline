@@ -192,7 +192,7 @@ def main():
         dft_functional=functional, 
         n_star_type=n_star_type
     )
-    
+
     # Launch static calculations
     vasp_batch_launch(
         vasp_inputs=inputs_list, 
@@ -222,6 +222,26 @@ def main():
         E_band_gap   = (E_N0_plus_n + E_N0_minus_n - 2*E_N0)/n
         bg_too_small = E_band_gap < 1.3
         bg_too_big   = E_band_gap > 3.6
+
+    from pymatgen.core.structure import SiteCollection
+    def calculate_delta_sol_energy(
+            name: str, 
+            structure: SiteCollection, 
+            E_N0: float, 
+            E_N0_plus_n: float, 
+            E_N0_minus_n: float, 
+        ) -> float:
+
+        n_ratio    = get_delta_sol_el_ratio(structure)
+        E_band_gap = (E_N0_plus_n + E_N0_minus_n - 2*E_N0)/n_ratio
+
+        return name, E_band_gap
+
+    def batch_calculate_delta_sol_energy(
+            structs_data: dict, 
+            final_energies: dict, 
+        /):
+        pass
 
         # Reject unsuitable structures
         if bg_too_small or bg_too_big:

@@ -658,7 +658,7 @@ def delta_sol_inputs_init(
         # Produce E(N0 + n) and E(N0 - n)'s CHGCAR files
         structure       = data['structure']
         chgcar          = data['CHGCAR']
-        data['n_ratio'] = get_delta_sol_el_ratio(structure)
+        data['n_ratio'] = get_delta_sol_el_ratio(structure, dft_functional, n_star_type)
         data['CHGCAR_plus'], data['CHGCAR_minus'] = chgcar_density_switch(chgcar, data['n_ratio'])
 
         # Prepare E(N0 + n) input set
