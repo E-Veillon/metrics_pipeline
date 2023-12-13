@@ -6,14 +6,14 @@ Functions to write VASP input files, launch VASP calculations and manage VASP ou
 ########################################
 # SYSTEM I/O MODULES
 
-from typing import Optional, Dict, List, Union, Sequence, Tuple
+from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal
 from pathlib import Path
 
 ########################################
 # OPTIMIZATION MODULES
 
 from scipy.constants import elementary_charge
-from itertools import cycle
+from itertools import cycle, chain, starmap
 from functools import partial
 from tqdm.contrib.concurrent import process_map
 
@@ -32,8 +32,26 @@ from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 
 from screening_pipeline.utils.fitted_values import U_VALUES
 from screening_pipeline.utils.paths import batch_add_new_dirs
+from screening_pipeline.utils.periodic_table import get_delta_sol_el_ratio
 
-PathLike = Union[str, Path] # Type Alias
+########################################
+# TYPE ALIASES
+
+PathLike = Union[str, Path]
+PMGRelaxSet = Literal[
+    'MITRelaxSet', 
+    'MPRelaxSet', 
+    'MPScanRelaxSet', 
+    'MPHSERelaxSet', 
+    'MPMetalRelaxSet', 
+    'MVLRelax52Set', 
+    'MVLScanRelaxSet'
+]
+PMGStaticSet = Literal[
+    'MPStaticSet', 
+    'MatPESStaticSet', 
+    'MPScanStaticSet'
+]
 
 ########################################
 # LOCAL FUNCTIONS
@@ -293,7 +311,7 @@ def vasp_batch_launch(
 
 def vasp_relaxation_settings(
         structure: SiteCollection, 
-        preset: str = 'MITRelaxSet', 
+        preset: PMGRelaxSet = 'MITRelaxSet', 
         user_incar_settings: Optional[dict] = None, 
         user_kpoints_settings: Optional[dict] = None, 
         user_potcar_settings: Optional[dict] = None
@@ -369,7 +387,7 @@ def vasp_relaxation_settings(
 
 def vasp_static_settings(
         structure: SiteCollection, 
-        preset: str = 'MPStaticSet', 
+        preset: PMGStaticSet = 'MPStaticSet', 
         from_prev_calc: bool = False, 
         prev_calc_dir: Optional[PathLike] = None, 
         user_incar_settings: Optional[dict] = None, 
@@ -595,3 +613,76 @@ def struct_charge_switch(structure: Structure, delta: float):
     return cation_struct, anion_struct
 
 ########################################
+
+def delta_sol_inputs_init(
+        structs_data: dict, 
+        preset: PMGStaticSet = 'MPStaticSet', 
+        dft_functional: Literal['LDA', 'PBE', 'AM05'] = 'PBE', 
+        n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
+    ) -> Tuple[List]:
+    '''
+    Initialize Vasp static input sets for structures with N0 - n and N0 + n electrons per cell, 
+    used in band gap calculations with Δ-Sol method.
+
+    Reference:
+        M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
+        (reference 32 in screening_pipeline/Bibliography, values in Table I)
+
+    Parameters:
+        structs_data (dict):    Dict containing relevant VASP data from a previous relaxation, 
+                                as provided by the batch_extract_vasp_data function.
+        
+        preset (PMGStaticSet):  One of the pymatgen static VASP preset labeled 'StaticSet'.
+
+        dft_functional ('LDA'|'PBE'|'AM05'):    Choose one of the functionals supported by Δ-Sol method.
+                                                Used to initialize N*. Defaults to 'PBE'.
+
+        n_star_type ('MIN'|'BEST'|'MAX'):       Which N* to initialize for given functional.
+                                                'BEST' is used for band gap estimation, 
+                                                while 'MIN' and 'MAX' are for uncertainty measurements on said gap.
+                                                Defaults to 'BEST'.
+    
+    Returns:
+        Tuple[List]:    A list of VaspInput objects corresponding to Δ-Sol runs, 
+                        and a list of the subdirectory names for these runs, in same order.
+    '''
+    
+    def inputs_init(
+            name: str, 
+            data: Dict, 
+            preset: PMGStaticSet = 'MPStaticSet', 
+            dft_functional: Literal['LDA', 'PBE', 'AM05'] = 'PBE', 
+            n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
+        ) -> List[Tuple[str, VaspInput]]:
+
+        # Produce E(N0 + n) and E(N0 - n)'s CHGCAR files
+        structure       = data['structure']
+        chgcar          = data['CHGCAR']
+        data['n_ratio'] = get_delta_sol_el_ratio(structure)
+        data['CHGCAR_plus'], data['CHGCAR_minus'] = chgcar_density_switch(chgcar, data['n_ratio'])
+
+        # Prepare E(N0 + n) input set
+        run_plus = vasp_static_settings(structure, preset=preset)
+        run_plus.update({'CHGCAR': data['CHGCAR_plus']})
+        run_plus_path = Path('_'.join(name , 'plus'))
+
+        # Prepare E(N0 - n) input set
+        run_minus = vasp_static_settings(structure, preset=preset)
+        run_minus.update({'CHGCAR': data['CHGCAR_minus']})
+        run_minus_path = Path('_'.join(name , 'minus'))
+
+        struct_list = [(run_plus_path, run_plus), (run_minus_path, run_minus)]
+
+        return struct_list
+
+    set_inputs_init = partial(
+        inputs_init, 
+        preset=preset, 
+        dft_functional=dft_functional, 
+        n_star_type=n_star_type
+    )
+    structs_tuples = list(chain(starmap(set_inputs_init, structs_data.items())))
+    subdirs_list   = [tup[0] for tup in structs_tuples]
+    inputs_list    = [tup[1] for tup in structs_tuples]
+
+    return inputs_list, subdirs_list
