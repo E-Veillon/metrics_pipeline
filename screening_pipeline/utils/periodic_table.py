@@ -246,7 +246,7 @@ def get_delta_sol_el_ratio(
     
     val_elec_type = 'sp'
 
-    for elt, _ in structure.elements:
+    for elt in structure.elements:
         match elt.block:
             case ('s'|'p'): continue
             case 'd': 
@@ -258,6 +258,6 @@ def get_delta_sol_el_ratio(
     N_0        = get_all_valence_electrons(structure)
     value_name = '_'.join(dft_functional, val_elec_type)
     N_star     = EL_PER_XC_VOL[n_star_type][value_name]
-    n          = N_0 / N_star
+    n          = float(N_0) / float(N_star)
 
     return n
