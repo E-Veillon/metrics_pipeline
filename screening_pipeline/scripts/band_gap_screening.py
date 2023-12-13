@@ -17,7 +17,6 @@ from pathlib import Path
 ########################################
 # PYTHON MATERIALS GENOMICS PACKAGE
 
-#from pymatgen.io.vasp.outputs import Oszicar, Chgcar
 
 ########################################
 # LOCAL MODULES
@@ -25,7 +24,8 @@ from pathlib import Path
 # from screening_pipeline.utils.cif_io import read_cif
 from screening_pipeline.utils.periodic_table import get_delta_sol_el_ratio
 from screening_pipeline.utils.vasp_io import vasp_static_settings, vasp_batch_launch, \
-                                             batch_extract_vasp_data, chgcar_density_switch
+                                             batch_extract_vasp_data, chgcar_density_switch, \
+                                             delta_sol_inputs_init
 
 ########################################
 # LOCAL FUNCTIONS
@@ -120,6 +120,22 @@ def main():
         metavar='StaticSet'
     )
     parser.add_argument(
+        '-f', 
+        '--functional', 
+        type=str, 
+        default='PBE', 
+        help='DFT functional to use for Δ-Sol N* parameter initialization.', 
+        metavar='str'
+    )
+    parser.add_argument(
+        '-n', 
+        '--n_star_type', 
+        type=str, 
+        default='BEST', 
+        help='Type of N* parameter to initialize for Δ-Sol method.', 
+        metavar='str'
+    )
+    parser.add_argument(
         '-i', 
         '--ignore', 
         type=str, 
@@ -146,6 +162,9 @@ def main():
     
     input_dir   = Path(args.input_dir)
     outdir      = Path(args.output)
+    preset      = args.method
+    functional  = args.functional
+    n_star_type = args.n_star_type
     ignore_file = args.ignore
     workers     = args.workers
 
@@ -160,24 +179,19 @@ def main():
     )
 
     # TODO: Le bloc ci-dessous reste à paralléliser
-    inputs_list  = []
-    subdirs_list = []
     for name, data in structs_data.items():
-        # Bloc de data-splitting
-        structure = data['structure']
-        chgcar    = data['CHGCAR']
-        delta     = get_delta_sol_el_ratio(structure)
-        data['n_ratio'] = delta
-        data['CHGCAR_plus'], data['CHGCAR_minus'] = chgcar_density_switch(chgcar, delta)
-        # Bloc de préparation des calculs
-        run_plus  = vasp_static_settings(structure)
-        run_plus.update({'CHGCAR': data['CHGCAR_plus']})
-        run_plus_path  = Path('_'.join(name , 'plus'))
-        run_minus = vasp_static_settings(structure)
-        run_minus.update({'CHGCAR': data['CHGCAR_minus']})
-        run_minus_path = Path('_'.join(name , 'minus'))
-        inputs_list.extend([run_plus, run_minus])
-        subdirs_list.extend([run_plus_path, run_minus_path])
+        data['n_ratio'] = get_delta_sol_el_ratio(
+            structure=data['structure'], 
+            dft_functional=functional, 
+            n_star_type=n_star_type
+        )
+
+    inputs_list, subdirs_list = delta_sol_inputs_init(
+        structs_data=structs_data, 
+        preset=preset, 
+        dft_functional=functional, 
+        n_star_type=n_star_type
+    )
     
     # Launch static calculations
     vasp_batch_launch(
