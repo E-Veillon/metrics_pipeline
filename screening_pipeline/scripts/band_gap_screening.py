@@ -207,7 +207,6 @@ def main():
         workers=workers
     )
 
-    final_energies = {name: data['final_energy'] for name, data in bg_structs_data.items()}
 
     # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap 
     # (Ref 32 in screening_pipeline/Bibliography))
@@ -216,32 +215,12 @@ def main():
         name_plus    = '_'.join(name, 'plus')
         name_minus   = '_'.join(name, 'minus')
         E_N0         = data['final_energy']
-        E_N0_plus_n  = final_energies[name_plus]['final_energy']
-        E_N0_minus_n = final_energies[name_minus]['final_energy']
+        E_N0_plus_n  = structs_data[name_plus]['final_energy']
+        E_N0_minus_n = structs_data[name_minus]['final_energy']
         n            = data['n_ratio']
         E_band_gap   = (E_N0_plus_n + E_N0_minus_n - 2*E_N0)/n
         bg_too_small = E_band_gap < 1.3
-        bg_too_big   = E_band_gap > 3.6
-
-    from pymatgen.core.structure import SiteCollection
-    def calculate_delta_sol_energy(
-            name: str, 
-            structure: SiteCollection, 
-            E_N0: float, 
-            E_N0_plus_n: float, 
-            E_N0_minus_n: float, 
-        ) -> float:
-
-        n_ratio    = get_delta_sol_el_ratio(structure)
-        E_band_gap = (E_N0_plus_n + E_N0_minus_n - 2*E_N0)/n_ratio
-
-        return name, E_band_gap
-
-    def batch_calculate_delta_sol_energy(
-            structs_data: dict, 
-            final_energies: dict, 
-        /):
-        pass
+        bg_too_big   = E_band_gap > 3.6        
 
         # Reject unsuitable structures
         if bg_too_small or bg_too_big:
