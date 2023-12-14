@@ -714,6 +714,8 @@ def calculate_delta_sol_band_gap(
     E_N0_plus_n  = data['E_N0_plus_n']
     E_N0_minus_n = data['E_N0_minus_n']
     n_ratio      = get_delta_sol_el_ratio(structure)
+    # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap 
+    # (Ref 32 in screening_pipeline/Bibliography))
     E_band_gap   = (E_N0_plus_n + E_N0_minus_n - 2*E_N0)/n_ratio
 
     return name, E_band_gap
