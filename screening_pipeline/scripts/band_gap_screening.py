@@ -25,7 +25,8 @@ from pathlib import Path
 from screening_pipeline.utils.periodic_table import get_delta_sol_el_ratio
 from screening_pipeline.utils.vasp_io import vasp_static_settings, vasp_batch_launch, \
                                              batch_extract_vasp_data, chgcar_density_switch, \
-                                             delta_sol_inputs_init
+                                             delta_sol_inputs_init, batch_calculate_delta_sol_band_gaps, \
+                                             filter_by_band_gap
 
 ########################################
 # LOCAL FUNCTIONS
@@ -178,14 +179,6 @@ def main():
         workers=workers
     )
 
-    # TODO: Le bloc ci-dessous reste à paralléliser
-    for name, data in structs_data.items():
-        data['n_ratio'] = get_delta_sol_el_ratio(
-            structure=data['structure'], 
-            dft_functional=functional, 
-            n_star_type=n_star_type
-        )
-
     inputs_list, subdirs_list = delta_sol_inputs_init(
         structs_data=structs_data, 
         preset=preset, 
@@ -207,33 +200,17 @@ def main():
         workers=workers
     )
 
+    E_band_gaps = batch_calculate_delta_sol_band_gaps(
+        structs_data, bg_structs_data, workers
+    )
 
-    # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap 
-    # (Ref 32 in screening_pipeline/Bibliography))
-    # TODO: Reste à paralléliser
-    for name, data in structs_data.items():
-        name_plus    = '_'.join(name, 'plus')
-        name_minus   = '_'.join(name, 'minus')
-        E_N0         = data['final_energy']
-        E_N0_plus_n  = structs_data[name_plus]['final_energy']
-        E_N0_minus_n = structs_data[name_minus]['final_energy']
-        n            = data['n_ratio']
-        E_band_gap   = (E_N0_plus_n + E_N0_minus_n - 2*E_N0)/n
-        bg_too_small = E_band_gap < 1.3
-        bg_too_big   = E_band_gap > 3.6        
-
-        # Reject unsuitable structures
-        if bg_too_small or bg_too_big:
-            reject_str = f'Δ-Sol band gap was estimated to {E_band_gap} eV, which is not inside the interval [1.3, 3.6].\n \
-            Therefore, it is not suitable for wanted application and should not be considered in further screening steps.'
-            
-            path_plus  = Path(outdir / name_plus / ignore_file)
-            path_plus.touch()
-            path_plus.write_text(reject_str)
-            
-            path_minus = Path(outdir / name_minus / ignore_file)
-            path_minus.touch()
-            path_minus.write_text(reject_str)
+    # Reject unsuitable structures
+    filter_by_band_gap(
+        E_band_gaps, 
+        valid_interval=[1.3, 3.6], 
+        base_dir=outdir, 
+        ignore_file=ignore_file
+    )
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
