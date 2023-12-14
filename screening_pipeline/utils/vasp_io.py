@@ -771,3 +771,32 @@ def batch_calculate_delta_sol_band_gaps(
     E_band_gaps = dict(E_band_gaps)
 
     return E_band_gaps
+
+def filter_by_band_gap(
+        E_band_gaps: dict, 
+        valid_interval: Sequence[float], 
+        base_dir: PathLike, 
+        ignore_file: str
+    ) -> None:
+
+    for name, E_band_gap in E_band_gaps.items():
+
+        name_plus    = '_'.join(name, 'plus')
+        name_minus   = '_'.join(name, 'minus')
+        bg_too_small = E_band_gap < min(valid_interval)
+        bg_too_big   = E_band_gap > max(valid_interval)
+
+        if bg_too_small or bg_too_big:
+
+            reject_str = f'Δ-Sol band gap was estimated to {E_band_gap} eV, \
+                        which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].\n \
+                        Therefore, it is not suitable for wanted application, \
+                        it should not be considered in further screening steps.'
+        
+            path_plus  = Path(base_dir / name_plus / ignore_file)
+            path_plus.touch()
+            path_plus.write_text(reject_str)
+        
+            path_minus = Path(base_dir / name_minus / ignore_file)
+            path_minus.touch()
+            path_minus.write_text(reject_str)
