@@ -11,3 +11,4 @@ cif_counter.py
 *.potcar
 *.poscar
 *.kpoints
+ConvexHull.py
