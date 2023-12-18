@@ -6,7 +6,7 @@ Functions to write VASP input files, launch VASP calculations and manage VASP ou
 ########################################
 # SYSTEM I/O MODULES
 
-from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal
+from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal, Any
 from pathlib import Path
 
 ########################################
@@ -476,10 +476,60 @@ def vasp_static_settings(
 
 ########################################
 
-def extract_vasp_data_from_prev_calc(
+def extract_vasp_data_for_convex_hull(
         struct_dir: PathLike = '.', 
         ignore_file: str = 'rejected.txt'
-) -> Tuple[str, Dict[Structure, Chgcar, float]]:
+) -> Tuple[str, Dict[str, Union[Structure, float]]]:
+    '''
+    Extracts VASP data from a previous run for one structure. 
+    Keeps only relevant data for relative stability calculation.
+
+    Parameters:
+        struct_dir (str|Path):  Directory containing a finished VASP calculation on a structure.
+
+        ignore_file (str):      Checks whether the provided file name exists in structure directory.
+                                Structure directories containing this file will return None.
+                                This parameter permits the filtration of structures that did not pass
+                                previous screening steps.
+        
+    Returns:
+        Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict, 
+                                containing following data, used in stability calculation:
+                                    - structure itself, 
+                                    - its raw chemical formula, 
+                                    - its final energy (in eV).
+    '''
+
+    assert isinstance(struct_dir, PathLike)
+    assert Path(struct_dir).is_dir()
+
+    struct_dir: Path = Path(struct_dir)
+    files            = set(file.name for file in struct_dir.iterdir())
+
+    if ignore_file in files:
+        return None
+
+    struct_name  = struct_dir.name
+    contcar_path = Path(struct_dir / 'CONTCAR')
+    oszicar_path = Path(struct_dir / 'OSZICAR')
+
+    structure    = Poscar.from_file(contcar_path).structure
+    formula      = structure.formula
+    final_energy_eV: float = Oszicar(oszicar_path).final_energy
+    struct_dict = {
+        'structure': structure, 
+        'formula': formula, 
+        'final_energy': final_energy_eV
+    }
+    struct_data = (struct_name, struct_dict)
+
+    return struct_data
+########################################
+
+def extract_vasp_data_for_delta_sol(
+        struct_dir: PathLike = '.', 
+        ignore_file: str = 'rejected.txt'
+) -> Tuple[str, Dict[str, Union[Structure, Chgcar, float]]]:
     '''
     Extracts VASP data from a previous run for one structure. 
     Keeps only relevant data for Δ-Sol method.
@@ -494,18 +544,17 @@ def extract_vasp_data_from_prev_calc(
         
     Returns:
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict, 
-                                containing following useful data:
+                                containing following data, used in Δ-Sol method:
                                     - structure itself, 
                                     - its CHGCAR file (to modify charge density), 
                                     - its final energy (in eV), used as E(N0).
     '''
+
     assert isinstance(struct_dir, PathLike)
+    assert Path(struct_dir).is_dir()
 
     struct_dir: Path = Path(struct_dir)
-
-    assert struct_dir.is_dir()
-
-    files = set(file.name for file in struct_dir.iterdir())
+    files            = set(file.name for file in struct_dir.iterdir())
 
     if ignore_file in files:
         return None
@@ -531,15 +580,18 @@ def extract_vasp_data_from_prev_calc(
 ########################################
 
 def batch_extract_vasp_data(
+        method: str, 
         base_dir: PathLike = '.', 
         ignore_file: str = 'rejected.txt', 
         workers: int = 1
-) -> Dict[str, Dict[str, Union[Structure, Chgcar, float]]]:
+) -> Dict[str, Dict[str, Any]]:
     '''
     Extracts VASP data from a previous run for each structure directory in given directory.
     Keeps only data that are useful for Δ-Sol method.
 
     Parameters:
+        method (str):           Name of the method that will use the data, used to know which data should be extracted.
+
         base_dir (str|Path):    Directory containing structures subdirs to extract data from.
 
         ignore_file (str):      Checks whether the provided file name exists in each subdirectory.
@@ -558,15 +610,19 @@ def batch_extract_vasp_data(
     '''
 
     assert isinstance(base_dir, PathLike)
-
-    base_dir: Path = Path(base_dir)
-
-    assert base_dir.is_dir()
+    assert Path(base_dir).is_dir()
 
     def is_directory(path: Path) -> bool:
         return path.is_dir()
+    
+    match method:
+        case "convex_hull":
+            set_vasp_extractor = partial(extract_vasp_data_for_convex_hull, ignore_file=ignore_file)
+        case "delta_sol":
+            set_vasp_extractor = partial(extract_vasp_data_for_delta_sol, ignore_file=ignore_file)
+        case _: raise NotImplementedError(f"Provided method ({method}) is not implemented.")
 
-    set_vasp_extractor = partial(extract_vasp_data_from_prev_calc, ignore_file=ignore_file)
+    base_dir           = Path(base_dir)
     structs_dir_list   = list(filter(is_directory, base_dir.iterdir()))
     nbr_structs        = len(structs_dir_list)
     chunksize          = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
@@ -771,6 +827,8 @@ def batch_calculate_delta_sol_band_gaps(
     E_band_gaps = dict(E_band_gaps)
 
     return E_band_gaps
+
+########################################
 
 def filter_by_band_gap(
         E_band_gaps: dict, 
