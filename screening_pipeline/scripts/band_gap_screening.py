@@ -174,6 +174,7 @@ def main():
 
     # Extract relevant previous VASP outputs
     structs_data = batch_extract_vasp_data(
+        method='delta_sol', 
         base_dir=input_dir, 
         ignore_file=ignore_file, 
         workers=workers
@@ -196,6 +197,7 @@ def main():
 
     # Extract resulting energies
     bg_structs_data = batch_extract_vasp_data(
+        method='delta_sol', 
         base_dir=outdir, 
         workers=workers
     )
