@@ -49,6 +49,13 @@ def assert_args(args: Namespace) -> None:
     f'Provided static preset must be one of the following:\n \
     {allowed_presets}'
 
+    assert args.functional in {'LDA', 'PBE', 'AM05'}, \
+    f'''Provided functional not supported for Δ-Sol method.
+        This argument should be either 'LDA', 'PBE' or 'AM05'.'''
+    
+    assert args.n_star_type in {'MIN', 'BEST', 'MAX'}, \
+    f"The type of N* should be either 'MIN', 'BEST' or 'MAX'."
+
     assert args.ignore.endswith('.txt'), \
     'Structure ignoring file must be a plain text file type (.txt).'
 
