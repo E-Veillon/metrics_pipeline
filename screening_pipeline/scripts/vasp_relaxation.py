@@ -125,7 +125,7 @@ def main():
     
     input_file = Path(args.filename)
     outdir     = Path(args.output)
-    method     = args.method
+    preset     = args.method
     workers    = args.workers
 
 
@@ -137,7 +137,7 @@ def main():
     # Setup parallel processing
     nbr_struct      = len(structures)
     chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
-    vasp_setup      = partial(vasp_relaxation_settings, preset=method)
+    vasp_setup      = partial(vasp_relaxation_settings, preset=preset)
     dir_names_list  = []
     
     for idx, structure in enumerate(structures):
