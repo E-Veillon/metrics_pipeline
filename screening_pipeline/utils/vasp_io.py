@@ -524,6 +524,7 @@ def extract_vasp_data_for_convex_hull(
     struct_data = (struct_name, struct_dict)
 
     return struct_data
+
 ########################################
 
 def extract_vasp_data_for_delta_sol(
@@ -858,3 +859,5 @@ def filter_by_band_gap(
             path_minus = Path(base_dir / name_minus / ignore_file)
             path_minus.touch()
             path_minus.write_text(reject_str)
+
+########################################
