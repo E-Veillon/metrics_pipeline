@@ -73,13 +73,6 @@ def main():
         '''
     prog_missing_steps = '''
         Missing steps to complete this script:
-            - Add necessary in-line command arguments
-            - Calculate N0, number of valence electrons in unit cell - OK
-            - Choose right N*best (PBE[sp] or PBE[spd]) - OK
-            - n = N0/N*best - OK
-            - Calculate E(N0), E(N0 + n), E(N0 - n) with VASP (static ionically)
-            - Calculate E(gap) = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n
-            - For photocatalysts article: keep materials with 1.3 < E(gap) < 3.6 eV by default
             - Set an option to enable incertainty calculation on the band gap using N*min and N*max
             - This option should let user choose if they want to keep materials according to the uncertainty case:
                 * If E(gap) is inside the goal but uncertainty gets out ?
