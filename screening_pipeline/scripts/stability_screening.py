@@ -49,7 +49,8 @@ def main():
     # ARGUMENTS PARSING BLOCK
 
     prog_name          = 'stability_screening'
-    prog_description   = 'A script using previous VASP relaxations to compute the relative stability of given structures.'
+    prog_description   = 'A script using previous VASP relaxations to compute the relative \
+                          stability of given structures.'
     prog_missing_steps = '''
         Missing steps to complete the script:
             - Determine the critical formation reaction of the structure
@@ -136,21 +137,66 @@ def main():
             name=name
         )
 
+        '''
+        Fil directeur du premier script ci-dessous :
+
+        0/ Définitions :
+
+            1 - CH = Convex Hull (Diagramme de phases compositionnels avec énergies).
+
+            2 - Grandeur d'une structure = nb d'éléments différents dans la structure.
+
+        1/  Grouper les structures par CH indépendantes (Les structures ayant le plus d'éléments
+            peuvent servir à définir les CH, ex : FeTiGe3O2 peut générer la CH Fe-Ti-Ge-O s'il 
+            n'y a pas de structure plus grande contenant tout ces éléments).
+
+            Pour faire ce groupage, il faut donc : 
+
+            1 - Détecter les structures les plus grandes.
+
+            2 - Si certaines ont au moins 2 éléments en commun, chercher les structures ayant une
+                formule entièrement inclue dans le sous-enemble d'éléments communs.
+
+            3 - S'il y en a, les grandes structures partiellement communes et les petites 
+                correspondantes forment une unique CH. Sinon, les grandes structures formeront
+                des CH séparées.
+            
+            4 - Ranger les structures dont la formule est inclue dans celle d'une des grandes 
+                structures avec la grande structure correspondante.
+            
+            5 - S'il reste des structures non groupées, reprendre à l'étape 1 sur le sous-ensemble
+                non-groupé.
+        
+        1.5/Récupérer les structures de références qui rentrent dans les groupes construits.
+
+        2/  Fabriquer une CH par groupe de structures, en initialisant les éléments simples 
+            à partir du contenu du groupe (donner l'attribut 'ref' aux structures de référence).
+        
+        3/  Calculer les ΔH dans chaque CH.
+
+        4/  Eliminer les structures dont le ΔH est trop important.
+        '''
+
+        # Alternatives possibles :
         # - Chercher les matériaux du dump qui correspondent chimiquement.
         # - Construire le diagramme de phase correspondant à cet ensemble.
         # - Demander la décomposition et l'énergie /r à la CH du candidat.
         # - Ecrire le fichier de rejet si l'énergie dépasse le seuil autorisé.
         # Optimisation : rassembler d'abord tout les candidats rentrant dans une même CH, 
         # afin de ne construire chaque CH de référence utiles qu'une fois.
-
-        # Fil directeur du script ci-dessous :
         # Ajouter les CH de références OQMD préconstruites dans un fichier utils.
         # Ecrire une fonction pour rassembler les structures selon la CH correspondante.
         # Ecrire une fonction qui compare en batch les structures d'un groupe avec sa CH, 
         # puis ajoute à leur data respectif la valeur 'delta_H'. 
         # Opti : Minimiser le nombre de CH à construire en groupant plus largement les candidats.
-        # Opti : Matcher et éliminer les structures équivalentes à celles de référence (StructureMatcher).
-        # Opti : Fabriquer une CH dynamique à partir des candidats d'un groupe, afin de voir les plus stables du groupe.
+        # Opti : Matcher et éliminer les structures équivalentes à celles de référence 
+        #        (StructureMatcher).
+        # Opti : Fabriquer une CH dynamique à partir des candidats d'un groupe, 
+        #        afin de voir les plus stables du groupe.
+        # Opti : Construire les CH de référence expérimentales en réalisant des calculs statiques 
+        #        sur les ~263k structures expérimentales de l'ICSD une seule fois (reproduction
+        #        de l'article 00). On peut même élaguer en éliminant les structures exp contenant
+        #        des gaz ou des terres rares (~184k restant).
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
