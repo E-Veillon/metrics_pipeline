@@ -14,7 +14,9 @@ pymatgen = ">=2023.10.11"
 spglib = ">=2.0.0"
 
 [tool.poetry.scripts]
+cif_counter = 'screening_pipeline.scripts.cif_counter:main'
 symmetrize = 'screening_pipeline.scripts.symmetrize:main'
+vasp_relaxation = 'screening_pipeline.scripts.vasp_relaxation:main'
 stability_screening = 'screening_pipeline.scripts.stability_screening:main'
 band_gap_screening = 'screening_pipeline.scripts.band_gap_screening:main'
 band_edge_pos_screening = 'screening_pipeline.scripts.band_edge_pos_screening:main'
