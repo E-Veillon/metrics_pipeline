@@ -20,7 +20,7 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # PYTHON MATERIAL GENOMICS PACKAGE
 
-from pymatgen.core.structure import Structure, SiteCollection
+from pymatgen.core.structure import Structure, SiteCollection, Composition
 from pymatgen.io.vasp import VaspInput
 from pymatgen.io.vasp.inputs import Poscar
 from pymatgen.io.vasp.outputs import Chgcar, Oszicar
@@ -496,7 +496,7 @@ def extract_vasp_data_for_convex_hull(
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict, 
                                 containing following data, used in stability calculation:
                                     - structure itself, 
-                                    - its raw chemical formula, 
+                                    - its chemical composition, 
                                     - its final energy (in eV).
     '''
 
@@ -514,11 +514,11 @@ def extract_vasp_data_for_convex_hull(
     oszicar_path = Path(struct_dir / 'OSZICAR')
 
     structure    = Poscar.from_file(contcar_path).structure
-    formula      = structure.formula
+    composition  = Composition(structure.formula)
     final_energy_eV: float = Oszicar(oszicar_path).final_energy
     struct_dict = {
         'structure': structure, 
-        'formula': formula, 
+        'composition': composition, 
         'final_energy': final_energy_eV
     }
     struct_data = (struct_name, struct_dict)
