@@ -125,17 +125,166 @@ def main():
     )
 
     # Script préliminaire
-    from pymatgen.core.composition import Element, Composition
+    from pymatgen.core.composition import Composition #, Element
     from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
+    #from itertools import product, combinations
+    from screening_pipeline.utils.matcher import flatten, group_by_stoichiometry
 
-    for name, data in structs_data:
+    '''def group_by_convex_hull(structs_data: dict) -> List[List[dict]]:
+        
+        'Group every structure in groups to make convex hulls from.'
+        
+        assert isinstance(structs_data, dict) and len(structs_data) > 0, \
+        f'Invalid input provided ({structs_data}), it either was not a dict or was an empty dict.'
 
-        comp  = Composition(data['formula'])
-        entry = PDEntry(
-            composition=comp, 
-            energy=data['final_energy'], 
-            name=name
-        )
+        groups    = []
+        comp_list = [(name, data['composition'], len(data['composition'])) for name, data in structs_data]
+        
+        while comp_list:
+
+            max_size          = max([tup[2] for tup in comp_list])
+            max_sized_structs = list(filter(lambda t: t[2] == max_size, comp_list))
+            smaller_structs   = list(filter(lambda t: t[2] < max_size, comp_list))
+
+            if len(max_sized_structs) == 1:
+                # All structures whose composition is only made of elements 
+                # that are in the bigger composition are added in the group 
+                # and removed from the main list.
+                max_sized_comp = max_sized_structs[0][1]
+
+                included_small_comps = list(filter(
+                    lambda t: all(elt in max_sized_comp for elt in t[1]), smaller_structs
+                ))
+                group = [*max_sized_structs, *included_small_comps]
+                groups.append(group)
+                for struct in group: comp_list.remove(struct)
+                continue
+
+            pairwise_compare = list(combinations(max_sized_structs, 2))
+
+            for comp1, comp2 in pairwise_compare:
+                # For each possible pair of big struct, elements in common are searched
+                common_elts    = list(filter(lambda elt: elt in comp2, comp1.elements))
+                nb_common_elts = len(common_elts)
+
+                if nb_common_elts < 2: continue
+
+                # Vérifier la composition commune avec les autres compositions mères
+                # plusieurs cas :
+                #   - le pattern ne correspond à aucune autre structure
+                #   - le pattern correspond à une seule autre structure
+                #   - le pattern correspond à plusieurs autres structures
+
+                # All structures whose composition is only made of elements 
+                # that are in the common composition are added in the group 
+                # and removed from the main list, along with the 2 bigger ones.
+                common_comp          = Composition(common_elts)
+                candidates           = list(filter(lambda t: t[2] <= nb_common_elts, smaller_structs))
+                included_small_comps = list(filter(lambda t: all(elt in common_comp for elt in t[1]), candidates))
+                group = [comp1, comp2, *included_small_comps]
+                groups.append(group)
+                # Manque des choses ici...'''
+
+    def calculate_instability_energies(structs_data: dict):
+        '''
+        Construct an adaptive convex hull for each structure according to their composition.
+        A binary structure does not need comparison with higher order structures.
+        For a higher order structure, smaller convex hulls can be combined into one of correct 
+        composition to put the structure in.
+
+        Parameters:
+            structs_data (dict):    A dict containing following data about each structure:
+                                        - structure directory name (dict's keys), 
+                                        - the Structure object, 
+                                        - its composition, 
+                                        - its relaxed energy (in eV).
+        Returns:
+            Dict: The same data with all ΔH calculated in 'delta_H' keys.
+        '''
+        
+        assert isinstance(structs_data, dict) and len(structs_data) > 0, \
+        f'Invalid input provided ({structs_data}), it either was not a dict or was an empty dict.'
+
+        groups       = [[]] # fill the index 0 to have correspondance between index and nbr of elts
+        structs_list = [(name, data) for name, data in structs_data.items()]
+        max_elts_nbr = max([len(data['composition']) for data in structs_data.values()])
+        elements     = list(set(flatten([struct[1]['composition'].elements for struct in structs_list])))
+        groups.append(elements)
+
+        for elts_nbr in range(2, max_elts_nbr + 1):
+            group = list(filter(lambda struct: len(struct[1]['composition']) == elts_nbr, structs_list))
+            groups.append(group)
+        # A ce stade,  groups = [[], [Elements], [Binaires], [Ternaires], ...]
+        for grp_idx, group in enumerate(groups[2:], start=2):
+            groups[grp_idx] = group_by_stoichiometry(group)
+        # A ce stade, groups = [
+        #                       [], 
+        #                       [Elements], 
+        #                       [[Bin. 1 (ex Fe-O)], [Bin. 2 (ex Mn-O)], ...], 
+        #                       [[Tern. 1 (ex Fe-Mn-O)], [Tern. 2 (ex Fe-Co-O)], ...], 
+        #                       ...
+        #                      ]
+        # On peut donc commencer à construire les Convex Hulls.
+        cached_pds: dict[str, dict] = {}
+
+        for elts_nbr in range(2, max_elts_nbr + 1):
+            for comp_region in groups[elts_nbr]:
+
+                elements   = list(filter(lambda elt: elt in comp_region[0].elements, groups[1]))
+                pd_name    = '-'.join([elt.symbol for elt in elements])
+
+                #TODO: finish cached diagrams conditional block
+                if elts_nbr > 2 and 'previous diagrams are included in this one':
+                    diagram1 = cached_pds['diagram1']
+                    diagram2 = cached_pds['diagram2']
+                    ...
+                    computed_data = {
+                        "@module": PhaseDiagram.__module__, 
+                        "@class": PhaseDiagram.__name__, 
+                        "all_entries": diagram1["all_entries"] + diagram2["all_entries"] + ..., 
+                        "elements": diagram1["elements"] + diagram2['elements'] + ..., 
+                        "computed_data": diagram1["computed_data"] + diagram2["computed_data"] + ...
+                    }
+                    comp_pd = PhaseDiagram.from_dict(dct=computed_data)
+
+                else:
+                    entry_list = [
+                        PDEntry(
+                            composition=Composition(elt), 
+                            energy=0.0, 
+                            name=elt.symbol, 
+                            attribute='element_ref'
+                        ) for elt in elements
+                    ] + [
+                        PDEntry(
+                            composition=struct[1]['composition'], 
+                            energy=struct[1]['final_energy'], 
+                            name=struct[0], 
+                            attribute='generated'
+                        ) for struct in comp_region
+                    ]
+
+                    comp_pd = PhaseDiagram(
+                        entries=entry_list, 
+                        elements=elements
+                    )
+
+                for entry in entry_list[elts_nbr:]:
+                    delta_H = comp_pd.get_e_above_hull(entry)
+                    structs_data[entry.name]['delta_H'] = delta_H
+
+                cached_pds[pd_name] = comp_pd.as_dict()
+        
+        return structs_data
+
+
+        # Les cristaux purs devraient être une énergie de référence.
+        # Les binaires doivent se voir assigner une CH 1D.
+        # Les ternaires doivent se voir assigner une combinaison de 3 CH 1D si possible, 
+        # sinon 2 CH 1D + 1 ligne vide entre les deux élts non-reliés, 
+        # sinon 1 CH + 1 elt relié aux 2 références par des lignes vides, 
+        # sinon une CH 2D vierge avec ses 3 elts pour références.
+        # Même principe pour les structures d'ordre supérieur.
 
         '''
         Fil directeur du premier script ci-dessous :
