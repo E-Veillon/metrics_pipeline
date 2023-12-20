@@ -183,6 +183,7 @@ def main():
     # Calcul de la symétrie d'espace des structures
 
     symmetrized_structs = list(filter(
+        None, 
         batch_symmetrizer(
             structures=structures, 
             valid_tol=args.valid_tol, 

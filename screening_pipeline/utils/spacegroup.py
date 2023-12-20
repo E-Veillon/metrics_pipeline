@@ -180,5 +180,6 @@ def batch_symmetrizer(
             set_structure_symmetrizer, 
             structures, 
             max_workers=workers, 
-            chunksize=chunksize
+            chunksize=chunksize, 
+            desc='Symmetrize structures'
     ))
