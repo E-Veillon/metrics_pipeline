@@ -182,15 +182,21 @@ def main():
     
     # Calcul de la symétrie d'espace des structures
 
-    symmetrized_structs = batch_symmetrizer(
-        structures=structures, 
-        valid_tol=args.valid_tol, 
-        symprec=args.precision, 
-        angle_tolerance=args.angleprec, 
-        workers=args.workers
-    )
+    symmetrized_structs = list(filter(
+        batch_symmetrizer(
+            structures=structures, 
+            valid_tol=args.valid_tol, 
+            symprec=args.precision, 
+            angle_tolerance=args.angleprec, 
+            workers=args.workers
+        )
+    ))
 
     print(f'{len(symmetrized_structs)} structures were symmetrized')
+
+    if args.valid_tol > 0.0:
+        nbr_not_valid = nbr_loaded_structs - len(symmetrized_structs)
+        print(f'{nbr_not_valid} structures having too close atoms were discarded')
 
     # Comparaison des structures pour éliminer les doublons
 
@@ -224,9 +230,19 @@ def main():
     print(' ')
     print(f'{nbr_total_structs} structures detected in total, including:')
     print(f'- {nbr_unique_structs} unique structures')
-    print(f'- {nbr_rare_gas_structs} structures containing rare gases')
-    print(f'- {nbr_rare_earth_structs} structures containing rare earths')
-    print(f'- {nbr_equivalent} structures that are duplicates')
+
+    if not args.keep_rare_gases:
+        print(f'- {nbr_rare_gas_structs} structures containing rare gases')
+
+    if not args.keep_rare_earths:
+        print(f'- {nbr_rare_earth_structs} structures containing rare earths')
+    
+    if args.valid_tol > 0.0:
+        print(f'{nbr_not_valid} sttructures with atoms that are too close (< {args.valid_tol} Angströms)')
+    
+    if not args.keep_equivalent:
+        print(f'- {nbr_equivalent} structures that are duplicates')
+
     print(' ')
     print(f"Output results written in '{args.output}'")
     print(f'elapsed time: {stop-start}')
