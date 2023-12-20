@@ -93,8 +93,8 @@ def main():
         help='name of output file containing filtered and symmetrized structures.',
     )
     parser.add_argument(
-        '-t', 
-        '--pos-tolerance', 
+        '-d', 
+        '--distance_tol', 
         type=float, 
         default=0.0, 
         help='''Tolerance for checking atoms relative positions in Angstroms.
@@ -184,6 +184,7 @@ def main():
 
     symmetrized_structs = batch_symmetrizer(
         structures=structures, 
+        valid_tol=args.valid_tol, 
         symprec=args.precision, 
         angle_tolerance=args.angleprec, 
         workers=args.workers

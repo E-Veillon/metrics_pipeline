@@ -105,7 +105,7 @@ def structure_symmetrizer(
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
 
-        if (valid_tol > 0) and not structure.is_valid(tol=valid_tol):
+        if (valid_tol > 0.0) and not structure.is_valid(tol=valid_tol):
             return None
 
         struct_analyzer = SpacegroupAnalyzer(
@@ -163,8 +163,8 @@ def batch_symmetrizer(
     '''
     from functools import partial
 
-    def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
-        return [(struct, symprec, angle_tolerance) for struct in structures]
+    #def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
+    #    return [(struct, symprec, angle_tolerance) for struct in structures]
 
     nbr_structs = len(structures)
     chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
