@@ -29,7 +29,7 @@ def assert_args(args: Namespace):
         and args.output.endswith('.cif')
     ), 'some arguments formats are not supported, please only use CIF format'
 
-    print(f'Tolerance in relative atomic distances check: {args.valid_tol}')
+    print(f'Tolerance in relative atomic distances check: {args.valid_tol} Angstroms')
 
     assert args.valid_tol >= 0.0, \
     'relative atomic positions tolerance cannot be negative.'
