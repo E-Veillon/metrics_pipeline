@@ -73,7 +73,7 @@ def structure_symmetrizer(
         valid_tol: float = 0.0, 
         symprec: float = 0.01, 
         angle_tolerance: float = 5.0
-    ) -> Structure | SymmetrizedStructure:
+    ) -> Structure | SymmetrizedStructure | None:
     '''
     Try to find spacegroup symmetry of a structure using spglib via pymatgen.
     If the first try does not work, it will retry several times with loosened tolerances.
@@ -94,8 +94,10 @@ def structure_symmetrizer(
 
     Returns:
         A Pymatgen SymmetrizedStructure object if symmetry detection worked properly,
-        or a Structure object with default P1 spacegroup if it could not detect any.
+        the original Structure object if it could not detect any symmetry, 
+        or None if distance checking is enabled and triggered.
     '''
+
     assert isinstance(structure, Structure)
     assert isinstance(valid_tol, float) and (valid_tol >= 0)
     assert isinstance(symprec, float)
