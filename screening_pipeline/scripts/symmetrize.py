@@ -239,7 +239,7 @@ def main():
         print(f'- {nbr_rare_earth_structs} structures containing rare earths')
     
     if args.valid_tol > 0.0:
-        print(f'{nbr_not_valid} sttructures with atoms that are too close (< {args.valid_tol} Angströms)')
+        print(f'- {nbr_not_valid} structures with too small interatomic distances')
     
     if not args.keep_equivalent:
         print(f'- {nbr_equivalent} structures that are duplicates')
