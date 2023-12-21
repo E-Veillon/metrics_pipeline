@@ -125,6 +125,7 @@ def main():
     )
 
     # Script préliminaire
+    from typing import Sequence, Any
     from pymatgen.core.composition import Composition #, Element
     from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
     #from itertools import product, combinations
@@ -235,17 +236,12 @@ def main():
 
                 #TODO: finish cached diagrams conditional block
                 if elts_nbr > 2 and 'previous diagrams are included in this one':
-                    diagram1 = cached_pds['diagram1']
-                    diagram2 = cached_pds['diagram2']
-                    ...
-                    computed_data = {
-                        "@module": PhaseDiagram.__module__, 
-                        "@class": PhaseDiagram.__name__, 
-                        "all_entries": diagram1["all_entries"] + diagram2["all_entries"] + ..., 
-                        "elements": diagram1["elements"] + diagram2['elements'] + ..., 
-                        "computed_data": diagram1["computed_data"] + diagram2["computed_data"] + ...
-                    }
-                    comp_pd = PhaseDiagram.from_dict(dct=computed_data)
+
+                    comp_pd = init_pd_from_cache(
+                        new_pd_name=pd_name, 
+                        cached_pd_data=cached_pds, 
+                        new_data=comp_region
+                    )
 
                 else:
                     entry_list = [
@@ -276,6 +272,63 @@ def main():
                 cached_pds[pd_name] = comp_pd.as_dict()
         
         return structs_data
+    
+    def init_pd_from_cache(
+            new_pd_name: str, 
+            cached_pd_data: dict, 
+            new_data: dict[str, Any]|Sequence[Tuple]
+        ) -> PhaseDiagram:
+        '''
+        Initialize a higher order PhaseDiagram object by combining data from lesser ones already computed.
+        Avoid expensive construction of complex phase diagrams and redundance in computations.
+        If some parts of the higher diagram are not computed yet, this function computes them
+
+        Parameters:
+            new_pd_name (str):          Name of the initialised phase diagram, as a string of its elemental 
+                                        references, separated by '-' (eg. 'Fe-P-O').
+            
+            cached_pd_data (dict):      A dict referencing computed diagrams by their name (same formalism 
+                                        as new_pd_name), and containing their MSONable dicts, as returned by
+                                        PhaseDiagram.as_dict() method.
+            
+            new_data (dict|Sequence):   Structure data to put in the phase diagram in addition to previous
+                                        diagrams, typically structures containing all elements of the diagram
+                                        in their composition.
+        
+        Returns:
+            The new PhaseDiagram for composition given by its name.
+        '''
+
+        assert isinstance(new_pd_name, str)
+        assert isinstance(cached_pd_data, dict)
+        assert isinstance(new_data, (dict, Sequence))
+
+        diagram1 = cached_pd_data['diagram1']
+        diagram2 = cached_pd_data['diagram2']
+        ...
+
+        entry_list = []
+
+        for struct in new_data:
+            entry = PDEntry(
+                Composition(struct), 
+                energy=struct.final_energy, 
+                name=struct.name, 
+                attribute='generated'
+            )
+            entry_list.append(entry)
+
+        computed_data = {
+        "@module": PhaseDiagram.__module__, 
+        "@class": PhaseDiagram.__name__, 
+        "all_entries": diagram1["all_entries"] + diagram2["all_entries"] + ... + entry_list, 
+        "elements": diagram1["elements"] + diagram2['elements'] + ..., 
+        "computed_data": diagram1["computed_data"] + diagram2["computed_data"] + ...
+        }
+
+        new_pd = PhaseDiagram.from_dict(dct=computed_data)
+        
+        return new_pd
 
 
         # Les cristaux purs devraient être une énergie de référence.
