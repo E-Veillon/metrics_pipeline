@@ -244,28 +244,13 @@ def main():
                     )
 
                 else:
-                    entry_list = [
-                        PDEntry(
-                            composition=Composition(elt), 
-                            energy=0.0, 
-                            name=elt.symbol, 
-                            attribute='element_ref'
-                        ) for elt in elements
-                    ] + [
-                        PDEntry(
-                            composition=struct[1]['composition'], 
-                            energy=struct[1]['final_energy'], 
-                            name=struct[0], 
-                            attribute='generated'
-                        ) for struct in comp_region
-                    ]
 
-                    comp_pd = PhaseDiagram(
-                        entries=entry_list, 
-                        elements=elements
+                    comp_pd = init_pd_from_scratch(
+                        new_pd_name=pd_name, 
+                        structs_data=comp_region
                     )
 
-                for entry in entry_list[elts_nbr:]:
+                for entry in comp_pd.all_entries[elts_nbr:]:
                     delta_H = comp_pd.get_e_above_hull(entry)
                     structs_data[entry.name]['delta_H'] = delta_H
 
@@ -296,7 +281,7 @@ def main():
                                         in their composition.
         
         Returns:
-            The new PhaseDiagram for composition given by its name.
+            The new PhaseDiagram of composition given by its name.
         '''
 
         assert isinstance(new_pd_name, str)
@@ -330,6 +315,46 @@ def main():
         
         return new_pd
 
+    def init_pd_from_scratch(
+            new_pd_name: str, 
+            structs_data: dict[str, Any]|Sequence[Tuple]
+        ) -> PhaseDiagram:
+        '''
+        Compute a PhaseDiagram object from given name and data. The name is used to initialize
+        the reference elements.
+
+        Parameters:
+            new_pd_name (str):              Name of the initialised phase diagram, as a string 
+                                            of its elemental references, separated by '-' 
+                                            (eg. 'Fe-P-O').
+
+            structs_data (dict|Sequence):   The structures data to put into the diagram.
+        
+        Returns:
+            The new PhaseDiagram of composition given by its name.
+        '''
+        entry_list = [
+            PDEntry(
+                composition=Composition(elt), 
+                energy=0.0, 
+                name=elt.symbol, 
+                attribute='element_ref'
+            ) for elt in new_pd_name.elements
+        ] + [
+            PDEntry(
+                composition=struct[1]['composition'], 
+                energy=struct[1]['final_energy'], 
+                name=struct[0], 
+                attribute='generated'
+            ) for struct in structs_data
+        ]
+
+        new_pd = PhaseDiagram(
+            entries=entry_list, 
+            elements=new_pd_name.elements
+        )
+
+        return new_pd
 
         # Les cristaux purs devraient être une énergie de référence.
         # Les binaires doivent se voir assigner une CH 1D.
