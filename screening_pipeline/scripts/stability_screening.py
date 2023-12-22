@@ -269,7 +269,7 @@ def main():
             elts_data (str|[str|int|Element]):  The data to parse Elements objects from.
 
                                                 If a single string is provided, it can either 
-                                                be a raw formula (eg. 'FePO3') or a composition 
+                                                be a raw formula (eg. 'FePO4') or a composition 
                                                 string containing element symbols separated by 
                                                 '-' (eg. 'Fe-P-O').
 
@@ -309,7 +309,7 @@ def main():
             ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
                                             
                                             If a single string is provided, it can either 
-                                            be a raw formula (eg. 'FePO3') or a composition 
+                                            be a raw formula (eg. 'FePO4') or a composition 
                                             string containing element symbols separated by 
                                             '-' (eg. 'Fe-P-O').
 
@@ -333,7 +333,16 @@ def main():
         assert isinstance(cached_pd_data, dict)
         assert isinstance(new_data, (dict, Sequence))
 
-        ref_elts = get_elements(ref_elts)
+        ref_elts      = get_elements(ref_elts)
+        computed_data = {
+            "@module": PhaseDiagram.__module__, 
+            "@class": PhaseDiagram.__name__, 
+        }
+
+        for pd_name in cached_pd_data.keys():
+            common_elts = list(filter(lambda elt: elt in ref_elts, get_elements(pd_name)))
+            if len(common_elts) < 2: continue
+
 
         diagram1 = cached_pd_data['diagram1']
         diagram2 = cached_pd_data['diagram2']
@@ -373,7 +382,7 @@ def main():
             ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
                                             
                                             If a single string is provided, it can either 
-                                            be a raw formula (eg. 'FePO3') or a composition 
+                                            be a raw formula (eg. 'FePO4') or a composition 
                                             string containing element symbols separated by 
                                             '-' (eg. 'Fe-P-O').
 
