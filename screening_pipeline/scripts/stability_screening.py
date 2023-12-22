@@ -125,7 +125,7 @@ def main():
     )
 
     # Script préliminaire
-    from typing import Sequence, Any, Union
+    from typing import Sequence, Any, Union, Iterable
     from pymatgen.core.composition import Composition, Element
     from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
     #from itertools import product, combinations
@@ -258,8 +258,45 @@ def main():
         
         return structs_data
     
+    def get_elements(
+            elts_data: str|Iterable[str|int|Element]
+        ) -> List[Element]:
+        '''
+        Flexible converter to get a list of unique Element objects from a single string or any 
+        iterable providing valid element symbols or atomic numbers, or a mixture of the two.
+
+        Parameters:
+            elts_data (str|[str|int|Element]):  The data to parse Elements objects from.
+
+                                                If a single string is provided, it can either 
+                                                be a raw formula (eg. 'FePO3') or a composition 
+                                                string containing element symbols separated by 
+                                                '-' (eg. 'Fe-P-O').
+
+                                                If an iterable is given, it can contain valid 
+                                                element symbols, atomic numbers and/or Element 
+                                                objects.
+
+        Raises: 
+            ValueError if some of the given data does not represents valid elements.
+
+        Returns: 
+            A list of parsed Element objects.
+        '''
+
+        assert isinstance(elts_data, Iterable)
+
+        if isinstance(elts_data, str):
+            elts_list = Composition(''.join(elts_data.split(sep='-')), strict=True).elements
+        
+        else:
+            assert all([isinstance(elt, (str, int, Element)) for elt in elts_data])
+            elts_list = Composition([(elt, 1) for elt in elts_data], strict=True).elements
+
+        return elts_list
+
     def init_pd_from_cache(
-            ref_elts: Union[str, Sequence[Element]], 
+            ref_elts: Union[str, Iterable], 
             cached_pd_data: dict, 
             new_data: dict[str, Any]|Sequence[Tuple]
         ) -> PhaseDiagram:
@@ -269,25 +306,34 @@ def main():
         If some parts of the higher diagram are not computed yet, this function computes them
 
         Parameters:
-            ref_elts (str|[Element]):   The  elemental references of the new phase diagram.
-                                        If a string is provided, it must be the name of the new phase diagram, 
-                                        ie. each element inside it, separated by '-' (eg. 'Fe-P-O').
+            ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
+                                            
+                                            If a single string is provided, it can either 
+                                            be a raw formula (eg. 'FePO3') or a composition 
+                                            string containing element symbols separated by 
+                                            '-' (eg. 'Fe-P-O').
+
+                                            If an iterable is given, it can contain valid 
+                                            element symbols, atomic numbers and/or Element 
+                                            objects.
             
-            cached_pd_data (dict):      A dict referencing computed diagrams by their name (same formalism 
-                                        as new_pd_name), and containing their MSONable dicts, as returned by
-                                        PhaseDiagram.as_dict() method.
+            cached_pd_data (dict):          A dict referencing computed diagrams by their name, 
+                                            and containing their MSONable dicts, as returned by
+                                            PhaseDiagram.as_dict() method.
             
-            new_data (dict|Sequence):   Structure data to put in the phase diagram in addition to previous
-                                        diagrams, typically structures containing all elements of the diagram
-                                        in their composition.
+            new_data (dict|[Tuple]):        Structure data to put in the phase diagram in addition to 
+                                            previousdiagrams, typically structures of same elemental
+                                            composition as the new diagram itself.
         
         Returns:
             The constructed PhaseDiagram object.
         '''
 
-        assert isinstance(ref_elts, str)
+        assert isinstance(ref_elts, (str, Iterable))
         assert isinstance(cached_pd_data, dict)
         assert isinstance(new_data, (dict, Sequence))
+
+        ref_elts = get_elements(ref_elts)
 
         diagram1 = cached_pd_data['diagram1']
         diagram2 = cached_pd_data['diagram2']
@@ -317,30 +363,39 @@ def main():
         return new_pd
 
     def init_pd_from_scratch(
-            ref_elts: Union[str, Sequence[Element]], 
+            ref_elts: Union[str, Iterable], 
             structs_data: dict[str, Any]|Sequence[Tuple]
         ) -> PhaseDiagram:
         '''
         Compute a PhaseDiagram object from given elements and structure data.
 
         Parameters:
-            ref_elts (str|[Element]):       The  elemental references of the new phase diagram.
-                                            If a string is provided, it must be the name of the 
-                                            new phase diagram, ie. each element inside it, 
-                                            separated by '-' (eg. 'Fe-P-O').
+            ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
+                                            
+                                            If a single string is provided, it can either 
+                                            be a raw formula (eg. 'FePO3') or a composition 
+                                            string containing element symbols separated by 
+                                            '-' (eg. 'Fe-P-O').
+
+                                            If an iterable is given, it can contain valid 
+                                            element symbols, atomic numbers and/or Element 
+                                            objects.
 
             structs_data (dict|Sequence):   The structures data to put into the diagram.
         
         Returns:
             The constructed PhaseDiagram object.
         '''
+
+        ref_elts = get_elements(ref_elts)
+
         entry_list = [
             PDEntry(
                 composition=Composition(elt), 
                 energy=0.0, 
                 name=elt.symbol, 
                 attribute='element_ref'
-            ) for elt in ref_elts.elements
+            ) for elt in ref_elts
         ] + [
             PDEntry(
                 composition=struct[1]['composition'], 
