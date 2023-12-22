@@ -125,8 +125,8 @@ def main():
     )
 
     # Script préliminaire
-    from typing import Sequence, Any
-    from pymatgen.core.composition import Composition #, Element
+    from typing import Sequence, Any, Union
+    from pymatgen.core.composition import Composition, Element
     from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
     #from itertools import product, combinations
     from screening_pipeline.utils.matcher import flatten, group_by_stoichiometry
@@ -238,7 +238,7 @@ def main():
                 if elts_nbr > 2 and 'previous diagrams are included in this one':
 
                     comp_pd = init_pd_from_cache(
-                        new_pd_name=pd_name, 
+                        ref_elts=pd_name, 
                         cached_pd_data=cached_pds, 
                         new_data=comp_region
                     )
@@ -246,7 +246,7 @@ def main():
                 else:
 
                     comp_pd = init_pd_from_scratch(
-                        new_pd_name=pd_name, 
+                        ref_elts=pd_name, 
                         structs_data=comp_region
                     )
 
@@ -259,7 +259,7 @@ def main():
         return structs_data
     
     def init_pd_from_cache(
-            new_pd_name: str, 
+            ref_elts: Union[str, Sequence[Element]], 
             cached_pd_data: dict, 
             new_data: dict[str, Any]|Sequence[Tuple]
         ) -> PhaseDiagram:
@@ -269,8 +269,9 @@ def main():
         If some parts of the higher diagram are not computed yet, this function computes them
 
         Parameters:
-            new_pd_name (str):          Name of the initialised phase diagram, as a string of its elemental 
-                                        references, separated by '-' (eg. 'Fe-P-O').
+            ref_elts (str|[Element]):   The  elemental references of the new phase diagram.
+                                        If a string is provided, it must be the name of the new phase diagram, 
+                                        ie. each element inside it, separated by '-' (eg. 'Fe-P-O').
             
             cached_pd_data (dict):      A dict referencing computed diagrams by their name (same formalism 
                                         as new_pd_name), and containing their MSONable dicts, as returned by
@@ -281,10 +282,10 @@ def main():
                                         in their composition.
         
         Returns:
-            The new PhaseDiagram of composition given by its name.
+            The constructed PhaseDiagram object.
         '''
 
-        assert isinstance(new_pd_name, str)
+        assert isinstance(ref_elts, str)
         assert isinstance(cached_pd_data, dict)
         assert isinstance(new_data, (dict, Sequence))
 
@@ -316,22 +317,22 @@ def main():
         return new_pd
 
     def init_pd_from_scratch(
-            new_pd_name: str, 
+            ref_elts: Union[str, Sequence[Element]], 
             structs_data: dict[str, Any]|Sequence[Tuple]
         ) -> PhaseDiagram:
         '''
-        Compute a PhaseDiagram object from given name and data. The name is used to initialize
-        the reference elements.
+        Compute a PhaseDiagram object from given elements and structure data.
 
         Parameters:
-            new_pd_name (str):              Name of the initialised phase diagram, as a string 
-                                            of its elemental references, separated by '-' 
-                                            (eg. 'Fe-P-O').
+            ref_elts (str|[Element]):       The  elemental references of the new phase diagram.
+                                            If a string is provided, it must be the name of the 
+                                            new phase diagram, ie. each element inside it, 
+                                            separated by '-' (eg. 'Fe-P-O').
 
             structs_data (dict|Sequence):   The structures data to put into the diagram.
         
         Returns:
-            The new PhaseDiagram of composition given by its name.
+            The constructed PhaseDiagram object.
         '''
         entry_list = [
             PDEntry(
@@ -339,7 +340,7 @@ def main():
                 energy=0.0, 
                 name=elt.symbol, 
                 attribute='element_ref'
-            ) for elt in new_pd_name.elements
+            ) for elt in ref_elts.elements
         ] + [
             PDEntry(
                 composition=struct[1]['composition'], 
@@ -351,7 +352,7 @@ def main():
 
         new_pd = PhaseDiagram(
             entries=entry_list, 
-            elements=new_pd_name.elements
+            elements=ref_elts.elements
         )
 
         return new_pd
