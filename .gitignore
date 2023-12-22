@@ -10,4 +10,4 @@ oqmd_poscar
 *.potcar
 *.poscar
 *.kpoints
-ConvexHull.py
+*_test.py
