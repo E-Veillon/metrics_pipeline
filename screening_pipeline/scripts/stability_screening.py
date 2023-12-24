@@ -338,28 +338,47 @@ def main():
         assert isinstance(cached_pd_data, dict)
         assert isinstance(new_data, (dict, Sequence))
 
-        ref_elts      = get_elements(ref_elts)
+        ref_elts    = get_elements(ref_elts)
         new_pd_data = {
-            "@module": PhaseDiagram.__module__, 
-            "@class": PhaseDiagram.__name__, 
-            "all_entries": [], 
-            "elements": [], 
+            "@module": PhaseDiagram.__module__, # OK
+            "@class": PhaseDiagram.__name__, # OK
+            "all_entries": [], # à calculer
+            "elements": [elt.as_dict() for elt in ref_elts], # OK
             "computed_data": {
                 "facets": None, # voir scipy.spatial.convexhull
                 "simplexes": None, # voir scipy.spatial.convexhull
-                "all_entries": [], 
+                "all_entries": [], # à calculer
                 "qhull_data": None, # numpy.ndarray, immutable...
-                "dim": 0, # len(ref_elts) + 1 pour l'énergie ?
-                "el_refs": [], 
-                "qhull_entries": []
+                "dim": len(ref_elts), # OK
+                "el_refs": [ # OK
+                    (elt, PDEntry(
+                        composition=Composition(elt), 
+                        energy=0.0, 
+                        name=elt.symbol, 
+                        attribute='element_ref'
+                    )) for elt in ref_elts
+                ], 
+                "qhull_entries": [] # à calculer
             }
         }
 
-        for pd_name in cached_pd_data.keys():
-            common_elts = list(filter(lambda elt: elt in ref_elts, get_elements(pd_name)))
-            if len(common_elts) < 2: continue
-            new_pd_data['all_entries'] += cached_pd_data[pd_name]['all_entries']
-            new_pd_data['elements'] += cached_pd_data[pd_name]['elements']
+        all_sub_pd_list = list(filter(
+            lambda pd_name: all(elt in ref_elts for elt in get_elements(pd_name)), 
+            cached_pd_data.keys()
+        ))
+
+        for sub_dim in reversed(range(2, len(ref_elts))):
+            dim_sub_pd_list = list(filter(
+                lambda sub_pd: len(get_elements(sub_pd)) == sub_dim, 
+                all_sub_pd_list
+            ))
+            if not dim_sub_pd_list: continue
+            new_pd_data['all_entries'] += sum(
+                cached_pd_data[pd_name]['all_entries'] for pd_name in dim_sub_pd_list
+            )
+            # TODO: Il faut éviter d'ajouter des sous-diagrammes si les arêtes 
+            #       correspondantes sont déjà satisfaites.
+
         
         new_pd_data['all_entries'] += [
             PDEntry(
