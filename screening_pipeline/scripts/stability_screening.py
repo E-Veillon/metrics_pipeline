@@ -361,17 +361,30 @@ def main():
             new_pd_data['all_entries'] += cached_pd_data[pd_name]['all_entries']
             new_pd_data['elements'] += cached_pd_data[pd_name]['elements']
         
-        if isinstance(new_data, dict):
-            new_pd_data['all_entries'] += [
-                PDEntry(
-                    composition=Composition(data['structure']), 
-                    energy=data['final_energy'], 
-                    name=name, 
-                    attribute='generated'
-                ).as_dict() for name, data in (new_data.items() if isinstance(new_data, dict) else new_data)
-            ]
+        new_pd_data['all_entries'] += [
+            PDEntry(
+                composition=Composition(data['structure']), 
+                energy=data['final_energy'], 
+                name=name, 
+                attribute='generated'
+            ).as_dict() for name, data in (new_data.items() if isinstance(new_data, dict) else new_data)
+        ]
 
-        new_pd_data['elements'] = list(set(new_pd_data['elements']))
+        new_pd_data['all_entries'] = list(set(new_pd_data['all_entries']))
+        new_pd_data['elements']    = list(set(new_pd_data['elements']))
+        
+        new_pd_data['computed_data']['all_entries'] = [
+            PDEntry.from_dict(entry) for entry in new_pd_data['all_entries']
+        ]
+
+        new_pd_data['computed_data']['el_refs'] = [
+            (Element.from_dict(elt), PDEntry(
+                composition=Composition(Element.from_dict(elt)), 
+                energy=0.0, 
+                name=Element.from_dict(elt).symbol, 
+                attribute='element_ref'
+            )) for elt in new_pd_data['elements']
+        ]
 
         '''
         diagram1 = cached_pd_data['diagram1']
