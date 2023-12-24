@@ -298,7 +298,7 @@ def main():
     def init_pd_from_cache(
             ref_elts: Union[str, Iterable], 
             cached_pd_data: dict, 
-            new_data: dict[str, Any]|Sequence[Tuple]
+            new_data: dict[str, dict]|Sequence[Tuple]
         ) -> PhaseDiagram:
         '''
         Initialize a higher order PhaseDiagram object by combining data from lesser ones already computed.
@@ -322,8 +322,13 @@ def main():
                                             PhaseDiagram.as_dict() method.
             
             new_data (dict|[Tuple]):        Structure data to put in the phase diagram in addition to 
-                                            previousdiagrams, typically structures of same elemental
-                                            composition as the new diagram itself.
+                                            previous diagrams, typically structures of same elemental
+                                            composition as the new diagram itself. 
+                                            They must be provided as a dict of {name: data} or a sequence 
+                                            of (name, data) tuples, where 'name' is the name of the 
+                                            structure directory where data were took from, and 'data' is 
+                                            a dict containing same infos as provided by the function
+                                            'screening_pipeline.utils.vasp_io.extract_vasp_data_for_convex_hull'.
         
         Returns:
             The constructed PhaseDiagram object.
@@ -334,16 +339,41 @@ def main():
         assert isinstance(new_data, (dict, Sequence))
 
         ref_elts      = get_elements(ref_elts)
-        computed_data = {
+        new_pd_data = {
             "@module": PhaseDiagram.__module__, 
             "@class": PhaseDiagram.__name__, 
+            "all_entries": [], 
+            "elements": [], 
+            "computed_data": {
+                "facets": None, # voir scipy.spatial.convexhull
+                "simplexes": None, # voir scipy.spatial.convexhull
+                "all_entries": [], 
+                "qhull_data": None, # numpy.ndarray, immutable...
+                "dim": 0, # len(ref_elts) + 1 pour l'énergie ?
+                "el_refs": [], 
+                "qhull_entries": []
+            }
         }
 
         for pd_name in cached_pd_data.keys():
             common_elts = list(filter(lambda elt: elt in ref_elts, get_elements(pd_name)))
             if len(common_elts) < 2: continue
+            new_pd_data['all_entries'] += cached_pd_data[pd_name]['all_entries']
+            new_pd_data['elements'] += cached_pd_data[pd_name]['elements']
+        
+        if isinstance(new_data, dict):
+            new_pd_data['all_entries'] += [
+                PDEntry(
+                    composition=Composition(data['structure']), 
+                    energy=data['final_energy'], 
+                    name=name, 
+                    attribute='generated'
+                ).as_dict() for name, data in (new_data.items() if isinstance(new_data, dict) else new_data)
+            ]
 
+        new_pd_data['elements'] = list(set(new_pd_data['elements']))
 
+        '''
         diagram1 = cached_pd_data['diagram1']
         diagram2 = cached_pd_data['diagram2']
         ...
@@ -366,8 +396,8 @@ def main():
         "elements": diagram1["elements"] + diagram2['elements'] + ..., 
         "computed_data": diagram1["computed_data"] + diagram2["computed_data"] + ...
         }
-
-        new_pd = PhaseDiagram.from_dict(dct=computed_data)
+        '''
+        new_pd = PhaseDiagram.from_dict(dct=new_pd_data)
         
         return new_pd
 
