@@ -380,7 +380,7 @@ def main():
             #       correspondantes sont déjà satisfaites.
 
         
-        new_pd_data['all_entries'] += [
+        '''new_pd_data['all_entries'] += [
             PDEntry(
                 composition=Composition(data['structure']), 
                 energy=data['final_energy'], 
@@ -403,7 +403,7 @@ def main():
                 name=Element.from_dict(elt).symbol, 
                 attribute='element_ref'
             )) for elt in new_pd_data['elements']
-        ]
+        ]'''
 
         '''
         diagram1 = cached_pd_data['diagram1']
