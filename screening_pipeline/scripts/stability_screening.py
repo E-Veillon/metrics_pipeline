@@ -339,6 +339,7 @@ def main():
         assert isinstance(new_data, (dict, Sequence))
 
         ref_elts    = get_elements(ref_elts)
+        new_pd_dim  = len(ref_elts)
         new_pd_data = {
             "@module": PhaseDiagram.__module__, # OK
             "@class": PhaseDiagram.__name__, # OK
@@ -349,7 +350,7 @@ def main():
                 "simplexes": None, # voir scipy.spatial.convexhull
                 "all_entries": [], # à calculer
                 "qhull_data": None, # numpy.ndarray, immutable...
-                "dim": len(ref_elts), # OK
+                "dim": new_pd_dim, # OK
                 "el_refs": [ # OK
                     (elt, PDEntry(
                         composition=Composition(elt), 
@@ -367,17 +368,22 @@ def main():
             cached_pd_data.keys()
         ))
 
-        for sub_dim in reversed(range(2, len(ref_elts))):
+        for sub_dim in reversed(range(2, new_pd_dim)):
             dim_sub_pd_list = list(filter(
                 lambda sub_pd: len(get_elements(sub_pd)) == sub_dim, 
                 all_sub_pd_list
             ))
             if not dim_sub_pd_list: continue
-            new_pd_data['all_entries'] += sum(
-                cached_pd_data[pd_name]['all_entries'] for pd_name in dim_sub_pd_list
-            )
             # TODO: Il faut éviter d'ajouter des sous-diagrammes si les arêtes 
             #       correspondantes sont déjà satisfaites.
+            new_pd_data['all_entries'] += list(set(sum(
+                cached_pd_data[pd_name]['all_entries'] for pd_name in dim_sub_pd_list
+            )))
+
+
+        new_pd_data['computed_data']['all_entries'] = [
+            PDEntry.from_dict(entry) for entry in new_pd_data['all_entries']
+        ]
 
         
         '''new_pd_data['all_entries'] += [
