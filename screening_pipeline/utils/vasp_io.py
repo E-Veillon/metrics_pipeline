@@ -588,23 +588,26 @@ def batch_extract_vasp_data(
 ) -> Dict[str, Dict[str, Any]]:
     '''
     Extracts VASP data from a previous run for each structure directory in given directory.
-    Keeps only data that are useful for Δ-Sol method.
+    Keeps only data that are useful according to given method.
 
     Parameters:
-        method (str):           Name of the method that will use the data, used to know which data should be extracted.
+        method (str):           Name of the method that will use the data, used to know 
+                                which data should be extracted.
 
         base_dir (str|Path):    Directory containing structures subdirs to extract data from.
 
-        ignore_file (str):      Checks whether the provided file name exists in each subdirectory.
-                                Structure directories containing this file will not be taken into account.
-                                This parameter permits the filtration of structures that did not pass
-                                previous steps.
+        ignore_file (str):      Checks whether the provided file name exists in each 
+                                subdirectory. Structure directories containing this file 
+                                will not be taken into account.
+                                This parameter permits the filtration of structures that did 
+                                not pass previous steps.
 
         workers (int):          Number of parallel processes to spawn.
 
     Returns:
         Dict[str: Dict]:        Dict with structure directory names as keys, 
-                                and a dict containing following data for corresponding structure as values:
+                                and a dict containing following data for corresponding 
+                                structure as values:
                                     - structure itself, 
                                     - its CHGCAR file (to modify charge density), 
                                     - its final energy (in eV), used as E(N0).

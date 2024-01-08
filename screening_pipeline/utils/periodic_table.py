@@ -108,7 +108,9 @@ def get_elements(
     ) -> List[Element]:
     '''
     Flexible converter to get a list of unique Element objects from a single string or any 
-    iterable providing valid element symbols or atomic numbers, or a mixture of the two.
+    iterable providing valid element symbols, atomic numbers, Element objects, or a mixture 
+    of the three.
+
     Parameters:
         elts_data (str|[str|int|Element]):  The data to parse Elements objects from.
                                             If a single string is provided, it can either 
