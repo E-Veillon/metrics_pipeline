@@ -86,10 +86,11 @@ def init_pd_from_cache(
     '''
     Initialize a higher order PhaseDiagram object by combining data from lesser ones already computed.
     Avoid expensive construction of complex phase diagrams and redundance in computations.
-    If some parts of the higher diagram are not computed yet, this function computes them
+    If some parts of the higher diagram are not computed yet, this function computes them from scratch
+    after combining cached data as much as possible to complete the diagram.
+
     Parameters:
         ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
-                                        
                                         If a single string is provided, it can either 
                                         be a raw formula (eg. 'FePO4') or a composition 
                                         string containing element symbols separated by 
@@ -114,9 +115,11 @@ def init_pd_from_cache(
     Returns:
         The constructed PhaseDiagram object.
     '''
+
     assert isinstance(ref_elts, (str, Iterable))
     assert isinstance(cached_pd_data, dict)
     assert isinstance(new_data, (dict, Sequence))
+
     ref_elts    = get_elements(ref_elts)
     new_pd_dim  = len(ref_elts)
     new_pd_data = {

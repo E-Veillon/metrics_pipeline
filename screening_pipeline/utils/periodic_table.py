@@ -118,18 +118,23 @@ def get_elements(
                                             If an iterable is given, it can contain valid 
                                             element symbols, atomic numbers and/or Element 
                                             objects.
+
     Raises: 
         ValueError if some of the given data does not represents valid elements.
+
     Returns: 
         A list of parsed Element objects.
     '''
+
     assert isinstance(elts_data, Iterable)
+
     if isinstance(elts_data, str):
         elts_list = Composition(''.join(elts_data.split(sep='-')), strict=True).elements
     
     else:
         assert all([isinstance(elt, (str, int, Element)) for elt in elts_data])
         elts_list = Composition([(elt, 1) for elt in elts_data], strict=True).elements
+
     return elts_list
 
 def get_element_group(atom: Union[Element, str]) -> str:
