@@ -204,7 +204,9 @@ def main():
         '''
         
         assert isinstance(structs_data, dict) and len(structs_data) > 0, \
-        f'Invalid input provided ({structs_data}), it either was not a dict or was an empty dict.'
+        f'''Invalid input provided, it either was not a dict or was empty.
+            Detected type: {type(structs_data)}.
+            Detected length: {len(structs_data)}.'''
 
         groups       = [[]] # fill the index 0 to have correspondance between index and nbr of elts
         structs_list = [(name, data) for name, data in structs_data.items()]
@@ -346,10 +348,10 @@ def main():
             "all_entries": [], # à calculer
             "elements": [elt.as_dict() for elt in ref_elts], # OK
             "computed_data": {
-                "facets": None, # voir scipy.spatial.convexhull
-                "simplexes": None, # voir scipy.spatial.convexhull
+                "facets": None, # utiliser get_facets une fois tout les points dans le tableau
+                "simplexes": None, # transformer les facets en Simplex et le lister ici
                 "all_entries": [], # à calculer
-                "qhull_data": None, # numpy.ndarray, immutable...
+                "qhull_data": None, # numpy.ndarray, à caster en liste et remettre en array ensuite
                 "dim": new_pd_dim, # OK
                 "el_refs": [ # OK
                     (elt, PDEntry(
@@ -441,7 +443,7 @@ def main():
 
     def init_pd_from_scratch(
             ref_elts: Union[str, Iterable], 
-            structs_data: dict[str, Any]|Sequence[Tuple]
+            structs_data: dict[str, Any]|Sequence[Tuple[str, Any]]
         ) -> PhaseDiagram:
         '''
         Compute a PhaseDiagram object from given elements and structure data.
@@ -465,6 +467,9 @@ def main():
         '''
 
         ref_elts = get_elements(ref_elts)
+
+        if isinstance(structs_data, dict):
+            structs_data = list(structs_data.items())
 
         entry_list = [
             PDEntry(
