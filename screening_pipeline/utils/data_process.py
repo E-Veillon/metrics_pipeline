@@ -6,7 +6,7 @@ Functions to process raw calculation results from VASP and test actual eliminati
 ########################################
 # SYSTEM I/O MODULES
 
-from typing import Dict, Union, Sequence, Tuple, Any, List
+from typing import Dict, Union, Sequence, Tuple, Any, List, Iterable
 from pathlib import Path
 
 ########################################
@@ -17,12 +17,14 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # PYTHON MATERIAL GENOMICS PACKAGE
 
+from pymatgen.core.composition import Composition
+from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 ########################################
 # LOCAL MODULES
 
 from screening_pipeline.utils.matcher import group_by_stoichiometry, flatten
-from screening_pipeline.utils.periodic_table import get_delta_sol_el_ratio
+from screening_pipeline.utils.periodic_table import get_elements, get_delta_sol_el_ratio
 
 ########################################
 # TYPE ALIASES
@@ -32,8 +34,8 @@ PathLike = Union[str, Path]
 ########################################
 # LOCAL FUNCTIONS
 
-########################################
-# stability screening (Convex Hull construction)
+
+# Functions related to phase stability screening with Convex Hull construction method.
 
 def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List[List[List[Tuple[str, dict[str, Any]]]]]:
     '''
@@ -75,7 +77,144 @@ def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List[List[List[Tupl
     return groups
 
 ########################################
-# Band Gap screening (Δ-Sol method)
+
+def init_pd_from_cache(
+        ref_elts: Union[str, Iterable], 
+        cached_pd_data: dict, 
+        new_data: dict[str, dict]|Sequence[Tuple]
+    ) -> PhaseDiagram:
+    '''
+    Initialize a higher order PhaseDiagram object by combining data from lesser ones already computed.
+    Avoid expensive construction of complex phase diagrams and redundance in computations.
+    If some parts of the higher diagram are not computed yet, this function computes them
+    Parameters:
+        ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
+                                        
+                                        If a single string is provided, it can either 
+                                        be a raw formula (eg. 'FePO4') or a composition 
+                                        string containing element symbols separated by 
+                                        '-' (eg. 'Fe-P-O').
+                                        If an iterable is given, it can contain valid 
+                                        element symbols, atomic numbers and/or Element 
+                                        objects.
+        
+        cached_pd_data (dict):          A dict referencing computed diagrams by their name, 
+                                        and containing their MSONable dicts, as returned by
+                                        PhaseDiagram.as_dict() method.
+        
+        new_data (dict|[Tuple]):        Structure data to put in the phase diagram in addition to 
+                                        previous diagrams, typically structures of same elemental
+                                        composition as the new diagram itself. 
+                                        They must be provided as a dict of {name: data} or a sequence 
+                                        of (name, data) tuples, where 'name' is the name of the 
+                                        structure directory where data were took from, and 'data' is 
+                                        a dict containing same infos as provided by the function
+                                        'screening_pipeline.utils.vasp_io.extract_vasp_data_for_convex_hull'.
+    
+    Returns:
+        The constructed PhaseDiagram object.
+    '''
+    assert isinstance(ref_elts, (str, Iterable))
+    assert isinstance(cached_pd_data, dict)
+    assert isinstance(new_data, (dict, Sequence))
+    ref_elts    = get_elements(ref_elts)
+    new_pd_dim  = len(ref_elts)
+    new_pd_data = {
+        "@module": PhaseDiagram.__module__, # OK
+        "@class": PhaseDiagram.__name__, # OK
+        "all_entries": [], # à calculer
+        "elements": [elt.as_dict() for elt in ref_elts], # OK
+        "computed_data": {
+            "facets": None, # utiliser get_facets une fois tout les points dans le tableau
+            "simplexes": None, # transformer les facets en Simplex et le lister ici
+            "all_entries": [], # à calculer
+            "qhull_data": None, # numpy.ndarray, à caster en liste et remettre en array ensuite
+            "dim": new_pd_dim, # OK
+            "el_refs": [ # OK
+                (elt, PDEntry(
+                    composition=Composition(elt), 
+                    energy=0.0, 
+                    name=elt.symbol, 
+                    attribute='element_ref'
+                )) for elt in ref_elts
+            ], 
+            "qhull_entries": [] # à calculer
+        }
+    }
+    all_sub_pd_list = list(filter(
+        lambda pd_name: all(elt in ref_elts for elt in get_elements(pd_name)), 
+        cached_pd_data.keys()
+    ))
+    for sub_dim in reversed(range(2, new_pd_dim)):
+        dim_sub_pd_list = list(filter(
+            lambda sub_pd: len(get_elements(sub_pd)) == sub_dim, 
+            all_sub_pd_list
+        ))
+        if not dim_sub_pd_list: continue
+        # TODO: Il faut éviter d'ajouter des sous-diagrammes si les arêtes 
+        #       correspondantes sont déjà satisfaites.
+        new_pd_data['all_entries'] += list(set(sum(
+            cached_pd_data[pd_name]['all_entries'] for pd_name in dim_sub_pd_list
+        )))
+
+    new_pd_data['computed_data']['all_entries'] = [
+        PDEntry.from_dict(entry) for entry in new_pd_data['all_entries']
+    ]
+
+    new_pd = PhaseDiagram.from_dict(dct=new_pd_data)
+    
+    return new_pd
+
+########################################
+
+def init_pd_from_scratch(
+        ref_elts: Union[str, Iterable], 
+        structs_data: dict[str, Any]|Sequence[Tuple[str, Any]]
+    ) -> PhaseDiagram:
+    '''
+    Compute a PhaseDiagram object from given elements and structure data.
+    Parameters:
+        ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
+                                        
+                                        If a single string is provided, it can either 
+                                        be a raw formula (eg. 'FePO4') or a composition 
+                                        string containing element symbols separated by 
+                                        '-' (eg. 'Fe-P-O').
+                                        If an iterable is given, it can contain valid 
+                                        element symbols, atomic numbers and/or Element 
+                                        objects.
+        structs_data (dict|Sequence):   The structures data to put into the diagram.
+    
+    Returns:
+        The constructed PhaseDiagram object.
+    '''
+    ref_elts = get_elements(ref_elts)
+    if isinstance(structs_data, dict):
+        structs_data = list(structs_data.items())
+    entry_list = [
+        PDEntry(
+            composition=Composition(elt), 
+            energy=0.0, 
+            name=elt.symbol, 
+            attribute='element_ref'
+        ) for elt in ref_elts
+    ] + [
+        PDEntry(
+            composition=struct[1]['composition'], 
+            energy=struct[1]['final_energy'], 
+            name=struct[0], 
+            attribute='generated'
+        ) for struct in structs_data
+    ]
+    new_pd = PhaseDiagram(
+        entries=entry_list, 
+        elements=ref_elts.elements
+    )
+    return new_pd
+
+########################################
+
+# Functions related to Band Gap screening with Δ-Sol method.
 
 def calculate_delta_sol_band_gap(
         data: dict

@@ -125,12 +125,7 @@ def main():
     )
 
     # Script préliminaire
-    from typing import Sequence, Any, Union, Iterable
-    from pymatgen.core.composition import Composition, Element
-    from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
-    #from itertools import product, combinations
-    from screening_pipeline.utils.periodic_table import get_elements
-    from screening_pipeline.utils.data_process import group_by_dim
+    from screening_pipeline.utils.data_process import group_by_dim, init_pd_from_cache, init_pd_from_scratch
 
     '''def group_by_convex_hull(structs_data: dict) -> List[List[dict]]:
         
@@ -244,203 +239,7 @@ def main():
         
         return structs_data
 
-    def init_pd_from_cache(
-            ref_elts: Union[str, Iterable], 
-            cached_pd_data: dict, 
-            new_data: dict[str, dict]|Sequence[Tuple]
-        ) -> PhaseDiagram:
-        '''
-        Initialize a higher order PhaseDiagram object by combining data from lesser ones already computed.
-        Avoid expensive construction of complex phase diagrams and redundance in computations.
-        If some parts of the higher diagram are not computed yet, this function computes them
-
-        Parameters:
-            ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
-                                            
-                                            If a single string is provided, it can either 
-                                            be a raw formula (eg. 'FePO4') or a composition 
-                                            string containing element symbols separated by 
-                                            '-' (eg. 'Fe-P-O').
-
-                                            If an iterable is given, it can contain valid 
-                                            element symbols, atomic numbers and/or Element 
-                                            objects.
-            
-            cached_pd_data (dict):          A dict referencing computed diagrams by their name, 
-                                            and containing their MSONable dicts, as returned by
-                                            PhaseDiagram.as_dict() method.
-            
-            new_data (dict|[Tuple]):        Structure data to put in the phase diagram in addition to 
-                                            previous diagrams, typically structures of same elemental
-                                            composition as the new diagram itself. 
-                                            They must be provided as a dict of {name: data} or a sequence 
-                                            of (name, data) tuples, where 'name' is the name of the 
-                                            structure directory where data were took from, and 'data' is 
-                                            a dict containing same infos as provided by the function
-                                            'screening_pipeline.utils.vasp_io.extract_vasp_data_for_convex_hull'.
-        
-        Returns:
-            The constructed PhaseDiagram object.
-        '''
-
-        assert isinstance(ref_elts, (str, Iterable))
-        assert isinstance(cached_pd_data, dict)
-        assert isinstance(new_data, (dict, Sequence))
-
-        ref_elts    = get_elements(ref_elts)
-        new_pd_dim  = len(ref_elts)
-        new_pd_data = {
-            "@module": PhaseDiagram.__module__, # OK
-            "@class": PhaseDiagram.__name__, # OK
-            "all_entries": [], # à calculer
-            "elements": [elt.as_dict() for elt in ref_elts], # OK
-            "computed_data": {
-                "facets": None, # utiliser get_facets une fois tout les points dans le tableau
-                "simplexes": None, # transformer les facets en Simplex et le lister ici
-                "all_entries": [], # à calculer
-                "qhull_data": None, # numpy.ndarray, à caster en liste et remettre en array ensuite
-                "dim": new_pd_dim, # OK
-                "el_refs": [ # OK
-                    (elt, PDEntry(
-                        composition=Composition(elt), 
-                        energy=0.0, 
-                        name=elt.symbol, 
-                        attribute='element_ref'
-                    )) for elt in ref_elts
-                ], 
-                "qhull_entries": [] # à calculer
-            }
-        }
-
-        all_sub_pd_list = list(filter(
-            lambda pd_name: all(elt in ref_elts for elt in get_elements(pd_name)), 
-            cached_pd_data.keys()
-        ))
-
-        for sub_dim in reversed(range(2, new_pd_dim)):
-            dim_sub_pd_list = list(filter(
-                lambda sub_pd: len(get_elements(sub_pd)) == sub_dim, 
-                all_sub_pd_list
-            ))
-            if not dim_sub_pd_list: continue
-            # TODO: Il faut éviter d'ajouter des sous-diagrammes si les arêtes 
-            #       correspondantes sont déjà satisfaites.
-            new_pd_data['all_entries'] += list(set(sum(
-                cached_pd_data[pd_name]['all_entries'] for pd_name in dim_sub_pd_list
-            )))
-
-
-        new_pd_data['computed_data']['all_entries'] = [
-            PDEntry.from_dict(entry) for entry in new_pd_data['all_entries']
-        ]
-
-        
-        '''new_pd_data['all_entries'] += [
-            PDEntry(
-                composition=Composition(data['structure']), 
-                energy=data['final_energy'], 
-                name=name, 
-                attribute='generated'
-            ).as_dict() for name, data in (new_data.items() if isinstance(new_data, dict) else new_data)
-        ]
-
-        new_pd_data['all_entries'] = list(set(new_pd_data['all_entries']))
-        new_pd_data['elements']    = list(set(new_pd_data['elements']))
-        
-        new_pd_data['computed_data']['all_entries'] = [
-            PDEntry.from_dict(entry) for entry in new_pd_data['all_entries']
-        ]
-
-        new_pd_data['computed_data']['el_refs'] = [
-            (Element.from_dict(elt), PDEntry(
-                composition=Composition(Element.from_dict(elt)), 
-                energy=0.0, 
-                name=Element.from_dict(elt).symbol, 
-                attribute='element_ref'
-            )) for elt in new_pd_data['elements']
-        ]'''
-
-        '''
-        diagram1 = cached_pd_data['diagram1']
-        diagram2 = cached_pd_data['diagram2']
-        ...
-
-        entry_list = []
-
-        for struct in new_data:
-            entry = PDEntry(
-                Composition(struct), 
-                energy=struct.final_energy, 
-                name=struct.name, 
-                attribute='generated'
-            )
-            entry_list.append(entry)
-
-        computed_data = {
-        "@module": PhaseDiagram.__module__, 
-        "@class": PhaseDiagram.__name__, 
-        "all_entries": diagram1["all_entries"] + diagram2["all_entries"] + ... + entry_list, 
-        "elements": diagram1["elements"] + diagram2['elements'] + ..., 
-        "computed_data": diagram1["computed_data"] + diagram2["computed_data"] + ...
-        }
-        '''
-        new_pd = PhaseDiagram.from_dict(dct=new_pd_data)
-        
-        return new_pd
-
-    def init_pd_from_scratch(
-            ref_elts: Union[str, Iterable], 
-            structs_data: dict[str, Any]|Sequence[Tuple[str, Any]]
-        ) -> PhaseDiagram:
-        '''
-        Compute a PhaseDiagram object from given elements and structure data.
-
-        Parameters:
-            ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
-                                            
-                                            If a single string is provided, it can either 
-                                            be a raw formula (eg. 'FePO4') or a composition 
-                                            string containing element symbols separated by 
-                                            '-' (eg. 'Fe-P-O').
-
-                                            If an iterable is given, it can contain valid 
-                                            element symbols, atomic numbers and/or Element 
-                                            objects.
-
-            structs_data (dict|Sequence):   The structures data to put into the diagram.
-        
-        Returns:
-            The constructed PhaseDiagram object.
-        '''
-
-        ref_elts = get_elements(ref_elts)
-
-        if isinstance(structs_data, dict):
-            structs_data = list(structs_data.items())
-
-        entry_list = [
-            PDEntry(
-                composition=Composition(elt), 
-                energy=0.0, 
-                name=elt.symbol, 
-                attribute='element_ref'
-            ) for elt in ref_elts
-        ] + [
-            PDEntry(
-                composition=struct[1]['composition'], 
-                energy=struct[1]['final_energy'], 
-                name=struct[0], 
-                attribute='generated'
-            ) for struct in structs_data
-        ]
-
-        new_pd = PhaseDiagram(
-            entries=entry_list, 
-            elements=ref_elts.elements
-        )
-
-        return new_pd
-
+    structs_data = calculate_instability_energies(structs_data)
         # Les cristaux purs devraient être une énergie de référence.
         # Les binaires doivent se voir assigner une CH 1D.
         # Les ternaires doivent se voir assigner une combinaison de 3 CH 1D si possible, 
@@ -449,7 +248,7 @@ def main():
         # sinon une CH 2D vierge avec ses 3 elts pour références.
         # Même principe pour les structures d'ordre supérieur.
 
-        '''
+    '''
         Fil directeur du premier script ci-dessous :
 
         0/ Définitions :
