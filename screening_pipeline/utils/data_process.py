@@ -12,6 +12,8 @@ from pathlib import Path
 ########################################
 # OPTIMIZATION MODULES
 
+import numpy as np
+from itertools import combinations
 from tqdm.contrib.concurrent import process_map
 
 ########################################
@@ -122,18 +124,29 @@ def init_pd_from_cache(
     assert isinstance(cached_pd_data, dict)
     assert isinstance(new_data, (dict, Sequence))
 
-    ref_elts    = get_elements(ref_elts)
-    new_pd_dim  = len(ref_elts)
-    new_pd_data = {
+    ref_elts        = get_elements(ref_elts)
+    new_pd_dim      = len(ref_elts)
+#    new_pd_edges    = set(combinations(ref_elts, 2))
+#    satisfied_edges = set()
+
+
+    all_sub_pd_list = get_elemental_subsets(ref_elts, cached_pd_data.keys())
+    all_entries = list(set([cached_pd_data[sub_pd].all_entries for sub_pd in all_sub_pd_list]))
+    qhull_entries = list(set([cached_pd_data[sub_pd].qhull_entries for sub_pd in all_sub_pd_list]))
+    qhull_data = np.array(list(set([cached_pd_data[sub_pd].qhull_data for sub_pd in all_sub_pd_list])))
+    facets = list(set([cached_pd_data[sub_pd].facets for sub_pd in all_sub_pd_list]))
+    simplexes = list(set([cached_pd_data[sub_pd].simplexes for sub_pd in all_sub_pd_list]))
+
+    new_pd_data  = {
         "@module": PhaseDiagram.__module__, # OK
         "@class": PhaseDiagram.__name__, # OK
-        "all_entries": [], # à calculer
+        "all_entries": [entry.as_dict() for entry in all_entries], 
         "elements": [elt.as_dict() for elt in ref_elts], # OK
         "computed_data": {
-            "facets": None, # utiliser get_facets une fois tout les points dans le tableau
-            "simplexes": None, # transformer les facets en Simplex et le lister ici
-            "all_entries": [], # à calculer
-            "qhull_data": None, # numpy.ndarray, à caster en liste et remettre en array ensuite
+            "facets": facets, # utiliser get_facets une fois tout les points dans le tableau
+            "simplexes": simplexes, # transformer les facets en Simplex et le lister ici
+            "all_entries": all_entries, # à calculer
+            "qhull_data": qhull_data, # numpy.ndarray, à caster en liste et remettre en array ensuite
             "dim": new_pd_dim, # OK
             "el_refs": [ # OK
                 (elt, PDEntry(
@@ -143,26 +156,38 @@ def init_pd_from_cache(
                     attribute='element_ref'
                 )) for elt in ref_elts
             ], 
-            "qhull_entries": [] # à calculer
+            "qhull_entries": qhull_entries # à calculer
         }
     }
-    all_sub_pd_list = get_elemental_subsets(ref_elts, cached_pd_data.keys())
 
-    for sub_dim in reversed(range(2, new_pd_dim)):
+    '''for sub_dim in reversed(range(2, new_pd_dim)):
+
         dim_sub_pd_list = list(filter(
             lambda sub_pd: len(get_elements(sub_pd)) == sub_dim, 
             all_sub_pd_list
         ))
-        if not dim_sub_pd_list: continue
+
+        if not dim_sub_pd_list:
+            continue
+
         # TODO: Il faut éviter d'ajouter des sous-diagrammes si les arêtes 
         #       correspondantes sont déjà satisfaites.
+        for sub_pd in dim_sub_pd_list:
+            sub_pd_edges = set(combinations(get_elements(sub_pd), 2))
+            for edge in sub_pd_edges:
+                if edge in satisfied_edges:
+                    dim_sub_pd_list.remove(sub_pd)
+
+        if not dim_sub_pd_list:
+            continue
+
         new_pd_data['all_entries'] += list(set(sum(
             cached_pd_data[pd_name]['all_entries'] for pd_name in dim_sub_pd_list
         )))
 
     new_pd_data['computed_data']['all_entries'] = [
         PDEntry.from_dict(entry) for entry in new_pd_data['all_entries']
-    ]
+    ]'''
 
     new_pd = PhaseDiagram.from_dict(dct=new_pd_data)
     
