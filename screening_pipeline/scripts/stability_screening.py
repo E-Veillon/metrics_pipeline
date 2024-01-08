@@ -125,7 +125,8 @@ def main():
     )
 
     # Script préliminaire
-    from screening_pipeline.utils.data_process import group_by_dim, init_pd_from_cache, init_pd_from_scratch
+    from screening_pipeline.utils.data_process import group_by_dim, init_pd_from_cache, \
+                                                      init_pd_from_scratch, get_elemental_subsets
 
     '''def group_by_convex_hull(structs_data: dict) -> List[List[dict]]:
         
@@ -216,7 +217,7 @@ def main():
                 pd_name    = '-'.join([elt.symbol for elt in elements])
 
                 #TODO: finish cached diagrams conditional block
-                if elts_nbr > 2 and 'previous diagrams are included in this one':
+                if elts_nbr > 2 and get_elemental_subsets(pd_name, cached_pds.keys()) and False:
 
                     comp_pd = init_pd_from_cache(
                         ref_elts=pd_name, 

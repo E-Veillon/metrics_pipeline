@@ -17,7 +17,7 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # PYTHON MATERIAL GENOMICS PACKAGE
 
-from pymatgen.core.composition import Composition
+from pymatgen.core.composition import Composition, Element
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 ########################################
@@ -29,7 +29,8 @@ from screening_pipeline.utils.periodic_table import get_elements, get_delta_sol_
 ########################################
 # TYPE ALIASES
 
-PathLike = Union[str, Path]
+PathLike    = Union[str, Path]
+FormulaLike = Union[str, Iterable[Union[str, int, Element]]]
 
 ########################################
 # LOCAL FUNCTIONS
@@ -78,8 +79,40 @@ def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List[List[List[Tupl
 
 ########################################
 
+def get_elemental_subsets(
+        main_elts_set: FormulaLike, 
+        elts_subsets: Sequence[FormulaLike]
+    ) -> List[str]:
+    '''
+    Flexible function to extract all formulas from a given sequence that are fully made 
+    of same elements as the given main formula. The atomic fractions are not taken into 
+    account, only presence and absence of the elements are checked.
+
+    Parameters:
+        main_elts_set (str|Iterable):   The reference formula to get sub-formulas from.
+                                        Only formulas containing only elements that are 
+                                        present in this one will be returned.
+        
+        elts_subsets ([str|Iterable]):  The pool of formulas from which subformulas must
+                                        be extracted.
+                
+    Returns:
+        List of the formulas fully included in the main one.
+    '''
+    
+    ref_elts = get_elements(main_elts_set)
+
+    sub_pd_list = list(filter(
+        lambda pd_elts: all([elt in ref_elts for elt in get_elements(pd_elts)]), 
+        elts_subsets
+    ))
+
+    return sub_pd_list
+
+########################################
+
 def init_pd_from_cache(
-        ref_elts: Union[str, Iterable], 
+        ref_elts: FormulaLike, 
         cached_pd_data: dict, 
         new_data: dict[str, dict]|Sequence[Tuple]
     ) -> PhaseDiagram:
@@ -144,10 +177,8 @@ def init_pd_from_cache(
             "qhull_entries": [] # à calculer
         }
     }
-    all_sub_pd_list = list(filter(
-        lambda pd_name: all(elt in ref_elts for elt in get_elements(pd_name)), 
-        cached_pd_data.keys()
-    ))
+    all_sub_pd_list = get_elemental_subsets(ref_elts, cached_pd_data.keys())
+
     for sub_dim in reversed(range(2, new_pd_dim)):
         dim_sub_pd_list = list(filter(
             lambda sub_pd: len(get_elements(sub_pd)) == sub_dim, 
@@ -171,14 +202,14 @@ def init_pd_from_cache(
 ########################################
 
 def init_pd_from_scratch(
-        ref_elts: Union[str, Iterable], 
+        ref_elts: FormulaLike, 
         structs_data: dict[str, Any]|Sequence[Tuple[str, Any]]
     ) -> PhaseDiagram:
     '''
-    Compute a PhaseDiagram object from given elements and structure data.
+    Compute a new PhaseDiagram object from given elements and structure data.
+
     Parameters:
         ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
-                                        
                                         If a single string is provided, it can either 
                                         be a raw formula (eg. 'FePO4') or a composition 
                                         string containing element symbols separated by 
@@ -186,14 +217,18 @@ def init_pd_from_scratch(
                                         If an iterable is given, it can contain valid 
                                         element symbols, atomic numbers and/or Element 
                                         objects.
+
         structs_data (dict|Sequence):   The structures data to put into the diagram.
     
     Returns:
         The constructed PhaseDiagram object.
     '''
+
     ref_elts = get_elements(ref_elts)
+
     if isinstance(structs_data, dict):
         structs_data = list(structs_data.items())
+
     entry_list = [
         PDEntry(
             composition=Composition(elt), 
@@ -209,10 +244,12 @@ def init_pd_from_scratch(
             attribute='generated'
         ) for struct in structs_data
     ]
+
     new_pd = PhaseDiagram(
         entries=entry_list, 
-        elements=ref_elts.elements
+        elements=ref_elts
     )
+
     return new_pd
 
 ########################################
