@@ -208,15 +208,9 @@ def main():
             Detected type: {type(structs_data)}.
             Detected length: {len(structs_data)}.'''
 
-        groups = group_by_dim(structs_data)
-        # A ce stade, groups = [
-        #                       [], 
-        #                       [Elements], 
-        #                       [[Binary 1 (ex Fe-O)], [Binary 2 (ex Mn-O)], ...], 
-        #                       [[Ternary 1 (ex Fe-Mn-O)], [Ternary 2 (ex Fe-Co-O)], ...], 
-        #                       ...
-        #                      ]
-        # On peut donc commencer à construire les Convex Hulls.
+        groups       = group_by_dim(structs_data)
+        max_elts_nbr = groups.index(groups[-1])
+
         cached_pds: dict[str, dict] = {}
 
         for elts_nbr in range(2, max_elts_nbr + 1):

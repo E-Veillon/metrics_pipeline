@@ -35,7 +35,7 @@ PathLike = Union[str, Path]
 ########################################
 # stability screening (Convex Hull construction)
 
-def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List:
+def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List[List[List[Tuple[str, dict[str, Any]]]]]:
     '''
     Groups structures inside nested lists according to the minimal 
     phase diagram necessary for each one.
