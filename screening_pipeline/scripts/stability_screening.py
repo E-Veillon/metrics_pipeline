@@ -126,7 +126,8 @@ def main():
 
     # Script préliminaire
     from screening_pipeline.utils.data_process import group_by_dim, init_pd_from_cache, \
-                                                      init_pd_from_scratch, get_elemental_subsets
+                                                      init_pd_from_scratch
+    from screening_pipeline.utils.periodic_table import get_elemental_subsets
 
     '''def group_by_convex_hull(structs_data: dict) -> List[List[dict]]:
         

@@ -6,7 +6,7 @@ Functions relative to Periodic Table's (PT) elements properties.
 ########################################
 # TYPE HINTING
 
-from typing import Union, Iterable, List, Tuple, Literal
+from typing import Union, Iterable, List, Tuple, Literal, Sequence
 
 ########################################
 # OPTIMIZATION MODULES
@@ -26,6 +26,13 @@ from pymatgen.io.cif import CifBlock
 
 #from screening_pipeline.utils import EL_PER_XC_VOL
 
+########################################
+# TYPE ALIASES
+
+FormulaLike = Union[str, Iterable[Union[str, int, Element]]]
+
+########################################
+# LOCAL FUNCTIONS
 
 def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
     """
@@ -138,6 +145,36 @@ def get_elements(
         elts_list = Composition([(elt, 1) for elt in elts_data], strict=True).elements
 
     return elts_list
+
+def get_elemental_subsets(
+        main_elts_set: FormulaLike, 
+        elts_subsets: Sequence[FormulaLike]
+    ) -> List[str]:
+    '''
+    Flexible function to extract all formulas from a given sequence that are fully made 
+    of same elements as the given main formula. The atomic fractions are not taken into 
+    account, only presence and absence of the elements are checked.
+
+    Parameters:
+        main_elts_set (str|Iterable):   The reference formula to get sub-formulas from.
+                                        Only formulas containing only elements that are 
+                                        present in this one will be returned.
+        
+        elts_subsets ([str|Iterable]):  The pool of formulas from which subformulas must
+                                        be extracted.
+                
+    Returns:
+        List of the formulas fully included in the main one.
+    '''
+    
+    ref_elts = get_elements(main_elts_set)
+
+    sub_pd_list = list(filter(
+        lambda pd_elts: all([elt in ref_elts for elt in get_elements(pd_elts)]), 
+        elts_subsets
+    ))
+
+    return sub_pd_list
 
 def get_element_group(atom: Union[Element, str]) -> str:
     '''
