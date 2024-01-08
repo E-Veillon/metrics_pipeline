@@ -129,6 +129,7 @@ def main():
     from pymatgen.core.composition import Composition, Element
     from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
     #from itertools import product, combinations
+    from screening_pipeline.utils.periodic_table import get_elements
     from screening_pipeline.utils.data_process import group_by_dim
 
     '''def group_by_convex_hull(structs_data: dict) -> List[List[dict]]:
@@ -242,43 +243,6 @@ def main():
                 cached_pds[pd_name] = comp_pd.as_dict()
         
         return structs_data
-    
-    def get_elements(
-            elts_data: str|Iterable[str|int|Element]
-        ) -> List[Element]:
-        '''
-        Flexible converter to get a list of unique Element objects from a single string or any 
-        iterable providing valid element symbols or atomic numbers, or a mixture of the two.
-
-        Parameters:
-            elts_data (str|[str|int|Element]):  The data to parse Elements objects from.
-
-                                                If a single string is provided, it can either 
-                                                be a raw formula (eg. 'FePO4') or a composition 
-                                                string containing element symbols separated by 
-                                                '-' (eg. 'Fe-P-O').
-
-                                                If an iterable is given, it can contain valid 
-                                                element symbols, atomic numbers and/or Element 
-                                                objects.
-
-        Raises: 
-            ValueError if some of the given data does not represents valid elements.
-
-        Returns: 
-            A list of parsed Element objects.
-        '''
-
-        assert isinstance(elts_data, Iterable)
-
-        if isinstance(elts_data, str):
-            elts_list = Composition(''.join(elts_data.split(sep='-')), strict=True).elements
-        
-        else:
-            assert all([isinstance(elt, (str, int, Element)) for elt in elts_data])
-            elts_list = Composition([(elt, 1) for elt in elts_data], strict=True).elements
-
-        return elts_list
 
     def init_pd_from_cache(
             ref_elts: Union[str, Iterable], 

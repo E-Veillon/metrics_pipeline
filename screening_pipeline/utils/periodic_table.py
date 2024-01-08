@@ -103,6 +103,35 @@ def discard_rare_earth_structures(
     kept_structs  = list(filterfalse(has_rare_earth, structures))
     return kept_structs, nbr_discarded
 
+def get_elements(
+        elts_data: str|Iterable[str|int|Element]
+    ) -> List[Element]:
+    '''
+    Flexible converter to get a list of unique Element objects from a single string or any 
+    iterable providing valid element symbols or atomic numbers, or a mixture of the two.
+    Parameters:
+        elts_data (str|[str|int|Element]):  The data to parse Elements objects from.
+                                            If a single string is provided, it can either 
+                                            be a raw formula (eg. 'FePO4') or a composition 
+                                            string containing element symbols separated by 
+                                            '-' (eg. 'Fe-P-O').
+                                            If an iterable is given, it can contain valid 
+                                            element symbols, atomic numbers and/or Element 
+                                            objects.
+    Raises: 
+        ValueError if some of the given data does not represents valid elements.
+    Returns: 
+        A list of parsed Element objects.
+    '''
+    assert isinstance(elts_data, Iterable)
+    if isinstance(elts_data, str):
+        elts_list = Composition(''.join(elts_data.split(sep='-')), strict=True).elements
+    
+    else:
+        assert all([isinstance(elt, (str, int, Element)) for elt in elts_data])
+        elts_list = Composition([(elt, 1) for elt in elts_data], strict=True).elements
+    return elts_list
+
 def get_element_group(atom: Union[Element, str]) -> str:
     '''
     Finds PT group of a given element as string or Element object.

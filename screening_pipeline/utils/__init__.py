@@ -1,5 +1,5 @@
 from .periodic_table import has_rare_gas, discard_rare_gas_structures, \
-    has_rare_earth, discard_rare_earth_structures, get_all_elements_groups, \
+    has_rare_earth, discard_rare_earth_structures, get_elements, get_all_elements_groups, \
     get_element_valence_electrons, get_all_valence_electrons
 from .cif_io import read_cif, write_cif, extract_cif_from_file, cif_str_to_struct
 from .matcher import remove_equivalent
@@ -15,7 +15,7 @@ from .data_process import group_by_dim, calculate_delta_sol_band_gap, batch_calc
 __all__ = [
     "has_rare_gas", "discard_rare_gas_structures", 
     "has_rare_earth", "discard_rare_earth_structures", 
-    "get_all_elements_groups", "get_all_valence_electrons", 
+    "get_elements", "get_all_elements_groups", "get_all_valence_electrons", 
     "read_cif", "write_cif", 
     "structure_symmetrizer", "batch_symmetrizer", 
     "remove_equivalent", 
