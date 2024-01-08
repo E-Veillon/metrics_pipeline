@@ -5,12 +5,12 @@ from .cif_io import read_cif, write_cif, extract_cif_from_file, cif_str_to_struc
 from .matcher import remove_equivalent
 from .vasp_io import vasp_relaxation_settings, vasp_static_settings, \
                     vasp_launcher, vasp_batch_launch, \
-                    batch_extract_vasp_data, chgcar_density_switch, delta_sol_inputs_init, \
-                    calculate_delta_sol_band_gap, batch_calculate_delta_sol_band_gaps, \
-                    filter_by_band_gap
+                    batch_extract_vasp_data, chgcar_density_switch, delta_sol_inputs_init
 from .spacegroup import structure_symmetrizer, batch_symmetrizer
 from .fitted_values import E_O2_FIT, U_VALUES, DELTA_E_M, EXP_DELTA_H, EL_PER_XC_VOL
 from .paths import add_new_dir, batch_add_new_dirs
+from .data_process import group_by_dim, calculate_delta_sol_band_gap, batch_calculate_delta_sol_band_gaps, \
+                    filter_by_band_gap
 
 __all__ = [
     "has_rare_gas", "discard_rare_gas_structures", 
@@ -22,8 +22,8 @@ __all__ = [
     "vasp_relaxation_settings", "vasp_static_settings", 
     "vasp_launcher", "vasp_batch_launch", 
     "batch_extract_vasp_data", "chgcar_density_switch", "delta_sol_inputs_init", 
-    "calculate_delta_sol_band_gap", "batch_calculate_delta_sol_band_gaps", 
-    "filter_by_band_gap", 
     "E_O2_FIT", "U_VALUES", "DELTA_E_M", "EXP_DELTA_H", "EL_PER_XC_VOL", 
-    "add_new_dir", "batch_add_new_dirs"
+    "add_new_dir", "batch_add_new_dirs", 
+    "group_by_dim", "calculate_delta_sol_band_gap", "batch_calculate_delta_sol_band_gaps", 
+    "filter_by_band_gap", 
     ]
