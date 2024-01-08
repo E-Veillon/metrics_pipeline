@@ -129,7 +129,7 @@ def main():
     from pymatgen.core.composition import Composition, Element
     from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
     #from itertools import product, combinations
-    from screening_pipeline.utils.matcher import flatten, group_by_stoichiometry
+    from screening_pipeline.utils.data_process import group_by_dim
 
     '''def group_by_convex_hull(structs_data: dict) -> List[List[dict]]:
         
@@ -208,23 +208,12 @@ def main():
             Detected type: {type(structs_data)}.
             Detected length: {len(structs_data)}.'''
 
-        groups       = [[]] # fill the index 0 to have correspondance between index and nbr of elts
-        structs_list = [(name, data) for name, data in structs_data.items()]
-        max_elts_nbr = max([len(data['composition']) for data in structs_data.values()])
-        elements     = list(set(flatten([struct[1]['composition'].elements for struct in structs_list])))
-        groups.append(elements)
-
-        for elts_nbr in range(2, max_elts_nbr + 1):
-            group = list(filter(lambda struct: len(struct[1]['composition']) == elts_nbr, structs_list))
-            groups.append(group)
-        # A ce stade,  groups = [[], [Elements], [Binaires], [Ternaires], ...]
-        for grp_idx, group in enumerate(groups[2:], start=2):
-            groups[grp_idx] = group_by_stoichiometry(group)
+        groups = group_by_dim(structs_data)
         # A ce stade, groups = [
         #                       [], 
         #                       [Elements], 
-        #                       [[Bin. 1 (ex Fe-O)], [Bin. 2 (ex Mn-O)], ...], 
-        #                       [[Tern. 1 (ex Fe-Mn-O)], [Tern. 2 (ex Fe-Co-O)], ...], 
+        #                       [[Binary 1 (ex Fe-O)], [Binary 2 (ex Mn-O)], ...], 
+        #                       [[Ternary 1 (ex Fe-Mn-O)], [Ternary 2 (ex Fe-Co-O)], ...], 
         #                       ...
         #                      ]
         # On peut donc commencer à construire les Convex Hulls.

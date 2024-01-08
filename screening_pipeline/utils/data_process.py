@@ -6,7 +6,7 @@ Functions to process raw calculation results from VASP and test actual eliminati
 ########################################
 # SYSTEM I/O MODULES
 
-from typing import Dict, Union, Sequence, Tuple
+from typing import Dict, Union, Sequence, Tuple, Any, List
 from pathlib import Path
 
 ########################################
@@ -21,6 +21,7 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # LOCAL MODULES
 
+from screening_pipeline.utils.matcher import group_by_stoichiometry, flatten
 from screening_pipeline.utils.periodic_table import get_delta_sol_el_ratio
 
 ########################################
@@ -34,7 +35,44 @@ PathLike = Union[str, Path]
 ########################################
 # stability screening (Convex Hull construction)
 
+def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List:
+    '''
+    Groups structures inside nested lists according to the minimal 
+    phase diagram necessary for each one.
+    Each index of the bigger list represent the dimension 
+    (ie. number of distinct elements) of structures inside each sublist.
+    Moreover, each sublist contains one subsublist for each composition type.
+    In other words, one gets something of the form:
+    groups = [
+              [], 
+              [Elements], 
+              [[Binary 1 (eg. all "Fe-O")], [Binary 2 (eg. all "Mn-O")], ...], 
+              [[Ternary 1 (eg. all "Fe-Mn-O")], [Ternary 2 (eg. all "Fe-Co-O")], ...], 
+              ...
+            ]
+    
+    Parameters:
+        structs_data (dict):    structures data as extracted from VASP with 
+                                extract_vasp_data_for_convex_hull function.
+    
+    Returns:
+        All structures data grouped by structure dimensionality and composition.
+    '''
+    groups       = [[]] # fill the index 0 to have correspondance between index and dim
+    structs_list = [(name, data) for name, data in structs_data.items()]
+    max_elts_nbr = max([len(data['composition']) for data in structs_data.values()])
+    elements     = list(set(flatten([struct[1]['composition'].elements for struct in structs_list])))
+    groups.append(elements)
 
+    for elts_nbr in range(2, max_elts_nbr + 1):
+        group = list(filter(lambda struct: len(struct[1]['composition']) == elts_nbr, structs_list))
+        groups.append(group)
+    # At this point,  groups = [[], [Elements], [Binaries], [Ternaries], ...]
+
+    for grp_idx, group in enumerate(groups[2:], start=2):
+        groups[grp_idx] = group_by_stoichiometry(group)
+
+    return groups
 
 ########################################
 # Band Gap screening (Δ-Sol method)
