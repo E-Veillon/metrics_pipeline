@@ -145,6 +145,35 @@ def init_pd_from_scratch(
 
 ########################################
 
+def get_sub_entries(
+        main_entry: PDEntry, 
+        entry_pool: Sequence[PDEntry]
+    ) -> List[PDEntry]:
+    '''
+    Extract all PDEntry objects which elemental composition are subsets of the
+    composition of the main PDEntry object from a Sequence of entries.
+
+    Parameters:
+        main_entry (PDEntry): The reference entry to search sub-entries from.
+
+        entry_pool ([PDEntry]): The sequence of entries to search sub-entries in.
+    
+    Returns:
+        The list of all found sub-entries relative to the main entry.
+    '''
+
+    assert isinstance(main_entry, PDEntry)
+    assert all(isinstance(entry, PDEntry) for entry in entry_pool)
+
+    sub_entries = list(filter(
+        lambda entry: all([elt in main_entry.elements for elt in entry.elements]), 
+        entry_pool
+    ))
+
+    return sub_entries
+
+########################################
+
 def init_pd_from_cache(
         ref_elts: FormulaLike, 
         cached_pd_data: dict, 
