@@ -25,7 +25,7 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 ########################################
 
 
-def hash_stoichiometry(comp: Union[Entry, SiteCollection, Composition]) -> int:
+def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
     '''
     Generate a hash from the fractional composition of a compatible pymatgen object, 
     ie. a Composition object or an object having a .composition attribute returning a
@@ -39,7 +39,7 @@ def hash_stoichiometry(comp: Union[Entry, SiteCollection, Composition]) -> int:
         int: The hash.
     '''
 
-    assert isinstance(comp, (Entry, SiteCollection, Composition))
+    assert isinstance(comp, (Composition, Entry, SiteCollection))
     
     if isinstance(comp, Composition):
         return hash(comp.fractional_composition)
