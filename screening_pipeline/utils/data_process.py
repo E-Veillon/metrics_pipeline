@@ -41,7 +41,7 @@ FormulaLike = Union[str, Iterable[Union[str, int, Element]]]
 
 # Functions related to phase stability screening with Convex Hull construction method.
 
-def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List[List[List[Tuple[str, dict[str, Any]]]]]:
+def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List[List[Union[PDEntry, List[PDEntry]]]]:
     '''
     Groups structures inside nested lists according to the minimal 
     phase diagram necessary for each one.
@@ -59,19 +59,37 @@ def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List[List[List[Tupl
     
     Parameters:
         structs_data (dict):    structures data as extracted from VASP with 
-                                extract_vasp_data_for_convex_hull function.
+                                batch_extract_vasp_data function.
     
     Returns:
         All structures data grouped by structure dimensionality and composition.
     '''
-    groups       = [[]] # fill the index 0 to have correspondance between index and dim
-    structs_list = [(name, data) for name, data in structs_data.items()]
-    max_elts_nbr = max([len(data['composition']) for data in structs_data.values()])
-    elements     = list(set(flatten([struct[1]['composition'].elements for struct in structs_list])))
-    groups.append(elements)
 
-    for elts_nbr in range(2, max_elts_nbr + 1):
-        group = list(filter(lambda struct: len(struct[1]['composition']) == elts_nbr, structs_list))
+    groups = [[]] # fill the index 0 to match indexes and entries dimensionality
+
+    entry_list = [
+        PDEntry(
+            composition=data['composition'], 
+            energy=data['final_energy'], 
+            name=name
+        ) for name, data in structs_data.items()
+    ]
+
+    max_dim  = max([len(entry.elements) for entry in entry_list])
+    elements = list(set(flatten([entry.elements for entry in entry_list])))
+
+    elts_entries = [
+        PDEntry(
+            composition=Composition(str(elt)), 
+            energy=0.
+        ) for elt in elements
+    ]
+
+    groups.append(elts_entries)
+    # At this point, groups = [[], [Elements]]
+
+    for dim in range(2, max_dim + 1):
+        group = list(filter(lambda entry: len(entry.elements) == dim, entry_list))
         groups.append(group)
     # At this point,  groups = [[], [Elements], [Binaries], [Ternaries], ...]
 
@@ -197,7 +215,7 @@ def init_pd_from_cache(
 
 def init_pd_from_scratch(
         ref_elts: FormulaLike, 
-        structs_data: dict[str, Any]|Sequence[Tuple[str, Any]]
+        entries: Sequence[PDEntry]
     ) -> PhaseDiagram:
     '''
     Compute a new PhaseDiagram object from given elements and structure data.
@@ -218,25 +236,17 @@ def init_pd_from_scratch(
         The constructed PhaseDiagram object.
     '''
 
+    assert all(isinstance(entry, PDEntry) for entry in entries)
+
     ref_elts = get_elements(ref_elts)
 
-    if isinstance(structs_data, dict):
-        structs_data = list(structs_data.items())
-
-    entry_list = [
+    entry_list = list(entries) + [
         PDEntry(
-            composition=Composition(elt), 
+            composition=Composition(str(elt)), 
             energy=0.0, 
             name=elt.symbol, 
             attribute='element_ref'
         ) for elt in ref_elts
-    ] + [
-        PDEntry(
-            composition=struct[1]['composition'], 
-            energy=struct[1]['final_energy'], 
-            name=struct[0], 
-            attribute='generated'
-        ) for struct in structs_data
     ]
 
     new_pd = PhaseDiagram(
