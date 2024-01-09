@@ -45,9 +45,6 @@ def hash_stoichiometry(comp: Union[Entry, SiteCollection, Composition]) -> int:
         return hash(comp.fractional_composition)
     
     return hash(comp.composition.fractional_composition)
-    
-
-
 
 
 def group_by_stoichiometry(
