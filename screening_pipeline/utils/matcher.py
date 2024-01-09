@@ -6,7 +6,7 @@ Functions to sort structures by stoichiometry and discard duplicates.
 ########################################
 # TYPE HINTING
 
-from typing import Tuple, List, Iterable
+from typing import Tuple, List, Union, Sequence
 
 ########################################
 # OPTIMIZATION MODULES
@@ -17,35 +17,47 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # PYTHON MATERIAL GENOMICS PACKAGE
 
-from pymatgen.core.structure import Structure
+from pymatgen.core.structure import Structure, SiteCollection
+from pymatgen.core.composition import Composition
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 ########################################
 
 
-def hash_stoichiometry(structure: Structure) -> int:
+def hash_stoichiometry(structure: Union[SiteCollection, Composition]) -> int:
     '''
     Generate a hash from the fractional composition of a structure.
 
     Parameters:
-        structure (Structure): A pymatgen Structure object.
+        structure (Structure|Composition): A pymatgen Structure or Composition object.
 
     Returns:
         int: The hash.
     '''
 
-    return hash(structure.composition.fractional_composition)
+    assert isinstance(structure, (SiteCollection, Composition))
+    
+    if isinstance(structure, SiteCollection):
+        return hash(structure.composition.fractional_composition)
+    
+    if isinstance(structure, Composition):
+        return hash(structure.fractional_composition)
 
 
-def group_by_stoichiometry(structures: List[Structure]) -> List[List[Structure]]:
+def group_by_stoichiometry(
+        structures: Union[Sequence[Structure], Sequence[Composition]]
+        ) -> Union[List[List[Structure]], List[List[Composition]]]:
     '''
-    Group structures by fractional composition using the `hash_stoichiometry` hash function.
+    Group structures or compositions by fractional composition using 
+    the `hash_stoichiometry` hash function.
 
     Parameters:
         structure (List[Structure]): The list of structures to group.
 
     Returns:
-        List[List[Structure]]: A list containing lists of structures with the same fractional composition.
+        List[List[Structure]]:  A list containing lists of structures 
+                                or compositions with the same fractional 
+                                composition.
     '''
 
     sorted_structs = sorted(structures, key=hash_stoichiometry)
@@ -69,9 +81,9 @@ def group_by_equivalence(structures: List[Structure]) -> List[List[Structure]]:
     matcher = StructureMatcher()
     return matcher.group_structures(structures)
 
-def flatten(iterable: Iterable, level_of_flattening: int = 1) -> List:
+def flatten(sequence: Sequence, level_of_flattening: int = 1) -> List:
     '''
-    Unpacks a nested list or tuple without modifying elements order.
+    Unpacks a nested sequence without modifying elements order.
 
     Parameters:
         iterable (Iterable):        The iterable to unpack.
@@ -84,8 +96,8 @@ def flatten(iterable: Iterable, level_of_flattening: int = 1) -> List:
     '''
 
     for _ in range(1, level_of_flattening + 1):
-        iterable = list(itertools.chain.from_iterable(iterable))
-    return iterable
+        sequence = list(itertools.chain.from_iterable(sequence))
+    return sequence
 
 def remove_equivalent(
     structures: List[Structure], 
@@ -126,10 +138,10 @@ def remove_equivalent(
     )
 
     if keep_equivalent:
-        sorted_structs = flatten(equivalent_structs, 2)
+        sorted_structs = flatten(equivalent_structs, level_of_flattening=2)
         return sorted_structs, nbr_discarded
     
-    sorted_structs = flatten(equivalent_structs, 1)
+    sorted_structs = flatten(equivalent_structs, level_of_flattening=1)
     nbr_discarded  = sum([len(sublist) - 1 for sublist in sorted_structs])
     unique_structs = [sublist[0] for sublist in sorted_structs]
     return unique_structs, nbr_discarded
