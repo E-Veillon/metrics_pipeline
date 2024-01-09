@@ -100,6 +100,51 @@ def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List[List[Union[PDE
 
 ########################################
 
+def init_pd_from_scratch(
+        ref_elts: FormulaLike, 
+        entries: Sequence[PDEntry]
+    ) -> PhaseDiagram:
+    '''
+    Compute a new PhaseDiagram object from given elements and structure data.
+
+    Parameters:
+        ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
+                                        If a single string is provided, it can either 
+                                        be a raw formula (eg. 'FePO4') or a composition 
+                                        string containing element symbols separated by 
+                                        '-' (eg. 'Fe-P-O').
+                                        If an iterable is given, it can contain valid 
+                                        element symbols, atomic numbers and/or Element 
+                                        objects.
+
+        structs_data (dict|Sequence):   The structures data to put into the diagram.
+    
+    Returns:
+        The constructed PhaseDiagram object.
+    '''
+
+    assert all(isinstance(entry, PDEntry) for entry in entries)
+
+    ref_elts = get_elements(ref_elts)
+
+    entry_list = list(entries) + [
+        PDEntry(
+            composition=Composition(str(elt)), 
+            energy=0.0, 
+            name=elt.symbol, 
+            attribute='element_ref'
+        ) for elt in ref_elts
+    ]
+
+    new_pd = PhaseDiagram(
+        entries=entry_list, 
+        elements=ref_elts
+    )
+
+    return new_pd
+
+########################################
+
 def init_pd_from_cache(
         ref_elts: FormulaLike, 
         cached_pd_data: dict, 
@@ -209,51 +254,6 @@ def init_pd_from_cache(
 
     new_pd = PhaseDiagram.from_dict(dct=new_pd_data)
     
-    return new_pd
-
-########################################
-
-def init_pd_from_scratch(
-        ref_elts: FormulaLike, 
-        entries: Sequence[PDEntry]
-    ) -> PhaseDiagram:
-    '''
-    Compute a new PhaseDiagram object from given elements and structure data.
-
-    Parameters:
-        ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
-                                        If a single string is provided, it can either 
-                                        be a raw formula (eg. 'FePO4') or a composition 
-                                        string containing element symbols separated by 
-                                        '-' (eg. 'Fe-P-O').
-                                        If an iterable is given, it can contain valid 
-                                        element symbols, atomic numbers and/or Element 
-                                        objects.
-
-        structs_data (dict|Sequence):   The structures data to put into the diagram.
-    
-    Returns:
-        The constructed PhaseDiagram object.
-    '''
-
-    assert all(isinstance(entry, PDEntry) for entry in entries)
-
-    ref_elts = get_elements(ref_elts)
-
-    entry_list = list(entries) + [
-        PDEntry(
-            composition=Composition(str(elt)), 
-            energy=0.0, 
-            name=elt.symbol, 
-            attribute='element_ref'
-        ) for elt in ref_elts
-    ]
-
-    new_pd = PhaseDiagram(
-        entries=entry_list, 
-        elements=ref_elts
-    )
-
     return new_pd
 
 ########################################
