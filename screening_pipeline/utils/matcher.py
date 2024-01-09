@@ -39,7 +39,8 @@ def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
         int: The hash.
     '''
 
-    assert isinstance(comp, (Composition, Entry, SiteCollection))
+    assert isinstance(comp, (Composition, Entry, SiteCollection)), \
+    f'Given object type is not supported ({type(comp)}).'
     
     if isinstance(comp, Composition):
         return hash(comp.fractional_composition)
