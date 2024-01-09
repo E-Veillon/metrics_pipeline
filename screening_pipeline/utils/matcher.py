@@ -19,51 +19,59 @@ from tqdm.contrib.concurrent import process_map
 
 from pymatgen.core.structure import Structure, SiteCollection
 from pymatgen.core.composition import Composition
+from pymatgen.analysis.phase_diagram import Entry
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 ########################################
 
 
-def hash_stoichiometry(structure: Union[SiteCollection, Composition]) -> int:
+def hash_stoichiometry(comp: Union[Entry, SiteCollection, Composition]) -> int:
     '''
-    Generate a hash from the fractional composition of a structure.
+    Generate a hash from the fractional composition of a compatible pymatgen object, 
+    ie. a Composition object or an object having a .composition attribute returning a
+    Composition object.
 
     Parameters:
-        structure (Structure|Composition): A pymatgen Structure or Composition object.
+        comp (Entry|SiteCollection|Composition):    A pymatgen object containing a 
+                                                    composition formula.
 
     Returns:
         int: The hash.
     '''
 
-    assert isinstance(structure, (SiteCollection, Composition))
+    assert isinstance(comp, (Entry, SiteCollection, Composition))
     
-    if isinstance(structure, SiteCollection):
-        return hash(structure.composition.fractional_composition)
+    if isinstance(comp, Composition):
+        return hash(comp.fractional_composition)
     
-    if isinstance(structure, Composition):
-        return hash(structure.fractional_composition)
+    return hash(comp.composition.fractional_composition)
+    
+
+
 
 
 def group_by_stoichiometry(
-        structures: Union[Sequence[Structure], Sequence[Composition]]
-        ) -> Union[List[List[Structure]], List[List[Composition]]]:
+        comps: Sequence[Union[Composition, Entry, SiteCollection]]
+        ) -> List[List[Union[Composition, Entry, SiteCollection]]]:
     '''
-    Group structures or compositions by fractional composition using 
-    the `hash_stoichiometry` hash function.
+    Group Composition objects or objects having a .composition attribute by fractional 
+    composition using the `hash_stoichiometry` hash function. Note that objects from 
+    different classes but having their respective associated composition equal will be
+    grouped together anyway.
 
     Parameters:
-        structure (List[Structure]): The list of structures to group.
+        comps ([Composition|Entry|SiteCollection]): The sequence of objects to group by
+                                                    their composition.
 
     Returns:
-        List[List[Structure]]:  A list containing lists of structures 
-                                or compositions with the same fractional 
-                                composition.
+        A list containing lists of objects with the same fractionnal composition.
     '''
 
-    sorted_structs = sorted(structures, key=hash_stoichiometry)
+    sorted_comps = sorted(comps, key=hash_stoichiometry)
+
     return [
         list(grouped)
-        for _, grouped in itertools.groupby(sorted_structs, hash_stoichiometry)
+        for _, grouped in itertools.groupby(sorted_comps, hash_stoichiometry)
     ]
 
 
