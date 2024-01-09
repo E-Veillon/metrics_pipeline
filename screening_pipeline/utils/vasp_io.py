@@ -581,7 +581,7 @@ def extract_vasp_data_for_delta_sol(
 ########################################
 
 def batch_extract_vasp_data(
-        method: str, 
+        method: Literal['convex_hull', 'delta_sol'], 
         base_dir: PathLike = '.', 
         ignore_file: str = 'rejected.txt', 
         workers: int = 1
@@ -593,6 +593,7 @@ def batch_extract_vasp_data(
     Parameters:
         method (str):           Name of the method that will use the data, used to know 
                                 which data should be extracted.
+                                Actual methods supported: 'convex_hull', 'delta_sol'.
 
         base_dir (str|Path):    Directory containing structures subdirs to extract data from.
 
@@ -605,16 +606,25 @@ def batch_extract_vasp_data(
         workers (int):          Number of parallel processes to spawn.
 
     Returns:
-        Dict[str: Dict]:        Dict with structure directory names as keys, 
-                                and a dict containing following data for corresponding 
-                                structure as values:
+        Dict[str, Dict]:        Dict with structure directory names as keys, 
+                                and a dict containing useful data according to chosen method 
+                                for corresponding structure as values.
+
+                                Data returned for 'convex_hull' method:
+                                    - structure itself, 
+                                    - composition of the formula unit, 
+                                    - final energy of the relaxation in eV.
+                                
+                                Data returned for 'delta_sol' method:
                                     - structure itself, 
                                     - its CHGCAR file (to modify charge density), 
-                                    - its final energy (in eV), used as E(N0).
+                                    - final energy of the relaxation in eV, used as E(N0).
     '''
 
     assert isinstance(base_dir, PathLike)
     assert Path(base_dir).is_dir()
+    assert isinstance(ignore_file, str)
+    assert isinstance(workers, int) and workers >= 1
 
     def is_directory(path: Path) -> bool:
         return path.is_dir()
@@ -624,7 +634,7 @@ def batch_extract_vasp_data(
             set_vasp_extractor = partial(extract_vasp_data_for_convex_hull, ignore_file=ignore_file)
         case "delta_sol":
             set_vasp_extractor = partial(extract_vasp_data_for_delta_sol, ignore_file=ignore_file)
-        case _: raise NotImplementedError(f"Provided method ({method}) is not implemented.")
+        case _: raise NotImplementedError(f"Provided method ({method}) is not supported.")
 
     base_dir           = Path(base_dir)
     structs_dir_list   = list(filter(is_directory, base_dir.iterdir()))
