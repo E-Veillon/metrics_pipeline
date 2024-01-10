@@ -116,6 +116,8 @@ def main():
     # MAIN BLOCK
 
     from screening_pipeline.utils.vasp_io import batch_extract_vasp_data
+    from screening_pipeline.utils.data_process import group_by_dim, phase_diagram_init, get_sub_entries
+
 
     structs_data = batch_extract_vasp_data(
         method='convex_hull', 
@@ -124,72 +126,13 @@ def main():
         workers=workers
     )
 
-    # Script préliminaire
-    from screening_pipeline.utils.data_process import group_by_dim, init_pd_from_cache, \
-                                                      phase_diagram_init
-    from screening_pipeline.utils.periodic_table import get_elemental_subsets
-
-    '''def group_by_convex_hull(structs_data: dict) -> List[List[dict]]:
-        
-        'Group every structure in groups to make convex hulls from.'
-        
-        assert isinstance(structs_data, dict) and len(structs_data) > 0, \
-        f'Invalid input provided ({structs_data}), it either was not a dict or was an empty dict.'
-
-        groups    = []
-        comp_list = [(name, data['composition'], len(data['composition'])) for name, data in structs_data]
-        
-        while comp_list:
-
-            max_size          = max([tup[2] for tup in comp_list])
-            max_sized_structs = list(filter(lambda t: t[2] == max_size, comp_list))
-            smaller_structs   = list(filter(lambda t: t[2] < max_size, comp_list))
-
-            if len(max_sized_structs) == 1:
-                # All structures whose composition is only made of elements 
-                # that are in the bigger composition are added in the group 
-                # and removed from the main list.
-                max_sized_comp = max_sized_structs[0][1]
-
-                included_small_comps = list(filter(
-                    lambda t: all(elt in max_sized_comp for elt in t[1]), smaller_structs
-                ))
-                group = [*max_sized_structs, *included_small_comps]
-                groups.append(group)
-                for struct in group: comp_list.remove(struct)
-                continue
-
-            pairwise_compare = list(combinations(max_sized_structs, 2))
-
-            for comp1, comp2 in pairwise_compare:
-                # For each possible pair of big struct, elements in common are searched
-                common_elts    = list(filter(lambda elt: elt in comp2, comp1.elements))
-                nb_common_elts = len(common_elts)
-
-                if nb_common_elts < 2: continue
-
-                # Vérifier la composition commune avec les autres compositions mères
-                # plusieurs cas :
-                #   - le pattern ne correspond à aucune autre structure
-                #   - le pattern correspond à une seule autre structure
-                #   - le pattern correspond à plusieurs autres structures
-
-                # All structures whose composition is only made of elements 
-                # that are in the common composition are added in the group 
-                # and removed from the main list, along with the 2 bigger ones.
-                common_comp          = Composition(common_elts)
-                candidates           = list(filter(lambda t: t[2] <= nb_common_elts, smaller_structs))
-                included_small_comps = list(filter(lambda t: all(elt in common_comp for elt in t[1]), candidates))
-                group = [comp1, comp2, *included_small_comps]
-                groups.append(group)
-                # Manque des choses ici...'''
-
     def calculate_instability_energies(structs_data: dict):
         '''
         Construct an adaptive convex hull for each structure according to their composition.
         A binary structure does not need comparison with higher order structures.
-        For a higher order structure, smaller convex hulls can be combined into one of correct 
-        composition to put the structure in.
+        However, for a higher order structure, smaller convex hulls can be useful to determine
+        its critical formation energy. Therefore, this function constructs the minimal convex hull
+        for each compositional group.
 
         Parameters:
             structs_data (dict):    A dict containing following data about each structure:
@@ -206,49 +149,44 @@ def main():
             Detected type: {type(structs_data)}.
             Detected length: {len(structs_data)}.'''
 
-        groups  = group_by_dim(structs_data)
-        max_dim = groups.index(groups[-1])
+        groups              = group_by_dim(structs_data)
+        entry_pool          = []
+        temp_entry_pool     = []
+        smallest_dim_passed = False
 
-        cached_pds: dict[str, dict] = {}
+        for dim, dim_group in enumerate(groups[2:], start=2):
+            if dim_group == []: continue
+            #TODO: à paralléliser
+            for comp_group in dim_group:
 
-        for elts_nbr in range(2, max_dim + 1):
-            for comp_region in groups[elts_nbr]:
-
-                elements   = list(filter(lambda elt: elt in comp_region[0].elements, groups[1]))
-                pd_name    = '-'.join([elt.symbol for elt in elements])
-
-                #TODO: finish cached diagrams conditional block
-                if elts_nbr > 2 and get_elemental_subsets(pd_name, cached_pds.keys()) and False:
-
-                    comp_pd = init_pd_from_cache(
-                        ref_elts=pd_name, 
-                        cached_pd_data=cached_pds, 
-                        new_data=comp_region
-                    )
+                if not smallest_dim_passed:
+                    entry_list = comp_group
+                    smallest_dim_passed = True
 
                 else:
-
-                    comp_pd = phase_diagram_init(
-                        ref_elts=pd_name, 
-                        structs_data=comp_region
+                    sub_entries = get_sub_entries(
+                        main_entry=comp_group[0], 
+                        entry_pool=entry_pool
                     )
+                    entry_list  = comp_group + sub_entries
 
-                for entry in comp_pd.all_entries[elts_nbr:]:
-                    delta_H = comp_pd.get_e_above_hull(entry)
+                convex_hull = phase_diagram_init(
+                    ref_elts=comp_group[0].elements, 
+                    entries=entry_list
+                )
+
+                for entry in convex_hull.entries[dim:]: # skip elemental entries
+                    delta_H = convex_hull.get_e_above_hull(entry, allow_negative=True)
                     structs_data[entry.name]['delta_H'] = delta_H
 
-                cached_pds[pd_name] = comp_pd.as_dict()
+                temp_entry_pool += comp_group
+
+            entry_pool += temp_entry_pool
+            temp_entry_pool = []
         
         return structs_data
 
     structs_data = calculate_instability_energies(structs_data)
-        # Les cristaux purs devraient être une énergie de référence.
-        # Les binaires doivent se voir assigner une CH 1D.
-        # Les ternaires doivent se voir assigner une combinaison de 3 CH 1D si possible, 
-        # sinon 2 CH 1D + 1 ligne vide entre les deux élts non-reliés, 
-        # sinon 1 CH + 1 elt relié aux 2 références par des lignes vides, 
-        # sinon une CH 2D vierge avec ses 3 elts pour références.
-        # Même principe pour les structures d'ordre supérieur.
 
     '''
         Fil directeur du premier script ci-dessous :
@@ -257,37 +195,18 @@ def main():
 
             1 - CH = Convex Hull (Diagramme de phases compositionnels avec énergies).
 
-            2 - Grandeur d'une structure = nb d'éléments différents dans la structure.
+            2 - Grandeur / dimension d'une structure = nb d'éléments différents dans la structure.
 
-        1/  Grouper les structures par CH indépendantes (Les structures ayant le plus d'éléments
-            peuvent servir à définir les CH, ex : FeTiGe3O2 peut générer la CH Fe-Ti-Ge-O s'il 
-            n'y a pas de structure plus grande contenant tout ces éléments).
-
-            Pour faire ce groupage, il faut donc : 
-
-            1 - Détecter les structures les plus grandes.
-
-            2 - Si certaines ont au moins 2 éléments en commun, chercher les structures ayant une
-                formule entièrement inclue dans le sous-enemble d'éléments communs.
-
-            3 - S'il y en a, les grandes structures partiellement communes et les petites 
-                correspondantes forment une unique CH. Sinon, les grandes structures formeront
-                des CH séparées.
-            
-            4 - Ranger les structures dont la formule est inclue dans celle d'une des grandes 
-                structures avec la grande structure correspondante.
-            
-            5 - S'il reste des structures non groupées, reprendre à l'étape 1 sur le sous-ensemble
-                non-groupé.
+        1/  Grouper les structures par CH minimales.
         
-        1.5/Récupérer les structures de références qui rentrent dans les groupes construits.
+        2/  Récupérer les structures de références qui rentrent dans les groupes construits.
 
-        2/  Fabriquer une CH par groupe de structures, en initialisant les éléments simples 
+        3/  Fabriquer une CH par groupe de structures, en initialisant les éléments simples 
             à partir du contenu du groupe (donner l'attribut 'ref' aux structures de référence).
         
-        3/  Calculer les ΔH dans chaque CH.
+        4/  Calculer les ΔH de toutes les entrées dans chaque CH.
 
-        4/  Eliminer les structures dont le ΔH est trop important.
+        5/  Eliminer les structures dont le ΔH est trop important.
         '''
 
         # Alternatives possibles :

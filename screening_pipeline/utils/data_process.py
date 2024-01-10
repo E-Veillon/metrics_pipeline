@@ -212,7 +212,13 @@ def init_pd_from_cache(
     Returns:
         The constructed PhaseDiagram object.
     '''
-
+    # Les cristaux purs devraient être une énergie de référence.
+    # Les binaires doivent se voir assigner une CH 1D.
+    # Les ternaires doivent se voir assigner une combinaison de 3 CH 1D si possible, 
+    # sinon 2 CH 1D + 1 ligne vide entre les deux élts non-reliés, 
+    # sinon 1 CH + 1 elt relié aux 2 références par des lignes vides, 
+    # sinon une CH 2D vierge avec ses 3 elts pour références.
+    # Même principe pour les structures d'ordre supérieur.
     assert isinstance(ref_elts, (str, Iterable))
     assert isinstance(cached_pd_data, dict)
     assert isinstance(new_data, (dict, Sequence))
