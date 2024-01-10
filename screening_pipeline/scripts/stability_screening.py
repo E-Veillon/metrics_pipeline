@@ -8,7 +8,7 @@ A script using previous VASP relaxations to compute the relative stability of gi
 
 from typing import List, Tuple
 from datetime import datetime
-from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
+from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from pathlib import Path
 
 ########################################
@@ -31,11 +31,12 @@ def assert_args(args: Namespace) -> None:
     assert Path(args.input_dir).is_dir(), \
     f'{args.input_dir}: No directory found.'
 
-    assert Path(args.output).is_dir(), \
-    f'{args.output}: No directory found.'
-
     assert args.ignore.endswith('.txt'), \
     'Structure ignoring file must be a plain text file type (.txt).'
+
+    assert args.eliminate >= 1e-5, \
+    '''Instability energy elimination criterion must be strictly positive.
+       Moreover, any value below 1.10-5 meV/atom is too low and not supported.'''
 
     assert args.workers >= 1, \
     'The number of workers cannot be negative or zero.'
@@ -58,7 +59,7 @@ def main():
             - Compare structure energy with the sum of reference structure energies
             - Aknowledge what to do with unstable structures
         '''
-    helper_format = RawDescriptionHelpFormatter
+    helper_format = RawTextHelpFormatter
 
     parser = ArgumentParser(
         prog=prog_name, 
@@ -71,16 +72,6 @@ def main():
         'input_dir',
         type=str,
         help='Base directory containing structure directories.', 
-    )
-    parser.add_argument(
-        '-o',
-        '--output',
-        type=str,
-        default='./',
-        help='''Path to the output directory where VASP files will be written.
-                A subdirectory will be created in output directory
-                for each structure processed.''', 
-        metavar='outdir'
     )
     parser.add_argument(
         '-i', 
@@ -96,6 +87,18 @@ def main():
         metavar='ignore_file.txt'
     )
     parser.add_argument(
+        '-e',
+        '--eliminate',
+        type=float,
+        default=36.,
+        help=f'''Maximum value of ΔH (in meV/atom) above which structures are considered too unstable and eliminated.
+                 Defaults to 36 meV/atom, as used in the following paper, and seems fairly strict: 
+                 Y. Wu, P. Lazic, G. Hautier, K. Persson, and G. Ceder, 
+                 First principles high throughput screening of oxynitrides for water-splitting photocatalysts, 
+                 Energy & Environmental Science 6, no. 1 (2012) 157''',
+        metavar='float',
+    )
+    parser.add_argument(
         '-w',
         '--workers',
         type=int,
@@ -107,10 +110,10 @@ def main():
 
     assert_args(args)
     
-    input_dir   = Path(args.input_dir)
-    outdir      = Path(args.output)
-    ignore_file = args.ignore
-    workers     = args.workers
+    input_dir     = Path(args.input_dir)
+    ignore_file   = args.ignore
+    delta_H_limit = round(args.eliminate, 5)
+    workers       = args.workers
 
 
     # MAIN BLOCK
@@ -188,6 +191,23 @@ def main():
 
     structs_data = calculate_instability_energies(structs_data)
 
+    unstable_structs = list(filter(
+        lambda _, data: data['delta_H'] > delta_H_limit, 
+        structs_data.items()
+    ))
+
+    for tup in unstable_structs:
+        name = tup[0]
+        data = tup[1]
+        reject_msg = f'''
+                    Instability energy for this structure is estimated at {data['delta_H']} meV/atom, 
+                    which is above the fixed instability limit of {delta_H_limit} meV/atom.
+                    Therefore, it is considered not suitable for wanted application, 
+                    and should not be considered in further screening steps.
+                    '''
+        reject_file_path = Path(input_dir / name / ignore_file)
+        reject_file_path.touch()
+        reject_file_path.write_text(reject_msg)
     '''
         Fil directeur du premier script ci-dessous :
 
