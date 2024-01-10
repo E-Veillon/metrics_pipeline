@@ -65,6 +65,9 @@ def group_by_stoichiometry(
         A list containing lists of objects with the same fractionnal composition.
     '''
 
+    assert isinstance(comps, Sequence)
+    if not comps: return []
+
     sorted_comps = sorted(comps, key=hash_stoichiometry)
 
     return [
