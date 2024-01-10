@@ -125,9 +125,8 @@ def phase_diagram_init(
 
     assert all(isinstance(entry, PDEntry) for entry in entries)
 
-    ref_elts = get_elements(ref_elts)
-
-    entry_list = list(entries) + [
+    ref_elts     = get_elements(ref_elts)
+    elts_entries = [
         PDEntry(
             composition=Composition(str(elt)), 
             energy=0.0, 
@@ -135,6 +134,8 @@ def phase_diagram_init(
             attribute='element_ref'
         ) for elt in ref_elts
     ]
+
+    entry_list = elts_entries + list(entries)
 
     new_pd = PhaseDiagram(
         entries=entry_list, 
