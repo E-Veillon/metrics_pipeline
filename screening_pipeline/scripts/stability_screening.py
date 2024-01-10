@@ -126,7 +126,7 @@ def main():
 
     # Script préliminaire
     from screening_pipeline.utils.data_process import group_by_dim, init_pd_from_cache, \
-                                                      init_pd_from_scratch
+                                                      phase_diagram_init
     from screening_pipeline.utils.periodic_table import get_elemental_subsets
 
     '''def group_by_convex_hull(structs_data: dict) -> List[List[dict]]:
@@ -206,12 +206,12 @@ def main():
             Detected type: {type(structs_data)}.
             Detected length: {len(structs_data)}.'''
 
-        groups       = group_by_dim(structs_data)
-        max_elts_nbr = groups.index(groups[-1])
+        groups  = group_by_dim(structs_data)
+        max_dim = groups.index(groups[-1])
 
         cached_pds: dict[str, dict] = {}
 
-        for elts_nbr in range(2, max_elts_nbr + 1):
+        for elts_nbr in range(2, max_dim + 1):
             for comp_region in groups[elts_nbr]:
 
                 elements   = list(filter(lambda elt: elt in comp_region[0].elements, groups[1]))
@@ -228,7 +228,7 @@ def main():
 
                 else:
 
-                    comp_pd = init_pd_from_scratch(
+                    comp_pd = phase_diagram_init(
                         ref_elts=pd_name, 
                         structs_data=comp_region
                     )

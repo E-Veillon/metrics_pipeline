@@ -100,7 +100,7 @@ def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List[List[Union[PDE
 
 ########################################
 
-def init_pd_from_scratch(
+def phase_diagram_init(
         ref_elts: FormulaLike, 
         entries: Sequence[PDEntry]
     ) -> PhaseDiagram:
@@ -173,7 +173,7 @@ def get_sub_entries(
     return sub_entries
 
 ########################################
-
+# TODO: Work in Progress, it does not work yet.
 def init_pd_from_cache(
         ref_elts: FormulaLike, 
         cached_pd_data: dict, 
