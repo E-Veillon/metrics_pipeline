@@ -95,7 +95,7 @@ def flatten(sequence: Sequence, level_of_flattening: int = 1) -> List:
     Unpacks a nested sequence without modifying elements order.
 
     Parameters:
-        iterable (Iterable):        The iterable to unpack.
+        sequence (Sequence):        The iterable to unpack.
 
         level_of_flattening (Int):  The number of nested levels to unpack.
                                     Defaults to 1.
