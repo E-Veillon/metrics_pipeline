@@ -164,6 +164,8 @@ def get_sub_entries(
     '''
 
     assert isinstance(main_entry, PDEntry)
+    assert isinstance(entry_pool, Sequence)
+    if not entry_pool: return []
     assert all(isinstance(entry, PDEntry) for entry in entry_pool)
 
     sub_entries = list(filter(
@@ -172,125 +174,6 @@ def get_sub_entries(
     ))
 
     return sub_entries
-
-########################################
-# TODO: Work in Progress, it does not work yet.
-def init_pd_from_cache(
-        ref_elts: FormulaLike, 
-        cached_pd_data: dict, 
-        new_data: dict[str, dict]|Sequence[Tuple]
-    ) -> PhaseDiagram:
-    '''
-    Initialize a higher order PhaseDiagram object by combining data from lesser ones already computed.
-    Avoid expensive construction of complex phase diagrams and redundance in computations.
-    If some parts of the higher diagram are not computed yet, this function computes them from scratch
-    after combining cached data as much as possible to complete the diagram.
-
-    Parameters:
-        ref_elts (str|Iterable):        The  elemental references of the new phase diagram.
-                                        If a single string is provided, it can either 
-                                        be a raw formula (eg. 'FePO4') or a composition 
-                                        string containing element symbols separated by 
-                                        '-' (eg. 'Fe-P-O').
-                                        If an iterable is given, it can contain valid 
-                                        element symbols, atomic numbers and/or Element 
-                                        objects.
-        
-        cached_pd_data (dict):          A dict referencing computed diagrams by their name, 
-                                        and containing their MSONable dicts, as returned by
-                                        PhaseDiagram.as_dict() method.
-        
-        new_data (dict|[Tuple]):        Structure data to put in the phase diagram in addition to 
-                                        previous diagrams, typically structures of same elemental
-                                        composition as the new diagram itself. 
-                                        They must be provided as a dict of {name: data} or a sequence 
-                                        of (name, data) tuples, where 'name' is the name of the 
-                                        structure directory where data were took from, and 'data' is 
-                                        a dict containing same infos as provided by the function
-                                        'screening_pipeline.utils.vasp_io.extract_vasp_data_for_convex_hull'.
-    
-    Returns:
-        The constructed PhaseDiagram object.
-    '''
-    # Les cristaux purs devraient être une énergie de référence.
-    # Les binaires doivent se voir assigner une CH 1D.
-    # Les ternaires doivent se voir assigner une combinaison de 3 CH 1D si possible, 
-    # sinon 2 CH 1D + 1 ligne vide entre les deux élts non-reliés, 
-    # sinon 1 CH + 1 elt relié aux 2 références par des lignes vides, 
-    # sinon une CH 2D vierge avec ses 3 elts pour références.
-    # Même principe pour les structures d'ordre supérieur.
-    assert isinstance(ref_elts, (str, Iterable))
-    assert isinstance(cached_pd_data, dict)
-    assert isinstance(new_data, (dict, Sequence))
-
-    ref_elts        = get_elements(ref_elts)
-    new_pd_dim      = len(ref_elts)
-#    new_pd_edges    = set(combinations(ref_elts, 2))
-#    satisfied_edges = set()
-
-
-    all_sub_pd_list = get_elemental_subsets(ref_elts, cached_pd_data.keys())
-    all_entries = list(set([cached_pd_data[sub_pd].all_entries for sub_pd in all_sub_pd_list]))
-    qhull_entries = list(set([cached_pd_data[sub_pd].qhull_entries for sub_pd in all_sub_pd_list]))
-    qhull_data = np.array(list(set([cached_pd_data[sub_pd].qhull_data for sub_pd in all_sub_pd_list])))
-    facets = list(set([cached_pd_data[sub_pd].facets for sub_pd in all_sub_pd_list]))
-    simplexes = list(set([cached_pd_data[sub_pd].simplexes for sub_pd in all_sub_pd_list]))
-
-    new_pd_data  = {
-        "@module": PhaseDiagram.__module__, # OK
-        "@class": PhaseDiagram.__name__, # OK
-        "all_entries": [entry.as_dict() for entry in all_entries], 
-        "elements": [elt.as_dict() for elt in ref_elts], # OK
-        "computed_data": {
-            "facets": facets, # utiliser get_facets une fois tout les points dans le tableau
-            "simplexes": simplexes, # transformer les facets en Simplex et le lister ici
-            "all_entries": all_entries, # à calculer
-            "qhull_data": qhull_data, # numpy.ndarray, à caster en liste et remettre en array ensuite
-            "dim": new_pd_dim, # OK
-            "el_refs": [ # OK
-                (elt, PDEntry(
-                    composition=Composition(elt), 
-                    energy=0.0, 
-                    name=elt.symbol, 
-                    attribute='element_ref'
-                )) for elt in ref_elts
-            ], 
-            "qhull_entries": qhull_entries # à calculer
-        }
-    }
-
-    '''for sub_dim in reversed(range(2, new_pd_dim)):
-
-        dim_sub_pd_list = list(filter(
-            lambda sub_pd: len(get_elements(sub_pd)) == sub_dim, 
-            all_sub_pd_list
-        ))
-
-        if not dim_sub_pd_list:
-            continue
-
-        # TODO: Il faut éviter d'ajouter des sous-diagrammes si les arêtes 
-        #       correspondantes sont déjà satisfaites.
-        for sub_pd in dim_sub_pd_list:
-            sub_pd_edges = set(combinations(get_elements(sub_pd), 2))
-            for edge in sub_pd_edges:
-                if edge in satisfied_edges:
-                    dim_sub_pd_list.remove(sub_pd)
-
-        if not dim_sub_pd_list:
-            continue
-
-        new_pd_data['all_entries'] += list(set(sum(
-            cached_pd_data[pd_name]['all_entries'] for pd_name in dim_sub_pd_list
-        )))
-
-    new_pd_data['computed_data']['all_entries'] = [
-        PDEntry.from_dict(entry) for entry in new_pd_data['all_entries']
-    ]'''
-
-    new_pd = PhaseDiagram.from_dict(dct=new_pd_data)
-    
-    return new_pd
 
 ########################################
 
