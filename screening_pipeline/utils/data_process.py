@@ -41,10 +41,12 @@ FormulaLike = Union[str, Iterable[Union[str, int, Element]]]
 
 # Functions related to phase stability screening with Convex Hull construction method.
 
-def group_by_dim(structs_data: dict[str, dict[str, Any]]) -> List[List[Union[PDEntry, List[PDEntry]]]]:
+def init_entries_and_group_by_dim(
+        structs_data: dict[str, dict[str, Any]]
+    ) -> List[List[Union[PDEntry, List[PDEntry]]]]:
     '''
-    Groups structures inside nested lists according to the minimal 
-    phase diagram necessary for each one.
+    Initialize entries from given data and group them inside nested lists 
+    according to the minimal phase diagram necessary for each one.
     Each index of the bigger list represent the dimension 
     (ie. number of distinct elements) of structures inside each sublist.
     Moreover, each sublist contains one subsublist for each composition type.
