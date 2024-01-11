@@ -118,8 +118,13 @@ def main():
 
     # MAIN BLOCK
 
+    from typing import Sequence, Dict
+    from functools import partial
+    from tqdm.contrib.concurrent import process_map
+    from pymatgen.analysis.phase_diagram import PDEntry
     from screening_pipeline.utils.vasp_io import batch_extract_vasp_data
-    from screening_pipeline.utils.data_process import group_by_dim, phase_diagram_init, get_sub_entries
+    from screening_pipeline.utils.matcher import flatten
+    from screening_pipeline.utils.data_process import init_entries_and_group_by_dim, phase_diagram_init, get_sub_entries
 
 
     structs_data = batch_extract_vasp_data(
@@ -152,40 +157,59 @@ def main():
             Detected type: {type(structs_data)}.
             Detected length: {len(structs_data)}.'''
 
-        groups              = group_by_dim(structs_data)
+        groups              = init_entries_and_group_by_dim(structs_data)
         entry_pool          = []
-        temp_entry_pool     = []
-        smallest_dim_passed = False
 
-        for dim, dim_group in enumerate(groups[2:], start=2):
+        for dim_group in groups[2:]:
             if dim_group == []: continue
-            #TODO: à paralléliser
-            for comp_group in dim_group:
 
-                if not smallest_dim_passed:
-                    entry_list = comp_group
-                    smallest_dim_passed = True
+            def _calculate_instability_energies(
+                    comp_group: Sequence[Sequence[PDEntry]], 
+                    entry_pool: List[PDEntry]
+                ) -> List[Tuple[str, float]]:
+                '''
+                Calculate energies for one pd, initialized from one comp_group.
+                Have to parallelize it over all a dim_group.
+                '''
 
-                else:
-                    sub_entries = get_sub_entries(
-                        main_entry=comp_group[0], 
-                        entry_pool=entry_pool
-                    )
-                    entry_list  = comp_group + sub_entries
+                energies = []
+                ref_elts = comp_group[0].elements
+
+                sub_entries = get_sub_entries(
+                    main_entry=comp_group[0], 
+                    entry_pool=entry_pool
+                )
+
+                entry_list  = comp_group + sub_entries
 
                 convex_hull = phase_diagram_init(
-                    ref_elts=comp_group[0].elements, 
+                    ref_elts=ref_elts, 
                     entries=entry_list
                 )
 
-                for entry in convex_hull.entries[dim:]: # skip elemental entries
+                for entry in convex_hull.entries[len(ref_elts):]: # skip elemental entries
                     delta_H = convex_hull.get_e_above_hull(entry, allow_negative=True)
-                    structs_data[entry.name]['delta_H'] = delta_H
+                    energies.append((entry.name, delta_H))
 
-                temp_entry_pool += comp_group
+                return energies
 
-            entry_pool += temp_entry_pool
-            temp_entry_pool = []
+            setup_calc_inst_energs = partial(
+                _calculate_instability_energies, 
+                entry_pool=entry_pool
+            )
+
+            energies = flatten(list(process_map(
+                setup_calc_inst_energs, 
+                dim_group, 
+                max_workers=workers, 
+                chunksize=1, 
+                desc=f'computing ΔH for structs of order {groups.index(dim_group)}'
+            )))
+
+            for energy in energies:
+                structs_data[energy[0]]['delta_H'] = energy[1]
+
+            entry_pool += flatten(dim_group)
         
         return structs_data
 
