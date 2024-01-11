@@ -1,6 +1,32 @@
 #!/usr/bin/python
 '''
 A script using previous VASP relaxations to compute the relative stability of given structures.
+
+Algorithm:
+
+    1/  Group structures by dimension and composition. - OK
+        
+    2/  Get reference structures from a dataset and add them to the pool
+        with a specific attribute. - Not done yet
+
+    3/  Build one convex hull per structure group 
+        (initialize ref elements from group composition) - OK
+        
+    4/  Inside each convex hull, compute ΔH for each generated entry. - OK
+
+    5/  Reject structures that have a ΔH above given threshold value. - OK
+
+Possible alternatives:
+
+    Comparing to known references:
+        1 - For each group, search in the dataset all corresponding structures.
+        2 - Build the phase diagram corresponding to dataset structures.
+        3 - Compute ΔH for all generated structures of the group.
+        4 - Reject structures too much above reference convex hull.
+
+    Opti:   Store some common phase spaces in a local util file.
+
+    Opti:   Match and ignore structures equivalents to references with StructureMatcher.
 '''
 
 ########################################
@@ -24,6 +50,12 @@ from pymatgen.core.structure import Structure
 from pymatgen.io.vasp import VaspInput
 
 ########################################
+# LOCAL MODULES
+
+from screening_pipeline.utils.vasp_io import batch_extract_vasp_data
+from screening_pipeline.utils.data_process import batch_calculate_instability_energies
+
+########################################
 # LOCAL FUNCTIONS
 
 def assert_args(args: Namespace) -> None:
@@ -34,7 +66,7 @@ def assert_args(args: Namespace) -> None:
     assert args.ignore.endswith('.txt'), \
     'Structure ignoring file must be a plain text file type (.txt).'
 
-    assert args.eliminate >= 1e-5, \
+    assert args.eliminate >= 1e-8, \
     '''Instability energy elimination criterion must be strictly positive.
        Moreover, any value below 1.10-5 meV/atom is too low and not supported.'''
 
@@ -90,8 +122,8 @@ def main():
         '-e',
         '--eliminate',
         type=float,
-        default=36.,
-        help=f'''Maximum value of ΔH (in meV/atom) above which structures are considered too unstable and eliminated.
+        default=0.036,
+        help=f'''Maximum value of ΔH (in eV/atom) above which structures are considered too unstable and rejected.
                  Defaults to 36 meV/atom, as used in the following paper, and seems fairly strict: 
                  Y. Wu, P. Lazic, G. Hautier, K. Persson, and G. Ceder, 
                  First principles high throughput screening of oxynitrides for water-splitting photocatalysts, 
@@ -112,20 +144,11 @@ def main():
     
     input_dir     = Path(args.input_dir)
     ignore_file   = args.ignore
-    delta_H_limit = round(args.eliminate, 5)
+    delta_H_limit = round(args.eliminate, 8)
     workers       = args.workers
 
 
     # MAIN BLOCK
-
-    from typing import Sequence, Dict
-    from functools import partial
-    from tqdm.contrib.concurrent import process_map
-    from pymatgen.analysis.phase_diagram import PDEntry
-    from screening_pipeline.utils.vasp_io import batch_extract_vasp_data
-    from screening_pipeline.utils.matcher import flatten
-    from screening_pipeline.utils.data_process import init_entries_and_group_by_dim, phase_diagram_init, get_sub_entries
-
 
     structs_data = batch_extract_vasp_data(
         method='convex_hull', 
@@ -134,145 +157,25 @@ def main():
         workers=workers
     )
 
-    def calculate_instability_energies(structs_data: dict):
-        '''
-        Construct an adaptive convex hull for each structure according to their composition.
-        A binary structure does not need comparison with higher order structures.
-        However, for a higher order structure, smaller convex hulls can be useful to determine
-        its critical formation energy. Therefore, this function constructs the minimal convex hull
-        for each compositional group.
-
-        Parameters:
-            structs_data (dict):    A dict containing following data about each structure:
-                                        - structure directory name (dict's keys), 
-                                        - the Structure object, 
-                                        - its composition, 
-                                        - its relaxed energy (in eV).
-        Returns:
-            Dict: The same data with all ΔH calculated in 'delta_H' keys.
-        '''
-        
-        assert isinstance(structs_data, dict) and len(structs_data) > 0, \
-        f'''Invalid input provided, it either was not a dict or was empty.
-            Detected type: {type(structs_data)}.
-            Detected length: {len(structs_data)}.'''
-
-        groups              = init_entries_and_group_by_dim(structs_data)
-        entry_pool          = []
-
-        for dim_group in groups[2:]:
-            if dim_group == []: continue
-
-            def _calculate_instability_energies(
-                    comp_group: Sequence[Sequence[PDEntry]], 
-                    entry_pool: List[PDEntry]
-                ) -> List[Tuple[str, float]]:
-                '''
-                Calculate energies for one pd, initialized from one comp_group.
-                Have to parallelize it over all a dim_group.
-                '''
-
-                energies = []
-                ref_elts = comp_group[0].elements
-
-                sub_entries = get_sub_entries(
-                    main_entry=comp_group[0], 
-                    entry_pool=entry_pool
-                )
-
-                entry_list  = comp_group + sub_entries
-
-                convex_hull = phase_diagram_init(
-                    ref_elts=ref_elts, 
-                    entries=entry_list
-                )
-
-                for entry in convex_hull.entries[len(ref_elts):]: # skip elemental entries
-                    delta_H = convex_hull.get_e_above_hull(entry, allow_negative=True)
-                    energies.append((entry.name, delta_H))
-
-                return energies
-
-            setup_calc_inst_energs = partial(
-                _calculate_instability_energies, 
-                entry_pool=entry_pool
-            )
-
-            energies = flatten(list(process_map(
-                setup_calc_inst_energs, 
-                dim_group, 
-                max_workers=workers, 
-                chunksize=1, 
-                desc=f'computing ΔH for structs of order {groups.index(dim_group)}'
-            )))
-
-            for energy in energies:
-                structs_data[energy[0]]['delta_H'] = energy[1]
-
-            entry_pool += flatten(dim_group)
-        
-        return structs_data
-
-    structs_data = calculate_instability_energies(structs_data)
+    structs_data = batch_calculate_instability_energies(structs_data, workers=workers)
 
     unstable_structs = list(filter(
         lambda _, data: data['delta_H'] > delta_H_limit, 
         structs_data.items()
     ))
 
-    for tup in unstable_structs:
-        name = tup[0]
-        data = tup[1]
+    for struct in unstable_structs:
+        name = struct[0]
+        data = struct[1]
         reject_msg = f'''
-                    Instability energy for this structure is estimated at {data['delta_H']} meV/atom, 
-                    which is above the fixed instability limit of {delta_H_limit} meV/atom.
+                    Instability energy for this structure is estimated at {data['delta_H']} eV/atom, 
+                    which is above the fixed instability limit of {delta_H_limit} eV/atom.
                     Therefore, it is considered not suitable for wanted application, 
                     and should not be considered in further screening steps.
                     '''
         reject_file_path = Path(input_dir / name / ignore_file)
         reject_file_path.touch()
         reject_file_path.write_text(reject_msg)
-    '''
-        Fil directeur du premier script ci-dessous :
-
-        0/ Définitions :
-
-            1 - CH = Convex Hull (Diagramme de phases compositionnels avec énergies).
-
-            2 - Grandeur / dimension d'une structure = nb d'éléments différents dans la structure.
-
-        1/  Grouper les structures par CH minimales.
-        
-        2/  Récupérer les structures de références qui rentrent dans les groupes construits.
-
-        3/  Fabriquer une CH par groupe de structures, en initialisant les éléments simples 
-            à partir du contenu du groupe (donner l'attribut 'ref' aux structures de référence).
-        
-        4/  Calculer les ΔH de toutes les entrées dans chaque CH.
-
-        5/  Eliminer les structures dont le ΔH est trop important.
-        '''
-
-        # Alternatives possibles :
-        # - Chercher les matériaux du dump qui correspondent chimiquement.
-        # - Construire le diagramme de phase correspondant à cet ensemble.
-        # - Demander la décomposition et l'énergie /r à la CH du candidat.
-        # - Ecrire le fichier de rejet si l'énergie dépasse le seuil autorisé.
-        # Optimisation : rassembler d'abord tout les candidats rentrant dans une même CH, 
-        # afin de ne construire chaque CH de référence utiles qu'une fois.
-        # Ajouter les CH de références OQMD préconstruites dans un fichier utils.
-        # Ecrire une fonction pour rassembler les structures selon la CH correspondante.
-        # Ecrire une fonction qui compare en batch les structures d'un groupe avec sa CH, 
-        # puis ajoute à leur data respectif la valeur 'delta_H'. 
-        # Opti : Minimiser le nombre de CH à construire en groupant plus largement les candidats.
-        # Opti : Matcher et éliminer les structures équivalentes à celles de référence 
-        #        (StructureMatcher).
-        # Opti : Fabriquer une CH dynamique à partir des candidats d'un groupe, 
-        #        afin de voir les plus stables du groupe.
-        # Opti : Construire les CH de référence expérimentales en réalisant des calculs statiques 
-        #        sur les ~263k structures expérimentales de l'ICSD une seule fois (reproduction
-        #        de l'article 00). On peut même élaguer en éliminant les structures exp contenant
-        #        des gaz ou des terres rares (~184k restant).
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
