@@ -9,7 +9,7 @@ from .vasp_io import vasp_relaxation_settings, vasp_static_settings, \
 from .spacegroup import structure_symmetrizer, batch_symmetrizer
 from .fitted_values import E_O2_FIT, U_VALUES, DELTA_E_M, EXP_DELTA_H, EL_PER_XC_VOL
 from .paths import add_new_dir, batch_add_new_dirs
-from .data_process import group_by_dim, init_pd_from_cache, phase_diagram_init, \
+from .data_process import group_by_dim, phase_diagram_init, get_sub_entries, \
                         calculate_delta_sol_band_gap, batch_calculate_delta_sol_band_gaps, \
                         filter_by_band_gap
 
@@ -25,7 +25,7 @@ __all__ = [
     "batch_extract_vasp_data", "chgcar_density_switch", "delta_sol_inputs_init", 
     "E_O2_FIT", "U_VALUES", "DELTA_E_M", "EXP_DELTA_H", "EL_PER_XC_VOL", 
     "add_new_dir", "batch_add_new_dirs", 
-    "group_by_dim", "init_pd_from_cache", "phase_diagram_init", 
+    "group_by_dim", "phase_diagram_init", "get_sub_entries", 
     "calculate_delta_sol_band_gap", "batch_calculate_delta_sol_band_gaps", 
     "filter_by_band_gap", 
     ]
