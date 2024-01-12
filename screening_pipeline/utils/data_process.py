@@ -167,6 +167,7 @@ def _get_relevant_entries(
     Returns:
         A list of filtered entries.
     '''
+
     ref_entry = PDEntry(
         composition=Composition([(elt, 1) for elt in ref_elts]), 
         energy=0.0, 
@@ -183,7 +184,7 @@ def _get_lacking_elts_entries(
     ) -> List[PDEntry]:
     '''
     Check elemental entries with respect to given reference elements, 
-    then auto-initialize lacking elemental entries with an energy of 0.0 eV.
+    then initialize lacking elemental entries with an energy of 0.0 eV.
 
     Parameter:
         entries ([PDEntry]):    Entries to check elemental entries in.
@@ -271,33 +272,54 @@ def phase_diagram_init(
     return new_pd
 
 ########################################
-#TODO: finish flexibility update
+
 def _calculate_instability_energies(
         main_entries: Sequence[PDEntry], 
         sub_entries_pool: Sequence[PDEntry]
     ) -> List[Tuple[str, float]]:
     '''
     Initialize a PhaseDiagram from given entries, then calculate relative
-    instability energies ΔH for each non-elemental entry in the diagram.
+    instability energies ΔH for each generated entry in the diagram, ie.
+    non-elemental nor reference structures. Entries that need to have 
+    their ΔH calculated must have the string 'generated' as entry.attribute.
 
+    Parameters:
+        main_entries ([PDEntry]):       Entries of the highest dimension that will 
+                                        serve as reference to define the space of 
+                                        the diagram.
+
+        sub_entries_pool ([PDEntry]):   All other entries that should be put into 
+                                        the diagram. If an entry in this argument
+                                        contains elements that are not referenced
+                                        in any main entry, it will not be put in 
+                                        the diagram and its energy will not be
+                                        computed.
+
+    Returns:
+        A list of tuples each containing the name and computed ΔH of a generated entry.
     '''
 
     energies = []
     ref_elts = get_elements_from_entries(main_entries)
 
-    sub_entries = get_sub_entries(
-        main_entry=main_entries[0], 
-        entry_pool=sub_entries_pool
+    sub_entries = _get_relevant_entries(
+        entries=sub_entries_pool, 
+        ref_elts=ref_elts
     )
 
-    entry_list  = main_entries + sub_entries
+    entry_list  = list(set(main_entries + sub_entries))
 
     convex_hull = phase_diagram_init(
         entries=entry_list, 
         ref_elts=ref_elts
     )
 
-    for entry in convex_hull.entries[len(ref_elts):]: # skip elemental entries
+    generated_entries = list(filter(
+        lambda entry: entry.attribute == 'generated', 
+        convex_hull.all_entries
+    ))
+
+    for entry in generated_entries:
         delta_H = convex_hull.get_e_above_hull(entry, allow_negative=True)
         energies.append((entry.name, delta_H))
 
