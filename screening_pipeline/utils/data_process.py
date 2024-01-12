@@ -282,6 +282,8 @@ def _calculate_instability_energies(
     instability energies ΔH for each generated entry in the diagram, ie.
     non-elemental nor reference structures. Entries that need to have 
     their ΔH calculated must have the string 'generated' as entry.attribute.
+    The PhaseDiagram's reference elements are automatically initialized 
+    from given entries at energy = 0.0 eV if not provided.
 
     Parameters:
         main_entries ([PDEntry]):       Entries of the highest dimension that will 
@@ -296,7 +298,8 @@ def _calculate_instability_energies(
                                         computed.
 
     Returns:
-        A list of tuples each containing the name and computed ΔH of a generated entry.
+        List[Tuple[str,float]]: A list of tuples each containing the name of the entry 
+                                and corresponding ΔH energy in eV/atom.
     '''
 
     energies = []
@@ -326,16 +329,18 @@ def _calculate_instability_energies(
     return energies
 
 ########################################
-#TODO: finish flexibility update
+
 def calculate_instability_energies(
         entries: Sequence[PDEntry], 
         ref_elts: Optional[Sequence[PDEntry]] = None
     ) -> List[Tuple[str, float]]:
     '''
     Initialize a PhaseDiagram from given entries, then calculate relative
-    instability energies ΔH for each non-elemental entry in the diagram.
+    instability energies ΔH for each generated entry in the diagram, ie.
+    non-elemental nor reference structures. Entries that need to have 
+    their ΔH calculated must have the string 'generated' as entry.attribute.
     The PhaseDiagram's reference elements are automatically initialized 
-    from given entries at energy = 0.0 if not provided.
+    from given entries at energy = 0.0 eV if not provided.
 
     parameters:
         entries ([PDEntry]):    The entries that will be put into the PhaseDiagram.
@@ -346,6 +351,8 @@ def calculate_instability_energies(
                                 entries. If some provided elements are not used in the entries, 
                                 they will be ignored to get minimal diagram dimension and save
                                 calculation time and memory.
+                                This argument is specifically designed in case non-zero elemental 
+                                energy references are needed, and can be ignored in other cases.
 
     Returns:
         List[Tuple[str,float]]: A list of tuples each containing the name of the entry and
@@ -365,22 +372,23 @@ def calculate_instability_energies(
     return _calculate_instability_energies(entries, ref_elts)
 
 ########################################
-#TODO: finish flexibility update
+
 def batch_calculate_instability_energies(structs_data: dict, workers: int = 1):
     '''
     Construct an adaptive convex hull for each structure according to their composition.
     A binary structure does not need comparison with higher order structures.
-    However, for a higher order structure, smaller convex hulls can be useful to determine
-    its critical formation energy. Therefore, this function constructs the minimal convex hull
-    for each compositional group.
+    However, for a higher order structure, convex hulls of smaller order can be useful to 
+    determine its critical formation energy. Therefore, this function constructs the minimal 
+    convex hull for each compositional group.
+
     Parameters:
         structs_data (dict):    A dict containing following data about each structure:
-                                    - structure directory name (dict's keys), 
-                                    - the Structure object, 
-                                    - its composition, 
+                                    - its name (dict's keys),  
+                                    - its composition as a Composition object, 
                                     - its relaxed energy (in eV).
+
     Returns:
-        Dict: The same data with all ΔH calculated in 'delta_H' keys.
+        Dict: The same data dict with all ΔH calculated in 'delta_H' keys.
     '''
     
     assert isinstance(structs_data, dict) and len(structs_data) > 0, \
@@ -388,12 +396,11 @@ def batch_calculate_instability_energies(structs_data: dict, workers: int = 1):
         Detected type: {type(structs_data)}.
         Detected length: {len(structs_data)}.'''
 
-    groups              = init_entries_and_group_by_dim(structs_data)
-    entry_pool          = []
+    dim_groups = init_entries_and_group_by_dim(structs_data)
+    entry_pool = dim_groups[1]
 
-    for dim_group in groups[2:]:
+    for dim_group in dim_groups[2:]:
         if dim_group == []: continue
-
 
         setup_calc_inst_energs = partial(
             _calculate_instability_energies, 
@@ -405,14 +412,16 @@ def batch_calculate_instability_energies(structs_data: dict, workers: int = 1):
             dim_group, 
             max_workers=workers, 
             chunksize=1, 
-            desc=f'computing ΔH for structs of order {groups.index(dim_group)}'
+            desc=f'computing ΔH for structs of order {dim_groups.index(dim_group)}'
         )))
 
         for energy in energies:
-            structs_data[energy[0]]['delta_H'] = energy[1]
+            name    = energy[0]
+            delta_H = energy[1]
+            structs_data[name]['delta_H'] = delta_H
 
         entry_pool += flatten(dim_group)
-    
+
     return structs_data
 
 ########################################
