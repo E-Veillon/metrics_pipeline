@@ -32,7 +32,6 @@ Possible alternatives:
 ########################################
 # SYSTEM I/O MODULES
 
-from typing import List, Tuple
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from pathlib import Path
@@ -40,14 +39,8 @@ from pathlib import Path
 ########################################
 # OPTIMIZATION MODULES
 
-from itertools import count
-from tqdm.contrib.concurrent import process_map
-
 ########################################
 # PYTON MATERIALS GENOMICS PACKAGE
-
-from pymatgen.core.structure import Structure
-from pymatgen.io.vasp import VaspInput
 
 ########################################
 # LOCAL MODULES
@@ -66,9 +59,9 @@ def assert_args(args: Namespace) -> None:
     assert args.ignore.endswith('.txt'), \
     'Structure ignoring file must be a plain text file type (.txt).'
 
-    assert args.eliminate >= 1e-8, \
+    assert args.limit >= 1e-8, \
     '''Instability energy elimination criterion must be strictly positive.
-       Moreover, any value below 1.10-5 meV/atom is too low and not supported.'''
+       Moreover, any value below 1.10-8 eV/atom is too low and not supported.'''
 
     assert args.workers >= 1, \
     'The number of workers cannot be negative or zero.'
@@ -119,8 +112,8 @@ def main():
         metavar='ignore_file.txt'
     )
     parser.add_argument(
-        '-e',
-        '--eliminate',
+        '-l',
+        '--limit',
         type=float,
         default=0.036,
         help=f'''Maximum value of ΔH (in eV/atom) above which structures are considered too unstable and rejected.
@@ -144,7 +137,7 @@ def main():
     
     input_dir     = Path(args.input_dir)
     ignore_file   = args.ignore
-    delta_H_limit = round(args.eliminate, 8)
+    delta_H_limit = round(args.limit, 8)
     workers       = args.workers
 
 
@@ -157,22 +150,25 @@ def main():
         workers=workers
     )
 
-    structs_data = batch_calculate_instability_energies(structs_data, workers=workers)
+    structs_data = batch_calculate_instability_energies(
+        structs_data=structs_data, 
+        workers=workers
+    )
 
     unstable_structs = list(filter(
-        lambda _, data: data['delta_H'] > delta_H_limit, 
+        lambda tup: tup[1]['delta_H'] > delta_H_limit, 
         structs_data.items()
     ))
 
     for struct in unstable_structs:
         name = struct[0]
         data = struct[1]
-        reject_msg = f'''
-                    Instability energy for this structure is estimated at {data['delta_H']} eV/atom, 
-                    which is above the fixed instability limit of {delta_H_limit} eV/atom.
-                    Therefore, it is considered not suitable for wanted application, 
-                    and should not be considered in further screening steps.
-                    '''
+        reject_msg = f"\
+                    STABILITY REJECTION\n\
+                    Instability energy for this structure is estimated at {data['delta_H']} eV/atom,\n \
+                    which is above the fixed instability limit of {delta_H_limit} eV/atom.\n \
+                    Therefore, it is considered not suitable for wanted application,\n \
+                    and should not be considered in further screening steps.\n"
         reject_file_path = Path(input_dir / name / ignore_file)
         reject_file_path.touch()
         reject_file_path.write_text(reject_msg)
