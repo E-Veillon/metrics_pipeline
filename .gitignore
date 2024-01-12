@@ -11,3 +11,4 @@ oqmd_poscar
 *.poscar
 *.kpoints
 *_test.py
+*.slurm
