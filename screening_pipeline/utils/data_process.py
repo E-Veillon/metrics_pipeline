@@ -27,8 +27,7 @@ from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 # LOCAL MODULES
 
 from screening_pipeline.utils.matcher import group_by_stoichiometry, flatten
-from screening_pipeline.utils.periodic_table import get_elements, get_elemental_subsets, \
-                                                    get_delta_sol_el_ratio
+from screening_pipeline.utils.periodic_table import get_elements, get_delta_sol_el_ratio
 
 ########################################
 # TYPE ALIASES
@@ -61,7 +60,8 @@ def get_elements_from_entries(entries: Sequence[PDEntry]) -> List[Element]:
 ########################################
 
 def init_entries_and_group_by_dim(
-        structs_data: dict[str, dict[str, Any]]
+        structs_data: Dict[str, Dict[str, Any]], 
+        ref_structs: Optional[Dict[str, Dict[str, Any]]] = None
     ) -> List[List[Union[PDEntry, List[PDEntry]]]]:
     '''
     Initialize entries from given data and group them inside nested lists 
@@ -79,12 +79,42 @@ def init_entries_and_group_by_dim(
             ]
     
     Parameters:
-        structs_data (dict):    structures data as extracted from VASP with 
-                                batch_extract_vasp_data function.
+        structs_data (dict):    Structure data as extracted from VASP with 
+                                batch_extract_vasp_data function. This arg
+                                is for relaxed structures that need a ΔH 
+                                computation (generated structures).
+        
+        ref_structs (dict):     Structure data as extracted from VASP with 
+                                batch_extract_vasp_data function. This arg 
+                                is for structures extracted from a dataset, 
+                                that can give some reference about previously
+                                found energies in the space of interest.
+                                The ΔH energy of these structures will not 
+                                be computed nor returned. Defaults to None.
     
     Returns:
         All structures data grouped by structure dimensionality and composition.
     '''
+
+    assert isinstance(structs_data, dict)
+    if not structs_data: return dict()
+    assert all(isinstance(name, str) for name in structs_data.keys())
+    assert all(isinstance(data, dict) for data in structs_data.values())
+
+    if not ref_structs: ref_entry_list = []
+    else:
+        assert isinstance(ref_structs, dict)
+        assert all(isinstance(name, str) for name in ref_structs.keys())
+        assert all(isinstance(data, dict) for data in ref_structs.values())
+
+        ref_entry_list = [
+            PDEntry(
+                composition=data['composition'], 
+                energy=data['final_energy'], 
+                name=name, 
+                attribute='struct_ref'
+        ) for name, data in ref_structs.items()
+        ]
 
     groups = [[]] # fill the index 0 to match indexes and entries dimensionality
 
@@ -92,9 +122,10 @@ def init_entries_and_group_by_dim(
         PDEntry(
             composition=data['composition'], 
             energy=data['final_energy'], 
-            name=name
+            name=name, 
+            attribute='generated'
         ) for name, data in structs_data.items()
-    ]
+    ] + ref_entry_list
 
     max_dim  = max([len(entry.elements) for entry in entry_list])
     elements = get_elements_from_entries(entry_list)
@@ -102,7 +133,9 @@ def init_entries_and_group_by_dim(
     elts_entries = [
         PDEntry(
             composition=Composition(str(elt)), 
-            energy=0.
+            energy=0., 
+            name=elt.symbol, 
+            attribut='element_ref'
         ) for elt in elements
     ]
 
