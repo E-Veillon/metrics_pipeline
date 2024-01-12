@@ -495,9 +495,8 @@ def extract_vasp_data_for_convex_hull(
     Returns:
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict, 
                                 containing following data, used in stability calculation:
-                                    - structure itself, 
-                                    - its chemical composition, 
-                                    - its final energy (in eV).
+                                    - structure chemical composition as Composition object, 
+                                    - structure final energy (in eV).
     '''
 
     assert isinstance(struct_dir, PathLike)
@@ -517,7 +516,6 @@ def extract_vasp_data_for_convex_hull(
     composition  = Composition(structure.formula)
     final_energy_eV: float = Oszicar(oszicar_path).final_energy
     struct_dict = {
-        'structure': structure, 
         'composition': composition, 
         'final_energy': final_energy_eV
     }
