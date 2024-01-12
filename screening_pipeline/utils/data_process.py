@@ -177,7 +177,7 @@ def _get_relevant_entries(
 
 ########################################
 
-def _auto_define_lacking_elts_entries(
+def _get_lacking_elts_entries(
         entries: Sequence[PDEntry], 
         ref_elts: Union[Sequence[Element], set[Element]]
     ) -> List[PDEntry]:
@@ -228,10 +228,12 @@ def phase_diagram_init(
         entries ([PDEntry]):        The entries that will be put into the PhaseDiagram.
                                     If some elemental entries are provided, they will be
                                     used with their energy. If some elemental entries are
-                                    lacking with respect to ref_elts, they will be auto-
+                                    lacking with respect to ref_elts, they will be 
                                     initialized with energy = 0.0 eV. If some entries have
-                                    elements not in referenced in provided ref_elts, they
-                                    will be ignored.
+                                    elements not referenced in provided ref_elts, they
+                                    will be ignored. This behaviour is particularly 
+                                    useful if you need to initialize several diagrams from 
+                                    different parts of the same entry dataset.
 
         ref_elts (str|Iterable):    The  elemental references of the new phase diagram.
                                     If a single string is provided, it can either 
@@ -242,6 +244,9 @@ def phase_diagram_init(
                                     element symbols, atomic numbers and/or Element 
                                     objects.
                                     If not provided, they are computed from given entries.
+                                    In that case, all provided entries are checked, so the
+                                    phase diagram will be of the minimal dimension that 
+                                    contains all entries.
     Returns:
         The constructed PhaseDiagram object.
     '''
@@ -256,7 +261,7 @@ def phase_diagram_init(
         ref_elts  = get_elements(ref_elts)
         entries   = _get_relevant_entries(entries, ref_elts)
 
-    entry_list = _auto_define_lacking_elts_entries(entries, ref_elts) + list(entries)
+    entry_list = _get_lacking_elts_entries(entries, ref_elts) + list(entries)
 
     new_pd = PhaseDiagram(
         entries=entry_list, 
