@@ -45,7 +45,7 @@ def assert_args(args: Namespace) -> None:
     assert Path(args.output).is_dir(), \
     f'{args.output} found but it is not a directory.'
 
-    allowed_presets = {(
+    allowed_presets = {
         'MITRelaxSet', 
         'MPRelaxSet', 
         'MPScanRelaxSet', 
@@ -53,7 +53,7 @@ def assert_args(args: Namespace) -> None:
         'MPMetalRelaxSet', 
         'MVLRelax52Set', 
         'MVLScanRelaxSet'
-    )}
+    }
 
     assert args.method in allowed_presets, \
     f'Provided relaxation preset must be one of the following:\n \
@@ -148,7 +148,7 @@ def main():
     vasp_inputs = list(process_map(
         vasp_setup, 
         structures, 
-        workers=workers, 
+        max_workers=workers, 
         chunksize=chunksize, 
         desc='Writing VASP input files'
     ))

@@ -303,8 +303,9 @@ def vasp_batch_launch(
     process_map(
         vasp_launcher, 
         inputs_list, 
-        workers=workers, 
-        chunksize=1
+        max_workers=workers, 
+        chunksize=1, 
+        desc='Relaxation of structs'
     )
 
 ########################################
