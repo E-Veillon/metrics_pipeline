@@ -13,7 +13,7 @@ from pathlib import Path
 # OPTIMIZATION MODULES
 
 from scipy.constants import elementary_charge
-from itertools import cycle, chain, starmap
+from itertools import chain, starmap
 from functools import partial
 from tqdm.contrib.concurrent import process_map
 
@@ -325,13 +325,13 @@ def vasp_relaxation_settings(
     It must be one of the allowed pymatgen relaxation presets:
     {allowed_presets}'''
 
-    assert isinstance(user_incar_settings, (dict, None)), \
+    assert isinstance(user_incar_settings, dict) or user_incar_settings is None, \
     'user_incar_settings must be a dict or None'
 
-    assert isinstance(user_kpoints_settings, (dict, None)), \
+    assert isinstance(user_kpoints_settings, dict) or user_kpoints_settings is None, \
     'user_kpoints_settings must be a dict or None'
 
-    assert isinstance(user_potcar_settings, (dict, None)), \
+    assert isinstance(user_potcar_settings, dict) or user_potcar_settings is None, \
     'user_potcar_settings must be a dict or None'
 
     if preset == 'MITRelaxSet':
@@ -402,7 +402,7 @@ def vasp_static_settings(
         'MPScanStaticSet'
     }
 
-    assert isinstance(structure, (SiteCollection, None)), '''
+    assert isinstance(structure, SiteCollection) or structure is None, '''
     "structure" argument format not supported.
     It must be an instance of the SiteCollection class or one of its subclasses.'''
     
@@ -411,13 +411,13 @@ def vasp_static_settings(
     It must be one of the allowed pymatgen static presets:
     {allowed_presets}'''
 
-    assert isinstance(user_incar_settings, (dict, None)), \
+    assert isinstance(user_incar_settings, dict) or user_incar_settings is None, \
     'user_incar_settings must be a dict or None'
 
-    assert isinstance(user_kpoints_settings, (dict, None)), \
+    assert isinstance(user_kpoints_settings, dict) or user_kpoints_settings is None, \
     'user_kpoints_settings must be a dict or None'
 
-    assert isinstance(user_potcar_settings, (dict, None)), \
+    assert isinstance(user_potcar_settings, dict) or user_potcar_settings is None, \
     'user_potcar_settings must be a dict or None'
 
     corrections = {}
