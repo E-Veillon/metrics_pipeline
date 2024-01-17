@@ -225,7 +225,8 @@ def read_cif(
         struct_strings, nbr_rare_earth_structs = discard_rare_earth_structures(struct_strings)
 
     nbr_struct = len(struct_strings)
-    assert nbr_struct > 0, "No structure data found in provided file"
+    assert nbr_struct > 0, \
+    "No structure data found in provided file (maybe they all have been discarded ?)"
 
     chunksize = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
