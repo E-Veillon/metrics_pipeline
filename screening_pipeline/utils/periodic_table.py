@@ -11,6 +11,7 @@ from typing import Union, Iterable, List, Tuple, Literal, Sequence
 ########################################
 # OPTIMIZATION MODULES
 
+import sys
 import re
 from itertools import filterfalse
 
@@ -125,7 +126,7 @@ def discard_rare_earth_structures(
     return kept_structs, nbr_discarded
 
 def get_elements(
-        elts_data: str|Iterable[str|int|Element]
+        elts_data: Union[str, Iterable[str|int|Element]]
     ) -> List[Element]:
     '''
     Flexible converter to get a list of unique Element objects from a single string or any 
@@ -221,36 +222,17 @@ def get_element_group(
 
     assert return_type == 'str' or return_type == 'int'
 
-    match atom:
-        case Element():
-            match atom.block:
-                case 's': return atom.block.upper() + str(atom.group) if return_type == 'str' else atom.group
-                case 'p': return atom.block.upper() + str(atom.group - 12) if return_type == 'str' else atom.group
-                case 'd': return atom.block.upper() + str(atom.group - 2) if return_type == 'str' else atom.group
-                case 'f': return (('L' if return_type == 'str' else 19) if atom.row == 6 else ('A' if return_type == 'str' else 20))
-        case ('H'|'Li'|'Na'|'K'|'Rb'|'Cs'|'Fr'): return 'S1' if return_type == 'str' else 1
-        case ('He'|'Be'|'Mg'|'Ca'|'Sr'|'Ba'|'Ra'): return 'S2' if return_type == 'str' else 2
-        case ('Sc'|'Y'|'Lu'|'Lr'): return 'D1' if return_type == 'str' else 3
-        case ('Ti'|'Zr'|'Hf'|'Rf'): return 'D2' if return_type == 'str' else 4
-        case ('V'|'Nb'|'Ta'|'Db'): return 'D3' if return_type == 'str' else 5
-        case ('Cr'|'Mo'|'W'|'Sg'): return 'D4' if return_type == 'str' else 6
-        case ('Mn'|'Tc'|'Re'|'Bh'): return 'D5' if return_type == 'str' else 7
-        case ('Fe'|'Ru'|'Os'|'Hs'): return 'D6' if return_type == 'str' else 8
-        case ('Co'|'Rh'|'Ir'|'Mt'): return 'D7' if return_type == 'str' else 9
-        case ('Ni'|'Pd'|'Pt'|'Ds'): return 'D8' if return_type == 'str' else 10
-        case ('Cu'|'Ag'|'Au'|'Rg'): return 'D9' if return_type == 'str' else 11
-        case ('Zn'|'Cd'|'Hg'|'Cn'): return 'D10' if return_type == 'str' else 12
-        case ('B'|'Al'|'Ga'|'In'|'Tl'|'Nh'): return 'P1' if return_type == 'str' else 13
-        case ('C'|'Si'|'Ge'|'Sn'|'Pb'|'Fl'): return 'P2' if return_type == 'str' else 14
-        case ('N'|'P'|'As'|'Sb'|'Bi'|'Mc'): return 'P3' if return_type == 'str' else 15
-        case ('O'|'S'|'Se'|'Te'|'Po'|'Lv'): return 'P4' if return_type == 'str' else 16
-        case ('F'|'Cl'|'Br'|'I'|'At'|'Ts'): return 'P5' if return_type == 'str' else 17
-        case ('Ne'|'Ar'|'Kr'|'Xe'|'Rn'|'Og'): return 'P6' if return_type == 'str' else 18
-        case ('La'|'Ce'|'Pr'|'Nd'|'Pm'|'Sm'|'Eu'|'Gd'|'Tb'|'Dy'|'Ho'|'Er'|'Tm'|'Yb'):
-            return 'L' if return_type == 'str' else 19
-        case ('Ac'|'Th'|'Pa'|'U'|'Np'|'Pu'|'Am'|'Cm'|'Bk'|'Cf'|'Es'|'Fm'|'Md'|'No'):
-            return 'A' if return_type == 'str' else 20
-        case str(): return None
+    try: atom = Element(atom)
+    except TypeError:
+        sys.exit(f"Provided 'atom' argument should be a str or Element, got {type(atom)} instead.")
+    except ValueError:
+        sys.exit(f'Provided str ({atom}) is not recognized as an element.')
+
+    match atom.block:
+        case 's': return ((atom.block.upper() + str(atom.group)) if return_type == 'str' else atom.group)
+        case 'p': return ((atom.block.upper() + str(atom.group - 12)) if return_type == 'str' else atom.group)
+        case 'd': return ((atom.block.upper() + str(atom.group - 2)) if return_type == 'str' else atom.group)
+        case 'f': return (('L' if return_type == 'str' else 19) if atom.row == 6 else ('A' if return_type == 'str' else 20))
         case _: raise TypeError(f'expected a Element or str, got {type(atom)}.')
 
 def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
