@@ -176,48 +176,65 @@ def get_elemental_subsets(
 
     return sub_pd_list
 
-def get_element_group(atom: Union[Element, str]) -> str:
+def get_element_group(
+        atom: Union[Element, str], 
+        return_type: Literal['int', 'str'] = 'str'
+    ) -> Union[int, str]:
     '''
-    Finds PT group of a given element as string or Element object.
+    Finds the Periodic Table group of an element given as a string or Element object.
 
     Parameters:
-        atom (str|Element): The element to find group for.
+        atom (str|Element):         The element to find the group for.
+
+        return_type ('int'|'str'):  Whether to return the group number as an int
+                                    (from 1 to 18, returns, 19 for Lanthanides and
+                                    20 for Actinides), or as a str representing the 
+                                    group relative to electronic structure ('S1', 
+                                    'S2', then from 'D1' to 'D10', then from 'P1' 
+                                    to 'P6', 'L' for Lanthanides and 'A' for Actinides).
     
     Returns:
-        str: The group of the element in '[block][group number in block]' form,
-             e.g. for Fe it will return 'D6'.
-             For f-block elements, a lone letter will be returned, as Δ-Sol method
-             is not usable for these at the moment.
+        int|str:    For return_type = 'str', the group of the element in 
+                    '[block][group number in block]' format, e.g. for Fe it will return 'D6'.
+                    For f-block elements, a lone letter will be returned, as Δ-Sol method
+                    is not usable for these at the moment.
+                    For return_type = 'int', the number of the group of the element, 
+                    Lanthanides considered in "group 19" and Actinides in "group 20" as to
+                    have a unique return for each group of elements, even if according to 
+                    periodic table the best classification should be group 3 for both.
     '''
+
+    assert return_type == 'str' or return_type == 'int'
+
     match atom:
         case Element():
             match atom.block:
-                case 's': return atom.block.upper() + str(atom.group)
-                case 'p': return atom.block.upper() + str(atom.group - 12)
-                case 'd': return atom.block.upper() + str(atom.group - 2)
-                case 'f': return ('L' if atom.row == 6 else 'A')
-        case ('H'|'Li'|'Na'|'K'|'Rb'|'Cs'|'Fr'): return 'S1'
-        case ('He'|'Be'|'Mg'|'Ca'|'Sr'|'Ba'|'Ra'): return 'S2'
-        case ('Sc'|'Y'|'Lu'|'Lr'): return 'D1'
-        case ('Ti'|'Zr'|'Hf'|'Rf'): return 'D2'
-        case ('V'|'Nb'|'Ta'|'Db'): return 'D3'
-        case ('Cr'|'Mo'|'W'|'Sg'): return 'D4'
-        case ('Mn'|'Tc'|'Re'|'Bh'): return 'D5'
-        case ('Fe'|'Ru'|'Os'|'Hs'): return 'D6'
-        case ('Co'|'Rh'|'Ir'|'Mt'): return 'D7'
-        case ('Ni'|'Pd'|'Pt'|'Ds'): return 'D8'
-        case ('Cu'|'Ag'|'Au'|'Rg'): return 'D9'
-        case ('Zn'|'Cd'|'Hg'|'Cn'): return 'D10'
-        case ('B'|'Al'|'Ga'|'In'|'Tl'|'Nh'): return 'P1'
-        case ('C'|'Si'|'Ge'|'Sn'|'Pb'|'Fl'): return 'P2'
-        case ('N'|'P'|'As'|'Sb'|'Bi'|'Mc'): return 'P3'
-        case ('O'|'S'|'Se'|'Te'|'Po'|'Lv'): return 'P4'
-        case ('F'|'Cl'|'Br'|'I'|'At'|'Ts'): return 'P5'
-        case ('Ne'|'Ar'|'Kr'|'Xe'|'Rn'|'Og'): return 'P6'
+                case 's': return atom.block.upper() + str(atom.group) if return_type == 'str' else atom.group
+                case 'p': return atom.block.upper() + str(atom.group - 12) if return_type == 'str' else atom.group
+                case 'd': return atom.block.upper() + str(atom.group - 2) if return_type == 'str' else atom.group
+                case 'f': return (('L' if return_type == 'str' else 19) if atom.row == 6 else ('A' if return_type == 'str' else 20))
+        case ('H'|'Li'|'Na'|'K'|'Rb'|'Cs'|'Fr'): return 'S1' if return_type == 'str' else 1
+        case ('He'|'Be'|'Mg'|'Ca'|'Sr'|'Ba'|'Ra'): return 'S2' if return_type == 'str' else 2
+        case ('Sc'|'Y'|'Lu'|'Lr'): return 'D1' if return_type == 'str' else 3
+        case ('Ti'|'Zr'|'Hf'|'Rf'): return 'D2' if return_type == 'str' else 4
+        case ('V'|'Nb'|'Ta'|'Db'): return 'D3' if return_type == 'str' else 5
+        case ('Cr'|'Mo'|'W'|'Sg'): return 'D4' if return_type == 'str' else 6
+        case ('Mn'|'Tc'|'Re'|'Bh'): return 'D5' if return_type == 'str' else 7
+        case ('Fe'|'Ru'|'Os'|'Hs'): return 'D6' if return_type == 'str' else 8
+        case ('Co'|'Rh'|'Ir'|'Mt'): return 'D7' if return_type == 'str' else 9
+        case ('Ni'|'Pd'|'Pt'|'Ds'): return 'D8' if return_type == 'str' else 10
+        case ('Cu'|'Ag'|'Au'|'Rg'): return 'D9' if return_type == 'str' else 11
+        case ('Zn'|'Cd'|'Hg'|'Cn'): return 'D10' if return_type == 'str' else 12
+        case ('B'|'Al'|'Ga'|'In'|'Tl'|'Nh'): return 'P1' if return_type == 'str' else 13
+        case ('C'|'Si'|'Ge'|'Sn'|'Pb'|'Fl'): return 'P2' if return_type == 'str' else 14
+        case ('N'|'P'|'As'|'Sb'|'Bi'|'Mc'): return 'P3' if return_type == 'str' else 15
+        case ('O'|'S'|'Se'|'Te'|'Po'|'Lv'): return 'P4' if return_type == 'str' else 16
+        case ('F'|'Cl'|'Br'|'I'|'At'|'Ts'): return 'P5' if return_type == 'str' else 17
+        case ('Ne'|'Ar'|'Kr'|'Xe'|'Rn'|'Og'): return 'P6' if return_type == 'str' else 18
         case ('La'|'Ce'|'Pr'|'Nd'|'Pm'|'Sm'|'Eu'|'Gd'|'Tb'|'Dy'|'Ho'|'Er'|'Tm'|'Yb'):
-            return 'L'
+            return 'L' if return_type == 'str' else 19
         case ('Ac'|'Th'|'Pa'|'U'|'Np'|'Pu'|'Am'|'Cm'|'Bk'|'Cf'|'Es'|'Fm'|'Md'|'No'):
-            return 'A'
+            return 'A' if return_type == 'str' else 20
         case str(): return None
         case _: raise TypeError(f'expected a Element or str, got {type(atom)}.')
 
@@ -243,7 +260,7 @@ def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
     if isinstance(structure, SiteCollection):
         elts_list = list(structure.composition.keys())
     
-    if isinstance(structure, str):
+    elif isinstance(structure, str):
         formula   = CifBlock.from_str(structure).data["_chemical_formula_structural"]
         comp      = Composition(formula)
         elts_list = list(comp.keys())
