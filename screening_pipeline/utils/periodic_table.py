@@ -66,8 +66,15 @@ def discard_rare_gas_structures(
         Int: The number of structures discarded.
     '''
 
+    assert isinstance(structures, Iterable), \
+    f"Provided 'structures' argument is not iterable (got {type(structures)} instead)."
+
+    structures = list(structures)
+    if not len(structures): return [], 0
+
     nbr_discarded = len(list(filter(has_rare_gas, structures)))
     kept_structs  = list(filterfalse(has_rare_gas, structures))
+
     return kept_structs, nbr_discarded
 
 def has_rare_earth(structure: Union[SiteCollection, str]) -> bool:
@@ -106,8 +113,15 @@ def discard_rare_earth_structures(
         Int: The number of structures discarded.
     '''
 
+    assert isinstance(structures, Iterable), \
+    f"Provided 'structures' argument is not iterable (got {type(structures)} instead)."
+
+    structures = list(structures)
+    if not len(structures): return [], 0
+
     nbr_discarded = len(list(filter(has_rare_earth, structures)))
     kept_structs  = list(filterfalse(has_rare_earth, structures))
+    
     return kept_structs, nbr_discarded
 
 def get_elements(
@@ -135,7 +149,8 @@ def get_elements(
         A list of parsed Element objects.
     '''
 
-    assert isinstance(elts_data, Iterable)
+    assert isinstance(elts_data, Iterable), \
+    f"Provided 'elts_data' argument is not iterable (got {type(elts_data)} instead)."
 
     if isinstance(elts_data, str):
         elts_list = Composition(''.join(elts_data.split(sep='-')), strict=True).elements
