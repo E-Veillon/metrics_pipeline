@@ -21,12 +21,9 @@ from pathlib import Path
 ########################################
 # LOCAL MODULES
 
-# from screening_pipeline.utils.cif_io import read_cif
-from screening_pipeline.utils.periodic_table import get_delta_sol_el_ratio
-from screening_pipeline.utils.vasp_io import vasp_static_settings, vasp_batch_launch, \
-                                             batch_extract_vasp_data, chgcar_density_switch, \
-                                             delta_sol_inputs_init, batch_calculate_delta_sol_band_gaps, \
-                                             filter_by_band_gap
+from screening_pipeline.utils.vasp_io import vasp_batch_launch, batch_extract_vasp_data, \
+                                             delta_sol_inputs_init
+from screening_pipeline.utils.data_process import batch_calculate_delta_sol_band_gaps
 
 ########################################
 # LOCAL FUNCTIONS
@@ -55,6 +52,13 @@ def assert_args(args: Namespace) -> None:
     
     assert args.n_star_type in {'MIN', 'BEST', 'MAX'}, \
     f"The type of N* should be either 'MIN', 'BEST' or 'MAX'."
+
+    assert args.valid_minimum >= 0.0 and args.valid_maximum >= 0.0, \
+    f"Valid band gap values must be positives or zero."
+
+    assert args.valid_minimum != args.valid_maximum, \
+    'Band gap valid interval cannot be a single value, \
+    different values must be provided for min and max valid band gap values.'
 
     assert args.ignore.endswith('.txt'), \
     'Structure ignoring file must be a plain text file type (.txt).'
@@ -137,6 +141,22 @@ def main():
         metavar='str'
     )
     parser.add_argument(
+        '-v',
+        '--valid_minimum',
+        type=float,
+        default=1.3,
+        help='''Minimum acceptable band gap value in eV.''', 
+        metavar='float'
+    )
+    parser.add_argument(
+        '-V',
+        '--valid_maximum',
+        type=float,
+        default=3.6,
+        help='''Maximum acceptable band gap value in eV.''', 
+        metavar='float'
+    )
+    parser.add_argument(
         '-i', 
         '--ignore', 
         type=str, 
@@ -166,6 +186,7 @@ def main():
     preset      = args.method
     functional  = args.functional
     n_star_type = args.n_star_type
+    valid_interval = sorted([args.valid_minimum, args.valid_maximum])
     ignore_file = args.ignore
     workers     = args.workers
 
@@ -207,12 +228,31 @@ def main():
     )
 
     # Reject unsuitable structures
-    filter_by_band_gap(
-        E_band_gaps, 
-        valid_interval=[1.3, 3.6], 
-        base_dir=outdir, 
-        ignore_file=ignore_file
-    )
+    for name, E_band_gap in E_band_gaps.items():
+
+        name_plus    = '_'.join(name, 'plus')
+        name_minus   = '_'.join(name, 'minus')
+        bg_too_small = E_band_gap < min(valid_interval)
+        bg_too_big   = E_band_gap > max(valid_interval)
+
+        if bg_too_small or bg_too_big:
+
+            reject_str = f'Δ-Sol band gap was estimated to {E_band_gap} eV, \
+                        which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].\n \
+                        Therefore, it is not suitable for wanted application, \
+                        it should not be considered in further screening steps.'
+
+            input_path = Path('/'.join((input_dir, name, ignore_file)))
+            input_path.touch()
+            input_path.write_text(reject_str)
+
+            path_plus  = Path('/'.join((outdir, name_plus, ignore_file)))
+            path_plus.touch()
+            path_plus.write_text(reject_str)
+        
+            path_minus = Path('/'.join((outdir, name_minus, ignore_file)))
+            path_minus.touch()
+            path_minus.write_text(reject_str)
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
