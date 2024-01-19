@@ -153,9 +153,9 @@ def main():
 
     # MAIN BLOCK
 
-    from screening_pipeline.utils import read_cif, write_cif
-    from screening_pipeline.utils import batch_symmetrizer
-    from screening_pipeline.utils import remove_equivalent
+    from screening_pipeline.utils.cif_io import read_cif, write_cif
+    from screening_pipeline.utils.spacegroup import batch_symmetrizer
+    from screening_pipeline.utils.matcher import remove_equivalent
 
     # Extraction des données CIF et conversion en structures
 
