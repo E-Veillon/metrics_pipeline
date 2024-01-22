@@ -100,10 +100,10 @@ def vasp_launcher(vasp_input: VaspInput, path: PathLike) -> None:
 
     assert isinstance(vasp_input, VaspInput)
     assert isinstance(path, PathLike)
-    path     = Path(path)
-    calc_dir = path
-    out_file = path / "vasp.out"
-    err_file = path / "vasp.err"
+    path     = str(path)
+    calc_dir = Path(path)
+    out_file = Path('/'.join(path, "vasp.out"))
+    err_file = Path('/'.join(path, "vasp.err"))
     vasp_input.run_vasp(run_dir=calc_dir, output_file=out_file, err_file=err_file)
 
 ########################################
@@ -150,7 +150,7 @@ def vasp_batch_launch(
         inputs_list, 
         max_workers=workers, 
         chunksize=1, 
-        desc='Relaxation of structs'
+        desc='VASP computations'
     )
 
 ########################################
