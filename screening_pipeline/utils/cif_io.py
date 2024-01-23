@@ -217,12 +217,15 @@ def read_cif(
     """
 
     struct_strings = extract_cif_from_file(filename)
+    nbr_rare_gas_structs, nbr_rare_earth_structs = 0, 0
 
     if not keep_rare_gases:
         struct_strings, nbr_rare_gas_structs = discard_rare_gas_structures(struct_strings)
+        print(f'{nbr_rare_gas_structs} rare gas structures ignored')
     
     if not keep_rare_earths:
         struct_strings, nbr_rare_earth_structs = discard_rare_earth_structures(struct_strings)
+        print(f'{nbr_rare_earth_structs} rare earths structures ignored')
 
     nbr_struct = len(struct_strings)
     assert nbr_struct > 0, \
