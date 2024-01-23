@@ -159,7 +159,7 @@ def main():
 
     # Use written VaspInput objects to write input files and run VASP
     vasp_batch_launch(
-        vasp_input=vasp_inputs, 
+        vasp_inputs=vasp_inputs, 
         base_dir=outdir, 
         subdir_names=dir_names_list, 
         workers=workers
