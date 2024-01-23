@@ -132,7 +132,11 @@ def main():
     # MAIN BLOCK
 
     # Convert CIF data into Structure objects
-    structures, *_ = read_cif(filename=input_file)
+    structures, *_ = read_cif(
+        filename=input_file, 
+        keep_rare_gases=True, # Avoid calling rare gaz screening function
+        keep_rare_earths=True # Avoid calling rare earth screening function
+    )
     
     # Setup parallel processing
     nbr_struct      = len(structures)
