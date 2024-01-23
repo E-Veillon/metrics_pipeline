@@ -11,6 +11,7 @@ The relaxation results then may be used in other scripts for material properties
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from pathlib import Path
+from ruamel.yaml import YAML
 
 ########################################
 # OPTIMIZATION MODULES
@@ -58,6 +59,15 @@ def assert_args(args: Namespace) -> None:
     assert args.method in allowed_presets, \
     f'Provided relaxation preset must be one of the following:\n \
     {allowed_presets}'
+
+    if args.user_input_file != 'None':
+        assert Path(args.user_input_file).is_file(), \
+        f'{args.user_input_file}: file not found.'
+        
+        assert args.user_input_file.endswith('.yaml'), \
+        'user settings file must be of .yaml format.'
+
+
 
 ########################################
 # MAIN FUNCTION
@@ -112,6 +122,15 @@ def main():
         metavar='RelaxSet'
     )
     parser.add_argument(
+        '-u', 
+        '--user-settings', 
+        type=str, 
+        default='None', 
+        help='Path to the .yaml file compiling tags overriding to put over the PMG preset.', 
+        metavar='file.yaml', 
+        dest='user_input_file'
+    )
+    parser.add_argument(
         '-w',
         '--workers',
         type=int,
@@ -128,6 +147,12 @@ def main():
     preset     = args.method
     workers    = args.workers
 
+    if args.user_input_file == 'None': user_settings = {}
+    else:
+        yaml = YAML()
+        user_settings_file = Path(args.user_input_file)
+        user_settings = yaml.load(user_settings_file) or {}
+
 
     # MAIN BLOCK
 
@@ -141,12 +166,12 @@ def main():
     # Setup parallel processing
     nbr_struct      = len(structures)
     chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
-    vasp_setup      = partial(vasp_relaxation_settings, preset=preset)
-    dir_names_list  = []
-    
-    for idx, structure in enumerate(structures):
-        struct_dir_name = f'{idx}_{structure.formula}'
-        dir_names_list.append(struct_dir_name)
+    vasp_setup      = partial(
+        vasp_relaxation_settings, 
+        preset=preset, 
+        user_corrections=user_settings
+    )
+    dir_names_list  = [f'{idx}_{structure.formula}' for idx, structure in enumerate(structures)]
 
     # Write VaspInput objects from structures and chosen preset
     vasp_inputs = list(process_map(
