@@ -54,6 +54,6 @@ def batch_add_new_dirs(
     assert base_dir.is_dir()
     assert all(isinstance(subdir, PathLike) for subdir in new_subdirs)
 
-    new_dirs = list(map(add_new_dir, zip(repeat(base_dir), new_subdirs)))
+    new_dirs = list(map(add_new_dir, repeat(base_dir), new_subdirs))
     
     return new_dirs
