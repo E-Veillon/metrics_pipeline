@@ -4,7 +4,7 @@ Implements functions to manage and operate on paths.
 
 from typing import Union, Sequence, List
 from pathlib import Path
-from functools import partial
+from itertools import repeat
 
 PathLike = Union[str, Path]
 
@@ -22,13 +22,10 @@ def add_new_dir(base_dir: PathLike, new_dir_name: PathLike) -> Path:
     '''
 
     assert isinstance(base_dir, PathLike)
-
-    base_dir = Path(base_dir)
-    
-    assert base_dir.is_dir()
+    assert Path(base_dir).is_dir()
     assert isinstance(new_dir_name, PathLike)
 
-    new_dir  = Path(base_dir / new_dir_name)
+    new_dir  = Path('/'.join(str(base_dir), new_dir_name))
     new_dir.mkdir()
 
     return new_dir
@@ -56,8 +53,7 @@ def batch_add_new_dirs(
     
     assert base_dir.is_dir()
     assert all(isinstance(subdir, PathLike) for subdir in new_subdirs)
-    
-    based_add_new_dir = partial(add_new_dir, base_dir=base_dir)
-    new_dirs = list(map(based_add_new_dir, new_subdirs))
+
+    new_dirs = list(map(add_new_dir, zip(repeat(base_dir), new_subdirs)))
     
     return new_dirs
