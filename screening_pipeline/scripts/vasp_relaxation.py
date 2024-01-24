@@ -60,9 +60,9 @@ def assert_args(args: Namespace) -> None:
     f'Provided relaxation preset must be one of the following:\n \
     {allowed_presets}'
 
-    assert Path(args.user_input_file).is_file(), \
+    assert Path(args.user_settings).is_file(), \
     f'{args.user_settings}: file not found.'
-        
+
     assert args.user_settings.endswith('.yaml'), \
     'user settings file must be of .yaml format.'
 
