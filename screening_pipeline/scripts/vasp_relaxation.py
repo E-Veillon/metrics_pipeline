@@ -165,7 +165,7 @@ def main():
         preset=preset, 
         user_corrections=user_settings
     )
-    dir_names_list  = [f'{idx}_{structure.formula}' for idx, structure in enumerate(structures)]
+    dir_names_list  = [f'{idx}_{structure.composition.reduced_formula}' for idx, structure in enumerate(structures)]
 
     # Write VaspInput objects from structures and chosen preset
     vasp_inputs = list(process_map(
