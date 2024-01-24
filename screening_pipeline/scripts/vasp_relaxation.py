@@ -22,6 +22,7 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # LOCAL MODULES
 
+from screening_pipeline.utils import _yaml_loader
 from screening_pipeline.utils.cif_io import read_cif
 from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_batch_launch
 
@@ -59,6 +60,14 @@ def assert_args(args: Namespace) -> None:
     f'Provided relaxation preset must be one of the following:\n \
     {allowed_presets}'
 
+    assert Path(args.user_settings).is_file(), \
+    f'{args.user_settings}: file not found.'
+
+    assert args.user_settings.endswith('.yaml'), \
+    'user settings file must be of .yaml format.'
+
+
+
 ########################################
 # MAIN FUNCTION
 
@@ -89,7 +98,7 @@ def main():
         'filename',
         type=str,
         help='Path to the CIF file containing structure data to read.', 
-        metavar='input_file'
+        metavar='input_file.cif'
     )
     parser.add_argument(
         '-o',
@@ -112,21 +121,31 @@ def main():
         metavar='RelaxSet'
     )
     parser.add_argument(
+        '-u', 
+        '--user-settings', 
+        type=str, 
+        default='user_settings.yaml', 
+        help='Path to the .yaml file containing tags overrides to put over the PMG preset.', 
+        metavar='file.yaml', 
+        dest='user_settings'
+    )
+    parser.add_argument(
         '-w',
         '--workers',
         type=int,
         default=1,
-        help='Number of parallel processes to create',
+        help='Number of parallel processes to spawn.',
         metavar='int',
     )
     args: Namespace = parser.parse_args()
 
     assert_args(args)
     
-    input_file = Path(args.filename)
-    outdir     = Path(args.output)
-    preset     = args.method
-    workers    = args.workers
+    input_file    = Path(args.filename)
+    outdir        = Path(args.output)
+    preset        = args.method
+    user_settings = _yaml_loader(args.user_settings)
+    workers       = args.workers
 
 
     # MAIN BLOCK
@@ -141,12 +160,12 @@ def main():
     # Setup parallel processing
     nbr_struct      = len(structures)
     chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
-    vasp_setup      = partial(vasp_relaxation_settings, preset=preset)
-    dir_names_list  = []
-    
-    for idx, structure in enumerate(structures):
-        struct_dir_name = f'{idx}_{structure.formula}'
-        dir_names_list.append(struct_dir_name)
+    vasp_setup      = partial(
+        vasp_relaxation_settings, 
+        preset=preset, 
+        user_corrections=user_settings
+    )
+    dir_names_list  = [f'{idx}_{structure.formula}' for idx, structure in enumerate(structures)]
 
     # Write VaspInput objects from structures and chosen preset
     vasp_inputs = list(process_map(
@@ -159,7 +178,7 @@ def main():
 
     # Use written VaspInput objects to write input files and run VASP
     vasp_batch_launch(
-        vasp_input=vasp_inputs, 
+        vasp_inputs=vasp_inputs, 
         base_dir=outdir, 
         subdir_names=dir_names_list, 
         workers=workers

@@ -165,10 +165,15 @@ def _RelaxSet_init(
                                         MPHSERelaxSet, MPMetalRelaxSet, MVLRelax52Set, \
                                         MVLScanRelaxSet
 
-    if not corrections: corrections = {}
-    incar_corrections   = corrections.get('INCAR', None)
-    kpoints_corrections = corrections.get('KPOINTS', None)
-    potcar_corrections  = corrections.get('POTCAR', None)
+    corrections = corrections or {}
+    incar_corrections = {}
+
+    if preset == 'MITRelaxSet':
+        incar_corrections = _MITRelaxSet_INCAR_corrections(structure.num_sites)
+    
+    incar_corrections.update(corrections.get('INCAR', {}))
+    kpoints_corrections = corrections.get('KPOINTS', {})
+    potcar_corrections  = corrections.get('POTCAR', {})
 
     match preset:
         case 'MITRelaxSet': return MITRelaxSet(
@@ -227,11 +232,11 @@ def _StaticSet_init(
 
     from pymatgen.io.vasp.sets import MPStaticSet, MatPESStaticSet, MPScanStaticSet
 
-    if not corrections: corrections = {}
-    incar_corrections   = corrections.get('INCAR', None)
-    kpoints_corrections = corrections.get('KPOINTS', None)
-    potcar_corrections  = corrections.get('POTCAR', None)
-    
+    corrections = corrections or {}
+    incar_corrections   = corrections.get('INCAR', {})
+    kpoints_corrections = corrections.get('KPOINTS', {})
+    potcar_corrections  = corrections.get('POTCAR', {})
+
     if from_prev_calc:
         dir_path = Path(struct_or_path)
         assert dir_path.is_dir()
@@ -284,9 +289,7 @@ def _StaticSet_init(
 def vasp_relaxation_settings(
         structure: SiteCollection, 
         preset: PMGRelaxSet = 'MITRelaxSet', 
-        user_incar_settings: Optional[dict] = None, 
-        user_kpoints_settings: Optional[dict] = None, 
-        user_potcar_settings: Optional[dict] = None
+        user_corrections: Optional[Dict] = None
     ) -> VaspInput:
     '''
     Setup VASP inputs for a given structure using one of the pymatgen relaxation presets.
@@ -296,14 +299,8 @@ def vasp_relaxation_settings(
 
         preset (str):                   The pymatgen preset to use for VASP inputs initialization.
 
-        user_incar_settings (dict):     User INCAR settings. It allows to override some of the standard INCAR tags if necessary.
-                                        Defaults to None.
-
-        user_kpoints_settings (dict):   User KPOINTS settings. It allows to override the standard Kpoints setup if necessary.
-                                        Defaults to None.
-
-        user_potcar_settings (dict):    User POTCAR settings. It allows to override the standard POTCAR settings, although it is not recommended.
-                                        Defaults to None.
+        user_corrections (dict):        User defined settings. It allows to override some of the preset 
+                                        INCAR, KPOINTS or POTCAR settings if necessary. Defaults to None.
     '''
     
     allowed_presets = {
@@ -325,32 +322,14 @@ def vasp_relaxation_settings(
     It must be one of the allowed pymatgen relaxation presets:
     {allowed_presets}'''
 
-    assert isinstance(user_incar_settings, dict) or user_incar_settings is None, \
+    assert isinstance(user_corrections, dict) or user_corrections is None, \
     'user_incar_settings must be a dict or None'
-
-    assert isinstance(user_kpoints_settings, dict) or user_kpoints_settings is None, \
-    'user_kpoints_settings must be a dict or None'
-
-    assert isinstance(user_potcar_settings, dict) or user_potcar_settings is None, \
-    'user_potcar_settings must be a dict or None'
-
-    if preset == 'MITRelaxSet':
-        MIT_INCAR_corrections = _MITRelaxSet_INCAR_corrections(structure.num_sites)
-
-        if user_incar_settings is not None:
-            MIT_INCAR_corrections.update(user_incar_settings)
-            user_incar_settings.update(MIT_INCAR_corrections)
-
-    corrections = {}
-    corrections.update(({'INCAR': user_incar_settings} if user_incar_settings else {}))
-    corrections.update(({'KPOINTS': user_kpoints_settings} if user_kpoints_settings else {}))
-    corrections.update(({'POTCAR': user_potcar_settings} if user_potcar_settings else {}))
 
     vasp_input = _RelaxSet_init(
         structure=structure, 
         preset=preset, 
-        corrections=(corrections or None)
-        ).get_vasp_input()
+        corrections=user_corrections
+    ).get_vasp_input()
 
     return vasp_input
 
@@ -361,9 +340,7 @@ def vasp_static_settings(
         preset: PMGStaticSet = 'MPStaticSet', 
         from_prev_calc: bool = False, 
         prev_calc_dir: Optional[PathLike] = None, 
-        user_incar_settings: Optional[dict] = None, 
-        user_kpoints_settings: Optional[dict] = None, 
-        user_potcar_settings: Optional[dict] = None
+        user_corrections: Optional[dict] = None
     ) -> VaspInput:
     '''
     Setup VASP inputs for a given structure using one of the pymatgen static presets.
@@ -386,14 +363,8 @@ def vasp_static_settings(
         prev_calc_dir (str|Path):       Directory to extract previous VASP run data from when from_prev_calc is True.
                                         If from_prev_calc is False, this argument is ignored.
 
-        user_incar_settings (dict):     User INCAR settings. It allows to override some of the standard INCAR tags if necessary.
-                                        Defaults to None.
-
-        user_kpoints_settings (dict):   User KPOINTS settings. It allows to override the standard Kpoints setup if necessary.
-                                        Defaults to None.
-
-        user_potcar_settings (dict):    User POTCAR settings. It allows to override the standard POTCAR settings, although it is not recommended.
-                                        Defaults to None.
+        user_corrections (dict):        User defined settings. It allows to override some of the preset INCAR, KPOINTS 
+                                        or POTCAR settings if necessary. Defaults to None.
     '''
 
     allowed_presets = {
@@ -411,25 +382,14 @@ def vasp_static_settings(
     It must be one of the allowed pymatgen static presets:
     {allowed_presets}'''
 
-    assert isinstance(user_incar_settings, dict) or user_incar_settings is None, \
-    'user_incar_settings must be a dict or None'
-
-    assert isinstance(user_kpoints_settings, dict) or user_kpoints_settings is None, \
-    'user_kpoints_settings must be a dict or None'
-
-    assert isinstance(user_potcar_settings, dict) or user_potcar_settings is None, \
-    'user_potcar_settings must be a dict or None'
-
-    corrections = {}
-    corrections.update(({'INCAR': user_incar_settings} if user_incar_settings else {}))
-    corrections.update(({'KPOINTS': user_kpoints_settings} if user_kpoints_settings else {}))
-    corrections.update(({'POTCAR': user_potcar_settings} if user_potcar_settings else {}))
+    assert isinstance(user_corrections, dict) or user_corrections is None, \
+    'user_corrections must be a dict or None'
 
     if not from_prev_calc:
         vasp_input = _StaticSet_init(
             struct_or_path=structure, 
             preset=preset, 
-            corrections=(corrections or None)
+            corrections=user_corrections
         ).get_vasp_input()
     
     else:
@@ -445,7 +405,7 @@ def vasp_static_settings(
             struct_or_path=prev_calc_dir, 
             from_prev_calc=from_prev_calc, 
             preset=preset, 
-            corrections=(corrections or None)
+            corrections=user_corrections
         ).get_vasp_input()
 
     return vasp_input
@@ -661,6 +621,7 @@ def struct_charge_switch(structure: Structure, delta: float):
 def delta_sol_inputs_init(
         structs_data: dict, 
         preset: PMGStaticSet = 'MPStaticSet', 
+        user_corrections: Optional[Dict] = None, 
         dft_functional: Literal['LDA', 'PBE', 'AM05'] = 'PBE', 
         n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
     ) -> Tuple[List]:
@@ -695,6 +656,7 @@ def delta_sol_inputs_init(
             name: str, 
             data: Dict, 
             preset: PMGStaticSet = 'MPStaticSet', 
+            user_corrections: Optional[Dict] = None, 
             dft_functional: Literal['LDA', 'PBE', 'AM05'] = 'PBE', 
             n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
         ) -> List[Tuple[str, VaspInput]]:
@@ -706,12 +668,12 @@ def delta_sol_inputs_init(
         data['CHGCAR_plus'], data['CHGCAR_minus'] = chgcar_density_switch(chgcar, data['n_ratio'])
 
         # Prepare E(N0 + n) input set
-        run_plus = vasp_static_settings(structure, preset=preset)
+        run_plus = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
         run_plus.update({'CHGCAR': data['CHGCAR_plus']})
         run_plus_path = Path('_'.join(name , 'plus'))
 
         # Prepare E(N0 - n) input set
-        run_minus = vasp_static_settings(structure, preset=preset)
+        run_minus = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
         run_minus.update({'CHGCAR': data['CHGCAR_minus']})
         run_minus_path = Path('_'.join(name , 'minus'))
 
@@ -722,6 +684,7 @@ def delta_sol_inputs_init(
     set_inputs_init = partial(
         inputs_init, 
         preset=preset, 
+        user_corrections=user_corrections, 
         dft_functional=dft_functional, 
         n_star_type=n_star_type
     )
