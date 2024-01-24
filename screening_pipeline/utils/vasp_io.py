@@ -174,49 +174,57 @@ def _RelaxSet_init(
     incar_corrections.update(corrections.get('INCAR', {}))
     kpoints_corrections = corrections.get('KPOINTS', {})
     potcar_corrections  = corrections.get('POTCAR', {})
+    potcar_functional_correction = corrections.get('POTCAR_FUNCTIONAL', {})
 
     match preset:
         case 'MITRelaxSet': return MITRelaxSet(
             structure=structure, 
             user_incar_settings=incar_corrections, 
             user_kpoints_settings=kpoints_corrections, 
-            user_potcar_settings=potcar_corrections
+            user_potcar_settings=potcar_corrections, 
+            user_potcar_functional=potcar_functional_correction
         )
         case 'MPRelaxSet': return MPRelaxSet(
             structure=structure, 
             user_incar_settings=incar_corrections, 
             user_kpoints_settings=kpoints_corrections, 
-            user_potcar_settings=potcar_corrections
+            user_potcar_settings=potcar_corrections, 
+            user_potcar_functional=potcar_functional_correction
         )
         case 'MPScanRelaxSet': return MPScanRelaxSet(
             structure=structure, 
             user_incar_settings=incar_corrections, 
             user_kpoints_settings=kpoints_corrections, 
-            user_potcar_settings=potcar_corrections
+            user_potcar_settings=potcar_corrections, 
+            user_potcar_functional=potcar_functional_correction
         )
         case 'MPHSERelaxSet': return MPHSERelaxSet(
             structure=structure, 
             user_incar_settings=incar_corrections, 
             user_kpoints_settings=kpoints_corrections, 
-            user_potcar_settings=potcar_corrections
+            user_potcar_settings=potcar_corrections, 
+            user_potcar_functional=potcar_functional_correction
         )
         case 'MPMetalRelaxSet': return MPMetalRelaxSet(
             structure=structure, 
             user_incar_settings=incar_corrections, 
             user_kpoints_settings=kpoints_corrections, 
-            user_potcar_settings=potcar_corrections
+            user_potcar_settings=potcar_corrections, 
+            user_potcar_functional=potcar_functional_correction
         )
         case 'MVLRelax52Set': return MVLRelax52Set(
             structure=structure, 
             user_incar_settings=incar_corrections, 
             user_kpoints_settings=kpoints_corrections, 
-            user_potcar_settings=potcar_corrections
+            user_potcar_settings=potcar_corrections, 
+            user_potcar_functional=potcar_functional_correction
         )
         case 'MVLScanRelaxSet': return MVLScanRelaxSet(
             structure=structure, 
             user_incar_settings=incar_corrections, 
             user_kpoints_settings=kpoints_corrections, 
-            user_potcar_settings=potcar_corrections
+            user_potcar_settings=potcar_corrections, 
+            user_potcar_functional=potcar_functional_correction
         )
         case str(): raise ValueError(f'Provided string is not a valid preset name ({preset}).')
         case _: raise TypeError(f'"preset" arg expected a str type, got {type(preset)} instead.')
@@ -236,6 +244,7 @@ def _StaticSet_init(
     incar_corrections   = corrections.get('INCAR', {})
     kpoints_corrections = corrections.get('KPOINTS', {})
     potcar_corrections  = corrections.get('POTCAR', {})
+    potcar_functional_correction = corrections.get('POTCAR_FUNCTIONAL', {})
 
     if from_prev_calc:
         dir_path = Path(struct_or_path)
@@ -246,19 +255,22 @@ def _StaticSet_init(
                 prev_calc_dir=dir_path, 
                 user_incar_settings=incar_corrections, 
                 user_kpoints_settings=kpoints_corrections, 
-                user_potcar_settings=potcar_corrections
+                user_potcar_settings=potcar_corrections, 
+                user_potcar_functional=potcar_functional_correction
             )
             case 'MatPESStaticSet': return MatPESStaticSet.from_prev_calc(
                 prev_calc_dir=dir_path, 
                 user_incar_settings=incar_corrections, 
                 user_kpoints_settings=kpoints_corrections, 
-                user_potcar_settings=potcar_corrections
+                user_potcar_settings=potcar_corrections, 
+                user_potcar_functional=potcar_functional_correction
             )
             case 'MPScanStaticSet': return MPScanStaticSet.from_prev_calc(
                 prev_calc_dir=dir_path, 
                 user_incar_settings=incar_corrections, 
                 user_kpoints_settings=kpoints_corrections, 
-                user_potcar_settings=potcar_corrections
+                user_potcar_settings=potcar_corrections, 
+                user_potcar_functional=potcar_functional_correction
             )
             case str(): raise ValueError(f'Provided string is not a valid preset name ({preset}).')
             case _: raise TypeError(f'"preset" arg expected a str type, got {type(preset)} instead.')
@@ -268,19 +280,22 @@ def _StaticSet_init(
             structure=struct_or_path, 
             user_incar_settings=incar_corrections, 
             user_kpoints_settings=kpoints_corrections, 
-            user_potcar_settings=potcar_corrections
+            user_potcar_settings=potcar_corrections, 
+            user_potcar_functional=potcar_functional_correction
         )
         case 'MatPESStaticSet': return MatPESStaticSet(
             structure=struct_or_path, 
             user_incar_settings=incar_corrections, 
             user_kpoints_settings=kpoints_corrections, 
-            user_potcar_settings=potcar_corrections
+            user_potcar_settings=potcar_corrections, 
+            user_potcar_functional=potcar_functional_correction
         )
         case 'MPScanStaticSet': return MPScanStaticSet(
             structure=struct_or_path, 
             user_incar_settings=incar_corrections, 
             user_kpoints_settings=kpoints_corrections, 
-            user_potcar_settings=potcar_corrections
+            user_potcar_settings=potcar_corrections, 
+            user_potcar_functional=potcar_functional_correction
         )
         case str(): raise ValueError(f'Provided string is not a valid preset name ({preset}).')
         case _: raise TypeError(f'"preset" arg expected a str type, got {type(preset)} instead.')
