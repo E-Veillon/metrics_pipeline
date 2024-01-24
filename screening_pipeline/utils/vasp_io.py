@@ -621,6 +621,7 @@ def struct_charge_switch(structure: Structure, delta: float):
 def delta_sol_inputs_init(
         structs_data: dict, 
         preset: PMGStaticSet = 'MPStaticSet', 
+        user_corrections: Optional[Dict] = None, 
         dft_functional: Literal['LDA', 'PBE', 'AM05'] = 'PBE', 
         n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
     ) -> Tuple[List]:
@@ -655,6 +656,7 @@ def delta_sol_inputs_init(
             name: str, 
             data: Dict, 
             preset: PMGStaticSet = 'MPStaticSet', 
+            user_corrections: Optional[Dict] = None, 
             dft_functional: Literal['LDA', 'PBE', 'AM05'] = 'PBE', 
             n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
         ) -> List[Tuple[str, VaspInput]]:
@@ -666,12 +668,12 @@ def delta_sol_inputs_init(
         data['CHGCAR_plus'], data['CHGCAR_minus'] = chgcar_density_switch(chgcar, data['n_ratio'])
 
         # Prepare E(N0 + n) input set
-        run_plus = vasp_static_settings(structure, preset=preset)
+        run_plus = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
         run_plus.update({'CHGCAR': data['CHGCAR_plus']})
         run_plus_path = Path('_'.join(name , 'plus'))
 
         # Prepare E(N0 - n) input set
-        run_minus = vasp_static_settings(structure, preset=preset)
+        run_minus = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
         run_minus.update({'CHGCAR': data['CHGCAR_minus']})
         run_minus_path = Path('_'.join(name , 'minus'))
 
@@ -682,6 +684,7 @@ def delta_sol_inputs_init(
     set_inputs_init = partial(
         inputs_init, 
         preset=preset, 
+        user_corrections=user_corrections, 
         dft_functional=dft_functional, 
         n_star_type=n_star_type
     )
