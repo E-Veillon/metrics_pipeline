@@ -31,3 +31,34 @@ __all__ = [
     "calculate_instability_energies", "batch_calculate_instability_energies",  
     "calculate_delta_sol_band_gap", "batch_calculate_delta_sol_band_gaps", 
     ]
+
+from pathlib import Path
+from typing import Union
+from ruamel.yaml import YAML
+
+PathLike = Union[Path, str]
+
+def _yaml_loader(file_path: PathLike):
+    if not isinstance(file_path, (Path, str)):
+        raise TypeError(f"Expected a Path object or str, got {type(file_path)} instead.")
+    
+    assert str(file_path).endswith('.yaml'), \
+    f'{str(file_path)} is not a .yaml file format.'
+
+    file_path = Path(file_path)
+
+    assert file_path.is_file(), \
+    f'{str(file_path)}: no such file found.'
+
+    yaml = YAML()
+    with open(file_path, encoding="utf-8") as yaml_file:
+        try: yaml_data = yaml.load(yaml_file) or {}
+        except Exception as exc:
+            warn_msg = f'An exception was thrown during yaml loading of file {str(file_path)}.\n\
+                        Data written in this file is ignored to proceed.\n\
+                        Thrown exception below:\n\
+                        {exc}'
+            print(warn_msg)
+            return {}
+        return dict(yaml_data)
+
