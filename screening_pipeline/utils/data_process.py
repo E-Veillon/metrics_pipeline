@@ -524,8 +524,8 @@ def batch_calculate_delta_sol_band_gaps(
             'name': name, 
             'structure': data['structure'], 
             'E_N0': data['final_energy'], 
-            'E_N0_plus_n': bg_structs_data['_'.join(name, 'plus')]['final_energy'], 
-            'E_N0_minus_n': bg_structs_data['_'.join(name, 'minus')]['final_energy']
+            'E_N0_plus_n': bg_structs_data['_'.join((name, 'plus'))]['final_energy'], 
+            'E_N0_minus_n': bg_structs_data['_'.join((name, 'minus'))]['final_energy']
         } for name, data in structs_data.items()
     }
 

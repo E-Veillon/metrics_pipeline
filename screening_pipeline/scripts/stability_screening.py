@@ -168,7 +168,7 @@ def main():
                     which is above the fixed instability limit of {delta_H_limit} eV/atom.\n \
                     Therefore, it is considered not suitable for wanted application,\n \
                     and should not be considered in further screening steps.\n"
-        reject_file_path = Path('/'.join(str(input_dir), name, ignore_file))
+        reject_file_path = Path('/'.join((str(input_dir), name, ignore_file)))
         reject_file_path.touch()
         reject_file_path.write_text(reject_msg)
 

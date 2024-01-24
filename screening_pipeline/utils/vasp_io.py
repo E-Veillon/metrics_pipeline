@@ -102,8 +102,8 @@ def vasp_launcher(vasp_input: VaspInput, path: PathLike) -> None:
     assert isinstance(path, PathLike)
     path     = str(path)
     calc_dir = Path(path)
-    out_file = Path('/'.join(path, "vasp.out"))
-    err_file = Path('/'.join(path, "vasp.err"))
+    out_file = Path('/'.join((path, "vasp.out")))
+    err_file = Path('/'.join((path, "vasp.err")))
     vasp_input.run_vasp(run_dir=calc_dir, output_file=out_file, err_file=err_file)
 
 ########################################
@@ -692,12 +692,12 @@ def delta_sol_inputs_init(
         # Prepare E(N0 + n) input set
         run_plus = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
         run_plus.update({'CHGCAR': data['CHGCAR_plus']})
-        run_plus_path = Path('_'.join(name , 'plus'))
+        run_plus_path = Path('_'.join((name , 'plus')))
 
         # Prepare E(N0 - n) input set
         run_minus = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
         run_minus.update({'CHGCAR': data['CHGCAR_minus']})
-        run_minus_path = Path('_'.join(name , 'minus'))
+        run_minus_path = Path('_'.join((name , 'minus')))
 
         struct_list = [(run_plus_path, run_plus), (run_minus_path, run_minus)]
 

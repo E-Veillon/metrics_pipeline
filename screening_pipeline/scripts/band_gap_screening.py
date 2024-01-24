@@ -248,8 +248,8 @@ def main():
     # Reject unsuitable structures
     for name, E_band_gap in E_band_gaps.items():
 
-        name_plus    = '_'.join(name, 'plus')
-        name_minus   = '_'.join(name, 'minus')
+        name_plus    = '_'.join((name, 'plus'))
+        name_minus   = '_'.join((name, 'minus'))
         bg_too_small = E_band_gap < min(valid_interval)
         bg_too_big   = E_band_gap > max(valid_interval)
 

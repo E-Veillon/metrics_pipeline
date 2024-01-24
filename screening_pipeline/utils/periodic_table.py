@@ -343,7 +343,7 @@ def get_delta_sol_el_ratio(
             case _: raise ValueError('Something is wrong with this loop or Element objects "block" property.')
     
     N_0        = get_all_valence_electrons(structure)
-    value_name = '_'.join(dft_functional, val_elec_type)
+    value_name = '_'.join((dft_functional, val_elec_type))
     N_star     = EL_PER_XC_VOL[n_star_type][value_name]
     n          = float(N_0) / float(N_star)
 
