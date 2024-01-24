@@ -11,7 +11,6 @@ The relaxation results then may be used in other scripts for material properties
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from pathlib import Path
-from ruamel.yaml import YAML
 
 ########################################
 # OPTIMIZATION MODULES
@@ -23,6 +22,7 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # LOCAL MODULES
 
+from screening_pipeline.utils import _yaml_loader
 from screening_pipeline.utils.cif_io import read_cif
 from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_batch_launch
 
@@ -60,12 +60,11 @@ def assert_args(args: Namespace) -> None:
     f'Provided relaxation preset must be one of the following:\n \
     {allowed_presets}'
 
-    if args.user_input_file != 'None':
-        assert Path(args.user_input_file).is_file(), \
-        f'{args.user_input_file}: file not found.'
+    assert Path(args.user_input_file).is_file(), \
+    f'{args.user_settings}: file not found.'
         
-        assert args.user_input_file.endswith('.yaml'), \
-        'user settings file must be of .yaml format.'
+    assert args.user_settings.endswith('.yaml'), \
+    'user settings file must be of .yaml format.'
 
 
 
@@ -99,7 +98,7 @@ def main():
         'filename',
         type=str,
         help='Path to the CIF file containing structure data to read.', 
-        metavar='input_file'
+        metavar='input_file.cif'
     )
     parser.add_argument(
         '-o',
@@ -125,33 +124,28 @@ def main():
         '-u', 
         '--user-settings', 
         type=str, 
-        default='None', 
-        help='Path to the .yaml file compiling tags overriding to put over the PMG preset.', 
+        default='user_settings.yaml', 
+        help='Path to the .yaml file containing tags overrides to put over the PMG preset.', 
         metavar='file.yaml', 
-        dest='user_input_file'
+        dest='user_settings'
     )
     parser.add_argument(
         '-w',
         '--workers',
         type=int,
         default=1,
-        help='Number of parallel processes to create',
+        help='Number of parallel processes to spawn.',
         metavar='int',
     )
     args: Namespace = parser.parse_args()
 
     assert_args(args)
     
-    input_file = Path(args.filename)
-    outdir     = Path(args.output)
-    preset     = args.method
-    workers    = args.workers
-
-    if args.user_input_file == 'None': user_settings = {}
-    else:
-        yaml = YAML()
-        user_settings_file = Path(args.user_input_file)
-        user_settings = yaml.load(user_settings_file) or {}
+    input_file    = Path(args.filename)
+    outdir        = Path(args.output)
+    preset        = args.method
+    user_settings = _yaml_loader(args.user_settings)
+    workers       = args.workers
 
 
     # MAIN BLOCK
