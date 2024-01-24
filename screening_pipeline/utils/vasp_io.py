@@ -108,6 +108,13 @@ def vasp_launcher(vasp_input: VaspInput, path: PathLike) -> None:
 
 ########################################
 
+def _vasp_launcher_wrapper(args_tuple: Tuple[VaspInput, PathLike]):
+    vasp_input = args_tuple[0]
+    path       = args_tuple[1]
+    vasp_launcher(vasp_input, path)
+
+########################################
+
 def vasp_batch_launch(
         vasp_inputs: Sequence[VaspInput], 
         base_dir: PathLike, 
@@ -146,7 +153,7 @@ def vasp_batch_launch(
     inputs_list   = list(zip(vasp_inputs, subpaths_list))
 
     process_map(
-        vasp_launcher, 
+        _vasp_launcher_wrapper, 
         inputs_list, 
         max_workers=workers, 
         chunksize=1, 
