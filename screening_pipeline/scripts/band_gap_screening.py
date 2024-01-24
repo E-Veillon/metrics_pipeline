@@ -21,6 +21,7 @@ from pathlib import Path
 ########################################
 # LOCAL MODULES
 
+from screening_pipeline.utils import _yaml_loader
 from screening_pipeline.utils.vasp_io import vasp_batch_launch, batch_extract_vasp_data, \
                                              delta_sol_inputs_init
 from screening_pipeline.utils.data_process import batch_calculate_delta_sol_band_gaps
@@ -45,6 +46,12 @@ def assert_args(args: Namespace) -> None:
     assert args.method in allowed_presets, \
     f'Provided static preset must be one of the following:\n \
     {allowed_presets}'
+
+    assert Path(args.user_settings).is_file(), \
+    f'{args.user_settings}: file not found.'
+
+    assert args.user_settings.endswith('.yaml'), \
+    'user settings file must be of .yaml format.'
 
     assert args.functional in {'LDA', 'PBE', 'AM05'}, \
     f'''Provided functional not supported for Δ-Sol method.
@@ -125,6 +132,15 @@ def main():
         metavar='StaticSet'
     )
     parser.add_argument(
+        '-u', 
+        '--user-settings', 
+        type=str, 
+        default='user_settings.yaml', 
+        help='Path to the .yaml file containing tags overrides to put over the PMG preset.', 
+        metavar='file.yaml', 
+        dest='user_settings'
+    )
+    parser.add_argument(
         '-f', 
         '--functional', 
         type=str, 
@@ -181,14 +197,15 @@ def main():
 
     assert_args(args)
     
-    input_dir   = Path(args.input_dir)
-    outdir      = Path(args.output)
-    preset      = args.method
-    functional  = args.functional
-    n_star_type = args.n_star_type
+    input_dir      = Path(args.input_dir)
+    outdir         = Path(args.output)
+    preset         = args.method
+    user_settings  = _yaml_loader(args.user_settings)
+    functional     = args.functional
+    n_star_type    = args.n_star_type
     valid_interval = sorted([args.valid_minimum, args.valid_maximum])
-    ignore_file = args.ignore
-    workers     = args.workers
+    ignore_file    = args.ignore
+    workers        = args.workers
 
 
     # MAIN BLOCK
@@ -204,6 +221,7 @@ def main():
     inputs_list, subdirs_list = delta_sol_inputs_init(
         structs_data=structs_data, 
         preset=preset, 
+        user_corrections=user_settings or None, 
         dft_functional=functional, 
         n_star_type=n_star_type
     )
