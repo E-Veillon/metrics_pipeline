@@ -245,32 +245,35 @@ def main():
         structs_data, bg_structs_data, workers
     )
 
-    # Reject unsuitable structures
-    for name, E_band_gap in E_band_gaps.items():
+    bad_bg_structs = list(filter(
+        lambda tup: tup[1] < min(valid_interval) or tup[1] > max(valid_interval), 
+        list(E_band_gaps.items())
+    ))
 
+    # Reject unsuitable structures
+    for struct in bad_bg_structs:
+        name         = struct[0]
+        E_band_gap   = struct[1]
         name_plus    = '_'.join((name, 'plus'))
         name_minus   = '_'.join((name, 'minus'))
-        bg_too_small = E_band_gap < min(valid_interval)
-        bg_too_big   = E_band_gap > max(valid_interval)
-
-        if bg_too_small or bg_too_big:
-
-            reject_str = f'Δ-Sol band gap was estimated to {E_band_gap} eV, \
+        reject_str   = f"\
+                        BAND GAP REJECTION\n\
+                        Δ-Sol band gap was estimated to {E_band_gap} eV, \
                         which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].\n \
                         Therefore, it is not suitable for wanted application, \
-                        it should not be considered in further screening steps.'
+                        and should not be considered in further screening steps."
 
-            input_path = Path('/'.join((input_dir, name, ignore_file)))
-            input_path.touch()
-            input_path.write_text(reject_str)
+        input_path = Path('/'.join((input_dir, name, ignore_file)))
+        input_path.touch()
+        input_path.write_text(reject_str)
 
-            path_plus  = Path('/'.join((outdir, name_plus, ignore_file)))
-            path_plus.touch()
-            path_plus.write_text(reject_str)
+        path_plus  = Path('/'.join((outdir, name_plus, ignore_file)))
+        path_plus.touch()
+        path_plus.write_text(reject_str)
         
-            path_minus = Path('/'.join((outdir, name_minus, ignore_file)))
-            path_minus.touch()
-            path_minus.write_text(reject_str)
+        path_minus = Path('/'.join((outdir, name_minus, ignore_file)))
+        path_minus.touch()
+        path_minus.write_text(reject_str)
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
