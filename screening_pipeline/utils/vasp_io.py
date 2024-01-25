@@ -598,6 +598,7 @@ def batch_extract_vasp_data(
     chunksize          = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
 
     structs_data_list  = list(filter(
+        None, 
         process_map(
             set_vasp_extractor, 
             structs_dir_list, 
