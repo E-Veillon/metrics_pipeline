@@ -51,15 +51,17 @@ def get_elements_from_entries(entries: Sequence[PDEntry]) -> List[Element]:
     Returns:
         The list of found Element objects.
     '''
+
     assert isinstance(entries, Sequence)
     if not entries: return []
     assert all(isinstance(entry, PDEntry) for entry in entries)
     if len(entries) == 1: return entries[0].elements
+
     return list(set(flatten([entry.elements for entry in entries])))
 
 ########################################
 
-def init_entries_and_group_by_dim(
+def init_entries_and_group_by_dim_and_comp(
         structs_data: Dict[str, Dict[str, Any]], 
         ref_structs: Optional[Dict[str, Dict[str, Any]]] = None
     ) -> List[List[Union[PDEntry, List[PDEntry]]]]:
@@ -97,15 +99,15 @@ def init_entries_and_group_by_dim(
     '''
 
     assert isinstance(structs_data, dict)
-    if not structs_data: return dict()
-    assert all(isinstance(name, str) for name in structs_data.keys())
-    assert all(isinstance(data, dict) for data in structs_data.values())
+    if not structs_data: return []
+    assert all(isinstance(name, str) and isinstance(data, dict) \
+               for name, data in structs_data.items())
 
     if not ref_structs: ref_entry_list = []
     else:
         assert isinstance(ref_structs, dict)
-        assert all(isinstance(name, str) for name in ref_structs.keys())
-        assert all(isinstance(data, dict) for data in ref_structs.values())
+        assert all(isinstance(name, str) and isinstance(data, dict) \
+                   for name, data in ref_structs.items())
 
         ref_entry_list = [
             PDEntry(
@@ -113,7 +115,7 @@ def init_entries_and_group_by_dim(
                 energy=data['final_energy'], 
                 name=name, 
                 attribute='struct_ref'
-        ) for name, data in ref_structs.items()
+            ) for name, data in ref_structs.items()
         ]
 
     groups = [[]] # fill the index 0 to match indexes and entries dimensionality
@@ -133,7 +135,7 @@ def init_entries_and_group_by_dim(
     elts_entries = [
         PDEntry(
             composition=Composition(str(elt)), 
-            energy=0., 
+            energy=0.0, 
             name=elt.symbol, 
             attribut='element_ref'
         ) for elt in elements
@@ -144,11 +146,8 @@ def init_entries_and_group_by_dim(
 
     for dim in range(2, max_dim + 1):
         group = list(filter(lambda entry: len(entry.elements) == dim, entry_list))
+        group = group_by_stoichiometry(group)
         groups.append(group)
-    # At this point,  groups = [[], [Elements], [Binaries], [Ternaries], ...]
-
-    for grp_idx, group in enumerate(groups[2:], start=2):
-        groups[grp_idx] = group_by_stoichiometry(group)
 
     return groups
 
@@ -429,7 +428,7 @@ def batch_calculate_instability_energies(structs_data: dict, workers: int = 1):
         Detected type: {type(structs_data)}.
         Detected length: {len(structs_data)}.'''
 
-    dim_groups = init_entries_and_group_by_dim(structs_data)
+    dim_groups = init_entries_and_group_by_dim_and_comp(structs_data)
     entry_pool = dim_groups[1]
 
     for dim_group in dim_groups[2:]:

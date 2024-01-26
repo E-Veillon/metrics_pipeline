@@ -471,8 +471,7 @@ def extract_vasp_data_for_convex_hull(
     struct_dir: Path = Path(struct_dir)
     files            = set(file.name for file in struct_dir.iterdir())
 
-    if ignore_file in files:
-        return None
+    if ignore_file in files: return {}
 
     struct_name  = struct_dir.name
     contcar_path = Path(struct_dir / 'CONTCAR')
@@ -521,8 +520,7 @@ def extract_vasp_data_for_delta_sol(
     struct_dir: Path = Path(struct_dir)
     files            = set(file.name for file in struct_dir.iterdir())
 
-    if ignore_file in files:
-        return None
+    if ignore_file in files: return {}
 
     struct_name  = struct_dir.name
     contcar_path = Path(struct_dir / 'CONTCAR')
@@ -575,7 +573,6 @@ def batch_extract_vasp_data(
                                 for corresponding structure as values.
 
                                 Data returned for 'convex_hull' method:
-                                    - structure itself, 
                                     - composition of the formula unit, 
                                     - final energy of the relaxation in eV.
                                 
@@ -606,6 +603,7 @@ def batch_extract_vasp_data(
     chunksize          = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
 
     structs_data_list  = list(filter(
+        None, 
         process_map(
             set_vasp_extractor, 
             structs_dir_list, 

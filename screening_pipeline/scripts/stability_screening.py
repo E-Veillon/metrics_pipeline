@@ -156,7 +156,7 @@ def main():
 
     unstable_structs = list(filter(
         lambda tup: tup[1]['delta_H'] > delta_H_limit, 
-        structs_data.items()
+        list(structs_data.items())
     ))
 
     for struct in unstable_structs:
