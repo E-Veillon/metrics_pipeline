@@ -13,7 +13,7 @@ from pathlib import Path
 # OPTIMIZATION MODULES
 
 from scipy.constants import elementary_charge
-from itertools import chain, starmap
+from itertools import chain, starmap, repeat
 from functools import partial
 from tqdm.contrib.concurrent import process_map
 
@@ -96,26 +96,31 @@ def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
 
 ########################################
 
-def vasp_launcher(vasp_input: VaspInput, path: PathLike) -> None:
+def vasp_launcher(vasp_exe: PathLike, vasp_input: VaspInput, path: PathLike) -> None:
 
+    assert isinstance(vasp_exe, (Path, str))
     assert isinstance(vasp_input, VaspInput)
     assert isinstance(path, PathLike)
-    path     = str(path)
-    calc_dir = Path(path)
-    out_file = Path('/'.join((path, "vasp.out")))
-    err_file = Path('/'.join((path, "vasp.err")))
-    vasp_input.run_vasp(run_dir=calc_dir, output_file=out_file, err_file=err_file)
+
+    vasp_exe_list = list((vasp_exe,))
+    path          = str(path)
+    calc_dir      = Path(path)
+    out_file      = Path('/'.join((path, "vasp.out")))
+    err_file      = Path('/'.join((path, "vasp.err")))
+    vasp_input.run_vasp(run_dir=calc_dir, vasp_cmd=vasp_exe_list, output_file=out_file, err_file=err_file)
 
 ########################################
 
 def _vasp_launcher_wrapper(args_tuple: Tuple[VaspInput, PathLike]):
-    vasp_input = args_tuple[0]
-    path       = args_tuple[1]
-    vasp_launcher(vasp_input, path)
+    vasp_exe   = args_tuple[0]
+    vasp_input = args_tuple[1]
+    path       = args_tuple[2]
+    vasp_launcher(vasp_exe, vasp_input, path)
 
 ########################################
 
 def vasp_batch_launch(
+        vasp_exe: PathLike, 
         vasp_inputs: Sequence[VaspInput], 
         base_dir: PathLike, 
         subdir_names: Sequence[PathLike], 
@@ -128,6 +133,8 @@ def vasp_batch_launch(
     it is recommended to parallelize it by setting workers > 1.
 
     Parameters:
+        vasp_exe (Path|str):        Path to the VASP executable.
+
         vasp_inputs ([VaspInput]):  The objects defining how to write VASP input files in each subdirectory.
 
         base_dir (str|Path):        The directory where the subdirs should be created.
@@ -139,6 +146,7 @@ def vasp_batch_launch(
                                     Defaults to 1.
     '''
 
+    assert isinstance(vasp_exe, (Path, str))
     assert all(isinstance(vasp_input, VaspInput) for vasp_input in vasp_inputs)
     assert isinstance(base_dir, PathLike)
     
@@ -150,7 +158,7 @@ def vasp_batch_launch(
     assert isinstance(workers, int) and workers >= 1
 
     subpaths_list = batch_add_new_dirs(base_dir=base_dir, new_subdirs=subdir_names)
-    inputs_list   = list(zip(vasp_inputs, subpaths_list))
+    inputs_list   = list(zip(repeat(vasp_exe), vasp_inputs, subpaths_list))
 
     process_map(
         _vasp_launcher_wrapper, 

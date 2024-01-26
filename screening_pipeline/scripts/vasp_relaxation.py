@@ -40,6 +40,9 @@ def assert_args(args: Namespace) -> None:
     assert args.filename.endswith('.cif'), \
     'Input structure data must be in CIF format.'
 
+    assert Path(args.executable_path).exists(), \
+    f'{args.executable_path}: No such file found.'
+
     assert Path(args.output).exists(), \
     f'{args.output}: path to output directory not found.'
 
@@ -101,6 +104,12 @@ def main():
         metavar='input_file.cif'
     )
     parser.add_argument(
+        'executable_path', 
+        type=str,
+        help='Path to the VASP executable.', 
+        metavar='/path/to/vasp'
+    )
+    parser.add_argument(
         '-o',
         '--output',
         type=str,
@@ -142,6 +151,7 @@ def main():
     assert_args(args)
     
     input_file    = Path(args.filename)
+    exe_path      = args.executable_path
     outdir        = Path(args.output)
     preset        = args.method
     user_settings = _yaml_loader(args.user_settings)
@@ -178,6 +188,7 @@ def main():
 
     # Use written VaspInput objects to write input files and run VASP
     vasp_batch_launch(
+        vasp_exe=exe_path, 
         vasp_inputs=vasp_inputs, 
         base_dir=outdir, 
         subdir_names=dir_names_list, 
