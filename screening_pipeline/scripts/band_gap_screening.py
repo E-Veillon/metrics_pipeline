@@ -40,6 +40,9 @@ def assert_args(args: Namespace) -> None:
     assert Path(args.input_dir).is_dir(), \
     f'{args.input_dir}: No directory found.'
 
+    assert Path(args.executable_path).exists(), \
+    f'{args.executable_path}: No such file found.'
+
     assert Path(args.output).is_dir(), \
     f'{args.output}: No directory found.'
 
@@ -66,6 +69,9 @@ def assert_args(args: Namespace) -> None:
     assert args.valid_minimum != args.valid_maximum, \
     'Band gap valid interval cannot be a single value, \
     different values must be provided for min and max valid band gap values.'
+
+    assert args.accept.endswith('.txt'), \
+    'Structure acceptance file must be a plain text file type (.txt).'
 
     assert args.ignore.endswith('.txt'), \
     'Structure ignoring file must be a plain text file type (.txt).'
@@ -110,6 +116,12 @@ def main():
         'input_dir',
         type=str,
         help='Base directory containing structure directories.', 
+    )
+    parser.add_argument(
+        'executable_path', 
+        type=str,
+        help='Path to the VASP executable.', 
+        metavar='/path/to/vasp'
     )
     parser.add_argument(
         '-o',
@@ -173,6 +185,15 @@ def main():
         metavar='float'
     )
     parser.add_argument(
+        '-a', 
+        '--accept', 
+        type=str, 
+        default='band_gap_passed.txt', 
+        help='''Defines a file whose presence in a structure directory means it passed this
+        screening step successfully and can be kept for further calculations.''',  
+        metavar='accept_file.txt'
+    )
+    parser.add_argument(
         '-i', 
         '--ignore', 
         type=str, 
@@ -198,12 +219,14 @@ def main():
     assert_args(args)
     
     input_dir      = Path(args.input_dir)
+    exe_path       = args.executable_path
     outdir         = Path(args.output)
     preset         = args.method
     user_settings  = _yaml_loader(args.user_settings)
     functional     = args.functional
     n_star_type    = args.n_star_type
     valid_interval = sorted([args.valid_minimum, args.valid_maximum])
+    accept_file    = args.accept
     ignore_file    = args.ignore
     workers        = args.workers
 
@@ -228,6 +251,7 @@ def main():
 
     # Launch static calculations
     vasp_batch_launch(
+        vasp_exe=exe_path, 
         vasp_inputs=inputs_list, 
         base_dir=outdir, 
         subdir_names=subdirs_list, 
@@ -245,10 +269,38 @@ def main():
         structs_data, bg_structs_data, workers
     )
 
+    good_bg_structs = list(filter(
+        lambda tup: min(valid_interval) <= tup[1] <= max(valid_interval), 
+        list(E_band_gaps.items())
+    ))
+
     bad_bg_structs = list(filter(
         lambda tup: tup[1] < min(valid_interval) or tup[1] > max(valid_interval), 
         list(E_band_gaps.items())
     ))
+
+    # Keep good structures
+    for struct in good_bg_structs:
+        name         = struct[0]
+        E_band_gap   = struct[1]
+        name_plus    = '_'.join((name, 'plus'))
+        name_minus   = '_'.join((name, 'minus'))
+        accept_msg   = f"\
+                        BAND GAP TEST PASSED\n\
+                        Δ-Sol band gap was estimated to {E_band_gap} eV, which is inside the interval [{min(valid_interval)}, {max(valid_interval)}].\n \
+                        Therefore, it is suitable for wanted application, and should be considered for further screening steps."
+
+        input_path = Path('/'.join((input_dir, name, accept_file)))
+        input_path.touch()
+        input_path.write_text(accept_msg)
+
+        path_plus  = Path('/'.join((outdir, name_plus, accept_file)))
+        path_plus.touch()
+        path_plus.write_text(accept_msg)
+        
+        path_minus = Path('/'.join((outdir, name_minus, accept_file)))
+        path_minus.touch()
+        path_minus.write_text(accept_msg)
 
     # Reject unsuitable structures
     for struct in bad_bg_structs:
@@ -256,7 +308,7 @@ def main():
         E_band_gap   = struct[1]
         name_plus    = '_'.join((name, 'plus'))
         name_minus   = '_'.join((name, 'minus'))
-        reject_str   = f"\
+        reject_msg   = f"\
                         BAND GAP REJECTION\n\
                         Δ-Sol band gap was estimated to {E_band_gap} eV, \
                         which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].\n \
@@ -265,15 +317,15 @@ def main():
 
         input_path = Path('/'.join((input_dir, name, ignore_file)))
         input_path.touch()
-        input_path.write_text(reject_str)
+        input_path.write_text(reject_msg)
 
         path_plus  = Path('/'.join((outdir, name_plus, ignore_file)))
         path_plus.touch()
-        path_plus.write_text(reject_str)
+        path_plus.write_text(reject_msg)
         
         path_minus = Path('/'.join((outdir, name_minus, ignore_file)))
         path_minus.touch()
-        path_minus.write_text(reject_str)
+        path_minus.write_text(reject_msg)
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')

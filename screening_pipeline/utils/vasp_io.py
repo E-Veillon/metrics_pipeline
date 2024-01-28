@@ -607,7 +607,7 @@ def batch_extract_vasp_data(
         process_map(
             set_vasp_extractor, 
             structs_dir_list, 
-            workers=workers, 
+            max_workers=workers, 
             chunksize=chunksize, 
             desc='Extracting infos from previous VASP output'
         )

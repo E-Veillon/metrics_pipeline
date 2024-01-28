@@ -57,6 +57,9 @@ def assert_args(args: Namespace) -> None:
     f'{args.input_dir}: No directory found.'
 
     assert args.ignore.endswith('.txt'), \
+    'Structure acceptance file must be a plain text file type (.txt)'
+
+    assert args.ignore.endswith('.txt'), \
     'Structure ignoring file must be a plain text file type (.txt).'
 
     assert args.limit >= 1e-8, \
@@ -98,6 +101,15 @@ def main():
         help='Base directory containing structure directories.', 
     )
     parser.add_argument(
+        '-a', 
+        '--accept', 
+        type=str, 
+        default='stability_passed.txt', 
+        help='''Defines a file whose presence in a structure directory means it passed this
+        screening step successfully and can be kept for further calculations.''',  
+        metavar='accept_file.txt'
+    )
+    parser.add_argument(
         '-i', 
         '--ignore', 
         type=str, 
@@ -135,6 +147,7 @@ def main():
     assert_args(args)
     
     input_dir     = Path(args.input_dir)
+    accept_file   = args.accept
     ignore_file   = args.ignore
     delta_H_limit = round(args.limit, 8)
     workers       = args.workers
@@ -154,10 +167,28 @@ def main():
         workers=workers
     )
 
+    stable_structs = list(filter(
+        lambda tup: tup[1]['delta_H'] <= delta_H_limit, 
+        list(structs_data.items())
+    ))
+
     unstable_structs = list(filter(
         lambda tup: tup[1]['delta_H'] > delta_H_limit, 
         list(structs_data.items())
     ))
+    
+    for struct in stable_structs:
+        name = struct[0]
+        data = struct[1]
+        accept_msg = f"\
+                    STABILITY TEST PASSED\n\
+                    Instability energy for this structure is estimated at {data['delta_H']} eV/atom,\n \
+                    which is below or equal to the fixed instability limit of {delta_H_limit} eV/atom.\n \
+                    Therefore, it is considered suitable for wanted application,\n \
+                    and should be considered for further screening steps.\n"
+        accept_file_path = Path('/'.join((str(input_dir), name, accept_file)))
+        accept_file_path.touch()
+        accept_file_path.write_text(accept_msg)
 
     for struct in unstable_structs:
         name = struct[0]

@@ -137,7 +137,7 @@ def init_entries_and_group_by_dim_and_comp(
             composition=Composition(str(elt)), 
             energy=0.0, 
             name=elt.symbol, 
-            attribut='element_ref'
+            attribute='element_ref'
         ) for elt in elements
     ]
 
@@ -228,7 +228,7 @@ def _get_lacking_elts_entries(
     '''
 
     user_elt_entries = list(filter(
-    lambda entry: entry.is_element() and entry.elements[0] in ref_elts, 
+    lambda entry: entry.is_element and entry.elements[0] in ref_elts, 
     entries
     ))
 
@@ -397,7 +397,7 @@ def calculate_instability_energies(
     
     if ref_elts:
         assert isinstance(ref_elts, Sequence)
-        assert all(isinstance(entry, PDEntry) and entry.is_element() for entry in ref_elts)
+        assert all(isinstance(entry, PDEntry) and entry.is_element for entry in ref_elts)
     
     else: ref_elts = []
 
@@ -436,7 +436,7 @@ def batch_calculate_instability_energies(structs_data: dict, workers: int = 1):
 
         setup_calc_inst_energs = partial(
             _calculate_instability_energies, 
-            entry_pool=entry_pool
+            sub_entries_pool=entry_pool
         )
 
         energies = flatten(list(process_map(
