@@ -241,7 +241,7 @@ def main():
         workers=workers
     )
 
-    inputs_list, subdirs_list = delta_sol_inputs_init(
+    subdirs_list, inputs_list = delta_sol_inputs_init(
         structs_data=structs_data, 
         preset=preset, 
         user_corrections=user_settings or None, 
@@ -255,7 +255,7 @@ def main():
         vasp_inputs=inputs_list, 
         base_dir=outdir, 
         subdir_names=subdirs_list, 
-        worker=workers
+        workers=workers
     )
 
     # Extract resulting energies

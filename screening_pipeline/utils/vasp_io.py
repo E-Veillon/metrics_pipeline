@@ -30,6 +30,7 @@ from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 ########################################
 # LOCAL MODULES
 
+from screening_pipeline.utils.matcher import flatten
 from screening_pipeline.utils.fitted_values import U_VALUES
 from screening_pipeline.utils.paths import batch_add_new_dirs
 from screening_pipeline.utils.periodic_table import get_delta_sol_el_ratio
@@ -366,7 +367,7 @@ def vasp_relaxation_settings(
 ########################################
 
 def vasp_static_settings(
-        structure: Optional[SiteCollection], 
+        structure: Optional[SiteCollection] = None, 
         preset: PMGStaticSet = 'MPStaticSet', 
         from_prev_calc: bool = False, 
         prev_calc_dir: Optional[PathLike] = None, 
@@ -407,7 +408,7 @@ def vasp_static_settings(
     "structure" argument format not supported.
     It must be an instance of the SiteCollection class or one of its subclasses.'''
     
-    assert preset in allowed_presets.keys(), f'''
+    assert preset in allowed_presets, f'''
     "preset" argument not recognized.
     It must be one of the allowed pymatgen static presets:
     {allowed_presets}'''
@@ -424,12 +425,12 @@ def vasp_static_settings(
     
     else:
         assert isinstance(prev_calc_dir, PathLike), \
-        'from_prev_calc was set to True, prev_calc_dir must be provided as str or Path object'
+        'from_prev_calc was set to True, prev_calc_dir must be provided as str or Path object.'
 
         prev_calc_dir = Path(prev_calc_dir)
 
         assert prev_calc_dir.is_dir(), \
-        'Provided prev_calc_dir is not a valid directory'
+        f'Prev_calc_dir: {prev_calc_dir} is not a valid directory.'
 
         vasp_input = _StaticSet_init(
             struct_or_path=prev_calc_dir, 
@@ -587,8 +588,8 @@ def batch_extract_vasp_data(
     assert isinstance(ignore_file, str)
     assert isinstance(workers, int) and workers >= 1
 
-    def is_directory(path: Path) -> bool:
-        return path.is_dir()
+    def is_struct_dir(path: Path) -> bool:
+        return path.is_dir() and path.name[0].isdecimal()
     
     match method:
         case "convex_hull":
@@ -598,7 +599,7 @@ def batch_extract_vasp_data(
         case _: raise NotImplementedError(f"Provided method ({method}) is not supported.")
 
     base_dir           = Path(base_dir)
-    structs_dir_list   = list(filter(is_directory, base_dir.iterdir()))
+    structs_dir_list   = list(filter(is_struct_dir, base_dir.iterdir()))
     nbr_structs        = len(structs_dir_list)
     chunksize          = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
 
@@ -716,10 +717,10 @@ def delta_sol_inputs_init(
         dft_functional=dft_functional, 
         n_star_type=n_star_type
     )
-    structs_tuples = list(chain(starmap(set_inputs_init, structs_data.items())))
+    structs_tuples = flatten(list(starmap(set_inputs_init, structs_data.items())))
     subdirs_list   = [tup[0] for tup in structs_tuples]
     inputs_list    = [tup[1] for tup in structs_tuples]
 
-    return inputs_list, subdirs_list
+    return subdirs_list, inputs_list
 
 ########################################
