@@ -57,20 +57,95 @@ PMGStaticSet = Literal[
 ########################################
 # LOCAL FUNCTIONS
 
-def _MITRelaxSet_INCAR_corrections(number_of_sites: int) -> Dict:
+def is_float(string: str) -> bool:
+    str_list = string.split(sep='.')
+    return ('.' in string) and (len(str_list) <= 2) and all([nbr.isdecimal() for nbr in str_list])
+
+def _MITRelaxSet_INCAR_corrections(
+        structure: SiteCollection, 
+        user_potcar_dict: Optional[Dict] = None, 
+        user_potcar_functional: Optional[str] = None
+    ) -> Dict:
     '''
     Corrects errors and imprecisions found in Pymatgen MITRelaxSet VASP preset's INCAR tags.
-    For example, some tags should depend on the number of atoms per unit cell of the structure.
+    Some tags should depend on the associated structure or POTCARs.
 
     parameters:
-        number_of_sites (int): number of atoms in a unit cell.
-    
+        structure (SiteCollection):     Structure associated with the VASP run.
+
+        user_potcar_dict (dict):        If POTCAR corrections are overriding MITRelaxSet's defaults, 
+                                        they must be provided here to initialize right ENCUT tag value.
+                                        If not provided, it will be initialized from original MITRelaxSet
+                                        POTCARs.
+
+        user_potcar_functional (str):   If POTCAR_FUNCTIONAL correction is overriding MITRelaxSet's default, 
+                                        it must be provided here to initialize right ENCUT tag value.
+                                        If not provided, it will be initialized from PMG_DEFAULT_FUNCTIONAL
+                                        in .pmgrc.yaml, or as 'PBE' if not found.
+
     Returns:
-        A dictionnary containing the INCAR tags corrections.
+        A dictionnary containing the INCAR tags corrections for MITRelaxSet.
     '''
 
-    corrected_EDIFF = float(5e-5)*number_of_sites
-    corrected_ENCUT = 520 # To be modified according to ENMAX value (ENCUT = 1.3*ENMAX)
+    import os
+    from monty.os.path import zpath
+    from pymatgen.core import SETTINGS
+    from pymatgen.io.vasp.inputs import PotcarSingle
+
+    corrected_EDIFF = float(5e-5)*structure.num_sites
+    # corrected_ENCUT = 520
+
+    if user_potcar_dict: potcar_dict = user_potcar_dict
+    else:
+        from ruamel.yaml import YAML
+        from pymatgen.io.vasp.sets import MODULE_DIR
+
+        yaml = YAML()
+        MITRelaxSet_path = '/'.join((MODULE_DIR, "MITRelaxSet.yaml"))
+
+        with open(MITRelaxSet_path, encoding='utf-8') as config_file:
+            default_config = dict(yaml.load(config_file))
+            potcar_dict    = default_config['POTCAR']
+
+    functional  = user_potcar_functional or SETTINGS.get('PMG_DEFAULT_FUNCTIONAL', 'PBE')
+    potcar_path = os.path.join(SETTINGS['PMG_VASP_PSP_DIR'], PotcarSingle.functional_dir[functional])
+    ENMAX_list  = []
+
+    for elt in structure.composition.elements:
+        
+        relevant_potcar = list(filter(
+            lambda symbol: symbol.find(str(elt)) != -1, 
+            potcar_dict.values()
+        ))[0]
+
+        paths_to_try = [
+            os.path.join(potcar_path, f"POTCAR.{relevant_potcar}"),
+            os.path.join(potcar_path, relevant_potcar, "POTCAR")
+        ]
+
+        for path in paths_to_try:
+
+            path = os.path.expanduser(path)
+            path = zpath(path)
+
+            if os.path.isfile(path):
+
+                with open(path, 'r') as pot_file:
+
+                    enmax_line = list(filter(
+                        lambda line: line.lstrip().startswith("ENMAX"), 
+                        pot_file.readlines()
+                    ))[0].split()
+
+                enmax_value = list(filter(
+                    lambda word: is_float(word), 
+                    enmax_line
+                ))[0]
+
+                ENMAX_list.append(float(enmax_value))
+
+    corrected_ENCUT = 1.3*max(ENMAX_list)
+
     corrected_LDAUL = {
         'F': {
             'Ag': 2, 'Co': 2, 'Cr': 2, 'Cu': 2, 'Fe': 2, 
