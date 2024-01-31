@@ -7,14 +7,12 @@ Functions to load and write CIF formatted data with multiple processes.
 # SYSTEM I/O MODULES
 
 from typing import Tuple, List, Union
-#from contextlib import redirect_stdout, redirect_stderr
 import re
 
 ########################################
 # OPTIMIZATION MODULES
 
 from tqdm.contrib.concurrent import process_map
-from functools import partial
 
 ########################################
 # PYTHON MATERIALS GENOMICS PACKAGE
@@ -26,7 +24,7 @@ from pymatgen.symmetry.analyzer import SymmetrizedStructure
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils import discard_rare_gas_structures, discard_rare_earth_structures
+from screening_pipeline.utils.spacegroup import discard_rare_gas_structures, discard_rare_earth_structures
 from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stderr
 
 ##################################################

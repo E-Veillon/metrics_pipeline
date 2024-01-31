@@ -6,7 +6,7 @@ Functions to find spacegroup symmetry on pymatgen Structure objects.
 ########################################
 # TYPE HINTING
 
-from typing import Tuple, List
+from typing import List
 
 ########################################
 # OPTIMIZATION MODULES
@@ -24,6 +24,8 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmetrizedStructure
 
 from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stderr
 
+########################################
+# LOCAL FUNCTIONS
 
 def _retry_get_symmetrized_structure(
         structure: Structure,
@@ -67,6 +69,8 @@ def _retry_get_symmetrized_structure(
             return sym_struct
     
     return structure
+
+########################################
 
 def structure_symmetrizer(
         structure: Structure, 
@@ -131,6 +135,8 @@ def structure_symmetrizer(
 
         return sym_struct
 
+########################################
+
 def batch_symmetrizer(
         structures: List[Structure], 
         valid_tol: float = 0.0, 
@@ -183,3 +189,5 @@ def batch_symmetrizer(
             chunksize=chunksize, 
             desc='Symmetrize structures'
     ))
+
+########################################

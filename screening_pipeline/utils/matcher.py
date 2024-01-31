@@ -23,7 +23,12 @@ from pymatgen.analysis.phase_diagram import Entry
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 ########################################
+# LOCAL MODULES
 
+from screening_pipeline.utils import flatten
+
+########################################
+# LOCAL FUNCTIONS
 
 def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
     '''
@@ -47,6 +52,7 @@ def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
     
     return hash(comp.composition.fractional_composition)
 
+########################################
 
 def group_by_stoichiometry(
         comps: Sequence[Union[Composition, Entry, SiteCollection]]
@@ -75,6 +81,7 @@ def group_by_stoichiometry(
         for _, grouped in itertools.groupby(sorted_comps, hash_stoichiometry)
     ]
 
+########################################
 
 def group_by_equivalence(structures: List[Structure]) -> List[List[Structure]]:
     '''
@@ -90,23 +97,7 @@ def group_by_equivalence(structures: List[Structure]) -> List[List[Structure]]:
     matcher = StructureMatcher()
     return matcher.group_structures(structures)
 
-def flatten(sequence: Sequence, level_of_flattening: int = 1) -> List:
-    '''
-    Unpacks a nested sequence without modifying elements order.
-
-    Parameters:
-        sequence (Sequence):        The iterable to unpack.
-
-        level_of_flattening (Int):  The number of nested levels to unpack.
-                                    Defaults to 1.
-    
-    Returns:
-        A list flattened the specified number of times.
-    '''
-
-    for _ in range(1, level_of_flattening + 1):
-        sequence = list(itertools.chain.from_iterable(sequence))
-    return sequence
+########################################
 
 def remove_equivalent(
     structures: List[Structure], 
@@ -154,3 +145,5 @@ def remove_equivalent(
     nbr_discarded  = sum([len(sublist) - 1 for sublist in sorted_structs])
     unique_structs = [sublist[0] for sublist in sorted_structs]
     return unique_structs, nbr_discarded
+
+########################################

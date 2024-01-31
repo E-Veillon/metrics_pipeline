@@ -33,10 +33,35 @@ __all__ = [
     ]
 
 from pathlib import Path
-from typing import Union
+from typing import Union, Sequence, List
+import itertools
 from ruamel.yaml import YAML
 
 PathLike = Union[Path, str]
+
+def is_float(string: str) -> bool:
+    str_list = string.split(sep='.')
+    return ('.' in string) and (len(str_list) <= 2) and all([nbr.isdecimal() for nbr in str_list])
+
+
+def flatten(sequence: Sequence, level_of_flattening: int = 1) -> List:
+    '''
+    Unpacks a nested sequence without modifying elements order.
+
+    Parameters:
+        sequence (Sequence):        The iterable to unpack.
+
+        level_of_flattening (Int):  The number of nested levels to unpack.
+                                    Defaults to 1.
+    
+    Returns:
+        A list flattened the specified number of times.
+    '''
+
+    for _ in range(1, level_of_flattening + 1):
+        sequence = list(itertools.chain.from_iterable(sequence))
+    return sequence
+
 
 def _yaml_loader(file_path: PathLike):
     if not isinstance(file_path, (Path, str)):

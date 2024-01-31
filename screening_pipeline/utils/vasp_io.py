@@ -33,6 +33,7 @@ from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 ########################################
 # LOCAL MODULES
 
+from screening_pipeline.utils import PathLike, is_float
 from screening_pipeline.utils.matcher import flatten
 from screening_pipeline.utils.fitted_values import U_VALUES
 from screening_pipeline.utils.paths import batch_add_new_dirs
@@ -41,7 +42,6 @@ from screening_pipeline.utils.periodic_table import get_delta_sol_el_ratio
 ########################################
 # TYPE ALIASES
 
-PathLike = Union[str, Path]
 PMGRelaxSet = Literal[
     'MITRelaxSet', 
     'MPRelaxSet', 
@@ -59,10 +59,6 @@ PMGStaticSet = Literal[
 
 ########################################
 # LOCAL FUNCTIONS
-
-def is_float(string: str) -> bool:
-    str_list = string.split(sep='.')
-    return ('.' in string) and (len(str_list) <= 2) and all([nbr.isdecimal() for nbr in str_list])
 
 def _get_POTCAR_ENMAX_values(
         structure: SiteCollection, 
@@ -117,6 +113,8 @@ def _get_POTCAR_ENMAX_values(
                 ENMAX_list.append(float(enmax_value))
     
     return ENMAX_list
+
+########################################
 
 def _MITRelaxSet_INCAR_corrections(**kwargs) -> Dict:
     '''

@@ -2,11 +2,24 @@
 Implements functions to manage and operate on paths.
 '''
 
-from typing import Union, Sequence, List
+########################################
+# SYSTEM I/O MODULES
+
+from typing import Sequence, List
 from pathlib import Path
+
+########################################
+# OPTIMIZATION MODULES
+
 from itertools import repeat
 
-PathLike = Union[str, Path]
+########################################
+# LOCAL MODULES
+
+from screening_pipeline.utils import PathLike
+
+########################################
+# LOCAL FUNCTIONS
 
 def add_new_dir(base_dir: PathLike, new_dir_name: PathLike) -> Path:
     '''
@@ -29,6 +42,8 @@ def add_new_dir(base_dir: PathLike, new_dir_name: PathLike) -> Path:
     new_dir.mkdir()
 
     return new_dir
+
+########################################
 
 def batch_add_new_dirs(
         base_dir: PathLike, 
@@ -57,3 +72,5 @@ def batch_add_new_dirs(
     new_dirs = list(map(add_new_dir, repeat(base_dir), new_subdirs))
     
     return new_dirs
+
+########################################
