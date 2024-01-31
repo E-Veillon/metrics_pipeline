@@ -240,8 +240,12 @@ def _RelaxSet_init(
     incar_corrections = {}
 
     if preset == 'MITRelaxSet':
-        incar_corrections = _MITRelaxSet_INCAR_corrections(structure.num_sites)
-    
+        incar_corrections = _MITRelaxSet_INCAR_corrections(
+            structure=structure, 
+            user_potcar_dict=corrections.get('POTCAR') or None, 
+            user_potcar_functional=corrections.get('POTCAR_FUNCTIONAL') or None
+        )
+
     incar_corrections.update(corrections.get('INCAR', {}))
     kpoints_corrections = corrections.get('KPOINTS', {})
     potcar_corrections  = corrections.get('POTCAR', {})
@@ -567,10 +571,10 @@ def extract_vasp_data_for_delta_sol(
     chgcar_path  = Path(struct_dir / 'CHGCAR')
     oszicar_path = Path(struct_dir / 'OSZICAR')
 
-    structure    = Poscar.from_file(contcar_path).structure
-    chgcar       = Chgcar.from_file(chgcar_path)
-    final_energy_eV: float = Oszicar(oszicar_path).final_energy
-    #final_energy_eV_per_at = final_energy_eV / float(structure.num_sites)
+    structure       = Poscar.from_file(contcar_path).structure
+    chgcar          = Chgcar.from_file(chgcar_path)
+    final_energy_eV = Oszicar(oszicar_path).final_energy
+
     struct_dict = {
         'structure': structure, 
         'CHGCAR': chgcar, 
@@ -673,16 +677,25 @@ def chgcar_density_switch(chgcar: Chgcar, delta: float):
 
 ########################################
 
-def struct_charge_switch(structure: Structure, delta: float):
+def struct_charge_switch(structure: Structure, new_charge: float):
     '''
-    Modifies overall charge of provided structure by +/- delta, 
+    Modifies overall charge of provided structure by +/- charge, 
     then returns the two resulting structures.
+
+    Parameters:
+        structure (Structure):  Neutral base structure on which charges will be added.
+
+        new_charge (float):     Value of the charge to apply.
+    
+    Returns:
+        Two copies of the input structure, with a positive and negative charge, respectively.
     '''
 
-    cation_struct, anion_struct = structure.copy(), structure.copy()
-    cation_struct.set_charge(structure.charge + delta)
-    anion_struct.set_charge(structure.charge - delta)
-    return cation_struct, anion_struct
+    pos_struct, neg_struct = structure.copy(), structure.copy()
+    pos_struct.set_charge(structure.charge + new_charge)
+    neg_struct.set_charge(structure.charge - new_charge)
+
+    return pos_struct, neg_struct
 
 ########################################
 
@@ -730,9 +743,9 @@ def delta_sol_inputs_init(
         ) -> List[Tuple[str, VaspInput]]:
 
         # Calculate number of electrons to add/remove to/from the structure cell
-        structure    = data['structure']
-        N_val        = get_all_valence_electrons(structure)
-        n_ratio      = get_delta_sol_el_ratio(structure, dft_functional, n_star_type)
+        structure = data['structure']
+        N_val     = get_all_valence_electrons(structure)
+        n_ratio   = get_delta_sol_el_ratio(structure, dft_functional, n_star_type)
 
         # Prepare E(N0 + n) input set
         run_plus = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
