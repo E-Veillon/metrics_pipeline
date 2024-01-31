@@ -703,8 +703,7 @@ def delta_sol_inputs_init(
         structs_data: dict, 
         preset: PMGStaticSet = 'MPStaticSet', 
         user_corrections: Optional[Dict] = None, 
-        dft_functional: Literal['LDA', 'PBE', 'AM05'] = 'PBE', 
-        n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
+        with_uncertainties: bool = False
     ) -> Tuple[List]:
     '''
     Initialize Vasp static input sets for structures with N0 - n and N0 + n electrons per cell, 
@@ -715,62 +714,65 @@ def delta_sol_inputs_init(
         (reference 32 in screening_pipeline/Bibliography, values in Table I)
 
     Parameters:
-        structs_data (dict):    Dict containing relevant VASP data from a previous relaxation, 
-                                as provided by the batch_extract_vasp_data function.
+        structs_data (dict):        Dict containing relevant VASP data from a previous relaxation, 
+                                    as provided by the batch_extract_vasp_data function.
         
-        preset (PMGStaticSet):  One of the pymatgen static VASP preset labeled 'StaticSet'.
+        preset (PMGStaticSet):      One of the pymatgen static VASP preset labeled 'StaticSet'.
 
-        dft_functional ('LDA'|'PBE'|'AM05'):    Choose one of the functionals supported by Δ-Sol method.
-                                                Used to initialize N*. Defaults to 'PBE'.
-
-        n_star_type ('MIN'|'BEST'|'MAX'):       Which N* to initialize for given functional.
-                                                'BEST' is used for band gap estimation, 
-                                                while 'MIN' and 'MAX' are for uncertainty measurements on said gap.
-                                                Defaults to 'BEST'.
+        with_uncertainties (bool):  Whether to also compute uncertainty boundaries of Δ-Sol method.
+                                    Defaults to False.
     
     Returns:
-        Tuple[List]:    A list of VaspInput objects corresponding to Δ-Sol runs, 
-                        and a list of the subdirectory names for these runs, in same order.
+        Tuple[List[str], List[VaspInput]]:  
+        A list of the subdirectory names corresponding to Δ-Sol runs, 
+        and a list of the VaspInput objects for these runs, both in same order.
     '''
     
-    def inputs_init(
-            name: str, 
-            data: Dict, 
-            preset: PMGStaticSet = 'MPStaticSet', 
-            user_corrections: Optional[Dict] = None, 
-            dft_functional: Literal['LDA', 'PBE', 'AM05'] = 'PBE', 
-            n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
-        ) -> List[Tuple[str, VaspInput]]:
+    def _inputs_init(struct_tuple: Tuple[str, Dict]) -> List[Tuple[str, VaspInput]]:
 
-        # Calculate number of electrons to add/remove to/from the structure cell
+        # Initialize input sets
+        name      = struct_tuple[0]
+        data      = struct_tuple[1]
         structure = data['structure']
         N_val     = get_all_valence_electrons(structure)
-        n_ratio   = get_delta_sol_el_ratio(structure, dft_functional, n_star_type)
+        run_set   = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
 
-        # Prepare E(N0 + n) input set
-        run_plus = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
-        run_plus['INCAR'].update({'NELECT': N_val + n_ratio})
-        run_plus_path = Path('_'.join((name , 'plus')))
+        # Search for the right N* parameter to use
+        pot_func = run_set.get('POTCAR_FUNCTIONAL', 'PBE')
 
-        # Prepare E(N0 - n) input set
-        run_minus = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
-        run_minus['INCAR'].update({'NELECT': N_val - n_ratio})
-        run_minus_path = Path('_'.join((name , 'minus')))
+        if 'LDA' in pot_func: delta_sol_functional = 'LDA'
+        elif 'PBE' in pot_func: delta_sol_functional = 'PBE'
+        elif 'AM05' in pot_func: delta_sol_functional = 'AM05'
+        else:
+            raise NotImplementedError(
+                "Provided POTCAR functional is not implemented for Δ-Sol method. \
+                Recognized functionals are the ones having 'LDA', 'PBE' or 'AM05' in the name."
+            )
 
-        struct_list = [(run_plus_path, run_plus), (run_minus_path, run_minus)]
+        struct_runs_list = []
+        n_star_types     = ('BEST', 'MIN', 'MAX') if with_uncertainties else ('BEST',)
 
-        return struct_list
+        # Compute relevant n = N_val / N* 
+        for n_star_type in n_star_types:
 
-    set_inputs_init = partial(
-        inputs_init, 
-        preset=preset, 
-        user_corrections=user_corrections, 
-        dft_functional=dft_functional, 
-        n_star_type=n_star_type
-    )
-    structs_tuples = flatten(list(starmap(set_inputs_init, structs_data.items())))
-    subdirs_list   = [tup[0] for tup in structs_tuples]
-    inputs_list    = [tup[1] for tup in structs_tuples]
+            n_ratio = get_delta_sol_el_ratio(
+                structure=structure, 
+                dft_functional=delta_sol_functional, 
+                n_star_type=n_star_type
+            )
+
+            run_plus       = run_set.copy().update({'NELECT': N_val + n_ratio})
+            run_minus      = run_set.copy().update({'NELECT': N_val - n_ratio})
+            run_plus_path  = Path('_'.join((name , n_star_type.lower(), 'plus')))
+            run_minus_path = Path('_'.join((name , n_star_type.lower(), 'minus')))
+
+            struct_runs_list += [(run_plus_path, run_plus), (run_minus_path, run_minus)]
+
+        return struct_runs_list
+
+    input_data   = flatten(list(starmap(_inputs_init, structs_data.items())))
+    subdirs_list = [tup[0] for tup in input_data]
+    inputs_list  = [tup[1] for tup in input_data]
 
     return subdirs_list, inputs_list
 

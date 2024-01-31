@@ -50,19 +50,11 @@ def assert_args(args: Namespace) -> None:
     assert args.user_settings.endswith('.yaml'), \
     'user settings file must be of .yaml format.'
 
-    assert args.functional in {'LDA', 'PBE', 'AM05'}, \
-    f'''Provided functional not supported for Δ-Sol method.
-        This argument should be either 'LDA', 'PBE' or 'AM05'.'''
-    
-    assert args.n_star_type in {'MIN', 'BEST', 'MAX'}, \
-    f"The type of N* should be either 'MIN', 'BEST' or 'MAX'."
+    assert args.minimum >= 0.0 and args.valid_maximum >= 0.0, \
+    f"Acceptable band gap values must be positive or zero."
 
-    assert args.valid_minimum >= 0.0 and args.valid_maximum >= 0.0, \
-    f"Valid band gap values must be positive or zero."
-
-    assert args.valid_minimum != args.valid_maximum, \
-    'Band gap valid interval cannot be a single value, \
-    different values must be provided for min and max valid band gap values.'
+    assert args.minimum != args.valid_maximum, \
+    f"Acceptable band gap values cannot have the same value."
 
     assert args.accept.endswith('.txt'), \
     'Structure acceptance file must be a plain text file type (.txt).'
@@ -91,7 +83,7 @@ def main():
         '''
     prog_missing_steps = '''
         Missing steps to complete this script:
-            - Set an option to enable incertainty calculation on the band gap using N*min and N*max
+            - Set an option to enable incertainty calculation on the band gap using N*min and N*max - OK
             - This option should let user choose if they want to keep materials according to the uncertainty case:
                 * If E(gap) is inside the goal but uncertainty gets out ?
                 * If E(gap) is outside the goal but uncertainty gets in ?
@@ -128,8 +120,8 @@ def main():
         metavar='outdir'
     )
     parser.add_argument(
-        '-m', 
-        '--method', 
+        '-p', 
+        '--preset', 
         type=str, 
         default='MPStaticSet', 
         help='''The pymatgen preset to use for VASP static calculations.
@@ -147,35 +139,19 @@ def main():
         dest='user_settings'
     )
     parser.add_argument(
-        '-f', 
-        '--functional', 
-        type=str, 
-        default='PBE', 
-        help='DFT functional to use for Δ-Sol N* parameter initialization.', 
-        metavar='str'
-    )
-    parser.add_argument(
-        '-n', 
-        '--n_star_type', 
-        type=str, 
-        default='BEST', 
-        help='Type of N* parameter to initialize for Δ-Sol method.', 
-        metavar='str'
-    )
-    parser.add_argument(
-        '-v',
-        '--valid_minimum',
+        '-m',
+        '--minimum',
         type=float,
         default=1.3,
-        help='''Minimum acceptable band gap value in eV.''', 
+        help='''Minimum acceptable band gap value in eV. Defaults to 1.3 eV.''', 
         metavar='float'
     )
     parser.add_argument(
-        '-V',
-        '--valid_maximum',
+        '-M',
+        '--maximum',
         type=float,
         default=3.6,
-        help='''Maximum acceptable band gap value in eV.''', 
+        help='''Maximum acceptable band gap value in eV. Defaults to 3.6 eV.''', 
         metavar='float'
     )
     parser.add_argument(
@@ -208,17 +184,22 @@ def main():
         help='Number of parallel processes to spawn for parallelized steps.',
         metavar='int',
     )
+    parser.add_argument(
+        '--with_uncertainties', 
+        action='store_true', 
+        help='Pass this flag to enable computation of minimal and maximal Δ-Sol band gaps.\n\
+              This will need one full VASP static total energy computation for each limit.'
+    )
+
     args: Namespace = parser.parse_args()
 
     assert_args(args)
-    
+
     input_dir      = Path(args.input_dir)
     exe_path       = args.executable_path
     outdir         = Path(args.output)
-    preset         = args.method
+    preset         = args.preset
     user_settings  = _yaml_loader(args.user_settings)
-    functional     = args.functional
-    n_star_type    = args.n_star_type
     valid_interval = sorted([args.valid_minimum, args.valid_maximum])
     accept_file    = args.accept
     ignore_file    = args.ignore
@@ -239,8 +220,7 @@ def main():
         structs_data=structs_data, 
         preset=preset, 
         user_corrections=user_settings or None, 
-        dft_functional=functional, 
-        n_star_type=n_star_type
+        with_uncertainties=args.with_uncertainties
     )
 
     # Launch static calculations
