@@ -26,15 +26,9 @@ from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils import flatten
+from screening_pipeline.utils import PathLike, FormulaLike, flatten
 from screening_pipeline.utils.matcher import group_by_stoichiometry
 from screening_pipeline.utils.periodic_table import get_elements, get_delta_sol_el_ratio
-
-########################################
-# TYPE ALIASES
-
-PathLike    = Union[str, Path]
-FormulaLike = Union[str, Iterable[Union[str, int, Element]]]
 
 ########################################
 # LOCAL FUNCTIONS

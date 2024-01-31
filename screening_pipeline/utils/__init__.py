@@ -33,12 +33,13 @@ __all__ = [
     ]
 
 from pathlib import Path
-from typing import Union, Sequence, List, Literal
+from typing import Union, Sequence, List, Literal, Iterable
 import itertools
 from ruamel.yaml import YAML
+from pymatgen.core.structure import Element
 
-PathLike = Union[Path, str]
-
+PathLike    = Union[Path, str]
+FormulaLike = Union[str, Iterable[Union[str, int, Element]]]
 PMGRelaxSet = Literal[
     'MITRelaxSet', 
     'MPRelaxSet', 

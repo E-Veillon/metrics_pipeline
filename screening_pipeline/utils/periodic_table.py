@@ -26,11 +26,7 @@ from pymatgen.io.cif import CifBlock
 # LOCAL MODULES
 
 #from screening_pipeline.utils import EL_PER_XC_VOL
-
-########################################
-# TYPE ALIASES
-
-FormulaLike = Union[str, Iterable[Union[str, int, Element]]]
+from screening_pipeline.utils import FormulaLike
 
 ########################################
 # LOCAL FUNCTIONS
