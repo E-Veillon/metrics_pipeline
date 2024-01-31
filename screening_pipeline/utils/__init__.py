@@ -33,11 +33,27 @@ __all__ = [
     ]
 
 from pathlib import Path
-from typing import Union, Sequence, List
+from typing import Union, Sequence, List, Literal
 import itertools
 from ruamel.yaml import YAML
 
 PathLike = Union[Path, str]
+
+PMGRelaxSet = Literal[
+    'MITRelaxSet', 
+    'MPRelaxSet', 
+    'MPScanRelaxSet', 
+    'MPHSERelaxSet', 
+    'MPMetalRelaxSet', 
+    'MVLRelax52Set', 
+    'MVLScanRelaxSet'
+]
+
+PMGStaticSet = Literal[
+    'MPStaticSet', 
+    'MatPESStaticSet', 
+    'MPScanStaticSet'
+]
 
 def is_float(string: str) -> bool:
     str_list = string.split(sep='.')

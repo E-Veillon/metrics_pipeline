@@ -33,29 +33,11 @@ from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils import PathLike, is_float
+from screening_pipeline.utils import PathLike, PMGRelaxSet, PMGStaticSet, is_float
 from screening_pipeline.utils.matcher import flatten
 from screening_pipeline.utils.fitted_values import U_VALUES
 from screening_pipeline.utils.paths import batch_add_new_dirs
 from screening_pipeline.utils.periodic_table import get_delta_sol_el_ratio
-
-########################################
-# TYPE ALIASES
-
-PMGRelaxSet = Literal[
-    'MITRelaxSet', 
-    'MPRelaxSet', 
-    'MPScanRelaxSet', 
-    'MPHSERelaxSet', 
-    'MPMetalRelaxSet', 
-    'MVLRelax52Set', 
-    'MVLScanRelaxSet'
-]
-PMGStaticSet = Literal[
-    'MPStaticSet', 
-    'MatPESStaticSet', 
-    'MPScanStaticSet'
-]
 
 ########################################
 # LOCAL FUNCTIONS

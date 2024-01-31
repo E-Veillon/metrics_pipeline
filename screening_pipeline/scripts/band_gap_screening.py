@@ -21,7 +21,7 @@ from pathlib import Path
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils import _yaml_loader
+from screening_pipeline.utils import PMGStaticSet, _yaml_loader
 from screening_pipeline.utils.vasp_io import vasp_batch_launch, batch_extract_vasp_data, \
                                              delta_sol_inputs_init
 from screening_pipeline.utils.data_process import batch_calculate_delta_sol_band_gaps
@@ -30,12 +30,6 @@ from screening_pipeline.utils.data_process import batch_calculate_delta_sol_band
 # LOCAL FUNCTIONS
 
 def assert_args(args: Namespace) -> None:
-    
-    allowed_presets = [
-        'MPStaticSet', 
-        'MatPESStaticSet', 
-        'MPScanStaticSet'
-    ]
 
     assert Path(args.input_dir).is_dir(), \
     f'{args.input_dir}: No directory found.'
@@ -46,9 +40,9 @@ def assert_args(args: Namespace) -> None:
     assert Path(args.output).is_dir(), \
     f'{args.output}: No directory found.'
 
-    assert args.method in allowed_presets, \
+    assert isinstance(args.method, PMGStaticSet), \
     f'Provided static preset must be one of the following:\n \
-    {allowed_presets}'
+    {PMGStaticSet}'
 
     assert Path(args.user_settings).is_file(), \
     f'{args.user_settings}: file not found.'
@@ -64,7 +58,7 @@ def assert_args(args: Namespace) -> None:
     f"The type of N* should be either 'MIN', 'BEST' or 'MAX'."
 
     assert args.valid_minimum >= 0.0 and args.valid_maximum >= 0.0, \
-    f"Valid band gap values must be positives or zero."
+    f"Valid band gap values must be positive or zero."
 
     assert args.valid_minimum != args.valid_maximum, \
     'Band gap valid interval cannot be a single value, \

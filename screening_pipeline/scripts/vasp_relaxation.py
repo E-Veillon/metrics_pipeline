@@ -22,7 +22,7 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils import _yaml_loader
+from screening_pipeline.utils import PMGRelaxSet, _yaml_loader
 from screening_pipeline.utils.cif_io import read_cif
 from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_batch_launch
 
@@ -49,19 +49,9 @@ def assert_args(args: Namespace) -> None:
     assert Path(args.output).is_dir(), \
     f'{args.output} found but it is not a directory.'
 
-    allowed_presets = {
-        'MITRelaxSet', 
-        'MPRelaxSet', 
-        'MPScanRelaxSet', 
-        'MPHSERelaxSet', 
-        'MPMetalRelaxSet', 
-        'MVLRelax52Set', 
-        'MVLScanRelaxSet'
-    }
-
-    assert args.method in allowed_presets, \
+    assert isinstance(args.method, PMGRelaxSet), \
     f'Provided relaxation preset must be one of the following:\n \
-    {allowed_presets}'
+    {PMGRelaxSet}'
 
     assert Path(args.user_settings).is_file(), \
     f'{args.user_settings}: file not found.'
