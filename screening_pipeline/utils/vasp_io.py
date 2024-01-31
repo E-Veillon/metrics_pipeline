@@ -6,6 +6,8 @@ Functions to write VASP input files, launch VASP calculations and manage VASP ou
 ########################################
 # SYSTEM I/O MODULES
 
+import os
+from monty.os.path import zpath
 from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal, Any
 from pathlib import Path
 
@@ -21,10 +23,11 @@ from tqdm.contrib.concurrent import process_map
 # PYTHON MATERIAL GENOMICS PACKAGE
 
 from pymatgen.core.structure import Structure, SiteCollection, Composition
+from pymatgen.core import SETTINGS
+from pymatgen.io.vasp.inputs import PotcarSingle
 from pymatgen.io.vasp import VaspInput
 from pymatgen.io.vasp.inputs import Poscar
 from pymatgen.io.vasp.outputs import Chgcar, Oszicar
-#TODO: The next import might be useless. Delete it if related functions are not used until end of pipeline devpt.
 from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 
 ########################################
@@ -61,11 +64,61 @@ def is_float(string: str) -> bool:
     str_list = string.split(sep='.')
     return ('.' in string) and (len(str_list) <= 2) and all([nbr.isdecimal() for nbr in str_list])
 
-def _MITRelaxSet_INCAR_corrections(
+def _get_POTCAR_ENMAX_values(
         structure: SiteCollection, 
+        pmg_preset: DictSet, 
         user_potcar_dict: Optional[Dict] = None, 
         user_potcar_functional: Optional[str] = None
-    ) -> Dict:
+) -> List[float]:
+
+    default_config = dict(pmg_preset.CONFIG)
+    potcar_dict    = user_potcar_dict or default_config.get('POTCAR', {})
+    functional     = user_potcar_functional or default_config.get('POTCAR_FUNCTIONAL', 'PBE')
+    potcar_path    = os.path.join(SETTINGS['PMG_VASP_PSP_DIR'], PotcarSingle.functional_dir[functional])
+    ENMAX_list     = []
+
+    for elt in structure.composition.elements:
+        
+        try:
+            potcar_symbol = next(filter(
+                lambda symbol: symbol.find(str(elt)) != -1, 
+                potcar_dict.values()
+            ))
+        except StopIteration:
+            raise ValueError(
+                f"No POTCAR symbol found for element '{elt}' in provided POTCAR settings. \
+                Please verify the .yaml file used for the calculation."
+            )
+
+        paths_to_try = [
+            os.path.join(potcar_path, f"POTCAR.{potcar_symbol}"),
+            os.path.join(potcar_path, potcar_symbol, "POTCAR")
+        ]
+
+        for path in paths_to_try:
+
+            path = os.path.expanduser(path)
+            path = zpath(path)
+
+            if os.path.isfile(path):
+
+                with open(path, 'r') as pot_file:
+
+                    enmax_line = next(filter(
+                        lambda line: line.lstrip().startswith("ENMAX"), 
+                        pot_file.readlines()
+                    )).split()
+
+                enmax_value = next(filter(
+                    lambda word: is_float(word), 
+                    enmax_line
+                ))
+
+                ENMAX_list.append(float(enmax_value))
+    
+    return ENMAX_list
+
+def _MITRelaxSet_INCAR_corrections(**kwargs) -> Dict:
     '''
     Corrects errors and imprecisions found in Pymatgen MITRelaxSet VASP preset's INCAR tags.
     Some tags should depend on the associated structure or POTCARs.
@@ -80,72 +133,19 @@ def _MITRelaxSet_INCAR_corrections(
 
         user_potcar_functional (str):   If POTCAR_FUNCTIONAL correction is overriding MITRelaxSet's default, 
                                         it must be provided here to initialize right ENCUT tag value.
-                                        If not provided, it will be initialized from PMG_DEFAULT_FUNCTIONAL
-                                        in .pmgrc.yaml, or as 'PBE' if not found.
+                                        If not provided, it will be initialized from MITRelaxSet default.
 
     Returns:
         A dictionnary containing the INCAR tags corrections for MITRelaxSet.
     '''
 
-    import os
-    from monty.os.path import zpath
-    from pymatgen.core import SETTINGS
-    from pymatgen.io.vasp.inputs import PotcarSingle
+    structure: SiteCollection   = kwargs.pop('structure')
+    user_potcar_dict: Dict      = kwargs.pop('user_potcar_dict', None)
+    user_potcar_functional: str = kwargs.pop('user_potcar_functional', None)
+    ENMAX_list = _get_POTCAR_ENMAX_values(structure, MITRelaxSet, user_potcar_dict, user_potcar_functional)
 
     corrected_EDIFF = float(5e-5)*structure.num_sites
-    # corrected_ENCUT = 520
-
-    if user_potcar_dict: potcar_dict = user_potcar_dict
-    else:
-        from ruamel.yaml import YAML
-        from pymatgen.io.vasp.sets import MODULE_DIR
-
-        yaml = YAML()
-        MITRelaxSet_path = '/'.join((MODULE_DIR, "MITRelaxSet.yaml"))
-
-        with open(MITRelaxSet_path, encoding='utf-8') as config_file:
-            default_config = dict(yaml.load(config_file))
-            potcar_dict    = default_config['POTCAR']
-
-    functional  = user_potcar_functional or SETTINGS.get('PMG_DEFAULT_FUNCTIONAL', 'PBE')
-    potcar_path = os.path.join(SETTINGS['PMG_VASP_PSP_DIR'], PotcarSingle.functional_dir[functional])
-    ENMAX_list  = []
-
-    for elt in structure.composition.elements:
-        
-        relevant_potcar = list(filter(
-            lambda symbol: symbol.find(str(elt)) != -1, 
-            potcar_dict.values()
-        ))[0]
-
-        paths_to_try = [
-            os.path.join(potcar_path, f"POTCAR.{relevant_potcar}"),
-            os.path.join(potcar_path, relevant_potcar, "POTCAR")
-        ]
-
-        for path in paths_to_try:
-
-            path = os.path.expanduser(path)
-            path = zpath(path)
-
-            if os.path.isfile(path):
-
-                with open(path, 'r') as pot_file:
-
-                    enmax_line = list(filter(
-                        lambda line: line.lstrip().startswith("ENMAX"), 
-                        pot_file.readlines()
-                    ))[0].split()
-
-                enmax_value = list(filter(
-                    lambda word: is_float(word), 
-                    enmax_line
-                ))[0]
-
-                ENMAX_list.append(float(enmax_value))
-
     corrected_ENCUT = 1.3*max(ENMAX_list)
-
     corrected_LDAUL = {
         'F': {
             'Ag': 2, 'Co': 2, 'Cr': 2, 'Cu': 2, 'Fe': 2, 
