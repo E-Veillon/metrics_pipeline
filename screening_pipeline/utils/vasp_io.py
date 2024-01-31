@@ -37,7 +37,7 @@ from screening_pipeline.utils import PathLike, PMGRelaxSet, PMGStaticSet, is_flo
 from screening_pipeline.utils.matcher import flatten
 from screening_pipeline.utils.fitted_values import U_VALUES
 from screening_pipeline.utils.paths import batch_add_new_dirs
-from screening_pipeline.utils.periodic_table import get_delta_sol_el_ratio
+from screening_pipeline.utils.periodic_table import get_all_valence_electrons, get_delta_sol_el_ratio
 
 ########################################
 # LOCAL FUNCTIONS
@@ -388,25 +388,15 @@ def vasp_relaxation_settings(
         user_corrections (dict):        User defined settings. It allows to override some of the preset 
                                         INCAR, KPOINTS or POTCAR settings if necessary. Defaults to None.
     '''
-    
-    allowed_presets = {
-        'MITRelaxSet', 
-        'MPRelaxSet', 
-        'MPScanRelaxSet', 
-        'MPHSERelaxSet', 
-        'MPMetalRelaxSet', 
-        'MVLRelax52Set', 
-        'MVLScanRelaxSet'
-    }
 
-    assert isinstance(structure, SiteCollection), '''
-    "structure" argument format not supported.
-    It must be an instance of the SiteCollection class or one of its subclasses.'''
+    assert isinstance(structure, SiteCollection), \
+    '"structure" argument format not supported. \
+    It must be an instance of the SiteCollection class or one of its subclasses.'
     
-    assert preset in allowed_presets, f'''
-    "preset" argument not recognized.
-    It must be one of the allowed pymatgen relaxation presets:
-    {allowed_presets}'''
+    assert isinstance(preset, PMGRelaxSet), \
+    f'"preset" argument not recognized. \
+    It must be one of the allowed pymatgen relaxation presets:\n\
+    {PMGRelaxSet}.'
 
     assert isinstance(user_corrections, dict) or user_corrections is None, \
     'user_incar_settings must be a dict or None'
@@ -453,20 +443,14 @@ def vasp_static_settings(
                                         or POTCAR settings if necessary. Defaults to None.
     '''
 
-    allowed_presets = {
-        'MPStaticSet', 
-        'MatPESStaticSet', 
-        'MPScanStaticSet'
-    }
-
-    assert isinstance(structure, SiteCollection) or structure is None, '''
-    "structure" argument format not supported.
-    It must be an instance of the SiteCollection class or one of its subclasses.'''
+    assert isinstance(structure, SiteCollection) or structure is None, \
+    '"structure" argument format not supported. \
+    It must be an instance of the SiteCollection class or one of its subclasses.'
     
-    assert preset in allowed_presets, f'''
-    "preset" argument not recognized.
-    It must be one of the allowed pymatgen static presets:
-    {allowed_presets}'''
+    assert isinstance(preset, PMGStaticSet), \
+    f'"preset" argument not recognized. \
+    It must be one of the allowed pymatgen static presets:\n\
+    {PMGStaticSet}.'
 
     assert isinstance(user_corrections, dict) or user_corrections is None, \
     'user_corrections must be a dict or None'
@@ -745,20 +729,19 @@ def delta_sol_inputs_init(
             n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
         ) -> List[Tuple[str, VaspInput]]:
 
-        # Produce E(N0 + n) and E(N0 - n)'s CHGCAR files
-        structure       = data['structure']
-        chgcar          = data['CHGCAR']
-        data['n_ratio'] = get_delta_sol_el_ratio(structure, dft_functional, n_star_type)
-        data['CHGCAR_plus'], data['CHGCAR_minus'] = chgcar_density_switch(chgcar, data['n_ratio'])
+        # Calculate number of electrons to add/remove to/from the structure cell
+        structure    = data['structure']
+        N_val        = get_all_valence_electrons(structure)
+        n_ratio      = get_delta_sol_el_ratio(structure, dft_functional, n_star_type)
 
         # Prepare E(N0 + n) input set
         run_plus = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
-        run_plus.update({'CHGCAR': data['CHGCAR_plus']})
+        run_plus['INCAR'].update({'NELECT': N_val + n_ratio})
         run_plus_path = Path('_'.join((name , 'plus')))
 
         # Prepare E(N0 - n) input set
         run_minus = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
-        run_minus.update({'CHGCAR': data['CHGCAR_minus']})
+        run_minus['INCAR'].update({'NELECT': N_val - n_ratio})
         run_minus_path = Path('_'.join((name , 'minus')))
 
         struct_list = [(run_plus_path, run_plus), (run_minus_path, run_minus)]
