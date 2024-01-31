@@ -110,8 +110,8 @@ def main():
         metavar='outdir'
     )
     parser.add_argument(
-        '-m', 
-        '--method', 
+        '-p', 
+        '--preset', 
         type=str, 
         default='MITRelaxSet', 
         help='''The pymatgen preset to use for VASP relaxation.
