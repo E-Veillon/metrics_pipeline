@@ -163,11 +163,20 @@ def vasp_launcher(vasp_exe: PathLike, vasp_input: VaspInput, path: PathLike) -> 
     calc_dir      = Path(path)
     out_file      = Path('/'.join((path, "vasp.out")))
     err_file      = Path('/'.join((path, "vasp.err")))
-    vasp_input.run_vasp(run_dir=calc_dir, vasp_cmd=vasp_exe_list, output_file=out_file, err_file=err_file)
+    
+    try:
+        vasp_input.run_vasp(
+            run_dir=calc_dir, 
+            vasp_cmd=vasp_exe_list, 
+            output_file=out_file, 
+            err_file=err_file
+        )
+    except FileExistsError:
+        print(f'WARNING: {str(path)}: This directory already exists, skipping...')
 
 ########################################
 
-def _vasp_launcher_wrapper(args_tuple: Tuple[VaspInput, PathLike]):
+def _vasp_launcher_batch_wrapper(args_tuple: Tuple[VaspInput, PathLike]):
     vasp_exe   = args_tuple[0]
     vasp_input = args_tuple[1]
     path       = args_tuple[2]
@@ -217,7 +226,7 @@ def vasp_batch_launch(
     inputs_list   = list(zip(repeat(vasp_exe), vasp_inputs, subpaths_list))
 
     process_map(
-        _vasp_launcher_wrapper, 
+        _vasp_launcher_batch_wrapper, 
         inputs_list, 
         max_workers=workers, 
         chunksize=1, 
