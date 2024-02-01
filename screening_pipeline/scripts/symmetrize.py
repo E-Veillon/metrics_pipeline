@@ -96,10 +96,11 @@ def main():
         '-d', 
         '--distance_tol', 
         type=float, 
-        default=0.0, 
+        default=0.5, 
         help='''Tolerance for checking atoms relative positions in Angstroms.
                 Structures containing atoms that are closer than this value will be discarded.
-                The default value of 0.0 disables this feature.''', 
+                Set this value at 0.0 to disable this feature. Defaults to 0.5 Angstroms, which 
+		is fairly close to Bohr radius.''', 
         metavar='float', 
         dest='valid_tol'
     )
