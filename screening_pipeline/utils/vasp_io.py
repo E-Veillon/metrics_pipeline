@@ -45,17 +45,31 @@ from screening_pipeline.utils.periodic_table import get_all_valence_electrons, g
 
 def _get_POTCAR_ENMAX_values(
         structure: SiteCollection, 
-        pmg_preset: DictSet, 
+        default_config: Dict, 
         user_potcar_dict: Optional[Dict] = None, 
         user_potcar_functional: Optional[str] = None
 ) -> List[float]:
+    '''
+    Reminder:
+    When installing the pipeline repository in a new environment, after having initialised 
+    POTCARs with pymatgen, assemble all ENMAX values in a file called 'ENMAX_<POTCAR_FUNCTIONAL>.txt 
+    in the POTCARs pymatgen directory before calling this function.
+    '''
 
-    default_config = dict(pmg_preset.CONFIG)
     potcar_dict    = user_potcar_dict or default_config.get('POTCAR', {})
     functional     = user_potcar_functional or default_config.get('POTCAR_FUNCTIONAL', 'PBE')
-    potcar_path    = os.path.join(SETTINGS['PMG_VASP_PSP_DIR'], PotcarSingle.functional_dir[functional])
-    tmp_path       = Path(os.path.expanduser('~/tmppot/'))
     ENMAX_list     = []
+
+    enmax_path = os.path.join(
+        SETTINGS['PMG_VASP_PSP_DIR'], 
+        PotcarSingle.functional_dir[functional], 
+        f'ENMAX_{functional}.txt'
+    )
+
+    if not Path(enmax_path).is_file():
+        raise FileNotFoundError(
+            f'{enmax_path} not found. Use gzip and grep commands to assemble ENMAX values in this file.'
+        )
 
     for elt in structure.composition.element_composition.elements:
         
@@ -66,47 +80,31 @@ def _get_POTCAR_ENMAX_values(
             ))
         except StopIteration:
             raise ValueError(
-                f"No POTCAR symbol found for element '{elt}' in provided POTCAR settings. \
-                Please verify the .yaml file used for the calculation."
+                f"No POTCAR symbol found for element '{elt}' in provided POTCAR settings."
+                "Please verify the .yaml file used for the calculation."
             )
 
-        paths_to_try = [
-            os.path.join(potcar_path, f"POTCAR.{potcar_symbol}"),
-            os.path.join(potcar_path, potcar_symbol, "POTCAR")
-        ]
+        with open(enmax_path, 'r') as enmax_file:
 
-        for path in paths_to_try:
-
-            path = os.path.expanduser(path)
-            path = zpath(path)
-
-            if not os.path.isfile(path): continue
-
-            if path.endswith('.gz'):
-                tmp_path.mkdir(exist_ok=True)
-                enmax_file = f'{tmp_path}/{potcar_symbol}_ENMAX.txt'
-                os.system(f'gunzip {path}')
-                os.system(f"grep {path.replace('.gz', '')} > {enmax_file}")
-                path = enmax_file
-
-            with open(path, 'r') as pot_file:
-
+            try:
                 enmax_line = next(filter(
-                    lambda line: line.lstrip().startswith("ENMAX"), 
-                    pot_file.readlines()
+                    lambda line: potcar_symbol in line, 
+                    enmax_file.readlines()
                 )).split()
+            except StopIteration:
+                raise ValueError(
+                    f"The POTCAR symbol '{potcar_symbol}' defined in the .yaml configuration file"
+                    f"cannot be found in {enmax_path}."
+                    "Make sure you are using the right POTCAR library or that the ENMAX file"
+                    "compiles the right POTCARs."
+                )
 
-            enmax_value = next(filter(
-                lambda word: is_float(word), 
-                enmax_line
-            ))
+        enmax_value = next(filter(
+            lambda word: is_float(word), 
+            enmax_line
+        ))
 
-            ENMAX_list.append(float(enmax_value))
-            
-            if path == enmax_file:
-                os.system(f"gzip {path.replace('.gz', '')}")
-                os.system(f'rm -f {path}')
-
+        ENMAX_list.append(float(enmax_value))
 
     return ENMAX_list
 
@@ -134,9 +132,12 @@ def _MITRelaxSet_INCAR_corrections(**kwargs) -> Dict:
     '''
 
     structure: SiteCollection   = kwargs.pop('structure')
+    default_config              = MITRelaxSet.CONFIG
     user_potcar_dict: Dict      = kwargs.pop('user_potcar_dict', None)
     user_potcar_functional: str = kwargs.pop('user_potcar_functional', None)
-    ENMAX_list = _get_POTCAR_ENMAX_values(structure, MITRelaxSet, user_potcar_dict, user_potcar_functional)
+    ENMAX_list = _get_POTCAR_ENMAX_values(
+        structure, default_config, user_potcar_dict, user_potcar_functional
+    )
 
     corrected_EDIFF = float(5e-5)*structure.num_sites
     corrected_ENCUT = 1.3*max(ENMAX_list)
