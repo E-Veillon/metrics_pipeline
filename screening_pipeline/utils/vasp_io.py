@@ -84,10 +84,10 @@ def _get_POTCAR_ENMAX_values(
 
             if path.endswith('.gz'):
                 tmp_path.mkdir(exist_ok=True)
-                tmp_path = os.path.join(str(tmp_path), Path(path).name)
-                os.system(f'cp {path} {tmp_path}')
-                os.system(f'gunzip {tmp_path}')
-                path = tmp_path
+                os.system(f'gunzip {path}')
+                os.system(f"grep {path.replace('.gz', '')} > {tmp_path}/{elt}_ENMAX.txt")
+                os.system(f"gzip {path.replace('.gz', '')}")
+                path = f'{tmp_path}/{elt}_ENMAX.txt'
 
             with open(path, 'r') as pot_file:
 
@@ -102,7 +102,7 @@ def _get_POTCAR_ENMAX_values(
             ))
 
             ENMAX_list.append(float(enmax_value))
-
+            
             if path == tmp_path: os.system(f'rm -f {path}')
     
     return ENMAX_list
