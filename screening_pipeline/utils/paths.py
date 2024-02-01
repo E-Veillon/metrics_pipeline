@@ -16,7 +16,7 @@ from itertools import repeat
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils import PathLike
+from screening_pipeline.utils.utils import PathLike
 
 ########################################
 # LOCAL FUNCTIONS

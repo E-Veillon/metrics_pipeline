@@ -25,8 +25,8 @@ from pymatgen.io.cif import CifBlock
 ########################################
 # LOCAL MODULES
 
-#from screening_pipeline.utils import EL_PER_XC_VOL
-from screening_pipeline.utils import FormulaLike
+#from screening_pipeline.utils.fitted_values import EL_PER_XC_VOL
+from screening_pipeline.utils.typing import FormulaLike
 
 ########################################
 # LOCAL FUNCTIONS

@@ -33,7 +33,8 @@ from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils import PathLike, PMGRelaxSet, PMGStaticSet, is_float
+from screening_pipeline.utils.utils import is_float
+from screening_pipeline.utils.typing import PathLike, PMGRelaxSet, PMGStaticSet
 from screening_pipeline.utils.matcher import flatten
 from screening_pipeline.utils.fitted_values import U_VALUES
 from screening_pipeline.utils.paths import batch_add_new_dirs

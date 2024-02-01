@@ -24,7 +24,7 @@ from pymatgen.symmetry.analyzer import SymmetrizedStructure
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils.spacegroup import discard_rare_gas_structures, discard_rare_earth_structures
+from screening_pipeline.utils.periodic_table import discard_rare_gas_structures, discard_rare_earth_structures
 from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stderr
 
 ##################################################
