@@ -23,7 +23,8 @@ from screening_pipeline.utils import PathLike
 
 def add_new_dir(base_dir: PathLike, new_dir_name: PathLike) -> Path:
     '''
-    Creates a new directory inside given base directory.
+    Creates a new directory inside given base directory. If the subdirectory already exists, 
+    it is untouched but its path is still returned.
     
     Parameters:
         base_dir (str|Path): The base directory inside which the new one will be created.
@@ -51,7 +52,8 @@ def batch_add_new_dirs(
     ) -> List[Path]:
     '''
     Iterates through new_subdirs to create a bunch of subdirectories in base_dir.
-    Returns the list of created paths.
+    Returns the list of created paths. If the subdirectory already exists, it is 
+    untouched but its path is still returned.
 
     Parameters:
         base_dir (str|Path):    An existing directory where subdirectories should be created.
