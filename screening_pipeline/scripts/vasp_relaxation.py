@@ -22,7 +22,8 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils import PMGRelaxSet, _yaml_loader
+from screening_pipeline.utils.utils import _yaml_loader
+from screening_pipeline.utils.typing import PMGRelaxSet
 from screening_pipeline.utils.cif_io import read_cif
 from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_batch_launch
 
