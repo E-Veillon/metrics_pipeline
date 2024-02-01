@@ -56,7 +56,7 @@ def _get_POTCAR_ENMAX_values(
     potcar_path    = os.path.join(SETTINGS['PMG_VASP_PSP_DIR'], PotcarSingle.functional_dir[functional])
     ENMAX_list     = []
 
-    for elt in structure.composition.elements:
+    for elt in structure.composition.element_composition.elements:
         
         try:
             potcar_symbol = next(filter(
