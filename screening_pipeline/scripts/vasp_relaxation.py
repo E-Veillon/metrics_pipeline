@@ -50,7 +50,7 @@ def assert_args(args: Namespace) -> None:
     assert Path(args.output).is_dir(), \
     f'{args.output} found but it is not a directory.'
 
-    assert isinstance(args.preset, PMGRelaxSet), \
+    assert args.preset in PMGRelaxSet, \
     f'Provided relaxation preset must be one of the following:\n \
     {PMGRelaxSet}'
 

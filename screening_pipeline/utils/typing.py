@@ -12,7 +12,7 @@ PathLike    = Union[Path, str]
 
 FormulaLike = Union[str, Iterable[Union[str, int, Element]]]
 
-PMGRelaxSet = Literal[
+PMGRelaxSetType = Literal[
     'MITRelaxSet', 
     'MPRelaxSet', 
     'MPScanRelaxSet', 
@@ -22,8 +22,24 @@ PMGRelaxSet = Literal[
     'MVLScanRelaxSet'
 ]
 
-PMGStaticSet = Literal[
+PMGRelaxSet = {
+    'MITRelaxSet', 
+    'MPRelaxSet', 
+    'MPScanRelaxSet', 
+    'MPHSERelaxSet', 
+    'MPMetalRelaxSet', 
+    'MVLRelax52Set', 
+    'MVLScanRelaxSet'
+}
+
+PMGStaticSetType = Literal[
     'MPStaticSet', 
     'MatPESStaticSet', 
     'MPScanStaticSet'
 ]
+
+PMGStaticSet = {
+    'MPStaticSet', 
+    'MatPESStaticSet', 
+    'MPScanStaticSet'
+}

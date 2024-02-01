@@ -13,7 +13,7 @@ from .data_process import get_elements_from_entries, init_entries_and_group_by_d
     get_sub_entries, phase_diagram_init, calculate_instability_energies, \
     batch_calculate_instability_energies, calculate_delta_sol_band_gap, \
     batch_calculate_delta_sol_band_gaps
-from .typing import PathLike, FormulaLike, PMGRelaxSet, PMGStaticSet
+from .typing import PathLike, FormulaLike, PMGRelaxSetType, PMGStaticSetType
 
 __all__ = [
     "has_rare_gas", "discard_rare_gas_structures", 

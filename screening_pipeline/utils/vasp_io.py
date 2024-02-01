@@ -34,7 +34,7 @@ from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
 # LOCAL MODULES
 
 from screening_pipeline.utils.utils import is_float
-from screening_pipeline.utils.typing import PathLike, PMGRelaxSet, PMGStaticSet
+from screening_pipeline.utils.typing import PathLike, PMGRelaxSetType, PMGStaticSetType, PMGRelaxSet, PMGStaticSet
 from screening_pipeline.utils.matcher import flatten
 from screening_pipeline.utils.fitted_values import U_VALUES
 from screening_pipeline.utils.paths import batch_add_new_dirs
@@ -388,7 +388,7 @@ def _StaticSet_init(
 ########################################
 def vasp_relaxation_settings(
         structure: SiteCollection, 
-        preset: PMGRelaxSet = 'MITRelaxSet', 
+        preset: PMGRelaxSetType = 'MITRelaxSet', 
         user_corrections: Optional[Dict] = None
     ) -> VaspInput:
     '''
@@ -407,7 +407,7 @@ def vasp_relaxation_settings(
     '"structure" argument format not supported. \
     It must be an instance of the SiteCollection class or one of its subclasses.'
     
-    assert isinstance(preset, PMGRelaxSet), \
+    assert preset in PMGRelaxSet, \
     f'"preset" argument not recognized. \
     It must be one of the allowed pymatgen relaxation presets:\n\
     {PMGRelaxSet}.'
@@ -427,7 +427,7 @@ def vasp_relaxation_settings(
 
 def vasp_static_settings(
         structure: Optional[SiteCollection] = None, 
-        preset: PMGStaticSet = 'MPStaticSet', 
+        preset: PMGStaticSetType = 'MPStaticSet', 
         from_prev_calc: bool = False, 
         prev_calc_dir: Optional[PathLike] = None, 
         user_corrections: Optional[dict] = None
@@ -461,7 +461,7 @@ def vasp_static_settings(
     '"structure" argument format not supported. \
     It must be an instance of the SiteCollection class or one of its subclasses.'
     
-    assert isinstance(preset, PMGStaticSet), \
+    assert preset in PMGStaticSet, \
     f'"preset" argument not recognized. \
     It must be one of the allowed pymatgen static presets:\n\
     {PMGStaticSet}.'
@@ -711,7 +711,7 @@ def struct_charge_switch(structure: Structure, new_charge: float):
 
 def delta_sol_inputs_init(
         structs_data: dict, 
-        preset: PMGStaticSet = 'MPStaticSet', 
+        preset: PMGStaticSetType = 'MPStaticSet', 
         user_corrections: Optional[Dict] = None, 
         with_uncertainties: bool = False
     ) -> Tuple[List]:
