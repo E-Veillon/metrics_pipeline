@@ -78,6 +78,7 @@ def _get_POTCAR_ENMAX_values(
                 lambda symbol: symbol.find(str(elt)) != -1, 
                 potcar_dict.values()
             ))
+            print(f'potcar symbol found: {potcar_symbol}')
         except StopIteration:
             raise ValueError(
                 f"No POTCAR symbol found for element '{elt}' in provided POTCAR settings."
@@ -88,9 +89,10 @@ def _get_POTCAR_ENMAX_values(
 
             try:
                 enmax_line = next(filter(
-                    lambda line: potcar_symbol in line, 
+                    lambda line: f'POTCAR.{potcar_symbol}:' in line or f'{potcar_symbol}/POTCAR:' in line, 
                     enmax_file.readlines()
                 )).split()
+                print(f'enmax_line found: {enmax_line}')
             except StopIteration:
                 raise ValueError(
                     f"The POTCAR symbol '{potcar_symbol}' defined in the .yaml configuration file"
@@ -99,11 +101,8 @@ def _get_POTCAR_ENMAX_values(
                     "compiles the right POTCARs."
                 )
 
-        enmax_value = next(filter(
-            lambda word: is_float(word), 
-            enmax_line
-        ))
-
+        enmax_value = enmax_line[enmax_line.index('ENMAX') + 2].rstrip(';')
+        print(f"Final ENMAX value found for '{potcar_symbol}': {enmax_value}")
         ENMAX_list.append(float(enmax_value))
 
     return ENMAX_list
@@ -141,6 +140,7 @@ def _MITRelaxSet_INCAR_corrections(**kwargs) -> Dict:
 
     corrected_EDIFF = float(5e-5)*structure.num_sites
     corrected_ENCUT = 1.3*max(ENMAX_list)
+    print(f"Calculated ENCUT: {corrected_ENCUT}")
     corrected_LDAUL = {
         'F': {
             'Ag': 2, 'Co': 2, 'Cr': 2, 'Cu': 2, 'Fe': 2, 
