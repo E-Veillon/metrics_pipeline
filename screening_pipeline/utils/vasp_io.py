@@ -54,6 +54,7 @@ def _get_POTCAR_ENMAX_values(
     potcar_dict    = user_potcar_dict or default_config.get('POTCAR', {})
     functional     = user_potcar_functional or default_config.get('POTCAR_FUNCTIONAL', 'PBE')
     potcar_path    = os.path.join(SETTINGS['PMG_VASP_PSP_DIR'], PotcarSingle.functional_dir[functional])
+    tmp_path       = Path(os.path.expanduser('~/tmppot/'))
     ENMAX_list     = []
 
     for elt in structure.composition.element_composition.elements:
@@ -79,21 +80,30 @@ def _get_POTCAR_ENMAX_values(
             path = os.path.expanduser(path)
             path = zpath(path)
 
-            if os.path.isfile(path):
+            if not os.path.isfile(path): continue
 
-                with open(path, 'r') as pot_file:
+            if path.endswith('.gz'):
+                tmp_path.mkdir(exist_ok=True)
+                tmp_path = os.path.join(str(tmp_path), Path(path).name)
+                os.system(f'cp {path} {tmp_path}')
+                os.system(f'gunzip {tmp_path}')
+                path = tmp_path
 
-                    enmax_line = next(filter(
-                        lambda line: line.lstrip().startswith("ENMAX"), 
-                        pot_file.readlines()
-                    )).split()
+            with open(path, 'r') as pot_file:
 
-                enmax_value = next(filter(
-                    lambda word: is_float(word), 
-                    enmax_line
-                ))
+                enmax_line = next(filter(
+                    lambda line: line.lstrip().startswith("ENMAX"), 
+                    pot_file.readlines()
+                )).split()
 
-                ENMAX_list.append(float(enmax_value))
+            enmax_value = next(filter(
+                lambda word: is_float(word), 
+                enmax_line
+            ))
+
+            ENMAX_list.append(float(enmax_value))
+
+            if path == tmp_path: os.system(f'rm -f {path}')
     
     return ENMAX_list
 
