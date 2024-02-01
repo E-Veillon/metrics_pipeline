@@ -50,7 +50,7 @@ def assert_args(args: Namespace) -> None:
     assert Path(args.output).is_dir(), \
     f'{args.output} found but it is not a directory.'
 
-    assert isinstance(args.method, PMGRelaxSet), \
+    assert isinstance(args.preset, PMGRelaxSet), \
     f'Provided relaxation preset must be one of the following:\n \
     {PMGRelaxSet}'
 
@@ -144,7 +144,7 @@ def main():
     input_file    = Path(args.filename)
     exe_path      = args.executable_path
     outdir        = Path(args.output)
-    preset        = args.method
+    preset        = args.preset
     user_settings = _yaml_loader(args.user_settings)
     workers       = args.workers
 

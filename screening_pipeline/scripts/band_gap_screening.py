@@ -41,7 +41,7 @@ def assert_args(args: Namespace) -> None:
     assert Path(args.output).is_dir(), \
     f'{args.output}: No directory found.'
 
-    assert isinstance(args.method, PMGStaticSet), \
+    assert isinstance(args.preset, PMGStaticSet), \
     f'Provided static preset must be one of the following:\n \
     {PMGStaticSet}'
 
