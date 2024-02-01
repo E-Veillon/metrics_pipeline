@@ -39,7 +39,7 @@ def add_new_dir(base_dir: PathLike, new_dir_name: PathLike) -> Path:
     assert isinstance(new_dir_name, PathLike)
 
     new_dir  = Path('/'.join((str(base_dir), str(new_dir_name))))
-    new_dir.mkdir()
+    new_dir.mkdir(exist_ok=True)
 
     return new_dir
 
