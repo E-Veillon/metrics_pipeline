@@ -78,7 +78,6 @@ def _get_POTCAR_ENMAX_values(
                 lambda symbol: symbol.find(str(elt)) != -1, 
                 potcar_dict.values()
             ))
-            print(f'potcar symbol found: {potcar_symbol}')
         except StopIteration:
             raise ValueError(
                 f"No POTCAR symbol found for element '{elt}' in provided POTCAR settings."
@@ -101,7 +100,6 @@ def _get_POTCAR_ENMAX_values(
                 )
 
         enmax_value = enmax_line[enmax_line.index('ENMAX') + 2].rstrip(';')
-        print(f"ENMAX value found for '{potcar_symbol}': {enmax_value}")
         ENMAX_list.append(float(enmax_value))
 
     return ENMAX_list
@@ -139,7 +137,6 @@ def _MITRelaxSet_INCAR_corrections(**kwargs) -> Dict:
 
     corrected_EDIFF = round(float(5e-5)*structure.num_sites, 6)
     corrected_ENCUT = 1.3*max(ENMAX_list)
-    print(f"Calculated ENCUT: {corrected_ENCUT}")
     corrected_LDAUL = {
         'F': {
             'Ag': 2, 'Co': 2, 'Cr': 2, 'Cu': 2, 'Fe': 2, 
@@ -763,7 +760,6 @@ def delta_sol_inputs_init(
         structure = data['structure']
         N_val     = get_all_valence_electrons(structure)
         run_set   = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
-        print(f'{type(run_set)=}')
         # Search for the right N* parameter to use
         pot_func = run_set.get('POTCAR_FUNCTIONAL', 'PBE')
 
