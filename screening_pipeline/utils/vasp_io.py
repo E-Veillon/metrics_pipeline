@@ -227,7 +227,7 @@ def vasp_batch_launch(
 
     assert all(isinstance(vasp_input, VaspInput) for vasp_input in vasp_inputs), \
     f'vasp_inputs: Expected VaspInput objects, got types listed below:\n\
-    {print(type(vasp_input)) for vasp_input in vasp_inputs}'
+    {print(list((type(vasp_input) for vasp_input in vasp_inputs)))}'
 
     assert isinstance(base_dir, (Path, str)), \
     f'base_dir: expected a str or Path, got {type(base_dir)} instead.'
