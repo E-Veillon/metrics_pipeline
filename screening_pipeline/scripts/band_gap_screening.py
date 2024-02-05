@@ -51,10 +51,10 @@ def assert_args(args: Namespace) -> None:
     assert args.user_settings.endswith('.yaml'), \
     'user settings file must be of .yaml format.'
 
-    assert args.minimum >= 0.0 and args.valid_maximum >= 0.0, \
+    assert args.minimum >= 0.0 and args.maximum >= 0.0, \
     f"Acceptable band gap values must be positive or zero."
 
-    assert args.minimum != args.valid_maximum, \
+    assert args.minimum != args.maximum, \
     f"Acceptable band gap values cannot have the same value."
 
     assert args.accept.endswith('.txt'), \
@@ -200,8 +200,8 @@ def main():
     exe_path       = args.executable_path
     outdir         = Path(args.output)
     preset         = args.preset
-    user_settings  = _yaml_loader(args.user_settings)
-    valid_interval = sorted([args.valid_minimum, args.valid_maximum])
+    user_settings  = _yaml_loader(args.user_settings, on_error='raise')
+    valid_interval = sorted([args.minimum, args.maximum])
     accept_file    = args.accept
     ignore_file    = args.ignore
     workers        = args.workers

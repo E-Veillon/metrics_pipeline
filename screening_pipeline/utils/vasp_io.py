@@ -92,7 +92,6 @@ def _get_POTCAR_ENMAX_values(
                     lambda line: f'POTCAR.{potcar_symbol}:' in line or f'{potcar_symbol}/POTCAR:' in line, 
                     enmax_file.readlines()
                 )).split()
-                print(f'enmax_line found: {enmax_line}')
             except StopIteration:
                 raise ValueError(
                     f"The POTCAR symbol '{potcar_symbol}' defined in the .yaml configuration file"
@@ -102,7 +101,7 @@ def _get_POTCAR_ENMAX_values(
                 )
 
         enmax_value = enmax_line[enmax_line.index('ENMAX') + 2].rstrip(';')
-        print(f"Final ENMAX value found for '{potcar_symbol}': {enmax_value}")
+        print(f"ENMAX value found for '{potcar_symbol}': {enmax_value}")
         ENMAX_list.append(float(enmax_value))
 
     return ENMAX_list
@@ -138,7 +137,7 @@ def _MITRelaxSet_INCAR_corrections(**kwargs) -> Dict:
         structure, default_config, user_potcar_dict, user_potcar_functional
     )
 
-    corrected_EDIFF = float(5e-5)*structure.num_sites
+    corrected_EDIFF = round(float(5e-5)*structure.num_sites, 6)
     corrected_ENCUT = 1.3*max(ENMAX_list)
     print(f"Calculated ENCUT: {corrected_ENCUT}")
     corrected_LDAUL = {
@@ -226,9 +225,15 @@ def vasp_batch_launch(
                                     Defaults to 1.
     '''
 
-    assert isinstance(vasp_exe, (Path, str))
-    assert all(isinstance(vasp_input, VaspInput) for vasp_input in vasp_inputs)
-    assert isinstance(base_dir, PathLike)
+    assert isinstance(vasp_exe, (Path, str)), \
+    f'vasp_exe: expected a str or Path, got {type(vasp_exe)} instead.'
+
+    assert all(isinstance(vasp_input, VaspInput) for vasp_input in vasp_inputs), \
+    f'vasp_inputs: Expected VaspInput objects, got types listed below:\n\
+    {print(type(vasp_input)) for vasp_input in vasp_inputs}'
+
+    assert isinstance(base_dir, (Path, str)), \
+    f'base_dir: expected a str or Path, got {type(base_dir)} instead.'
     
     base_dir = Path(base_dir)
 
@@ -752,15 +757,13 @@ def delta_sol_inputs_init(
         and a list of the VaspInput objects for these runs, both in same order.
     '''
     
-    def _inputs_init(struct_tuple: Tuple[str, Dict]) -> List[Tuple[str, VaspInput]]:
+    def _inputs_init(name: str, data: Dict[str, Any]) -> List[Tuple[str, VaspInput]]:
 
         # Initialize input sets
-        name      = struct_tuple[0]
-        data      = struct_tuple[1]
         structure = data['structure']
         N_val     = get_all_valence_electrons(structure)
         run_set   = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
-
+        print(f'{type(run_set)=}')
         # Search for the right N* parameter to use
         pot_func = run_set.get('POTCAR_FUNCTIONAL', 'PBE')
 
@@ -785,10 +788,12 @@ def delta_sol_inputs_init(
                 n_star_type=n_star_type
             )
 
-            run_plus       = run_set.copy().update({'NELECT': N_val + n_ratio})
-            run_minus      = run_set.copy().update({'NELECT': N_val - n_ratio})
-            run_plus_path  = Path('_'.join((name , n_star_type.lower(), 'plus')))
-            run_minus_path = Path('_'.join((name , n_star_type.lower(), 'minus')))
+            run_plus, run_minus = run_set.as_dict(), run_set.as_dict()
+            run_plus['INCAR'].update({'NELECT': N_val + n_ratio})
+            run_minus['INCAR'].update({'NELECT': N_val - n_ratio})
+            run_plus, run_minus = VaspInput.from_dict(run_plus), VaspInput.from_dict(run_minus)
+            run_plus_path  = '_'.join((name , n_star_type.lower(), 'plus'))
+            run_minus_path = '_'.join((name , n_star_type.lower(), 'minus'))
 
             struct_runs_list += [(run_plus_path, run_plus), (run_minus_path, run_minus)]
 

@@ -4,11 +4,15 @@ Module implementing general utilitary functions.
 
 
 from pathlib import Path
-from typing import Sequence, List, Any
+from typing import Sequence, List, Any, Literal
 import itertools
 from ruamel.yaml import YAML
+import warnings
 
 from screening_pipeline.utils.typing import PathLike
+
+class BadYamlWarning(UserWarning):
+    '''Class of warnings related to .yaml files reading.'''
 
 def is_float(string: str) -> bool:
     str_list = string.split(sep='.')
@@ -34,7 +38,7 @@ def flatten(sequence: Sequence[Any], level_of_flattening: int = 1) -> List:
     return sequence
 
 
-def _yaml_loader(file_path: PathLike):
+def _yaml_loader(file_path: PathLike, on_error: Literal['raise', 'warn', 'ignore'] = 'warn'):
     if not isinstance(file_path, (Path, str)):
         raise TypeError(f"Expected a Path object or str, got {type(file_path)} instead.")
     
@@ -48,13 +52,16 @@ def _yaml_loader(file_path: PathLike):
 
     yaml = YAML()
     with open(file_path, encoding="utf-8") as yaml_file:
-        try: yaml_data = yaml.load(yaml_file) or {}
+        try: yaml_data = yaml.load(yaml_file)
         except Exception as exc:
-            warn_msg = f'An exception was thrown during yaml loading of file {str(file_path)}.\n\
-                        Data written in this file is ignored to proceed.\n\
-                        Thrown exception below:\n\
-                        {exc}'
-            print(warn_msg)
+            if on_error == 'raise': raise exc
+            elif on_error == 'warn':
+                warnings.warn(
+                    f'An exception was thrown during yaml loading of file {str(file_path)}.\n'
+                    f'Data written in this file is ignored to proceed.\n'
+                    f'Thrown exception below:\n'
+                    f'{exc}', BadYamlWarning
+                )
             return {}
         return dict(yaml_data)
 
