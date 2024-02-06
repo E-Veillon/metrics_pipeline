@@ -467,8 +467,8 @@ def calculate_delta_sol_band_gap(
                         - Its name, 
                         - The Structure object, 
                         - Its original relaxed total energy, 
-                        - Its total energy with more charge density, 
-                        - Its total energy with less charge density
+                        - Its total energy with more electrons, 
+                        - Its total energy with less electrons
     Returns:
         Tuple[str, float]: The name of the structure and its band gap value.
     '''
@@ -481,6 +481,7 @@ def calculate_delta_sol_band_gap(
     E_N0_plus_n  = data['E_N0_plus_n']
     E_N0_minus_n = data['E_N0_minus_n']
     n_ratio      = get_delta_sol_el_ratio(structure)
+
     # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap 
     # (Ref 32 in screening_pipeline/Bibliography))
     E_band_gap   = (E_N0_plus_n + E_N0_minus_n - 2*E_N0)/n_ratio
@@ -502,7 +503,7 @@ def batch_calculate_delta_sol_band_gaps(
     Parameters:
         structs_data (dict):    Dict containing the original data extracted from previous VASP calculation.
 
-        bg_structs_data (dict): Dict of the calculated data on structures with changed charge density.
+        bg_structs_data (dict): Dict of the calculated data on structures with changed electron numbers.
 
         workers (int):          The number of parallel processes to spawn. Defaults to 1.
     
