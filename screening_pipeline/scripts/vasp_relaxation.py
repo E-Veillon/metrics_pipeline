@@ -64,6 +64,11 @@ def assert_args(args: Namespace) -> None:
     assert args.user_settings.endswith('.yaml'), \
     'user settings file must be of .yaml format.'
 
+    assert args.workers >= 1, \
+    '"workers" arg must be strictly positive.'
+
+    assert args.task_index >= 0 or args.task_index is None, \
+    '"task_index" arg must be positive or zero.'
 
 ########################################
 # MAIN FUNCTION
@@ -141,13 +146,11 @@ def main():
         metavar='int',
     )
     parser.add_argument(
-        '-i', 
-        '--index', 
+        '-t', 
+        '--task_index', 
         type=int, 
-        default=-1, 
         help='If a job array is used, provide here the structure index to treat according to task IDs\n \
-            (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).\n \
-            Defaults to -1, which deactivates job array handling.'
+            (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).\n'
     )
 
     args: Namespace = parser.parse_args()
@@ -160,7 +163,7 @@ def main():
     preset        = args.preset
     user_settings = _yaml_loader(args.user_settings)
     workers       = args.workers
-    struct_idx    = args.index
+    struct_idx    = args.task_index
 
 
     # MAIN BLOCK
@@ -172,7 +175,7 @@ def main():
         keep_rare_earths=True # Avoid calling rare earth screening function
     )
 
-    if struct_idx < 0: # Make use of tqdm.contrib.concurrent.process_map() to do the calculation
+    if not struct_idx: # Make use of tqdm.contrib.concurrent.process_map() to do the calculation
 
         # Setup parallel processing
         nbr_struct      = len(structures)
@@ -215,7 +218,7 @@ def main():
 
         vasp_launcher(vasp_exe=exe_path, vasp_input=vasp_input, path=os.path.join(outdir, dir_name))
     
-    else: raise AssertionError('struct_idx arg value is not recognized as a valid integer but somehow passed argparse type checking.')
+    else: raise AssertionError('"task_index" arg must be positive or zero.')
 
     stop = datetime.now()
     print(f'Elapsed time: {stop-start}')
