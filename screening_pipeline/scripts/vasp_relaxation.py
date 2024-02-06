@@ -150,7 +150,7 @@ def main():
         '--task_index', 
         type=int, 
         help='If a job array is used, provide here the structure index to treat according to task IDs\n \
-            (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).\n'
+            (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).'
     )
 
     args: Namespace = parser.parse_args()
@@ -175,7 +175,9 @@ def main():
         keep_rare_earths=True # Avoid calling rare earth screening function
     )
 
-    if not struct_idx: # Make use of tqdm.contrib.concurrent.process_map() to do the calculation
+    if not struct_idx: # Use tqdm.contrib.concurrent.process_map() to do the calculation
+        
+        #TODO: Revoir cette partie puisqu'elle ne fonctionne que pour une structure à la fois
 
         # Setup parallel processing
         nbr_struct      = len(structures)
