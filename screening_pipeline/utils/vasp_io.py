@@ -622,6 +622,7 @@ def extract_vasp_data_for_delta_sol(
 def batch_extract_vasp_data(
         method: Literal['convex_hull', 'delta_sol'], 
         base_dir: PathLike = '.', 
+        structs_names: Optional[Sequence[str]] = None, 
         ignore_file: str = 'rejected.txt', 
         workers: int = 1
 ) -> Dict[str, Dict[str, Any]]:
@@ -635,6 +636,10 @@ def batch_extract_vasp_data(
                                 Actual methods supported: 'convex_hull', 'delta_sol'.
 
         base_dir (str|Path):    Directory containing structures subdirs to extract data from.
+
+        structs_names ([str]):  Provide specific structures sub-directories to extract data from.
+                                If specified, only specified subdirs in base_dir are checked.
+                                If not, all subdirs in base_dir are checked.
 
         ignore_file (str):      Checks whether the provided file name exists in each 
                                 subdirectory. Structure directories containing this file 
@@ -676,6 +681,10 @@ def batch_extract_vasp_data(
 
     base_dir           = Path(base_dir)
     structs_dir_list   = list(filter(is_struct_dir, base_dir.iterdir()))
+    
+    if structs_names:
+        structs_dir_list = list(filter(lambda path: path.name in structs_names, structs_dir_list))
+    
     nbr_structs        = len(structs_dir_list)
     chunksize          = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
 
