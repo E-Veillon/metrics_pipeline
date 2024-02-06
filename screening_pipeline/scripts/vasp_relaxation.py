@@ -8,16 +8,20 @@ The relaxation results then may be used in other scripts for material properties
 ########################################
 # SYSTEM I/O MODULES
 
+import os
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
-from pathlib import Path
 
 ########################################
 # OPTIMIZATION MODULES
 
-from itertools import count
 from functools import partial
 from tqdm.contrib.concurrent import process_map
+
+########################################
+# PYTHON MATERIAL GENOMICS PACKAGE
+
+from pymatgen.core.structure import SiteCollection
 
 ########################################
 # LOCAL MODULES
@@ -25,41 +29,40 @@ from tqdm.contrib.concurrent import process_map
 from screening_pipeline.utils.utils import _yaml_loader
 from screening_pipeline.utils.typing import PMGRelaxSet
 from screening_pipeline.utils.cif_io import read_cif
-from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_batch_launch
+from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_batch_launch, vasp_launcher
 
 ########################################
 # LOCAL FUNCTIONS
 
 def assert_args(args: Namespace) -> None:
     
-    assert Path(args.filename).exists(), \
+    assert os.path.exists(args.filename), \
     f'{args.filename}: path to input file not found.'
     
-    assert Path(args.filename).is_file(), \
+    assert os.path.isfile(args.filename), \
     f'{args.filename} found but it is not a file.'
 
     assert args.filename.endswith('.cif'), \
     'Input structure data must be in CIF format.'
 
-    assert Path(args.executable_path).exists(), \
-    f'{args.executable_path}: No such file found.'
+    assert os.path.exists(args.executable_path), \
+    f'{args.executable_path}: executable file not found.'
 
-    assert Path(args.output).exists(), \
+    assert os.path.exists(args.output), \
     f'{args.output}: path to output directory not found.'
 
-    assert Path(args.output).is_dir(), \
+    assert os.path.isdir(args.output), \
     f'{args.output} found but it is not a directory.'
 
     assert args.preset in PMGRelaxSet, \
     f'Provided relaxation preset must be one of the following:\n \
     {PMGRelaxSet}'
 
-    assert Path(args.user_settings).is_file(), \
+    assert os.path.isfile(args.user_settings), \
     f'{args.user_settings}: file not found.'
 
     assert args.user_settings.endswith('.yaml'), \
     'user settings file must be of .yaml format.'
-
 
 
 ########################################
@@ -137,16 +140,27 @@ def main():
         help='Number of parallel processes to spawn.',
         metavar='int',
     )
+    parser.add_argument(
+        '-i', 
+        '--index', 
+        type=int, 
+        default=-1, 
+        help='If a job array is used, provide here the structure index to treat according to task IDs\n \
+            (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).\n \
+            Defaults to -1, which deactivates job array handling.'
+    )
+
     args: Namespace = parser.parse_args()
 
     assert_args(args)
     
-    input_file    = Path(args.filename)
+    input_file    = args.filename
     exe_path      = args.executable_path
-    outdir        = Path(args.output)
+    outdir        = args.output
     preset        = args.preset
     user_settings = _yaml_loader(args.user_settings)
     workers       = args.workers
+    struct_idx    = args.index
 
 
     # MAIN BLOCK
@@ -157,34 +171,51 @@ def main():
         keep_rare_gases=True, # Avoid calling rare gaz screening function
         keep_rare_earths=True # Avoid calling rare earth screening function
     )
+
+    if struct_idx < 0: # Make use of tqdm.contrib.concurrent.process_map() to do the calculation
+
+        # Setup parallel processing
+        nbr_struct      = len(structures)
+        chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
+        vasp_setup      = partial(
+            vasp_relaxation_settings, 
+            preset=preset, 
+            user_corrections=user_settings
+        )
+        dir_names_list  = [f'{idx}_{structure.composition.reduced_formula}' for idx, structure in enumerate(structures)]
+
+        # Write VaspInput objects from structures and chosen preset
+        vasp_inputs = list(process_map(
+            vasp_setup, 
+            structures, 
+            max_workers=workers, 
+            chunksize=chunksize, 
+            desc='Writing VASP input files'
+        ))
+
+        # Use written VaspInput objects to write input files and run VASP
+        vasp_batch_launch(
+            vasp_exe=exe_path, 
+            vasp_inputs=vasp_inputs, 
+            base_dir=outdir, 
+            subdir_names=dir_names_list, 
+            workers=workers
+        )
     
-    # Setup parallel processing
-    nbr_struct      = len(structures)
-    chunksize       = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
-    vasp_setup      = partial(
-        vasp_relaxation_settings, 
-        preset=preset, 
-        user_corrections=user_settings
-    )
-    dir_names_list  = [f'{idx}_{structure.composition.reduced_formula}' for idx, structure in enumerate(structures)]
+    elif struct_idx >= 0: # Use the job array to parallelize the calculation
 
-    # Write VaspInput objects from structures and chosen preset
-    vasp_inputs = list(process_map(
-        vasp_setup, 
-        structures, 
-        max_workers=workers, 
-        chunksize=chunksize, 
-        desc='Writing VASP input files'
-    ))
+        structure: SiteCollection = structures[struct_idx]
+        dir_name                  = f'{struct_idx}_{structure.composition.reduced_formula}'
+        
+        vasp_input = vasp_relaxation_settings(
+            structure=structure, 
+            preset=preset, 
+            user_corrections=user_settings
+        )
 
-    # Use written VaspInput objects to write input files and run VASP
-    vasp_batch_launch(
-        vasp_exe=exe_path, 
-        vasp_inputs=vasp_inputs, 
-        base_dir=outdir, 
-        subdir_names=dir_names_list, 
-        workers=workers
-    )
+        vasp_launcher(vasp_exe=exe_path, vasp_input=vasp_input, path=os.path.join(outdir, dir_name))
+    
+    else: raise AssertionError('struct_idx arg value is not recognized as a valid integer but somehow passed argparse type checking.')
 
     stop = datetime.now()
     print(f'Elapsed time: {stop-start}')
