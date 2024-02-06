@@ -163,17 +163,26 @@ def _MITRelaxSet_INCAR_corrections(**kwargs) -> Dict:
 
 ########################################
 
-def vasp_launcher(vasp_exe: PathLike, vasp_input: VaspInput, path: PathLike) -> None:
+def vasp_launcher(vasp_exe: PathLike, path: PathLike, vasp_input: VaspInput) -> None:
+    '''
+    Function to run VASP from a VaspInput object.
 
+    Parameters:
+        vasp_exe (str|Path):    Absolute path to the VASP executable.
+
+        path (str|Path):        Path to the directory where VASP files will be written and run.
+
+        vasp_input (VaspInput): The VaspInput object containing all necessary data to run VASP.
+    '''
     assert isinstance(vasp_exe, (Path, str))
-    assert isinstance(vasp_input, VaspInput)
     assert isinstance(path, PathLike)
+    assert isinstance(vasp_input, VaspInput)
 
-    vasp_exe_list = list((vasp_exe,))
+    vasp_exe_list = list((vasp_exe,)) # Necessary for subprocess to take it as a full command
     path          = str(path)
-    calc_dir      = Path(path)
-    out_file      = Path('/'.join((path, "vasp.out")))
-    err_file      = Path('/'.join((path, "vasp.err")))
+    calc_dir      = path
+    out_file      = os.path.join(path, "vasp.out")
+    err_file      = os.path.join(path, "vasp.err")
     
     try:
         vasp_input.run_vasp(
@@ -187,19 +196,18 @@ def vasp_launcher(vasp_exe: PathLike, vasp_input: VaspInput, path: PathLike) -> 
 
 ########################################
 
-def _vasp_launcher_batch_wrapper(args_tuple: Tuple[VaspInput, PathLike]):
+def _vasp_launcher_batch_wrapper(args_tuple: Tuple[PathLike, VaspInput]):
     vasp_exe   = args_tuple[0]
-    vasp_input = args_tuple[1]
-    path       = args_tuple[2]
-    vasp_launcher(vasp_exe, vasp_input, path)
+    path       = args_tuple[1]
+    vasp_input = args_tuple[2]
+    vasp_launcher(vasp_exe, path, vasp_input)
 
 ########################################
 
 def vasp_batch_launch(
         vasp_exe: PathLike, 
-        vasp_inputs: Sequence[VaspInput], 
         base_dir: PathLike, 
-        subdir_names: Sequence[PathLike], 
+        inputs_data: Dict[PathLike, VaspInput], 
         workers: int = 1
     ) -> None:
     '''
@@ -211,12 +219,9 @@ def vasp_batch_launch(
     Parameters:
         vasp_exe (Path|str):        Path to the VASP executable.
 
-        vasp_inputs ([VaspInput]):  The objects defining how to write VASP input files in each subdirectory.
+        inputs_data (dict):         Dict of structure data to run, of the form {subdir_name: VaspInput}.
 
         base_dir (str|Path):        The directory where the subdirs should be created.
-
-        subdir_names ([str|Path]):  The names or subpaths for created subdirectories.
-                                    Note that its length must match the length of vasp_inputs.
 
         workers (int):              The number of parallel processes to spawn.
                                     Defaults to 1.
@@ -225,9 +230,9 @@ def vasp_batch_launch(
     assert isinstance(vasp_exe, (Path, str)), \
     f'vasp_exe: expected a str or Path, got {type(vasp_exe)} instead.'
 
-    assert all(isinstance(vasp_input, VaspInput) for vasp_input in vasp_inputs), \
-    f'vasp_inputs: Expected VaspInput objects, got types listed below:\n\
-    {print(list((type(vasp_input) for vasp_input in vasp_inputs)))}'
+    assert all(isinstance(vasp_input, VaspInput) for vasp_input in inputs_data.values()), \
+    f'vasp_inputs: Expected VaspInput objects, got types listed belinputs_data.values()
+    {print(list((type(vasp_input) for vasp_input in inputs_data.values())))}'
 
     assert isinstance(base_dir, (Path, str)), \
     f'base_dir: expected a str or Path, got {type(base_dir)} instead.'
@@ -235,12 +240,14 @@ def vasp_batch_launch(
     base_dir = Path(base_dir)
 
     assert base_dir.is_dir()
-    assert all(isinstance(subdir_name, PathLike) for subdir_name in subdir_names)
-    assert len(vasp_inputs) == len(subdir_names)
+    assert all(isinstance(subdir_name, PathLike) for subdir_name in inputs_data.keys())
+    #assert len(vasp_inputs) == len(subdir_names)
     assert isinstance(workers, int) and workers >= 1
 
-    subpaths_list = batch_add_new_dirs(base_dir=base_dir, new_subdirs=subdir_names)
-    inputs_list   = list(zip(repeat(vasp_exe), vasp_inputs, subpaths_list))
+    subpaths_list = batch_add_new_dirs(base_dir=base_dir, new_subdirs=list(inputs_data.keys()))
+    inputs_data   = {subpath: inputs_data.get(subpath.name) for subpath in subpaths_list}
+    inputs_list   = list(zip(repeat(vasp_exe), inputs_data.items()))
+    inputs_list   = list(tuple(flatten(input)) for input in inputs_list)
 
     process_map(
         _vasp_launcher_batch_wrapper, 
@@ -795,10 +802,8 @@ def delta_sol_inputs_init(
 
         return struct_runs_list
 
-    input_data   = flatten(list(starmap(_inputs_init, structs_data.items())))
-    subdirs_list = [tup[0] for tup in input_data]
-    inputs_list  = [tup[1] for tup in input_data]
+    inputs_data = dict(flatten(list(starmap(_inputs_init, structs_data.items()))))
 
-    return subdirs_list, inputs_list
+    return inputs_data
 
 ########################################
