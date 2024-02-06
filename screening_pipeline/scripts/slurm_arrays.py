@@ -20,12 +20,11 @@ def main():
         help='Input file.'
     )
     parser.add_argument(
-        'line_to_treat', 
+        'index', 
         type=int, 
         help='Index number of the line to write. The output file will have the form "_[index_nbr].txt".\n \
             This argument is meant to be used with slurm job array tasks indexes.', 
-        metavar='job_array_task_id', 
-        dest='index'
+        metavar='job_array_task_id' 
     )
     parser.add_argument(
         '-o', 
@@ -43,18 +42,21 @@ def main():
     assert args.input.endswith('.txt'), \
     f'Input file must be a .txt file (got {args.input})'
 
+    assert args.index >= 0, \
+    f'Line index must be positive or zero.'
+
     if args.outdir == '[input]_out':
         args.outdir = args.input.replace('.txt', '_out')
     
     Path(args.outdir).mkdir(exist_ok=True)
 
-    with open(args.input, 'r') as read_file:
+    with open(args.input, 'rt') as read_file:
         lines = read_file.readlines()
 
-    assert args.index <= len(lines), \
-    f'Provided index "{args.index}" is out of the range of the text ({len(lines)}).'
+    assert args.index < len(lines), \
+    f'Provided index "{args.index}" is out of the range of the text ({len(lines)-1}).'
 
-    with open(os.path.join(args.outdir, f'_{args.index}.txt')) as out_file:
+    with open(os.path.join(args.outdir, f'_{args.index}.txt'), 'wt') as out_file:
         out_file.write(lines[args.index])
     
     stop = datetime.now()
