@@ -10,9 +10,9 @@ Reference for Δ-Sol method:
 ########################################
 # SYSTEM I/O MODULES
 
+import os
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
-from pathlib import Path
 
 ########################################
 # PYTHON MATERIALS GENOMICS PACKAGE
@@ -23,7 +23,7 @@ from pathlib import Path
 
 from screening_pipeline.utils.utils import _yaml_loader
 from screening_pipeline.utils.typing import PMGStaticSet
-from screening_pipeline.utils.vasp_io import vasp_batch_launch, batch_extract_vasp_data, \
+from screening_pipeline.utils.vasp_io import vasp_batch_launch, vasp_launcher, batch_extract_vasp_data, \
                                              delta_sol_inputs_init
 from screening_pipeline.utils.data_process import batch_calculate_delta_sol_band_gaps
 
@@ -32,20 +32,20 @@ from screening_pipeline.utils.data_process import batch_calculate_delta_sol_band
 
 def assert_args(args: Namespace) -> None:
 
-    assert Path(args.input_dir).is_dir(), \
+    assert os.path.isdir(args.input_dir), \
     f'{args.input_dir}: No directory found.'
 
-    assert Path(args.executable_path).exists(), \
+    assert os.path.exists(args.executable_path), \
     f'{args.executable_path}: No such file found.'
 
-    assert Path(args.output).is_dir(), \
+    assert os.path.isdir(args.output), \
     f'{args.output}: No directory found.'
 
     assert args.preset in PMGStaticSet, \
     f'Provided static preset must be one of the following:\n \
     {PMGStaticSet}'
 
-    assert Path(args.user_settings).is_file(), \
+    assert os.path.isfile(args.user_settings), \
     f'{args.user_settings}: file not found.'
 
     assert args.user_settings.endswith('.yaml'), \
@@ -186,6 +186,13 @@ def main():
         metavar='int',
     )
     parser.add_argument(
+        '-t', 
+        '--task_index', 
+        type=int, 
+        help='If a job array is used, provide here the structure index to treat according to task IDs\n \
+            (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).'
+    )
+    parser.add_argument(
         '--with_uncertainties', 
         action='store_true', 
         help='Pass this flag to enable computation of minimal and maximal Δ-Sol band gaps.\n\
@@ -196,15 +203,16 @@ def main():
 
     assert_args(args)
 
-    input_dir      = Path(args.input_dir)
+    input_dir      = args.input_dir
     exe_path       = args.executable_path
-    outdir         = Path(args.output)
+    outdir         = args.output
     preset         = args.preset
     user_settings  = _yaml_loader(args.user_settings, on_error='raise')
     valid_interval = sorted([args.minimum, args.maximum])
     accept_file    = args.accept
     ignore_file    = args.ignore
     workers        = args.workers
+    struct_idx     = args.task_index
 
 
     # MAIN BLOCK
@@ -217,28 +225,64 @@ def main():
         workers=workers
     )
 
-    subdirs_list, inputs_list = delta_sol_inputs_init(
-        structs_data=structs_data, 
-        preset=preset, 
-        user_corrections=user_settings or None, 
-        with_uncertainties=args.with_uncertainties
-    )
+    if not struct_idx: # Use tqdm.contrib.concurrent.process_map() to do the calculation
 
-    # Launch static calculations
-    vasp_batch_launch(
-        vasp_exe=exe_path, 
-        vasp_inputs=inputs_list, 
-        base_dir=outdir, 
-        subdir_names=subdirs_list, 
-        workers=workers
-    )
+        inputs_data = delta_sol_inputs_init(
+            structs_data=structs_data, 
+            preset=preset, 
+            user_corrections=user_settings or None, 
+            with_uncertainties=args.with_uncertainties
+        )
 
-    # Extract resulting energies
-    bg_structs_data = batch_extract_vasp_data(
-        method='delta_sol', 
-        base_dir=outdir, 
-        workers=workers
-    )
+        # Launch static calculations
+        vasp_batch_launch(
+            vasp_exe=exe_path, 
+            inputs_data=inputs_data, 
+            base_dir=outdir, 
+            workers=workers
+        )
+
+        # Extract resulting energies
+        bg_structs_data = batch_extract_vasp_data(
+            method='delta_sol', 
+            base_dir=outdir, 
+            workers=workers
+        )
+
+        E_band_gaps = batch_calculate_delta_sol_band_gaps(
+            structs_data, bg_structs_data, workers
+        )
+
+    elif struct_idx >= 0: # Use the job array to parallelize the calculation
+
+        try: struct_name = next(filter(
+            lambda key: key.startswith(f'{struct_idx}_'), 
+            structs_data.keys()
+            ))
+        except StopIteration:
+            raise ValueError(f'Provided "task_index" arg is out of the range of indexed structures.')
+        
+        structs_data = {struct_name: structs_data.get(struct_name)}
+
+        inputs_data = delta_sol_inputs_init(
+            structs_data=structs_data, 
+            preset=preset, 
+            user_corrections=user_settings or None, 
+            with_uncertainties=args.with_uncertainties
+        )
+
+        for name, input in inputs_data.items():
+            run_path = os.path.join(outdir, name)
+            vasp_launcher(vasp_exe=exe_path, path=run_path, vasp_input=input)
+
+        bg_structs_data = batch_extract_vasp_data(
+            method='delta_sol', 
+            base_dir=outdir, 
+            structs_names=list(inputs_data.keys()), 
+            workers=workers
+        )
+
+    else: raise AssertionError('"task_index" arg must be positive or zero.')
 
     E_band_gaps = batch_calculate_delta_sol_band_gaps(
         structs_data, bg_structs_data, workers
@@ -265,15 +309,15 @@ def main():
                         Δ-Sol band gap was estimated to {E_band_gap} eV, which is inside the interval [{min(valid_interval)}, {max(valid_interval)}].\n \
                         Therefore, it is suitable for wanted application, and should be considered for further screening steps."
 
-        input_path = Path('/'.join((input_dir, name, accept_file)))
+        input_path = os.path.join(input_dir, name, accept_file)
         input_path.touch()
         input_path.write_text(accept_msg)
 
-        path_plus  = Path('/'.join((outdir, name_plus, accept_file)))
+        path_plus  = os.path.join(outdir, name_plus, accept_file)
         path_plus.touch()
         path_plus.write_text(accept_msg)
         
-        path_minus = Path('/'.join((outdir, name_minus, accept_file)))
+        path_minus = os.path.join(outdir, name_minus, accept_file)
         path_minus.touch()
         path_minus.write_text(accept_msg)
 
@@ -290,15 +334,15 @@ def main():
                         Therefore, it is not suitable for wanted application, \
                         and should not be considered in further screening steps."
 
-        input_path = Path('/'.join((input_dir, name, ignore_file)))
+        input_path = os.path.join(input_dir, name, ignore_file)
         input_path.touch()
         input_path.write_text(reject_msg)
 
-        path_plus  = Path('/'.join((outdir, name_plus, ignore_file)))
+        path_plus  = os.path.join(outdir, name_plus, ignore_file)
         path_plus.touch()
         path_plus.write_text(reject_msg)
         
-        path_minus = Path('/'.join((outdir, name_minus, ignore_file)))
+        path_minus = os.path.join(outdir, name_minus, ignore_file)
         path_minus.touch()
         path_minus.write_text(reject_msg)
 
