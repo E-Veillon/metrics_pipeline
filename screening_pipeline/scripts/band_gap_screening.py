@@ -225,7 +225,7 @@ def main():
         workers=workers
     )
 
-    if not struct_idx: # Use tqdm.contrib.concurrent.process_map() to do the calculation
+    if struct_idx is None: # Use tqdm.contrib.concurrent.process_map() to do the calculation
 
         inputs_data = delta_sol_inputs_init(
             structs_data=structs_data, 
@@ -249,9 +249,6 @@ def main():
             workers=workers
         )
 
-        E_band_gaps = batch_calculate_delta_sol_band_gaps(
-            structs_data, bg_structs_data, workers
-        )
 
     elif struct_idx >= 0: # Use the job array to parallelize the calculation
 

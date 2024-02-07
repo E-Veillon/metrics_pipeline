@@ -175,7 +175,7 @@ def main():
         keep_rare_earths=True # Avoid calling rare earth screening function
     )
 
-    if not struct_idx: # Use tqdm.contrib.concurrent.process_map() to do the calculation
+    if struct_idx is None: # Use tqdm.contrib.concurrent.process_map() to do the calculation
         
         #TODO: Revoir cette partie puisqu'elle ne fonctionne que pour une structure à la fois
 
