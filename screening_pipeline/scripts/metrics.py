@@ -41,6 +41,9 @@ def main():
     import os
     import json
 
+    import numpy as np
+    from pymatgen.analysis.structure_matcher import StructureMatcher
+
     from screening_pipeline.utils.vasp_io import batch_extract_vasp_structures
     from screening_pipeline.utils.cif_io import read_cif, extract_cif_from_file
     from screening_pipeline.utils.matcher import remove_equivalent
@@ -54,7 +57,9 @@ def main():
     with open(args.summary, "r") as fp:
         summary = json.load(fp)
 
-    relaxed = batch_extract_vasp_structures([struct["path"] for struct in summary])
+    vasp_structures = batch_extract_vasp_structures(
+        [struct["path"] for struct in summary]
+    )
 
     # remove duplicate structures from the dataset
     dataset, _ = remove_equivalent(
@@ -82,6 +87,19 @@ def main():
     # novel + unique + stable count
     num_novel_unique_stable = len(filter(map(lambda x: x["stable"], summary)))
 
+    # RMSD
+    rmsd_list = []
+    matcher = StructureMatcher()
+    for in_struct, out_struct in vasp_structures:
+        if in_struct is None or out_struct is None:
+            continue
+
+        rms = matcher.get_rms_dist(in_struct, out_struct)
+
+        if rms is not None:
+            rmsd_list.append(rms[0])
+    rmsd = float(np.mean(rmsd_list))
+
     metrics = {
         "num_generated": num_generated,
         "num_unique": num_unique,
@@ -89,6 +107,7 @@ def main():
         "num_novel_unique": num_novel_unique,
         "num_novel_unique_stable": num_novel_unique_stable,
         "SUN": num_novel_unique_stable / num_generated,
+        "rmsd": rmsd,
     }
 
     with open(args.output, "w") as fp:

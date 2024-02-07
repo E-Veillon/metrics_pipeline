@@ -24,7 +24,7 @@ from tqdm.contrib.concurrent import process_map
 from pymatgen.core.structure import Structure, SiteCollection, Composition
 from pymatgen.core import SETTINGS
 from pymatgen.io.vasp.inputs import PotcarSingle
-from pymatgen.io.vasp import VaspInput
+from pymatgen.io.vasp import VaspInput, Vasprun
 from pymatgen.io.vasp.inputs import Poscar
 from pymatgen.io.vasp.outputs import Chgcar, Oszicar
 from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
@@ -803,11 +803,17 @@ def vasp_output_sructure(struct_dir: str) -> Structure:
 
     contcar_path = os.path.join(struct_dir, "CONTCAR")
     incar_path = os.path.join(struct_dir, "INCAR")
+    vasprun_path = os.path.join(struct_dir, "vasprun.xml")
 
-    in_struct = Poscar.from_file(incar_path).structure
-    out_struct = Poscar.from_file(contcar_path).structure
+    vasprun = Vasprun(vasprun_path)
 
-    return in_struct, out_struct
+    if vasprun.converged:
+        in_struct = Poscar.from_file(incar_path).structure
+        out_struct = Poscar.from_file(contcar_path).structure
+
+        return in_struct, out_struct
+
+    return (None, None)
 
 
 def batch_extract_vasp_structures(
