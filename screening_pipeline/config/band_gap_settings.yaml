@@ -5,7 +5,10 @@
 # Putting '~' or 'None' as value cancels the tag value used in the preset.
 # If no modification of the original value is what you need, just comment the tag.
 
-#INCAR: ~
+INCAR:
+  ISMEAR: 0
+  LORBIT: None
+  LVHAR: False
 
 #KPOINTS: ~
 
