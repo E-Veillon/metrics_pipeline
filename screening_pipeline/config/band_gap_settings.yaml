@@ -2,13 +2,13 @@
 # If distinct modifications are necessary for several steps of the pipeline, just copy and rename this file.
 # In that case, do not forget to provide the name of the right file with -u arg in corresponding steps calls.
 # WARNING: 
-# Putting '~' or 'None' as value cancels the tag value used in the preset.
-# If no modification of the original value is what you need, just comment the tag.
+# Putting '~' as value cancels the tag value used in the preset (interpreted as None).
+# If no modification of the original value is what you need, comment or suppress the tag.
 
 INCAR:
   ISMEAR: 0
-  LORBIT: None
-  LVHAR: False
+  LORBIT: ~
+  LVHAR: ~
 
 #KPOINTS: ~
 

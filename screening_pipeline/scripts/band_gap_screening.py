@@ -268,9 +268,9 @@ def main():
             with_uncertainties=args.with_uncertainties
         )
 
-        for name, input in inputs_data.items():
+        for name, vasp_input in inputs_data.items():
             run_path = os.path.join(outdir, name)
-            vasp_launcher(vasp_exe=exe_path, path=run_path, vasp_input=input)
+            vasp_launcher(vasp_exe=exe_path, path=run_path, vasp_input=vasp_input)
 
         bg_structs_data = batch_extract_vasp_data(
             method='delta_sol', 
