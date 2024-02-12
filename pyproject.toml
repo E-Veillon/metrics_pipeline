@@ -19,6 +19,8 @@ symmetrize = 'screening_pipeline.scripts.symmetrize:main'
 vasp_relaxation = 'screening_pipeline.scripts.vasp_relaxation:main'
 stability_screening = 'screening_pipeline.scripts.stability_screening:main'
 band_gap_screening = 'screening_pipeline.scripts.band_gap_screening:main'
+delta_sol_inputs_writer = 'screening_pipeline.scripts.delta_sol_inputs_writer:main'
+delta_sol_calculator = 'screening_pipeline.scripts.delta_sol_calculator:main'
 band_edge_pos_screening = 'screening_pipeline.scripts.band_edge_pos_screening:main'
 test_cif = 'screening_pipeline.scripts.test_cif_block:main'
 
