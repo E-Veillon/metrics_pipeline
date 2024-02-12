@@ -177,6 +177,15 @@ def vasp_launcher(vasp_exe: PathLike, path: PathLike, vasp_input: VaspInput) -> 
     assert isinstance(vasp_exe, (Path, str))
     assert isinstance(path, PathLike)
     assert isinstance(vasp_input, VaspInput)
+    assert vasp_input.get('INCAR') is not None, \
+    f'vasp_launcher: There is no INCAR defined in the input !'
+    assert vasp_input.get('POSCAR') is not None
+    f'vasp_launcher: There is no POSCAR defined in the input !'
+    assert vasp_input.get('KPOINTS') is not None or vasp_input['INCAR'].get('KSPACING') is not None
+    f'vasp_launcher: There is no KPOINTS or KSPACING tag defined in the input !'
+    assert vasp_input.get('POTCAR') is not None
+    f'vasp_launcher: There is no POTCAR defined in the input !'
+
 
     vasp_exe_list = list((vasp_exe,)) # Necessary for subprocess to take it as a full command
     path          = str(path)
@@ -191,7 +200,7 @@ def vasp_launcher(vasp_exe: PathLike, path: PathLike, vasp_input: VaspInput) -> 
             output_file=out_file, 
             err_file=err_file
         )
-    except FileExistsError:
+    except FileExistsError: # Case of several processors trying to do the same calculation at once
         print(f'WARNING: {str(path)}: This directory already exists, skipping...')
 
 ########################################
