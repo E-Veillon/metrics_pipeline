@@ -282,9 +282,9 @@ def main():
     else: raise AssertionError('"task_index" arg must be positive or zero.')
 
     E_band_gaps = batch_calculate_delta_sol_band_gaps(
-        structs_data, bg_structs_data, workers
+        structs_data, bg_structs_data, args.with_uncertainties, workers
     )
-
+    #TODO: apply uncertainties in final reports
     good_bg_structs = list(filter(
         lambda tup: min(valid_interval) <= tup[1] <= max(valid_interval), 
         list(E_band_gaps.items())
