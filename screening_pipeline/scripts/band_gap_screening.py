@@ -284,7 +284,7 @@ def main():
     E_band_gaps = batch_calculate_delta_sol_band_gaps(
         structs_data, bg_structs_data, args.with_uncertainties, workers
     )
-    #TODO: apply uncertainties in final reports
+
     good_bg_structs = list(filter(
         lambda tup: min(valid_interval) <= tup[1] <= max(valid_interval), 
         list(E_band_gaps.items())
@@ -305,6 +305,13 @@ def main():
                         BAND GAP TEST PASSED\n\
                         Δ-Sol band gap was estimated to {E_band_gap} eV, which is inside the interval [{min(valid_interval)}, {max(valid_interval)}].\n \
                         Therefore, it is suitable for wanted application, and should be considered for further screening steps."
+
+        if args.with_uncertainties:
+            E_band_gap_min = struct[2]
+            E_band_gap_max = struct[3]
+            accept_msg += f"\nUncertainty interval (does not affect acception or rejection):\n \
+                          Band Gap minimum = {E_band_gap_min}\n \
+                          Band Gap maximum = {E_band_gap_max}\n"
 
         input_path = os.path.join(input_dir, name, accept_file)
         input_path.touch()
@@ -330,6 +337,13 @@ def main():
                         which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].\n \
                         Therefore, it is not suitable for wanted application, \
                         and should not be considered in further screening steps."
+
+        if args.with_uncertainties:
+            E_band_gap_min = struct[2]
+            E_band_gap_max = struct[3]
+            accept_msg += f"\nUncertainty interval (does not affect acception or rejection):\n \
+                          Band Gap minimum = {E_band_gap_min}\n \
+                          Band Gap maximum = {E_band_gap_max}\n"
 
         input_path = os.path.join(input_dir, name, ignore_file)
         input_path.touch()
