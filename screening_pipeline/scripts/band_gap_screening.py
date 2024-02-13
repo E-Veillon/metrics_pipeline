@@ -301,18 +301,22 @@ def main():
         E_band_gap   = struct[1]
         name_plus    = '_'.join((name, 'plus'))
         name_minus   = '_'.join((name, 'minus'))
-        accept_msg   = f"\
-                        BAND GAP TEST PASSED\n\
-                        Δ-Sol band gap was estimated to {E_band_gap} eV, which is inside the interval [{min(valid_interval)}, {max(valid_interval)}].\n \
-                        Therefore, it is suitable for wanted application, and should be considered for further screening steps."
+        accept_msg   = "\n".join([
+            "BAND GAP TEST PASSED", 
+            f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is inside the interval [{min(valid_interval)}, {max(valid_interval)}].", 
+            "Therefore, it is suitable for wanted application, and should be considered for further screening steps."
+        ])
 
         if args.with_uncertainties:
             E_band_gap_min = struct[2]
             E_band_gap_max = struct[3]
-            accept_msg += f"\nUncertainty interval (does not affect acception or rejection):\n \
-                          Band Gap minimum = {E_band_gap_min}\n \
-                          Band Gap maximum = {E_band_gap_max}\n"
+            accept_msg += [
+                "\nUncertainty interval (does not affect acception or rejection):", 
+                f"Band Gap minimum = {E_band_gap_min}", 
+                f"Band Gap maximum = {E_band_gap_max}"
+            ]
 
+        accept_msg = "\n".join(accept_msg)
         input_path = os.path.join(input_dir, name, accept_file)
         path_plus  = os.path.join(outdir, name_plus, accept_file)
         path_minus = os.path.join(outdir, name_minus, accept_file)
@@ -328,20 +332,22 @@ def main():
         E_band_gap   = struct[1]
         name_plus    = '_'.join((name, 'plus'))
         name_minus   = '_'.join((name, 'minus'))
-        reject_msg   = f"\
-                        BAND GAP REJECTION\n\
-                        Δ-Sol band gap was estimated to {E_band_gap} eV, \
-                        which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].\n \
-                        Therefore, it is not suitable for wanted application, \
-                        and should not be considered in further screening steps."
+        reject_msg   = "\n".join([
+            "BAND GAP REJECTION", 
+            f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].", 
+            "Therefore, it is not suitable for wanted application, and should not be considered in further screening steps."
+        ])
 
         if args.with_uncertainties:
             E_band_gap_min = struct[2]
             E_band_gap_max = struct[3]
-            reject_msg += f"\nUncertainty interval (does not affect acception or rejection):\n \
-                          Band Gap minimum = {E_band_gap_min}\n \
-                          Band Gap maximum = {E_band_gap_max}\n"
+            reject_msg += [
+                "\nUncertainty interval (does not affect acception or rejection):", 
+                f"Band Gap minimum = {E_band_gap_min}", 
+                f"Band Gap maximum = {E_band_gap_max}"
+            ]
 
+        reject_msg = "\n".join(reject_msg)
         input_path = os.path.join(input_dir, name, ignore_file)
         path_plus  = os.path.join(outdir, name_plus, ignore_file)
         path_minus = os.path.join(outdir, name_minus, ignore_file)
