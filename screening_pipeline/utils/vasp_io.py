@@ -632,7 +632,7 @@ def extract_vasp_data_for_convex_hull(
     struct_dir: Path = Path(struct_dir)
     files = set(file.name for file in struct_dir.iterdir())
 
-    if ignore_file in files:
+    if ignore_file is not None and ignore_file in files:
         return {}
 
     struct_name = struct_dir.name
@@ -747,7 +747,7 @@ def batch_extract_vasp_data(
 
     assert isinstance(base_dir, PathLike)
     assert Path(base_dir).is_dir()
-    assert isinstance(ignore_file, str)
+    assert isinstance(ignore_file, str) or ignore_file is None
     assert isinstance(workers, int) and workers >= 1
 
     def is_struct_dir(path: Path) -> bool:
@@ -782,6 +782,7 @@ def batch_extract_vasp_data(
             ),
         )
     )
+    print(structs_data_list)
     structs_data = dict(structs_data_list)
 
     return structs_data

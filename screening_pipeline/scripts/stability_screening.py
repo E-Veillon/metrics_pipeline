@@ -47,8 +47,12 @@ import json
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils.vasp_io import batch_extract_vasp_data
-from screening_pipeline.utils.data_process import batch_calculate_instability_energies
+from screening_pipeline.utils import (
+    batch_extract_vasp_data,
+    batch_calculate_instability_energies,
+    load_phase_diagram_entries,
+)
+
 
 ########################################
 # LOCAL FUNCTIONS
@@ -57,14 +61,6 @@ from screening_pipeline.utils.data_process import batch_calculate_instability_en
 def assert_args(args: Namespace) -> None:
 
     assert Path(args.input_dir).is_dir(), f"{args.input_dir}: No directory found."
-
-    assert args.ignore.endswith(
-        ".txt"
-    ), "Structure acceptance file must be a plain text file type (.txt)"
-
-    assert args.ignore.endswith(
-        ".txt"
-    ), "Structure ignoring file must be a plain text file type (.txt)."
 
     assert (
         args.limit >= 1e-8
@@ -107,6 +103,11 @@ def main():
         help="Base directory containing structure directories.",
     )
     parser.add_argument(
+        "-r",
+        "--reference",
+        help="If the used want to calculate the energy above the hull from an existing dataset used as a reference (json format).",
+    )
+    parser.add_argument(
         "-a",
         "--accept",
         type=str,
@@ -119,7 +120,7 @@ def main():
         "-i",
         "--ignore",
         type=str,
-        default="rejected.txt",
+        default=None,
         help="""Defines a file whose presence in a structure directory means it did not pass
         previous screening steps and should not be used in this calculation. 
         This file will also be written in structure directories that did not pass this step.
@@ -132,7 +133,7 @@ def main():
         "-l",
         "--limit",
         type=float,
-        default=0.036,
+        default=0.1,
         help=f"""Maximum value of ΔH (in eV/atom) above which structures are considered too unstable and rejected.
                  Defaults to 36 meV/atom, as used in the following paper, and seems fairly strict: 
                  Y. Wu, P. Lazic, G. Hautier, K. Persson, and G. Ceder, 
@@ -151,6 +152,7 @@ def main():
     parser.add_argument(
         "-s",
         "--summary",
+        default="summary.json",
         help="Output file indicating whether a calculation results in a stable or an unstable crystal (json format).",
     )
     args: Namespace = parser.parse_args()
@@ -163,11 +165,6 @@ def main():
     delta_H_limit = round(args.limit, 8)
     workers = args.workers
 
-    if "summary" not in args:
-        summary = os.path.join(input_dir, "summary.json")
-    else:
-        summary = args.summary
-
     # MAIN BLOCK
 
     structs_data = batch_extract_vasp_data(
@@ -177,8 +174,13 @@ def main():
         workers=workers,
     )
 
+    if "reference" in args:
+        structs_reference = load_phase_diagram_entries(args.reference)
+    else:
+        structs_reference = None
+
     structs_data = batch_calculate_instability_energies(
-        structs_data=structs_data, workers=workers
+        structs_data=structs_data, structs_ref=structs_reference, workers=workers
     )
 
     stable_structs = list(
@@ -218,15 +220,16 @@ def main():
     for struct in unstable_structs:
         name = struct[0]
         data = struct[1]
-        reject_msg = f"\
-                    STABILITY REJECTION\n\
-                    Instability energy for this structure is estimated at {data['delta_H']} eV/atom,\n \
-                    which is above the fixed instability limit of {delta_H_limit} eV/atom.\n \
-                    Therefore, it is considered not suitable for wanted application,\n \
-                    and should not be considered in further screening steps.\n"
-        reject_file_path = Path("/".join((str(input_dir), name, ignore_file)))
-        reject_file_path.touch()
-        reject_file_path.write_text(reject_msg)
+        if ignore_file is not None:
+            reject_msg = f"\
+                        STABILITY REJECTION\n\
+                        Instability energy for this structure is estimated at {data['delta_H']} eV/atom,\n \
+                        which is above the fixed instability limit of {delta_H_limit} eV/atom.\n \
+                        Therefore, it is considered not suitable for wanted application,\n \
+                        and should not be considered in further screening steps.\n"
+            reject_file_path = Path("/".join((str(input_dir), name, ignore_file)))
+            reject_file_path.touch()
+            reject_file_path.write_text(reject_msg)
         screening_results.append(
             {
                 "path": os.path.join(str(input_dir), name),
@@ -235,8 +238,8 @@ def main():
             }
         )
 
-    with open(summary, "w") as fp:
-        json.dump(screening_results, fp)
+    with open(args.summary, "w") as fp:
+        json.dump(screening_results, fp, indent=4)
 
     stop = datetime.now()
     print(f"elapsed time: {stop-start}")
