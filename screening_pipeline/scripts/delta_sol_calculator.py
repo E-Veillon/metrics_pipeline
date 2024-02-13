@@ -294,7 +294,7 @@ def main():
         if args.with_uncertainties:
             E_band_gap_min = struct[2]
             E_band_gap_max = struct[3]
-            accept_msg += f"\nUncertainty interval (does not affect acception or rejection):\n \
+            reject_msg += f"\nUncertainty interval (does not affect acception or rejection):\n \
                           Band Gap minimum = {E_band_gap_min}\n \
                           Band Gap maximum = {E_band_gap_max}\n"
 
