@@ -112,7 +112,7 @@ def main():
         "num_novel_unique": num_novel_unique,
         "num_novel_unique_stable": num_novel_unique_stable,
         "SUN": num_novel_unique_stable / num_generated,
-        "rmsd": rmsd,
+        "RMSD": rmsd,
     }
 
     with open(args.output, "w") as fp:
