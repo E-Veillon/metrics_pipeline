@@ -48,11 +48,13 @@ def main():
     from screening_pipeline.utils.cif_io import read_cif, extract_cif_from_file
     from screening_pipeline.utils.matcher import remove_equivalent
 
-    generated = read_cif(args.generated, keep_rare_gases=True, keep_rare_earths=True)
-    symmetrized = read_cif(
+    generated, _, _ = read_cif(
+        args.generated, keep_rare_gases=True, keep_rare_earths=True
+    )
+    symmetrized, _, _ = read_cif(
         args.symmetrized, keep_rare_gases=True, keep_rare_earths=True
     )
-    dataset = read_cif(args.dataset, keep_rare_gases=True, keep_rare_earths=True)
+    dataset, _, _ = read_cif(args.dataset, keep_rare_gases=True, keep_rare_earths=True)
 
     with open(args.summary, "r") as fp:
         summary = json.load(fp)
@@ -85,7 +87,7 @@ def main():
     num_novel_unique = len(concat_novel_unique) - len(dataset)
 
     # novel + unique + stable count
-    num_novel_unique_stable = len(filter(map(lambda x: x["stable"], summary)))
+    num_novel_unique_stable = sum(map(lambda x: x["stable"], summary))
 
     # RMSD
     rmsd_list = []
@@ -97,7 +99,10 @@ def main():
         rms = matcher.get_rms_dist(in_struct, out_struct)
 
         if rms is not None:
-            rmsd_list.append(rms[0])
+            normalize = (out_struct.volume / out_struct.num_sites) ** (
+                1 / 3
+            )  # denormalize
+            rmsd_list.append(rms[0] * normalize)
     rmsd = float(np.mean(rmsd_list))
 
     metrics = {
@@ -113,7 +118,7 @@ def main():
     with open(args.output, "w") as fp:
         json.dump(metrics, fp, indent=4)
 
-    print(json.dum(metrics, indent=4))
+    print(json.dumps(metrics, indent=4))
 
 
 if __name__ == "__main__":

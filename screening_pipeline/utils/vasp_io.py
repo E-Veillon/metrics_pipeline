@@ -803,13 +803,13 @@ def vasp_output_sructure(struct_dir: str) -> Structure:
     assert Path(struct_dir).is_dir()
 
     contcar_path = os.path.join(struct_dir, "CONTCAR")
-    incar_path = os.path.join(struct_dir, "INCAR")
+    poscar_path = os.path.join(struct_dir, "POSCAR")
     vasprun_path = os.path.join(struct_dir, "vasprun.xml")
 
     vasprun = Vasprun(vasprun_path)
 
     if vasprun.converged:
-        in_struct = Poscar.from_file(incar_path).structure
+        in_struct = Poscar.from_file(poscar_path).structure
         out_struct = Poscar.from_file(contcar_path).structure
 
         return in_struct, out_struct
