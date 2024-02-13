@@ -314,16 +314,13 @@ def main():
                           Band Gap maximum = {E_band_gap_max}\n"
 
         input_path = os.path.join(input_dir, name, accept_file)
-        input_path.touch()
-        input_path.write_text(accept_msg)
-
         path_plus  = os.path.join(outdir, name_plus, accept_file)
-        path_plus.touch()
-        path_plus.write_text(accept_msg)
-        
         path_minus = os.path.join(outdir, name_minus, accept_file)
-        path_minus.touch()
-        path_minus.write_text(accept_msg)
+
+        with open(input_path, 'xt') as f1, open(path_plus, 'xt') as f2, open(path_minus, 'xt') as f3:
+            f1.write(accept_msg)
+            f2.write(accept_msg)
+            f3.write(accept_msg)
 
     # Reject unsuitable structures
     for struct in bad_bg_structs:
@@ -346,16 +343,13 @@ def main():
                           Band Gap maximum = {E_band_gap_max}\n"
 
         input_path = os.path.join(input_dir, name, ignore_file)
-        input_path.touch()
-        input_path.write_text(reject_msg)
-
         path_plus  = os.path.join(outdir, name_plus, ignore_file)
-        path_plus.touch()
-        path_plus.write_text(reject_msg)
-        
         path_minus = os.path.join(outdir, name_minus, ignore_file)
-        path_minus.touch()
-        path_minus.write_text(reject_msg)
+
+        with open(input_path, 'xt') as f1, open(path_plus, 'xt') as f2, open(path_minus, 'xt') as f3:
+            f1.write(reject_msg)
+            f2.write(reject_msg)
+            f3.write(reject_msg)
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
