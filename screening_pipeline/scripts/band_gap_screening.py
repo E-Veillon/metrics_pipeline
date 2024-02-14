@@ -51,10 +51,10 @@ def assert_args(args: Namespace) -> None:
     assert args.user_settings.endswith('.yaml'), \
     'user settings file must be of .yaml format.'
 
-    assert args.minimum >= 0.0 and args.maximum >= 0.0, \
+    assert args.mini_maxi[0] >= 0.0 and args.mini_maxi[1] >= 0.0, \
     f"Acceptable band gap values must be positive or zero."
 
-    assert args.minimum != args.maximum, \
+    assert args.mini_maxi[0] != args.mini-maxi[1], \
     f"Acceptable band gap values cannot have the same value."
 
     assert args.accept.endswith('.txt'), \
@@ -83,13 +83,9 @@ def main():
             (reference 32 in screening_pipeline/Bibliography)
         '''
     prog_missing_steps = '''
-        Missing steps to complete this script:
-            - Set an option to enable incertainty calculation on the band gap using N*min and N*max - OK
-            - This option should let user choose if they want to keep materials according to the uncertainty case:
-                * If E(gap) is inside the goal but uncertainty gets out ?
-                * If E(gap) is outside the goal but uncertainty gets in ?
-                Possible options: keep, keep_aside, discard, auto (keep_aside if at least half the interval is in, else discard)
+        Missing steps to complete this script: None
         '''
+
     helper_format = RawTextHelpFormatter
 
     parser = ArgumentParser(
@@ -141,19 +137,12 @@ def main():
     )
     parser.add_argument(
         '-m',
-        '--minimum',
+        '--mini-maxi',
+        nargs=2,
         type=float,
-        default=1.3,
-        help='''Minimum acceptable band gap value in eV. Defaults to 1.3 eV.''', 
-        metavar='float'
-    )
-    parser.add_argument(
-        '-M',
-        '--maximum',
-        type=float,
-        default=3.6,
-        help='''Maximum acceptable band gap value in eV. Defaults to 3.6 eV.''', 
-        metavar='float'
+        default=[1.3, 3.6],
+        help='''Acceptable interval of band gap values in eV (Defaults: %(default)s eV).''', 
+        metavar='float float'
     )
     parser.add_argument(
         '-a', 
@@ -208,7 +197,7 @@ def main():
     outdir         = args.output
     preset         = args.preset
     user_settings  = _yaml_loader(args.user_settings, on_error='raise')
-    valid_interval = sorted([args.minimum, args.maximum])
+    valid_interval = sorted(args.mini_maxi)
     accept_file    = args.accept
     ignore_file    = args.ignore
     workers        = args.workers
@@ -270,6 +259,11 @@ def main():
 
         for name, vasp_input in inputs_data.items():
             run_path = os.path.join(outdir, name)
+            #if exe_path is None:
+                #vasp_input.write_input(run_path)
+                #os.system(f'cd {run_path}')
+                #os.system(f'vasp')
+            #else: vasp_launcher(vasp_exe=exe_path, path=run_path, vasp_input=vasp_input)
             vasp_launcher(vasp_exe=exe_path, path=run_path, vasp_input=vasp_input)
 
         bg_structs_data = batch_extract_vasp_data(
