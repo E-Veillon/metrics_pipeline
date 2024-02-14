@@ -690,7 +690,7 @@ def batch_extract_vasp_data(
 
     base_dir           = Path(base_dir)
     structs_dir_list   = list(filter(is_struct_dir, base_dir.iterdir()))
-    
+
     if structs_names:
         structs_dir_list = list(filter(lambda path: path.name in structs_names, structs_dir_list))
     
@@ -707,6 +707,7 @@ def batch_extract_vasp_data(
             desc='Extracting infos from previous VASP output'
         )
     ))
+
     structs_data = dict(structs_data_list)
 
     return structs_data
@@ -813,10 +814,11 @@ def delta_sol_inputs_init(
             run_plus['INCAR'].update({'NELECT': N_val + n_ratio})
             run_minus['INCAR'].update({'NELECT': N_val - n_ratio})
             run_plus, run_minus = VaspInput.from_dict(run_plus), VaspInput.from_dict(run_minus)
-            run_plus_path  = '_'.join((name , n_star_type.lower(), 'plus'))
-            run_minus_path = '_'.join((name , n_star_type.lower(), 'minus'))
+            run_neutral_path = '_'.join((name , n_star_type.lower(), 'neutral'))
+            run_plus_path    = '_'.join((name , n_star_type.lower(), 'plus'))
+            run_minus_path   = '_'.join((name , n_star_type.lower(), 'minus'))
 
-            struct_runs_list += [(run_plus_path, run_plus), (run_minus_path, run_minus)]
+            struct_runs_list += [(run_neutral_path, run_set), (run_plus_path, run_plus), (run_minus_path, run_minus)]
 
         return struct_runs_list
 

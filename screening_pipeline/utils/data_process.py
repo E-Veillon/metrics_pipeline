@@ -523,7 +523,7 @@ def batch_calculate_delta_sol_band_gaps(
             name: {
                 'name': name, 
                 'structure': data['structure'], 
-                'E_N0': data['final_energy'], 
+                'E_N0': bg_structs_data['_'.join((name, 'best', 'neutral'))]['final_energy'], 
                 'E_N0_plus_n_best': bg_structs_data['_'.join((name, 'best', 'plus'))]['final_energy'], 
                 'E_N0_minus_n_best': bg_structs_data['_'.join((name, 'best', 'minus'))]['final_energy']
             } for name, data in structs_data.items()
@@ -534,7 +534,7 @@ def batch_calculate_delta_sol_band_gaps(
             name: {
                 'name': name, 
                 'structure': data['structure'], 
-                'E_N0': data['final_energy'], 
+                'E_N0': bg_structs_data['_'.join((name, 'best', 'neutral'))]['final_energy'], 
                 'E_N0_plus_n_best': bg_structs_data['_'.join((name, 'best', 'plus'))]['final_energy'], 
                 'E_N0_minus_n_best': bg_structs_data['_'.join((name, 'best', 'minus'))]['final_energy'], 
                 'E_N0_plus_n_min': bg_structs_data['_'.join((name, 'min', 'plus'))]['final_energy'], 
