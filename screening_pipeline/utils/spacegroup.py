@@ -181,13 +181,15 @@ def batch_symmetrizer(
         angle_tolerance=angle_tolerance
     )
     
-    return list(
+    return list(filter(
+        None, 
         process_map(
             set_structure_symmetrizer, 
             structures, 
             max_workers=workers, 
             chunksize=chunksize, 
             desc='Symmetrize structures'
+        )
     ))
 
 ########################################
