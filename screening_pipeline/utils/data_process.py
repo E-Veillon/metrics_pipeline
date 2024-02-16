@@ -20,7 +20,9 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # PYTHON MATERIAL GENOMICS PACKAGE
 
-from pymatgen.core.composition import Composition, Element
+from pymatgen.core.periodic_table import Element
+from pymatgen.core.composition import Composition
+from pymatgen.core.structure import SiteCollection
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 ########################################
@@ -34,6 +36,39 @@ from screening_pipeline.utils.periodic_table import get_elements, get_delta_sol_
 ########################################
 # LOCAL FUNCTIONS
 
+
+def check_interatomic_distances(
+        structures: Sequence[SiteCollection], 
+        valid_tol: float = 0.5
+    ) -> Tuple[List[SiteCollection], int]:
+    '''
+    Checks interatomic distances with respect to a tolerance in angstroms 
+    for all given structures, then returns the valid ones in a list.
+
+    Parameters:
+        structures ([SiteCollection]):  The structures to check.
+
+        valid_tol (float):              Tolerance below which a distance between 2 sites 
+                                        is considered invalid and is eliminatory for the
+                                        structure. Defaults to 0.5 angstroms.
+
+    Returns:
+        List[SiteCollection]: list of valid structures.
+        int: Number of invalid structures discarded.
+    '''
+    def _is_valid(structure: SiteCollection):
+        return structure.is_valid(tol=valid_tol)
+    
+    assert isinstance(structures, Sequence)
+    assert all(isinstance(structure, SiteCollection) for structure in structures)
+    assert isinstance(valid_tol, float)
+
+    valid_structs = list(filter(_is_valid, structures))
+    nbr_discarded = len(structures) - len(valid_structs)
+
+    return valid_structs, nbr_discarded
+
+########################################
 
 # Functions related to phase stability screening with Convex Hull construction method.
 
