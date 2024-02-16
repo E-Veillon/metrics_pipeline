@@ -73,8 +73,7 @@ def _retry_get_symmetrized_structure(
 ########################################
 
 def structure_symmetrizer(
-        structure: Structure, 
-        valid_tol: float = 0.0, 
+        structure: Structure,  
         symprec: float = 0.01, 
         angle_tolerance: float = 5.0
     ) -> Structure | SymmetrizedStructure | None:
@@ -103,14 +102,10 @@ def structure_symmetrizer(
     '''
 
     assert isinstance(structure, Structure)
-    assert isinstance(valid_tol, float) and (valid_tol >= 0)
     assert isinstance(symprec, float)
     assert isinstance(angle_tolerance, float)
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
-
-        if (valid_tol > 0.0) and not structure.is_valid(tol=valid_tol):
-            return None
 
         struct_analyzer = SpacegroupAnalyzer(
             structure=structure, 
@@ -181,13 +176,15 @@ def batch_symmetrizer(
         angle_tolerance=angle_tolerance
     )
     
-    return list(
+    return list(filter(
+        None, 
         process_map(
             set_structure_symmetrizer, 
             structures, 
             max_workers=workers, 
             chunksize=chunksize, 
             desc='Symmetrize structures'
+        )
     ))
 
 ########################################
