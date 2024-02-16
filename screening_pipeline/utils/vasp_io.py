@@ -451,7 +451,7 @@ def vasp_relaxation_settings(
         structure=structure, 
         preset=preset, 
         corrections=user_corrections
-    ).get_vasp_input()
+    ).get_input_set()
 
     return vasp_input
 
@@ -506,7 +506,7 @@ def vasp_static_settings(
             struct_or_path=structure, 
             preset=preset, 
             corrections=user_corrections
-        ).get_vasp_input()
+        ).get_input_set()
     
     else:
         assert isinstance(prev_calc_dir, PathLike), \
@@ -522,7 +522,7 @@ def vasp_static_settings(
             from_prev_calc=from_prev_calc, 
             preset=preset, 
             corrections=user_corrections
-        ).get_vasp_input()
+        ).get_input_set()
 
     return vasp_input
 
