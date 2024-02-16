@@ -274,7 +274,7 @@ def main():
         path_plus  = os.path.join(outdir, name_plus, accept_file)
         path_minus = os.path.join(outdir, name_minus, accept_file)
 
-        with open(input_path, 'xt') as f1, open(path_plus, 'xt') as f2, open(path_minus, 'xt') as f3:
+        with open(input_path, 'wt') as f1, open(path_plus, 'wt') as f2, open(path_minus, 'wt') as f3:
             f1.write(accept_msg)
             f2.write(accept_msg)
             f3.write(accept_msg)
@@ -305,7 +305,7 @@ def main():
         path_plus  = os.path.join(outdir, name_plus, ignore_file)
         path_minus = os.path.join(outdir, name_minus, ignore_file)
 
-        with open(input_path, 'xt') as f1, open(path_plus, 'xt') as f2, open(path_minus, 'xt') as f3:
+        with open(input_path, 'wt') as f1, open(path_plus, 'wt') as f2, open(path_minus, 'wt') as f3:
             f1.write(reject_msg)
             f2.write(reject_msg)
             f3.write(reject_msg)

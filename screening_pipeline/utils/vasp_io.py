@@ -782,6 +782,8 @@ def delta_sol_inputs_init(
     
     def _inputs_init(name: str, data: Dict[str, Any]) -> List[Tuple[str, VaspInput]]:
 
+        import math
+
         # Initialize input sets
         structure = data['structure']
         N_val     = get_all_valence_electrons(structure)
@@ -810,15 +812,22 @@ def delta_sol_inputs_init(
                 n_star_type=n_star_type
             )
 
-            run_plus, run_minus = run_set.as_dict(), run_set.as_dict()
-            run_plus['INCAR'].update({'NELECT': N_val + n_ratio})
-            run_minus['INCAR'].update({'NELECT': N_val - n_ratio})
-            run_plus, run_minus = VaspInput.from_dict(run_plus), VaspInput.from_dict(run_minus)
+            run_neutral, run_plus, run_minus = run_set.as_dict(), run_set.as_dict(), run_set.as_dict()
+            new_nbands = math.ceil(round(N_val + n_ratio, 0)/2 + structure.num_sites/2 + 1)
+
+            run_neutral['INCAR'].update({'NBANDS': new_nbands})
+            run_plus['INCAR'].update({'NELECT': N_val + n_ratio, 'NBANDS': new_nbands})
+            run_minus['INCAR'].update({'NELECT': N_val - n_ratio, 'NBANDS': new_nbands})
+
+            run_neutral = VaspInput.from_dict(run_neutral)
+            run_plus    = VaspInput.from_dict(run_plus)
+            run_minus   = VaspInput.from_dict(run_minus)
+
             run_neutral_path = '_'.join((name , n_star_type.lower(), 'neutral'))
             run_plus_path    = '_'.join((name , n_star_type.lower(), 'plus'))
             run_minus_path   = '_'.join((name , n_star_type.lower(), 'minus'))
 
-            struct_runs_list += [(run_neutral_path, run_set), (run_plus_path, run_plus), (run_minus_path, run_minus)]
+            struct_runs_list += [(run_neutral_path, run_neutral), (run_plus_path, run_plus), (run_minus_path, run_minus)]
 
         return struct_runs_list
 

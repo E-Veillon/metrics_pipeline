@@ -6,11 +6,12 @@
 # If no modification of the original value is what you need, comment or suppress the tag.
 
 INCAR:
-  ISMEAR: 0
+  ISMEAR: -5
   LORBIT: ~
   LVHAR: ~
 
-#KPOINTS: ~
+KPOINTS:
+  reciprocal_density: 128
 
 POTCAR_FUNCTIONAL: PBE_54_W_HASH
 POTCAR:

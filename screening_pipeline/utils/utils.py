@@ -65,3 +65,36 @@ def _yaml_loader(file_path: PathLike, on_error: Literal['raise', 'warn', 'ignore
             return {}
         return dict(yaml_data)
 
+#def _cast_str_to_seq(string: str, /, *, seq: Literal['tuple','list']) -> Union[Tuple, List]:
+#   string = string[1:-1]
+#   if string.find('[') != -1 or string.find('(') != -1 or string.find('{') != -1:
+#       #TODO: gérer les conteneurs imbriquées
+#       raise NotImplementedError
+#   else:
+#       new_seq = tuple(string.split(sep=',')) if seq == 'tuple' else string.split(sep=',')
+#       return new_seq
+#
+#def _parse_dict(dct: Dict[str, str]) -> Dict[str, Any]:
+#   
+#   for k, v in dct.items():
+#       if isinstance(v, str):
+#           if v.lower() == 'true': dct[k] = True
+#           elif v.lower() == 'false': dct[k] = False
+#           elif v.isdecimal(): dct[k] = int(v)
+#           elif is_float(v): dct[k] = float(v)
+#           elif v.startswith('[') and v.endswith(']'):
+#               v = _cast_str_to_seq(v, seq='list')
+#               dct[k] = _parse_seq(v, seq='list')
+#           elif v.startswith('(') and v.endswith(')'):
+#               v = _cast_str_to_seq(v, seq='tuple')
+#               dct[k] = _parse_seq(v, seq='tuple')
+#           elif v.startswith('{') and v.endswith('}') and ':' in v:
+#               v = _cast_str_to_dict(v)
+#               dct[k] = _parse_dict(v)
+#           elif v.startswith('{') and v.endswith('}'):
+#               v = _cast_str_to_set(v)
+#               dct[k] = _parse_set(v)
+
+
+
+
