@@ -37,6 +37,13 @@ def assert_args(args: Namespace):
     print(' - ACTIVATED FEATURES - ')
     print(f'CHECK RARE GASES: {not args.no_rare_gas_check}')
     print(f'CHECK RARE EARTHS: {not args.no_rare_earth_check}')
+    print(f'CHECK INTERATOMIC DISTANCES: {not args.no_dist_check}')
+    print(f'* Distance tolerance: {args.dist_tolerance} Angstroms {"(ignored)" if args.no_dist_check else ""}')
+
+    if not args.no_dist_check:
+        assert args.dist_tolerance > 0.0, \
+        'Interatomic distance tolerance must be positive.'
+
     print(f'SYMMETRIZATION: {not args.no_symmetrization}')
     print(f'* Fractional coordinates tolerance: {args.symprec} {"(ignored)" if args.no_symmetrization else ""}')
 
@@ -49,13 +56,6 @@ def assert_args(args: Namespace):
     if not args.no_symmetrization:
         assert (0.0 <= args.angleprec <= 30.0), \
         'Angles tolerance must be between 0.0 and 20.0 degrees to retain some reliability.'
-
-    print(f'CHECK INTERATOMIC DISTANCES: {not args.no_dist_check}')
-    print(f'* Distance tolerance: {args.dist_tolerance} Angstroms {"(ignored)" if args.no_dist_check else ""}')
-
-    if not args.no_dist_check:
-        assert args.dist_tolerance > 0.0, \
-        'Interatomic distance tolerance must be positive.'
 
     print(f'STRUCTURE MATCHING: {not args.no_equiv_match}')
     print(f'NUMBER OF WORKERS: {args.workers}')
@@ -112,6 +112,22 @@ def main():
         help='A flag to disable elimination of structures containing f-block elements.'
     )
     parser.add_argument(
+        '--no-dist-check', 
+        action='store_true', 
+        help='A flag to disable structures interatomic distances checking.'
+    )
+    parser.add_argument(
+        '-d', 
+        '--dist-tolerance', 
+        type=float, 
+        default=0.5, 
+        help='''Tolerance for checking interatomic distances in Angstroms.
+                Structures containing atoms that are closer than this value will be discarded.
+                (Default: %(default)s Angstroms).''', 
+        metavar='float', 
+        dest='valid_tol'
+    )
+    parser.add_argument(
         '--no-symmetrization', 
         action='store_true', 
         help='A flag to disable search of structures symmetry space groups.'
@@ -131,22 +147,6 @@ def main():
         default=5.0,
         help='Angle tolerance for symmetry finding in degrees (Default: %(default)s degrees).',
         metavar='float',
-    )
-    parser.add_argument(
-        '--no-dist-check', 
-        action='store_true', 
-        help='A flag to disable structures interatomic distances checking.'
-    )
-    parser.add_argument(
-        '-d', 
-        '--dist-tolerance', 
-        type=float, 
-        default=0.5, 
-        help='''Tolerance for checking interatomic distances in Angstroms.
-                Structures containing atoms that are closer than this value will be discarded.
-                (Default: %(default)s Angstroms).''', 
-        metavar='float', 
-        dest='valid_tol'
     )
     parser.add_argument(
         '--no-equiv-match',
@@ -173,8 +173,11 @@ def main():
     output_file     = args.output
     keep_rare_gas   = args.no_rare_gas_check
     keep_rare_earth = args.no_rare_earth_check
-    no_symmetry     = args.no_symmetrization
     no_dist_check   = args.no_dist_check
+    dist_tol        = args.dist_tolerance
+    no_symmetry     = args.no_symmetrization
+    symprec         = args.symprec
+    angleprec       = args.angleprec
     no_equiv_match  = args.no_equiv_match
     workers         = args.workers
 
@@ -182,6 +185,7 @@ def main():
     # MAIN BLOCK
 
     from screening_pipeline.utils.cif_io import read_cif, write_cif
+    from screening_pipeline.utils.data_process import check_interatomic_distances
     from screening_pipeline.utils.spacegroup import batch_symmetrizer
     from screening_pipeline.utils.matcher import remove_equivalent
 
@@ -208,24 +212,27 @@ def main():
 
     print(f'{nbr_loaded_structs} structures are kept for further processing')
     
+    # Vérification des distances interatomiques
+
+    if not no_dist_check:
+        structures, nbr_not_valid = check_interatomic_distances(structures, valid_tol=dist_tol)
+        print(f'{nbr_not_valid} structures having too close atoms were discarded')
+
     # Calcul de la symétrie d'espace des structures
 
-    symmetrized_structs = list(filter(
-        None, 
-        batch_symmetrizer(
-            structures=structures, 
-            valid_tol=args.valid_tol, 
-            symprec=args.precision, 
-            angle_tolerance=args.angleprec, 
-            workers=workers
-        )
-    ))
+    if no_symmetry: symmetrized_structs = structures
+    else:
+        symmetrized_structs = list(filter(
+            None, 
+            batch_symmetrizer(
+                structures=structures,  
+                symprec=args.precision, 
+                angle_tolerance=args.angleprec, 
+                workers=workers
+            )
+        ))
 
-    print(f'{len(symmetrized_structs)} structures were symmetrized')
-
-    if args.valid_tol > 0.0:
-        nbr_not_valid = nbr_loaded_structs - len(symmetrized_structs)
-        print(f'{nbr_not_valid} structures having too close atoms were discarded')
+        print(f'{len(symmetrized_structs)} structures were symmetrized')
 
     # Comparaison des structures pour éliminer les doublons
 
@@ -266,7 +273,7 @@ def main():
     if not keep_rare_earth:
         print(f'- {nbr_rare_earth_structs} structures containing rare earths')
     
-    if args.valid_tol > 0.0:
+    if not no_dist_check:
         print(f'- {nbr_not_valid} structures with too small interatomic distances')
     
     if not no_equiv_match:
