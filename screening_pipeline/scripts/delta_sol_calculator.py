@@ -251,7 +251,7 @@ def main():
     # Keep good structures
     for struct in good_bg_structs:
         name         = struct[0]
-        E_band_gap   = struct[1]
+        E_band_gap   = round(struct[1], 6)
         name_plus    = '_'.join((name, 'best', 'plus'))
         name_minus   = '_'.join((name, 'best', 'minus'))
         accept_msg   = [
@@ -261,12 +261,12 @@ def main():
         ]
         
         if args.with_uncertainties:
-            E_band_gap_min = struct[2]
-            E_band_gap_max = struct[3]
+            E_band_gap_min = round(struct[2], 6)
+            E_band_gap_max = round(struct[3], 6)
             accept_msg += [
                 "\nUncertainty interval (does not affect acception or rejection):", 
-                f"Band Gap minimum = {E_band_gap_min}", 
-                f"Band Gap maximum = {E_band_gap_max}"
+                f"Band Gap minimum = {E_band_gap_min} eV", 
+                f"Band Gap maximum = {E_band_gap_max} eV"
             ]
 
         accept_msg = "\n".join(accept_msg)
@@ -282,22 +282,22 @@ def main():
     # Reject unsuitable structures
     for struct in bad_bg_structs:
         name         = struct[0]
-        E_band_gap   = struct[1]
+        E_band_gap   = round(struct[1], 6)
         name_plus    = '_'.join((name, 'best', 'plus'))
         name_minus   = '_'.join((name, 'best', 'minus'))
         reject_msg   = [
             "BAND GAP REJECTION", 
-            f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].", 
+            f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].",
             "Therefore, it is not suitable for wanted application, and should not be considered in further screening steps."
         ]
 
         if args.with_uncertainties:
-            E_band_gap_min = struct[2]
-            E_band_gap_max = struct[3]
+            E_band_gap_min = round(struct[2], 6)
+            E_band_gap_max = round(struct[3], 6)
             reject_msg += [
                 "\nUncertainty interval (does not affect acception or rejection):", 
-                f"Band Gap minimum = {E_band_gap_min}", 
-                f"Band Gap maximum = {E_band_gap_max}"
+                f"Band Gap minimum = {E_band_gap_min} eV", 
+                f"Band Gap maximum = {E_band_gap_max} eV"
             ]
 
         reject_msg = "\n".join(reject_msg)

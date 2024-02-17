@@ -9,9 +9,14 @@ INCAR:
   ISMEAR: -5
   LORBIT: ~
   LVHAR: ~
+  LDAU: true
+  LDAUJ: {'O': {'Ti': 0.0}}
+  LDAUL: {'O': {'Ti': 2}}
+  LDAUU: {'O': {'Ti': 4.0}}
+  LDAUTYPE: 2
 
 KPOINTS:
-  reciprocal_density: 128
+  reciprocal_density: 256
 
 POTCAR_FUNCTIONAL: PBE_54_W_HASH
 POTCAR:

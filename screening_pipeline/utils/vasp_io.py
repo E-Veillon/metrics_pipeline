@@ -815,7 +815,7 @@ def delta_sol_inputs_init(
             run_neutral, run_plus, run_minus = run_set.as_dict(), run_set.as_dict(), run_set.as_dict()
             new_nbands = math.ceil(round(N_val + n_ratio, 0)/2 + structure.num_sites/2 + 1)
 
-            run_neutral['INCAR'].update({'NBANDS': new_nbands})
+            run_neutral['INCAR'].update({'NELECT': N_val, 'NBANDS': new_nbands})
             run_plus['INCAR'].update({'NELECT': N_val + n_ratio, 'NBANDS': new_nbands})
             run_minus['INCAR'].update({'NELECT': N_val - n_ratio, 'NBANDS': new_nbands})
 
