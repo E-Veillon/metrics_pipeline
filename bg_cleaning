@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export REJECT=$HOME/Batch_test/Relaxations/0_TiO2/rejected.txt
-export BANDGAP=$HOME/Batch_test/Band_gaps/
+export BANDGAP=$HOME/Batch_test/Band_gaps_full_bg
 export BGPLUS=$BANDGAP/0_TiO2_best_plus
 export BGZERO=$BANDGAP/0_TiO2_best_neutral
 export BGMINUS=$BANDGAP/0_TiO2_best_minus

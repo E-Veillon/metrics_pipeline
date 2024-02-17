@@ -54,7 +54,7 @@ def assert_args(args: Namespace) -> None:
     assert args.mini_maxi[0] >= 0.0 and args.mini_maxi[1] >= 0.0, \
     f"Acceptable band gap values must be positive or zero."
 
-    assert args.mini_maxi[0] != args.mini-maxi[1], \
+    assert args.mini_maxi[0] != args.mini_maxi[1], \
     f"Acceptable band gap values cannot have the same value."
 
     assert args.accept.endswith('.txt'), \
@@ -259,11 +259,6 @@ def main():
 
         for name, vasp_input in inputs_data.items():
             run_path = os.path.join(outdir, name)
-            #if exe_path is None:
-                #vasp_input.write_input(run_path)
-                #os.system(f'cd {run_path}')
-                #os.system(f'vasp')
-            #else: vasp_launcher(vasp_exe=exe_path, path=run_path, vasp_input=vasp_input)
             vasp_launcher(vasp_exe=exe_path, path=run_path, vasp_input=vasp_input)
 
         bg_structs_data = batch_extract_vasp_data(
