@@ -5,6 +5,7 @@ Implements functions to manage and operate on paths.
 ########################################
 # SYSTEM I/O MODULES
 
+import os
 from typing import Sequence, List
 from pathlib import Path
 
@@ -36,11 +37,11 @@ def add_new_dir(base_dir: PathLike, new_dir_name: PathLike) -> Path:
     '''
 
     assert isinstance(base_dir, PathLike)
-    assert Path(base_dir).is_dir()
+    assert os.path.isdir(str(base_dir))
     assert isinstance(new_dir_name, PathLike)
 
-    new_dir  = Path('/'.join((str(base_dir), str(new_dir_name))))
-    new_dir.mkdir(exist_ok=True)
+    new_dir = os.path.join(str(base_dir), str(new_dir_name))
+    os.makedirs(new_dir, exist_ok=True)
 
     return new_dir
 

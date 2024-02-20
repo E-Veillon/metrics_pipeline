@@ -201,19 +201,36 @@ def _MITRelaxSet_INCAR_corrections(**kwargs) -> Dict:
 
 ########################################
 
+def vasp_launcher(vasp_exe: PathLike, path: PathLike, vasp_input: VaspInput) -> None:
+    '''
+    Function to run VASP from a VaspInput object.
 
-def vasp_launcher(vasp_exe: PathLike, vasp_input: VaspInput, path: PathLike) -> None:
+    Parameters:
+        vasp_exe (str|Path):    Absolute path to the VASP executable.
 
+        path (str|Path):        Path to the directory where VASP files will be written and run.
+
+        vasp_input (VaspInput): The VaspInput object containing all necessary data to run VASP.
+    '''
     assert isinstance(vasp_exe, (Path, str))
-    assert isinstance(vasp_input, VaspInput)
     assert isinstance(path, PathLike)
+    assert isinstance(vasp_input, VaspInput)
+    assert vasp_input.get('INCAR') is not None, \
+    f'vasp_launcher: There is no INCAR defined in the input !'
+    assert vasp_input.get('POSCAR') is not None
+    f'vasp_launcher: There is no POSCAR defined in the input !'
+    assert vasp_input.get('KPOINTS') is not None or vasp_input['INCAR'].get('KSPACING') is not None
+    f'vasp_launcher: There is no KPOINTS or KSPACING tag defined in the input !'
+    assert vasp_input.get('POTCAR') is not None
+    f'vasp_launcher: There is no POTCAR defined in the input !'
 
-    vasp_exe_list = list((vasp_exe,))
-    path = str(path)
-    calc_dir = Path(path)
-    out_file = Path("/".join((path, "vasp.out")))
-    err_file = Path("/".join((path, "vasp.err")))
 
+    vasp_exe_list = list((vasp_exe,)) # Necessary for subprocess to take it as a full command
+    path          = str(path)
+    calc_dir      = path
+    out_file      = os.path.join(path, "vasp.out")
+    err_file      = os.path.join(path, "vasp.err")
+    
     try:
         vasp_input.run_vasp(
             run_dir=calc_dir,
@@ -221,32 +238,29 @@ def vasp_launcher(vasp_exe: PathLike, vasp_input: VaspInput, path: PathLike) -> 
             output_file=out_file,
             err_file=err_file,
         )
-    except FileExistsError:
-        print(f"WARNING: {str(path)}: This directory already exists, skipping...")
-
+    except FileExistsError: # Case of several processors trying to do the same calculation at once
+        print(f'WARNING: {str(path)}: This directory already exists, skipping...')
 
 ########################################
 
-
-def _vasp_launcher_batch_wrapper(args_tuple: Tuple[VaspInput, PathLike]):
-    vasp_exe = args_tuple[0]
-    vasp_input = args_tuple[1]
-    path = args_tuple[2]
-    vasp_launcher(vasp_exe, vasp_input, path)
+def _vasp_launcher_batch_wrapper(args_tuple: Tuple[PathLike, VaspInput]):
+    vasp_exe   = args_tuple[0]
+    path       = args_tuple[1]
+    vasp_input = args_tuple[2]
+    vasp_launcher(vasp_exe, path, vasp_input)
 
 
 ########################################
 
 
 def vasp_batch_launch(
-    vasp_exe: PathLike,
-    vasp_inputs: Sequence[VaspInput],
-    base_dir: PathLike,
-    subdir_names: Sequence[PathLike],
-    workers: int = 1,
-) -> None:
-    """
-    Creates a subdirectory with given names for each provided VaspInput object,
+        vasp_exe: PathLike, 
+        base_dir: PathLike, 
+        inputs_data: Dict[PathLike, VaspInput], 
+        workers: int = 1
+    ) -> None:
+    '''
+    Creates a subdirectory with given names for each provided VaspInput object, 
     writes VASP input files in those subdirectories, then runs VASP inside each one.
     As this process can be very expensive as it actually does the VASP computations,
     it is recommended to parallelize it by setting workers > 1.
@@ -254,12 +268,9 @@ def vasp_batch_launch(
     Parameters:
         vasp_exe (Path|str):        Path to the VASP executable.
 
-        vasp_inputs ([VaspInput]):  The objects defining how to write VASP input files in each subdirectory.
+        inputs_data (dict):         Dict of structure data to run, of the form {subdir_name: VaspInput}.
 
         base_dir (str|Path):        The directory where the subdirs should be created.
-
-        subdir_names ([str|Path]):  The names or subpaths for created subdirectories.
-                                    Note that its length must match the length of vasp_inputs.
 
         workers (int):              The number of parallel processes to spawn.
                                     Defaults to 1.
@@ -269,24 +280,21 @@ def vasp_batch_launch(
         vasp_exe, (Path, str)
     ), f"vasp_exe: expected a str or Path, got {type(vasp_exe)} instead."
 
-    assert all(
-        isinstance(vasp_input, VaspInput) for vasp_input in vasp_inputs
-    ), f"vasp_inputs: Expected VaspInput objects, got types listed below:\n\
-    {print(list((type(vasp_input) for vasp_input in vasp_inputs)))}"
-
-    assert isinstance(
-        base_dir, (Path, str)
-    ), f"base_dir: expected a str or Path, got {type(base_dir)} instead."
+    assert all(isinstance(vasp_input, VaspInput) for vasp_input in inputs_data.values()), \
+    f'vasp_inputs: Expected VaspInput objects, got types listed below:\n \
+    {print(list((type(vasp_input) for vasp_input in inputs_data.values())))}'
 
     base_dir = Path(base_dir)
 
     assert base_dir.is_dir()
-    assert all(isinstance(subdir_name, PathLike) for subdir_name in subdir_names)
-    assert len(vasp_inputs) == len(subdir_names)
+    assert all(isinstance(subdir_name, PathLike) for subdir_name in inputs_data.keys())
+    #assert len(vasp_inputs) == len(subdir_names)
     assert isinstance(workers, int) and workers >= 1
 
-    subpaths_list = batch_add_new_dirs(base_dir=base_dir, new_subdirs=subdir_names)
-    inputs_list = list(zip(repeat(vasp_exe), vasp_inputs, subpaths_list))
+    subpaths_list = batch_add_new_dirs(base_dir=base_dir, new_subdirs=list(inputs_data.keys()))
+    inputs_data   = {subpath: inputs_data.get(subpath.name) for subpath in subpaths_list}
+    inputs_list   = list(zip(repeat(vasp_exe), inputs_data.items()))
+    inputs_list   = list(tuple(flatten(input)) for input in inputs_list)
 
     process_map(
         _vasp_launcher_batch_wrapper,
@@ -519,8 +527,10 @@ def vasp_relaxation_settings(
     ), "user_incar_settings must be a dict or None"
 
     vasp_input = _RelaxSet_init(
-        structure=structure, preset=preset, corrections=user_corrections
-    ).get_vasp_input()
+        structure=structure, 
+        preset=preset, 
+        corrections=user_corrections
+    ).get_input_set()
 
     return vasp_input
 
@@ -577,9 +587,11 @@ def vasp_static_settings(
 
     if not from_prev_calc:
         vasp_input = _StaticSet_init(
-            struct_or_path=structure, preset=preset, corrections=user_corrections
-        ).get_vasp_input()
-
+            struct_or_path=structure, 
+            preset=preset, 
+            corrections=user_corrections
+        ).get_input_set()
+    
     else:
         assert isinstance(
             prev_calc_dir, PathLike
@@ -592,11 +604,11 @@ def vasp_static_settings(
         ), f"Prev_calc_dir: {prev_calc_dir} is not a valid directory."
 
         vasp_input = _StaticSet_init(
-            struct_or_path=prev_calc_dir,
-            from_prev_calc=from_prev_calc,
-            preset=preset,
-            corrections=user_corrections,
-        ).get_vasp_input()
+            struct_or_path=prev_calc_dir, 
+            from_prev_calc=from_prev_calc, 
+            preset=preset, 
+            corrections=user_corrections
+        ).get_input_set()
 
     return vasp_input
 
@@ -706,10 +718,11 @@ def extract_vasp_data_for_delta_sol(
 
 
 def batch_extract_vasp_data(
-    method: Literal["convex_hull", "delta_sol"],
-    base_dir: PathLike = ".",
-    ignore_file: str = "rejected.txt",
-    workers: int = 1,
+        method: Literal['convex_hull', 'delta_sol'], 
+        base_dir: PathLike = '.', 
+        structs_names: Optional[Sequence[str]] = None, 
+        ignore_file: str = 'rejected.txt', 
+        workers: int = 1
 ) -> Dict[str, Dict[str, Any]]:
     """
     Extracts VASP data from a previous run for each structure directory in given directory.
@@ -722,8 +735,12 @@ def batch_extract_vasp_data(
 
         base_dir (str|Path):    Directory containing structures subdirs to extract data from.
 
-        ignore_file (str):      Checks whether the provided file name exists in each
-                                subdirectory. Structure directories containing this file
+        structs_names ([str]):  Provide specific structures sub-directories to extract data from.
+                                If specified, only specified subdirs in base_dir are checked.
+                                If not, all subdirs in base_dir are checked.
+
+        ignore_file (str):      Checks whether the provided file name exists in each 
+                                subdirectory. Structure directories containing this file 
                                 will not be taken into account.
                                 This parameter permits the filtration of structures that did
                                 not pass previous steps.
@@ -765,10 +782,14 @@ def batch_extract_vasp_data(
         case _:
             raise NotImplementedError(f"Provided method ({method}) is not supported.")
 
-    base_dir = Path(base_dir)
-    structs_dir_list = list(filter(is_struct_dir, base_dir.iterdir()))
-    nbr_structs = len(structs_dir_list)
-    chunksize = min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1
+    base_dir           = Path(base_dir)
+    structs_dir_list   = list(filter(is_struct_dir, base_dir.iterdir()))
+
+    if structs_names:
+        structs_dir_list = list(filter(lambda path: path.name in structs_names, structs_dir_list))
+    
+    nbr_structs        = len(structs_dir_list)
+    chunksize          = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
 
     structs_data_list = list(
         filter(
@@ -781,8 +802,8 @@ def batch_extract_vasp_data(
                 desc="Extracting infos from previous VASP output",
             ),
         )
-    )
-    print(structs_data_list)
+    ))
+
     structs_data = dict(structs_data_list)
 
     return structs_data
@@ -914,6 +935,8 @@ def delta_sol_inputs_init(
 
     def _inputs_init(name: str, data: Dict[str, Any]) -> List[Tuple[str, VaspInput]]:
 
+        import math
+
         # Initialize input sets
         structure = data["structure"]
         N_val = get_all_valence_electrons(structure)
@@ -947,24 +970,28 @@ def delta_sol_inputs_init(
                 n_star_type=n_star_type,
             )
 
-            run_plus, run_minus = run_set.as_dict(), run_set.as_dict()
-            run_plus["INCAR"].update({"NELECT": N_val + n_ratio})
-            run_minus["INCAR"].update({"NELECT": N_val - n_ratio})
-            run_plus, run_minus = VaspInput.from_dict(run_plus), VaspInput.from_dict(
-                run_minus
-            )
-            run_plus_path = "_".join((name, n_star_type.lower(), "plus"))
-            run_minus_path = "_".join((name, n_star_type.lower(), "minus"))
+            run_neutral, run_plus, run_minus = run_set.as_dict(), run_set.as_dict(), run_set.as_dict()
+            new_nbands = math.ceil(round(N_val + n_ratio, 0)/2 + structure.num_sites/2 + 1)
 
-            struct_runs_list += [(run_plus_path, run_plus), (run_minus_path, run_minus)]
+            run_neutral['INCAR'].update({'NELECT': N_val, 'NBANDS': new_nbands})
+            run_plus['INCAR'].update({'NELECT': N_val + n_ratio, 'NBANDS': new_nbands})
+            run_minus['INCAR'].update({'NELECT': N_val - n_ratio, 'NBANDS': new_nbands})
+
+            run_neutral = VaspInput.from_dict(run_neutral)
+            run_plus    = VaspInput.from_dict(run_plus)
+            run_minus   = VaspInput.from_dict(run_minus)
+
+            run_neutral_path = '_'.join((name , n_star_type.lower(), 'neutral'))
+            run_plus_path    = '_'.join((name , n_star_type.lower(), 'plus'))
+            run_minus_path   = '_'.join((name , n_star_type.lower(), 'minus'))
+
+            struct_runs_list += [(run_neutral_path, run_neutral), (run_plus_path, run_plus), (run_minus_path, run_minus)]
 
         return struct_runs_list
 
-    input_data = flatten(list(starmap(_inputs_init, structs_data.items())))
-    subdirs_list = [tup[0] for tup in input_data]
-    inputs_list = [tup[1] for tup in input_data]
+    inputs_data = dict(flatten(list(starmap(_inputs_init, structs_data.items()))))
 
-    return subdirs_list, inputs_list
+    return inputs_data
 
 
 ########################################

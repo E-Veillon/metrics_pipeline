@@ -19,7 +19,9 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # PYTHON MATERIAL GENOMICS PACKAGE
 
-from pymatgen.core.composition import Composition, Element
+from pymatgen.core.periodic_table import Element
+from pymatgen.core.composition import Composition
+from pymatgen.core.structure import SiteCollection
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 ########################################
@@ -33,6 +35,39 @@ from screening_pipeline.utils.periodic_table import get_elements, get_delta_sol_
 ########################################
 # LOCAL FUNCTIONS
 
+
+def check_interatomic_distances(
+        structures: Sequence[SiteCollection], 
+        valid_tol: float = 0.5
+    ) -> Tuple[List[SiteCollection], int]:
+    '''
+    Checks interatomic distances with respect to a tolerance in angstroms 
+    for all given structures, then returns the valid ones in a list.
+
+    Parameters:
+        structures ([SiteCollection]):  The structures to check.
+
+        valid_tol (float):              Tolerance below which a distance between 2 sites 
+                                        is considered invalid and is eliminatory for the
+                                        structure. Defaults to 0.5 angstroms.
+
+    Returns:
+        List[SiteCollection]: list of valid structures.
+        int: Number of invalid structures discarded.
+    '''
+    def _is_valid(structure: SiteCollection):
+        return structure.is_valid(tol=valid_tol)
+    
+    assert isinstance(structures, Sequence)
+    assert all(isinstance(structure, SiteCollection) for structure in structures)
+    assert isinstance(valid_tol, float)
+
+    valid_structs = list(filter(_is_valid, structures))
+    nbr_discarded = len(structures) - len(valid_structs)
+
+    return valid_structs, nbr_discarded
+
+########################################
 
 # Functions related to phase stability screening with Convex Hull construction method.
 
@@ -500,44 +535,50 @@ def calculate_delta_sol_band_gap(data: dict) -> Tuple[str, float]:
 
     Parameters:
         data (dict): A dict containing following data about a structure:
-                        - Its name,
-                        - The Structure object,
-                        - Its original relaxed total energy,
-                        - Its total energy with more charge density,
-                        - Its total energy with less charge density
+                        - Its name, 
+                        - The Structure object, 
+                        - Its original relaxed total energy, 
+                        - Its total energy with more electrons, 
+                        - Its total energy with less electrons
     Returns:
         Tuple[str, float]: The name of the structure and its band gap value.
     """
 
     assert isinstance(data, dict)
+    assert len(data) == 5 or len(data) == 9
 
-    name = data["name"]
-    structure = data["structure"]
-    E_N0 = data["E_N0"]
-    E_N0_plus_n = data["E_N0_plus_n"]
-    E_N0_minus_n = data["E_N0_minus_n"]
-    n_ratio = get_delta_sol_el_ratio(structure)
-    # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap
+    n_ratio = get_delta_sol_el_ratio(data['structure'])
+
+    # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap 
     # (Ref 32 in screening_pipeline/Bibliography))
-    E_band_gap = (E_N0_plus_n + E_N0_minus_n - 2 * E_N0) / n_ratio
+    E_band_gap = (data['E_N0_plus_n_best'] + data['E_N0_minus_n_best'] - 2*data['E_N0'])/n_ratio
 
-    return name, E_band_gap
+    if len(data) == 9: # data have uncertainty keys
+        E_band_gap_min = (data['E_N0_plus_n_min'] + data['E_N0_minus_n_min'] - 2*data['E_N0'])/n_ratio
+        E_band_gap_max = (data['E_N0_plus_n_max'] + data['E_N0_minus_n_max'] - 2*data['E_N0'])/n_ratio
+        return data['name'], E_band_gap, E_band_gap_min, E_band_gap_max
+
+    return data['name'], E_band_gap
 
 
 ########################################
 
 
 def batch_calculate_delta_sol_band_gaps(
-    structs_data: dict, bg_structs_data: dict, workers: int = 1, /
-) -> Dict[str, float]:
-    """
+        structs_data: dict, 
+        bg_structs_data: dict, 
+        with_uncertainties: bool = False, 
+        workers: int = 1, 
+        /
+    ) -> Dict[str, float]:
+    '''
     Calculate Δ-Sol band gap value for every structure in a batch from their data,
     as provided by extract_vasp_data_for_delta_sol function applied on the 3 energy calculations.
 
     Parameters:
         structs_data (dict):    Dict containing the original data extracted from previous VASP calculation.
 
-        bg_structs_data (dict): Dict of the calculated data on structures with changed charge density.
+        bg_structs_data (dict): Dict of the calculated data on structures with changed electron numbers.
 
         workers (int):          The number of parallel processes to spawn. Defaults to 1.
 
@@ -547,33 +588,56 @@ def batch_calculate_delta_sol_band_gaps(
 
     assert isinstance(structs_data, dict)
     assert isinstance(bg_structs_data, dict)
-    assert isinstance(workers, int) and workers >= 0
+    assert isinstance(with_uncertainties, bool)
+    assert isinstance(workers, int) and workers >= 1
 
-    final_energies = {
-        name: {
-            "name": name,
-            "structure": data["structure"],
-            "E_N0": data["final_energy"],
-            "E_N0_plus_n": bg_structs_data["_".join((name, "plus"))]["final_energy"],
-            "E_N0_minus_n": bg_structs_data["_".join((name, "minus"))]["final_energy"],
+    if not with_uncertainties:
+        final_energies = {
+            name: {
+                'name': name, 
+                'structure': data['structure'], 
+                'E_N0': bg_structs_data['_'.join((name, 'best', 'neutral'))]['final_energy'], 
+                'E_N0_plus_n_best': bg_structs_data['_'.join((name, 'best', 'plus'))]['final_energy'], 
+                'E_N0_minus_n_best': bg_structs_data['_'.join((name, 'best', 'minus'))]['final_energy']
+            } for name, data in structs_data.items()
         }
-        for name, data in structs_data.items()
-    }
+
+    elif with_uncertainties:
+        final_energies = {
+            name: {
+                'name': name, 
+                'structure': data['structure'], 
+                'E_N0': bg_structs_data['_'.join((name, 'best', 'neutral'))]['final_energy'], 
+                'E_N0_plus_n_best': bg_structs_data['_'.join((name, 'best', 'plus'))]['final_energy'], 
+                'E_N0_minus_n_best': bg_structs_data['_'.join((name, 'best', 'minus'))]['final_energy'], 
+                'E_N0_plus_n_min': bg_structs_data['_'.join((name, 'min', 'plus'))]['final_energy'], 
+                'E_N0_minus_n_min': bg_structs_data['_'.join((name, 'min', 'minus'))]['final_energy'], 
+                'E_N0_plus_n_max': bg_structs_data['_'.join((name, 'max', 'plus'))]['final_energy'], 
+                'E_N0_minus_n_max': bg_structs_data['_'.join((name, 'max', 'minus'))]['final_energy']
+            } for name, data in structs_data.items()
+        }
 
     nbr_structs = len(final_energies)
     chunksize = min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1
     data_list = list(final_energies.values())
 
-    E_band_gaps = list(
-        process_map(
-            calculate_delta_sol_band_gap,
-            data_list,
-            workers=workers,
-            chhunksize=chunksize,
-        )
-    )
+    E_band_gaps = list(process_map(
+        calculate_delta_sol_band_gap, 
+        data_list, 
+        max_workers=workers, 
+        chunksize=chunksize
+    ))
 
-    E_band_gaps = dict(E_band_gaps)
+    if not with_uncertainties:
+        return dict(E_band_gaps)
+
+    E_band_gaps = {
+        tup[0]: {
+            'E_band_gap': tup[1], 
+            'E_band_gap_min': tup[2], 
+            'E_band_gap_max': tup[3]
+        } for tup in E_band_gaps
+    }
 
     return E_band_gaps
 

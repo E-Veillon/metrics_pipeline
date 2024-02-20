@@ -51,10 +51,10 @@ def assert_args(args: Namespace) -> None:
     assert args.user_settings.endswith('.yaml'), \
     'user settings file must be of .yaml format.'
 
-    assert args.mini_maxi[0] >= 0.0 and args.mini_maxi[1] >= 0.0, \
+    assert args.minimum >= 0.0 and args.maximum >= 0.0, \
     f"Acceptable band gap values must be positive or zero."
 
-    assert args.mini_maxi[0] != args.mini_maxi[1], \
+    assert args.minimum != args.maximum, \
     f"Acceptable band gap values cannot have the same value."
 
     assert args.accept.endswith('.txt'), \
@@ -65,6 +65,9 @@ def assert_args(args: Namespace) -> None:
 
     assert args.workers >= 1, \
     'The number of workers cannot be negative or zero.'
+
+    assert args.task_index >= 0 or args.task_index is None, \
+    '"task_index" arg must be positive or zero.'
 
 ########################################
 # MAIN FUNCTION
@@ -83,9 +86,13 @@ def main():
             (reference 32 in screening_pipeline/Bibliography)
         '''
     prog_missing_steps = '''
-        Missing steps to complete this script: None
+        Missing steps to complete this script:
+            - Set an option to enable incertainty calculation on the band gap using N*min and N*max - OK
+            - This option should let user choose if they want to keep materials according to the uncertainty case:
+                * If E(gap) is inside the goal but uncertainty gets out ?
+                * If E(gap) is outside the goal but uncertainty gets in ?
+                Possible options: keep, keep_aside, discard, auto (keep_aside if at least half the interval is in, else discard)
         '''
-
     helper_format = RawTextHelpFormatter
 
     parser = ArgumentParser(
@@ -137,12 +144,19 @@ def main():
     )
     parser.add_argument(
         '-m',
-        '--mini-maxi',
-        nargs=2,
+        '--minimum',
         type=float,
-        default=[1.3, 3.6],
-        help='''Acceptable interval of band gap values in eV (Defaults: %(default)s eV).''', 
-        metavar='float float'
+        default=1.3,
+        help='''Minimum acceptable band gap value in eV. Defaults to 1.3 eV.''', 
+        metavar='float'
+    )
+    parser.add_argument(
+        '-M',
+        '--maximum',
+        type=float,
+        default=3.6,
+        help='''Maximum acceptable band gap value in eV. Defaults to 3.6 eV.''', 
+        metavar='float'
     )
     parser.add_argument(
         '-a', 
@@ -197,11 +211,11 @@ def main():
     outdir         = args.output
     preset         = args.preset
     user_settings  = _yaml_loader(args.user_settings, on_error='raise')
-    valid_interval = sorted(args.mini_maxi)
+    valid_interval = sorted([args.minimum, args.maximum])
     accept_file    = args.accept
     ignore_file    = args.ignore
     workers        = args.workers
-    struct_idx     = args.task_index
+    struct_idx     = args.task_index if args.task_index is not None else 0
 
 
     # MAIN BLOCK
@@ -214,137 +228,25 @@ def main():
         workers=workers
     )
 
-    if struct_idx is None: # Use tqdm.contrib.concurrent.process_map() to do the calculation
+    try: struct_name = next(filter(
+        lambda key: key.startswith(f'{struct_idx}_'), 
+        structs_data.keys()
+        ))
+    except StopIteration:
+        raise ValueError(f'Provided "task_index" arg is out of the range of indexed structures.')
+    
+    structs_data = {struct_name: structs_data.get(struct_name)}
 
-        inputs_data = delta_sol_inputs_init(
-            structs_data=structs_data, 
-            preset=preset, 
-            user_corrections=user_settings or None, 
-            with_uncertainties=args.with_uncertainties
-        )
-
-        # Launch static calculations
-        vasp_batch_launch(
-            vasp_exe=exe_path, 
-            inputs_data=inputs_data, 
-            base_dir=outdir, 
-            workers=workers
-        )
-
-        # Extract resulting energies
-        bg_structs_data = batch_extract_vasp_data(
-            method='delta_sol', 
-            base_dir=outdir, 
-            workers=workers
-        )
-
-
-    elif struct_idx >= 0: # Use the job array to parallelize the calculation
-
-        try: struct_name = next(filter(
-            lambda key: key.startswith(f'{struct_idx}_'), 
-            structs_data.keys()
-            ))
-        except StopIteration:
-            raise ValueError(f'Provided "task_index" arg is out of the range of indexed structures.')
-        
-        structs_data = {struct_name: structs_data.get(struct_name)}
-
-        inputs_data = delta_sol_inputs_init(
-            structs_data=structs_data, 
-            preset=preset, 
-            user_corrections=user_settings or None, 
-            with_uncertainties=args.with_uncertainties
-        )
-
-        for name, vasp_input in inputs_data.items():
-            run_path = os.path.join(outdir, name)
-            vasp_launcher(vasp_exe=exe_path, path=run_path, vasp_input=vasp_input)
-
-        bg_structs_data = batch_extract_vasp_data(
-            method='delta_sol', 
-            base_dir=outdir, 
-            structs_names=list(inputs_data.keys()), 
-            workers=workers
-        )
-
-    else: raise AssertionError('"task_index" arg must be positive or zero.')
-
-    E_band_gaps = batch_calculate_delta_sol_band_gaps(
-        structs_data, bg_structs_data, args.with_uncertainties, workers
+    inputs_data = delta_sol_inputs_init(
+        structs_data=structs_data, 
+        preset=preset, 
+        user_corrections=user_settings or None, 
+        with_uncertainties=args.with_uncertainties
     )
 
-    good_bg_structs = list(filter(
-        lambda tup: min(valid_interval) <= tup[1] <= max(valid_interval), 
-        list(E_band_gaps.items())
-    ))
-
-    bad_bg_structs = list(filter(
-        lambda tup: tup[1] < min(valid_interval) or tup[1] > max(valid_interval), 
-        list(E_band_gaps.items())
-    ))
-
-    # Keep good structures
-    for struct in good_bg_structs:
-        name         = struct[0]
-        E_band_gap   = round(struct[1], 6)
-        name_plus    = '_'.join((name, 'best', 'plus'))
-        name_minus   = '_'.join((name, 'best', 'minus'))
-        accept_msg   = [
-            "BAND GAP TEST PASSED", 
-            f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is inside the interval [{min(valid_interval)}, {max(valid_interval)}].", 
-            "Therefore, it is suitable for wanted application, and should be considered for further screening steps."
-        ]
-        
-        if args.with_uncertainties:
-            E_band_gap_min = round(struct[2], 6)
-            E_band_gap_max = round(struct[3], 6)
-            accept_msg += [
-                "\nUncertainty interval (does not affect acception or rejection):", 
-                f"Band Gap minimum = {E_band_gap_min} eV", 
-                f"Band Gap maximum = {E_band_gap_max} eV"
-            ]
-
-        accept_msg = "\n".join(accept_msg)
-        input_path = os.path.join(input_dir, name, accept_file)
-        path_plus  = os.path.join(outdir, name_plus, accept_file)
-        path_minus = os.path.join(outdir, name_minus, accept_file)
-
-        with open(input_path, 'wt') as f1, open(path_plus, 'wt') as f2, open(path_minus, 'wt') as f3:
-            f1.write(accept_msg)
-            f2.write(accept_msg)
-            f3.write(accept_msg)
-
-    # Reject unsuitable structures
-    for struct in bad_bg_structs:
-        name         = struct[0]
-        E_band_gap   = round(struct[1], 6)
-        name_plus    = '_'.join((name, 'best', 'plus'))
-        name_minus   = '_'.join((name, 'best', 'minus'))
-        reject_msg   = [
-            "BAND GAP REJECTION", 
-            f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].",
-            "Therefore, it is not suitable for wanted application, and should not be considered in further screening steps."
-        ]
-
-        if args.with_uncertainties:
-            E_band_gap_min = round(struct[2], 6)
-            E_band_gap_max = round(struct[3], 6)
-            reject_msg += [
-                "\nUncertainty interval (does not affect acception or rejection):", 
-                f"Band Gap minimum = {E_band_gap_min} eV", 
-                f"Band Gap maximum = {E_band_gap_max} eV"
-            ]
-
-        reject_msg = "\n".join(reject_msg)
-        input_path = os.path.join(input_dir, name, ignore_file)
-        path_plus  = os.path.join(outdir, name_plus, ignore_file)
-        path_minus = os.path.join(outdir, name_minus, ignore_file)
-
-        with open(input_path, 'wt') as f1, open(path_plus, 'wt') as f2, open(path_minus, 'wt') as f3:
-            f1.write(reject_msg)
-            f2.write(reject_msg)
-            f3.write(reject_msg)
+    for name, vasp_input in inputs_data.items():
+        run_dir = os.path.join(outdir, name)
+        vasp_input.write_input(output_dir=run_dir)
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
