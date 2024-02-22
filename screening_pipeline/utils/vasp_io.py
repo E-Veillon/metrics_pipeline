@@ -9,6 +9,7 @@ import os
 from monty.os.path import zpath
 from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal, Any
 from pathlib import Path
+from dataclasses import dataclass
 
 ########################################
 # OPTIMIZATION MODULES
@@ -27,7 +28,9 @@ from pymatgen.io.vasp.inputs import PotcarSingle
 from pymatgen.io.vasp import VaspInput, Vasprun
 from pymatgen.io.vasp.inputs import Poscar
 from pymatgen.io.vasp.outputs import Chgcar, Oszicar
-from pymatgen.io.vasp.sets import DictSet, MITRelaxSet
+from pymatgen.io.vasp.sets import (
+    DictSet, MITRelaxSet, MVLRelax52Set, _load_yaml_config, UserPotcarFunctional
+)
 
 ########################################
 # LOCAL MODULES
@@ -47,6 +50,56 @@ from screening_pipeline.utils.periodic_table import (
     get_all_valence_electrons,
     get_delta_sol_el_ratio,
 )
+
+
+########################################
+# LOCAL CLASSES
+
+@dataclass
+class GenMatRelax54Set(MVLRelax52Set):
+    '''
+    Implementation of VaspInputSet using the public Materials Project
+    parameters with some tweaks for INCAR, exact MP parameters for KPOINTS, 
+    and VASP's recommended PAW potentials for POTCAR (PBE_54).
+
+    The changes from MP parameters are described below:
+
+    - INCAR:    'ISMEAR' = 0 for robustness across any type of structure (VASP recommended)
+                'LASPH'  = True for correct description of PAW pseudopotentials
+                'LDAU': Adding a U correction of 5.0 eV on Ti oxydes
+                (A discussion about it can be found in ref: J. Chem. Phys. 135, 054503 (2011).
+                The value used is the one giving best compromise between all studied properties)
+
+    - POTCAR_FUNCTIONAL: 'PBE_54' instead of 'PBE'
+
+    - POTCAR: PBE_54 POTCAR files as recommended in pymatgen in 'PBE54Base.yaml' file.
+    '''
+    user_potcar_functional: UserPotcarFunctional = "PBE_54"
+    POTCAR_CONFIG = _load_yaml_config("PBE54Base.yaml")
+    CONFIG = MVLRelax52Set.CONFIG.update({
+        'POTCAR_FUNCTIONAL': POTCAR_CONFIG.get('POTCAR_FUNCTIONAL'), 
+        'POTCAR': POTCAR_CONFIG.get('POTCAR')
+        })
+    _valid_potcars = ('PBE_54',)
+
+    def incar_updates(self) -> Dict:
+        """Get updates to the INCAR config for this calculation type."""
+        ref_config: Dict = super().CONFIG.get('INCAR')
+        new_ldauj: Dict = ref_config.get('LDAUJ').get('O').update({'Ti': 0.0})
+        new_ldaul: Dict = ref_config.get('LDAUL').get('O').update({'Ti': 2})
+        new_ldauu: Dict = ref_config.get('LDAUU').get('O').update({'Ti': 5.0})
+        updates = {
+            'ISMEAR': 0, 'LASPH': True, 'LDAUJ': new_ldauj, 'LDAUL': new_ldaul, 'LDAUU': new_ldauu,
+        }
+        return updates
+
+
+########################################
+
+
+class GenMatStatic54Set(GenMatRelax54Set):
+    pass
+
 
 ########################################
 # LOCAL FUNCTIONS
@@ -259,7 +312,7 @@ def vasp_batch_launch(
         inputs_data: Dict[PathLike, VaspInput], 
         workers: int = 1
     ) -> None:
-    '''
+    """
     Creates a subdirectory with given names for each provided VaspInput object, 
     writes VASP input files in those subdirectories, then runs VASP inside each one.
     As this process can be very expensive as it actually does the VASP computations,
@@ -802,7 +855,7 @@ def batch_extract_vasp_data(
                 desc="Extracting infos from previous VASP output",
             ),
         )
-    ))
+    )
 
     structs_data = dict(structs_data_list)
 
