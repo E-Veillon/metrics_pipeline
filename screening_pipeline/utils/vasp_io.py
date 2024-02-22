@@ -77,7 +77,7 @@ class GenMatRelax54Set(MVLRelax52Set):
     Parameters:
         structure (Structure):          The input structure.
 
-        user_potcar_functional (str):   It is possible to switch between PBE_54 and PBE_54_W_HASH.
+        user_potcar_functional (str):   Choose from PBE_54 and PBE_54_W_HASH.
 
         **kwargs:                       Other keywords arguments supported by DictSet.
     '''
@@ -106,8 +106,8 @@ class GenMatRelax54Set(MVLRelax52Set):
 
 class GenMatStatic54Set(GenMatRelax54Set):
     '''
-    Subclass of GenMatRelax54Set to do static calculations 
-    after relaxations using this custom set.
+    Subclass of GenMatRelax54Set to do static calculations after relaxations 
+    done with this set.
 
     Parameters:
         structure (Structure):          The input structure.
