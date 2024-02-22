@@ -73,6 +73,13 @@ class GenMatRelax54Set(MVLRelax52Set):
     - POTCAR_FUNCTIONAL: 'PBE_54' instead of 'PBE'
 
     - POTCAR: PBE_54 POTCAR files as recommended in pymatgen in 'PBE54Base.yaml' file.
+
+    Parameters:
+        structure (Structure):          The input structure.
+
+        user_potcar_functional (str):   It is possible to switch between PBE_54 and PBE_54_W_HASH.
+
+        **kwargs:                       Other keywords arguments supported by DictSet.
     '''
     user_potcar_functional: UserPotcarFunctional = "PBE_54"
     POTCAR_CONFIG = _load_yaml_config("PBE54Base.yaml")
@@ -80,14 +87,14 @@ class GenMatRelax54Set(MVLRelax52Set):
         'POTCAR_FUNCTIONAL': POTCAR_CONFIG.get('POTCAR_FUNCTIONAL'), 
         'POTCAR': POTCAR_CONFIG.get('POTCAR')
         })
-    _valid_potcars = ('PBE_54',)
+    _valid_potcars = ('PBE_54', 'PBE_54_W_HASH')
 
     def incar_updates(self) -> Dict:
         """Get updates to the INCAR config for this calculation type."""
         ref_config: Dict = super().CONFIG.get('INCAR')
-        new_ldauj: Dict = ref_config.get('LDAUJ').get('O').update({'Ti': 0.0})
-        new_ldaul: Dict = ref_config.get('LDAUL').get('O').update({'Ti': 2})
-        new_ldauu: Dict = ref_config.get('LDAUU').get('O').update({'Ti': 5.0})
+        new_ldauj: Dict = ref_config['LDAUJ']['O'].update({'Ti': 0.0})
+        new_ldaul: Dict = ref_config['LDAUL']['O'].update({'Ti': 2})
+        new_ldauu: Dict = ref_config['LDAUU']['O'].update({'Ti': 5.0})
         updates = {
             'ISMEAR': 0, 'LASPH': True, 'LDAUJ': new_ldauj, 'LDAUL': new_ldaul, 'LDAUU': new_ldauu,
         }
@@ -98,7 +105,22 @@ class GenMatRelax54Set(MVLRelax52Set):
 
 
 class GenMatStatic54Set(GenMatRelax54Set):
-    pass
+    '''
+    Subclass of GenMatRelax54Set to do static calculations 
+    after relaxations using this custom set.
+
+    Parameters:
+        structure (Structure):          The input structure.
+
+        user_potcar_functional (str):   It is possible to switch between PBE_54 and PBE_54_W_HASH.
+
+        **kwargs:                       Other keywords arguments supported by DictSet.
+    '''
+
+    def incar_updates(self) -> Dict:
+        updates = super().incar_updates()
+        updates.update({"NSW": 0, 'ISMEAR': -5, "LCHARG": True, "LORBIT": 11, "LREAL": False})
+        return updates
 
 
 ########################################
