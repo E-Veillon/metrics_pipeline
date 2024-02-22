@@ -9,12 +9,21 @@ authors = [
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.9"
 pymatgen = ">=2023.10.11"
 spglib = ">=2.0.0"
 
 [tool.poetry.scripts]
+cif_counter = 'screening_pipeline.scripts.cif_counter:main'
 symmetrize = 'screening_pipeline.scripts.symmetrize:main'
+vasp_relaxation = 'screening_pipeline.scripts.vasp_relaxation:main'
+stability_screening = 'screening_pipeline.scripts.stability_screening:main'
+metrics = 'screening_pipeline.scripts.metrics:main'
+band_gap_screening = 'screening_pipeline.scripts.band_gap_screening:main'
+delta_sol_inputs_writer = 'screening_pipeline.scripts.delta_sol_inputs_writer:main'
+delta_sol_calculator = 'screening_pipeline.scripts.delta_sol_calculator:main'
+band_edge_pos_screening = 'screening_pipeline.scripts.band_edge_pos_screening:main'
+test_cif = 'screening_pipeline.scripts.test_cif_block:main'
 
 [build-system]
 requires = ["poetry-core"]
