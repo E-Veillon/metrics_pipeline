@@ -757,8 +757,7 @@ def extract_vasp_data_for_delta_sol(
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
                                 containing following data, used in Δ-Sol method:
                                     - structure itself,
-                                    - its CHGCAR file (to modify charge density),
-                                    - its final energy (in eV), used as E(N0).
+                                    - its final energy (in eV).
     """
 
     assert isinstance(struct_dir, PathLike)
@@ -772,16 +771,13 @@ def extract_vasp_data_for_delta_sol(
 
     struct_name = struct_dir.name
     contcar_path = Path(struct_dir / "CONTCAR")
-    chgcar_path = Path(struct_dir / "CHGCAR")
     oszicar_path = Path(struct_dir / "OSZICAR")
 
     structure = Poscar.from_file(contcar_path).structure
-    chgcar = Chgcar.from_file(chgcar_path)
     final_energy_eV = Oszicar(oszicar_path).final_energy
 
     struct_dict = {
         "structure": structure,
-        "CHGCAR": chgcar,
         "final_energy": final_energy_eV,
     }
     struct_data = (struct_name, struct_dict)
@@ -1010,31 +1006,30 @@ def delta_sol_inputs_init(
 
     def _inputs_init(name: str, data: Dict[str, Any]) -> List[Tuple[str, VaspInput]]:
 
-        import math
-
         # Initialize input sets
-        structure = data["structure"]
-        N_val = get_all_valence_electrons(structure)
-        run_set = vasp_static_settings(
-            structure, preset=preset, user_corrections=user_corrections
-        )
-        # Search for the right N* parameter to use
-        pot_func = run_set.get("POTCAR_FUNCTIONAL", "PBE")
+        structure = data['structure']
+        N_val     = get_all_valence_electrons(structure)
+        run_set   = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
 
-        if "LDA" in pot_func:
-            delta_sol_functional = "LDA"
-        elif "PBE" in pot_func:
-            delta_sol_functional = "PBE"
-        elif "AM05" in pot_func:
-            delta_sol_functional = "AM05"
+        # Search for the right N* parameter to use
+        pot_func = run_set.get('POTCAR_FUNCTIONAL', 'PBE')
+
+        if 'LDA' in pot_func: delta_sol_functional = 'LDA'
+        elif 'PBE' in pot_func: delta_sol_functional = 'PBE'
+        elif 'AM05' in pot_func: delta_sol_functional = 'AM05'
         else:
             raise NotImplementedError(
                 "Provided POTCAR functional is not implemented for Δ-Sol method. \
                 Recognized functionals are the ones having 'LDA', 'PBE' or 'AM05' in the name."
             )
 
-        struct_runs_list = []
-        n_star_types = ("BEST", "MIN", "MAX") if with_uncertainties else ("BEST",)
+        n_star_types     = ('BEST', 'MIN', 'MAX') if with_uncertainties else ('BEST',)
+        run_N0_dict = run_set.as_dict()
+        run_N0_dict['INCAR'].update({'NELECT': N_val, 'NBANDS': N_val})
+        run_N0 = VaspInput.from_dict(run_N0_dict)
+        run_N0_path = '_'.join((name , 'neutral'))
+        struct_runs_list = [(run_N0_path, run_N0)]
+
 
         # Compute relevant n = N_val / N*
         for n_star_type in n_star_types:
@@ -1042,29 +1037,25 @@ def delta_sol_inputs_init(
             n_ratio = get_delta_sol_el_ratio(
                 structure=structure,
                 dft_functional=delta_sol_functional,
-                n_star_type=n_star_type,
+                n_star_type=n_star_type
             )
 
-            run_neutral, run_plus, run_minus = run_set.as_dict(), run_set.as_dict(), run_set.as_dict()
-            new_nbands = math.ceil(round(N_val + n_ratio, 0)/2 + structure.num_sites/2 + 1)
+            run_plus, run_minus = run_set.as_dict(), run_set.as_dict()
 
-            run_neutral['INCAR'].update({'NELECT': N_val, 'NBANDS': new_nbands})
-            run_plus['INCAR'].update({'NELECT': N_val + n_ratio, 'NBANDS': new_nbands})
-            run_minus['INCAR'].update({'NELECT': N_val - n_ratio, 'NBANDS': new_nbands})
+            run_plus['INCAR'].update({'NELECT': N_val + n_ratio, 'NBANDS': N_val})
+            run_minus['INCAR'].update({'NELECT': N_val - n_ratio, 'NBANDS': N_val})
 
-            run_neutral = VaspInput.from_dict(run_neutral)
             run_plus    = VaspInput.from_dict(run_plus)
             run_minus   = VaspInput.from_dict(run_minus)
 
-            run_neutral_path = '_'.join((name , n_star_type.lower(), 'neutral'))
             run_plus_path    = '_'.join((name , n_star_type.lower(), 'plus'))
             run_minus_path   = '_'.join((name , n_star_type.lower(), 'minus'))
 
-            struct_runs_list += [(run_neutral_path, run_neutral), (run_plus_path, run_plus), (run_minus_path, run_minus)]
+            struct_runs_list += [(run_plus_path, run_plus), (run_minus_path, run_minus)]
 
         return struct_runs_list
 
-    inputs_data = dict(flatten(list(starmap(_inputs_init, structs_data.items()))))
+    inputs_data = dict(flatten(list(starmap(_inputs_init, list(structs_data.items())))))
 
     return inputs_data
 

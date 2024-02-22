@@ -571,7 +571,7 @@ def batch_calculate_delta_sol_band_gaps(
         workers: int = 1, 
         /
     ) -> Dict[str, float]:
-    '''
+    """
     Calculate Δ-Sol band gap value for every structure in a batch from their data,
     as provided by extract_vasp_data_for_delta_sol function applied on the 3 energy calculations.
 
@@ -596,18 +596,18 @@ def batch_calculate_delta_sol_band_gaps(
             name: {
                 'name': name, 
                 'structure': data['structure'], 
-                'E_N0': bg_structs_data['_'.join((name, 'best', 'neutral'))]['final_energy'], 
+                'E_N0': bg_structs_data['_'.join((name, 'neutral'))]['final_energy'], 
                 'E_N0_plus_n_best': bg_structs_data['_'.join((name, 'best', 'plus'))]['final_energy'], 
                 'E_N0_minus_n_best': bg_structs_data['_'.join((name, 'best', 'minus'))]['final_energy']
             } for name, data in structs_data.items()
         }
 
-    elif with_uncertainties:
+    else:
         final_energies = {
             name: {
                 'name': name, 
                 'structure': data['structure'], 
-                'E_N0': bg_structs_data['_'.join((name, 'best', 'neutral'))]['final_energy'], 
+                'E_N0': bg_structs_data['_'.join((name, 'neutral'))]['final_energy'], 
                 'E_N0_plus_n_best': bg_structs_data['_'.join((name, 'best', 'plus'))]['final_energy'], 
                 'E_N0_minus_n_best': bg_structs_data['_'.join((name, 'best', 'minus'))]['final_energy'], 
                 'E_N0_plus_n_min': bg_structs_data['_'.join((name, 'min', 'plus'))]['final_energy'], 
@@ -629,15 +629,20 @@ def batch_calculate_delta_sol_band_gaps(
     ))
 
     if not with_uncertainties:
-        return dict(E_band_gaps)
+        E_band_gaps = {
+            tup[0]: {
+                'E_band_gap': tup[1]
+            } for tup in E_band_gaps
+        }
 
-    E_band_gaps = {
-        tup[0]: {
-            'E_band_gap': tup[1], 
-            'E_band_gap_min': tup[2], 
-            'E_band_gap_max': tup[3]
-        } for tup in E_band_gaps
-    }
+    else:
+        E_band_gaps = {
+            tup[0]: {
+                'E_band_gap': tup[1], 
+                'E_band_gap_min': tup[2], 
+                'E_band_gap_max': tup[3]
+            } for tup in E_band_gaps
+        }
 
     return E_band_gaps
 

@@ -182,7 +182,7 @@ def main():
             (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).'
     )
     parser.add_argument(
-        '--with_uncertainties', 
+        '--with-uncertainties', 
         action='store_true', 
         help='Pass this flag to enable computation of minimal and maximal Δ-Sol band gaps.\n\
               This will need one full VASP static total energy computation for each limit.'

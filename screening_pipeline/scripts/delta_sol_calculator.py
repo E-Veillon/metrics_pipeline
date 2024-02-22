@@ -11,6 +11,7 @@ Reference for Δ-Sol method:
 # SYSTEM I/O MODULES
 
 import os
+from pathlib import Path
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
@@ -196,7 +197,7 @@ def main():
             (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).'
     )
     parser.add_argument(
-        '--with_uncertainties', 
+        '--with-uncertainties', 
         action='store_true', 
         help='Pass this flag to enable computation of minimal and maximal Δ-Sol band gaps.\n\
               This will need one full VASP static total energy computation for each limit.'
@@ -239,76 +240,67 @@ def main():
     )
 
     good_bg_structs = list(filter(
-        lambda tup: min(valid_interval) <= tup[1] <= max(valid_interval), 
+        lambda tup: min(valid_interval) <= tup[1]['E_band_gap'] <= max(valid_interval), 
         list(E_band_gaps.items())
     ))
 
     bad_bg_structs = list(filter(
-        lambda tup: tup[1] < min(valid_interval) or tup[1] > max(valid_interval), 
+        lambda tup: tup[1]['E_band_gap'] < min(valid_interval) or tup[1]['E_band_gap'] > max(valid_interval), 
         list(E_band_gaps.items())
     ))
 
     # Keep good structures
     for struct in good_bg_structs:
-        name         = struct[0]
-        E_band_gap   = round(struct[1], 6)
-        name_plus    = '_'.join((name, 'best', 'plus'))
-        name_minus   = '_'.join((name, 'best', 'minus'))
-        accept_msg   = [
+        name       = struct[0]
+        bgdict     = struct[1]
+        E_band_gap = max(round(bgdict['E_band_gap'], 6), 0.0)
+        accept_msg = [
             "BAND GAP TEST PASSED", 
             f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is inside the interval [{min(valid_interval)}, {max(valid_interval)}].", 
             "Therefore, it is suitable for wanted application, and should be considered for further screening steps."
         ]
         
         if args.with_uncertainties:
-            E_band_gap_min = round(struct[2], 6)
-            E_band_gap_max = round(struct[3], 6)
+            E_band_gap_min = max(round(bgdict['E_band_gap_min'], 6), 0.0)
+            E_band_gap_max = max(round(bgdict['E_band_gap_max'], 6), 0.0)
             accept_msg += [
                 "\nUncertainty interval (does not affect acception or rejection):", 
-                f"Band Gap minimum = {E_band_gap_min} eV", 
-                f"Band Gap maximum = {E_band_gap_max} eV"
+                f"Band Gap minimum = {E_band_gap_max} eV", 
+                f"Band Gap maximum = {E_band_gap_min} eV"
             ]
 
         accept_msg = "\n".join(accept_msg)
-        input_path = os.path.join(input_dir, name, accept_file)
-        path_plus  = os.path.join(outdir, name_plus, accept_file)
-        path_minus = os.path.join(outdir, name_minus, accept_file)
 
-        with open(input_path, 'wt') as f1, open(path_plus, 'wt') as f2, open(path_minus, 'wt') as f3:
-            f1.write(accept_msg)
-            f2.write(accept_msg)
-            f3.write(accept_msg)
+        for calc_dir in filter(lambda path: path.name.startswith(name), Path(outdir).iterdir()):
+            accept_path = os.path.join(calc_dir, accept_file)
+            with open(accept_path, 'wt') as fp:
+                fp.write(accept_msg)
 
     # Reject unsuitable structures
     for struct in bad_bg_structs:
-        name         = struct[0]
-        E_band_gap   = round(struct[1], 6)
-        name_plus    = '_'.join((name, 'best', 'plus'))
-        name_minus   = '_'.join((name, 'best', 'minus'))
-        reject_msg   = [
+        name       = struct[0]
+        bgdict     = struct[1]
+        E_band_gap = max(round(bgdict['E_band_gap'], 6), 0.0)
+        reject_msg = [
             "BAND GAP REJECTION", 
             f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].",
             "Therefore, it is not suitable for wanted application, and should not be considered in further screening steps."
         ]
 
         if args.with_uncertainties:
-            E_band_gap_min = round(struct[2], 6)
-            E_band_gap_max = round(struct[3], 6)
+            E_band_gap_min = max(round(bgdict['E_band_gap_min'], 6), 0.0)
+            E_band_gap_max = max(round(bgdict['E_band_gap_max'], 6), 0.0)
             reject_msg += [
                 "\nUncertainty interval (does not affect acception or rejection):", 
-                f"Band Gap minimum = {E_band_gap_min} eV", 
-                f"Band Gap maximum = {E_band_gap_max} eV"
+                f"Band Gap minimum = {E_band_gap_max} eV", 
+                f"Band Gap maximum = {E_band_gap_min} eV"
             ]
 
         reject_msg = "\n".join(reject_msg)
-        input_path = os.path.join(input_dir, name, ignore_file)
-        path_plus  = os.path.join(outdir, name_plus, ignore_file)
-        path_minus = os.path.join(outdir, name_minus, ignore_file)
-
-        with open(input_path, 'wt') as f1, open(path_plus, 'wt') as f2, open(path_minus, 'wt') as f3:
-            f1.write(reject_msg)
-            f2.write(reject_msg)
-            f3.write(reject_msg)
+        for calc_dir in filter(lambda path: path.name.startswith(name), Path(outdir).iterdir()):
+            reject_path = os.path.join(calc_dir, ignore_file)
+            with open(reject_path, 'wt') as fp:
+                fp.write(reject_msg)
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
