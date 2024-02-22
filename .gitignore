@@ -1,5 +1,6 @@
 .vscode
 __pycache__
+data
 dist
 poetry.lock
 *.cif
@@ -12,4 +13,5 @@ oqmd_poscar
 *.kpoints
 *_test.py
 *.slurm
+*.json
 slurm-*
