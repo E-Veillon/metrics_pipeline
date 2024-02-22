@@ -884,7 +884,7 @@ def batch_extract_vasp_data(
     return structs_data
 
 
-def vasp_output_sructure(struct_dir: str) -> Structure:
+def vasp_output_structure(struct_dir: str) -> Structure:
     """
     Get a pymatgen Structure from the output of a VASP calculation
 
@@ -928,7 +928,7 @@ def batch_extract_vasp_structures(
     """
 
     return process_map(
-        vasp_output_sructure,
+        vasp_output_structure,
         calc_dirs,
         max_workers=workers,
         desc="Extracting structures from VASP output",
