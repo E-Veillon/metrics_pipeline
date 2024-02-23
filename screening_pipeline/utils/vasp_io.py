@@ -1023,7 +1023,7 @@ def delta_sol_inputs_init(
                 Recognized functionals are the ones having 'LDA', 'PBE' or 'AM05' in the name."
             )
 
-        n_star_types     = ('BEST', 'MIN', 'MAX') if with_uncertainties else ('BEST',)
+        n_star_types = ('BEST', 'MIN', 'MAX') if with_uncertainties else ('BEST',)
         run_N0_dict = run_set.as_dict()
         run_N0_dict['INCAR'].update({'NELECT': N_val, 'NBANDS': N_val})
         run_N0 = VaspInput.from_dict(run_N0_dict)
@@ -1061,3 +1061,67 @@ def delta_sol_inputs_init(
 
 
 ########################################
+
+def delta_sol_calculation_init(
+        structure: Structure, 
+        calc_index: int, 
+        preset: callable = GenMatStatic54Set, 
+        user_corrections: Optional[Dict[str, Any]] = None, 
+    ) -> VaspInput:
+    """
+    Initializes one of the static calculations used for delta-sol method for one structure.
+    Parameters:
+        structure (Structure):      The input structure.
+        calc_index (int):           An integer corresponding to a delta-sol static calculation:
+                                    0 = E(N0), 
+                                    1-2 = E(N0 + n), E(N0 - n) respectively, using N*_best, 
+                                    3-4 = E(N0 + n), E(N0 - n) respectively, using N*_min, 
+                                    5-6 = E(N0 + n), E(N0 - n) respectively, using N*_max.
+        preset (callable):          A pymatgen preset or the custom GenMatStatic54Set specifically
+                                    tuned for this pipeline. Defaults to GenMatStatic54Set.
+        user_corrections (dict):    Additional corrections provided by the user in a separate .yaml file.
+    
+    Returns:
+        The corresponding VaspInput object.
+    """
+
+    assert isinstance(structure, Structure)
+    assert isinstance(calc_index, int) and (0 <= calc_index <= 6)
+    assert preset in PMGStaticSet or preset == GenMatStatic54Set
+    assert isinstance(user_corrections, Dict) or user_corrections is None
+
+    N_val = get_all_valence_electrons(structure)
+    run_set = vasp_static_settings(structure, preset, user_corrections=user_corrections)
+
+    # Search for the right N* parameter to use with respect to the functional
+    pot_func = run_set.get('POTCAR_FUNCTIONAL', 'PBE')
+
+    if 'LDA' in pot_func: delta_sol_functional = 'LDA'
+    elif 'PBE' in pot_func: delta_sol_functional = 'PBE'
+    elif 'AM05' in pot_func: delta_sol_functional = 'AM05'
+    else:
+        raise NotImplementedError(
+            "Provided POTCAR functional is not implemented for Δ-Sol method.\n"
+            "Recognized functionals are 'LDA', 'PBE', and 'AM05'."
+        )
+
+    match calc_index:
+        case 0: n_star_type = None
+        case 1, 2: n_star_type = "BEST"
+        case 3, 4: n_star_type = "MIN"
+        case 5, 6: n_star_type = "MAX"
+
+    if n_star_type is not None:
+        n_ratio = get_delta_sol_el_ratio(
+            structure=structure,
+            dft_functional=delta_sol_functional,
+            n_star_type=n_star_type
+        )
+        nelect = N_val + n_ratio if calc_index % 2 == 1 else N_val - n_ratio
+    else: nelect = N_val
+
+    run_dict = run_set.as_dict()
+    run_dict['INCAR'].update({'NELECT': nelect, 'NBANDS': N_val})
+    run_set = VaspInput.from_dict(run_dict)
+
+    return run_set

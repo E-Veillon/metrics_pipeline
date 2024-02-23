@@ -23,8 +23,10 @@ from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
 from screening_pipeline.utils.utils import _yaml_loader
 from screening_pipeline.utils.typing import PMGStaticSet
-from screening_pipeline.utils.vasp_io import vasp_batch_launch, vasp_launcher, batch_extract_vasp_data, \
-                                             delta_sol_inputs_init
+from screening_pipeline.utils.vasp_io import (
+    vasp_batch_launch, vasp_launcher, batch_extract_vasp_data, 
+    delta_sol_inputs_init, delta_sol_calculation_init
+)
 from screening_pipeline.utils.data_process import batch_calculate_delta_sol_band_gaps
 
 ########################################
@@ -190,7 +192,7 @@ def main():
     )
     parser.add_argument(
         '-t', 
-        '--task_index', 
+        '--task-index', 
         type=int, 
         help='If a job array is used, provide here the structure index to treat according to task IDs\n \
             (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).'
@@ -215,7 +217,6 @@ def main():
     accept_file    = args.accept
     ignore_file    = args.ignore
     workers        = args.workers
-    struct_idx     = args.task_index if args.task_index is not None else 0
 
 
     # MAIN BLOCK
@@ -228,25 +229,44 @@ def main():
         workers=workers
     )
 
-    try: struct_name = next(filter(
-        lambda key: key.startswith(f'{struct_idx}_'), 
-        structs_data.keys()
+    try:
+        struct_name = next(filter(
+            lambda key: key.startswith(f'{struct_idx}_'), 
+            structs_data.keys()
         ))
     except StopIteration:
-        raise ValueError(f'Provided "task_index" arg is out of the range of indexed structures.')
-    
-    structs_data = {struct_name: structs_data.get(struct_name)}
+        raise ValueError(
+            "Provided 'task_index' arg is out of the range of indexed structures, "
+            "or the corresponding structure is already rejected."
+        )
 
-    inputs_data = delta_sol_inputs_init(
-        structs_data=structs_data, 
-        preset=preset, 
-        user_corrections=user_settings or None, 
-        with_uncertainties=args.with_uncertainties
-    )
+    if 'task_index' in args: # Initialize input and run VASP on it
+        task_index       = args.task_index
+        tasks_per_struct = 7 if args.with_uncertainties else 3
+        struct_idx       = task_index // tasks_per_struct
+        calc_idx         = task_index % tasks_per_struct
 
-    for name, vasp_input in inputs_data.items():
-        run_dir = os.path.join(outdir, name)
-        vasp_input.write_input(output_dir=run_dir)
+        input_data = delta_sol_calculation_init(
+            structure=structs_data[struct_name].get('structure'), 
+            calc_index=calc_idx, 
+            preset=preset, 
+            user_corrections=user_settings
+        )
+        vasp_launcher(vasp_exe=exe_path, path=outdir, vasp_input=input_data)
+
+    elif not "task_index" in args: # Write inputs only
+        structs_data = {struct_name: structs_data.get(struct_name)}
+
+        inputs_data = delta_sol_inputs_init(
+            structs_data=structs_data, 
+            preset=preset, 
+            user_corrections=user_settings or None, 
+            with_uncertainties=args.with_uncertainties
+        )
+
+        for name, vasp_input in inputs_data.items():
+            run_dir = os.path.join(outdir, name)
+            vasp_input.write_input(output_dir=run_dir)
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')
