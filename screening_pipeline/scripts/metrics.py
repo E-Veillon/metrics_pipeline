@@ -4,7 +4,7 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(
-        "A command line tool to calculate S.U.N. and RSMD metrics"
+        "A command line tool to calculate S.U.N. and RMSD metrics"
     )
 
     parser.add_argument(

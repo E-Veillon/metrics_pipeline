@@ -166,6 +166,7 @@ def main():
     run_dir = Path(args.run_dir)
     accept_file = args.accept
     ignore_file = args.ignore
+    summary_file = args.summary
     delta_H_limit = round(args.limit, 8)
     workers = args.workers
 
@@ -175,6 +176,7 @@ def main():
         method="convex_hull",
         base_dir=run_dir,
         ignore_file=ignore_file,
+        path_to_summary=summary_file,
         workers=workers,
     )
 
@@ -204,6 +206,7 @@ def main():
     for struct in stable_structs:
         name = struct[0]
         data = struct[1]
+
         if accept_file is not None:
             accept_msg = f"\
                         STABILITY TEST PASSED\n\
@@ -214,6 +217,7 @@ def main():
             accept_file_path = Path("/".join((str(run_dir), name, accept_file)))
             accept_file_path.touch()
             accept_file_path.write_text(accept_msg)
+
         screening_results.append(
             {
                 "path": os.path.join(str(run_dir), name),
@@ -225,6 +229,7 @@ def main():
     for struct in unstable_structs:
         name = struct[0]
         data = struct[1]
+
         if ignore_file is not None:
             reject_msg = f"\
                         STABILITY REJECTION\n\
@@ -235,6 +240,7 @@ def main():
             reject_file_path = Path("/".join((str(run_dir), name, ignore_file)))
             reject_file_path.touch()
             reject_file_path.write_text(reject_msg)
+
         screening_results.append(
             {
                 "path": os.path.join(str(run_dir), name),

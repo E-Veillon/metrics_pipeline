@@ -14,6 +14,7 @@ from dataclasses import dataclass
 ########################################
 # OPTIMIZATION MODULES
 
+import re
 from scipy.constants import elementary_charge
 from itertools import chain, starmap, repeat
 from functools import partial
@@ -692,7 +693,7 @@ def vasp_static_settings(
 
 
 def extract_vasp_data_for_convex_hull(
-    struct_dir: PathLike = ".", ignore_file: str = "rejected.txt"
+    struct_dir: PathLike = ".", ignore_file: str|None = None, path_to_summary: str|None = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
     """
     Extracts VASP data from a previous run for one structure.
@@ -701,10 +702,17 @@ def extract_vasp_data_for_convex_hull(
     Parameters:
         struct_dir (str|Path):  Directory containing a finished VASP calculation on a structure.
 
-        ignore_file (str):      Checks whether the provided file name exists in structure directory.
-                                Structure directories containing this file will return None.
-                                This parameter permits the filtration of structures that did not pass
-                                previous screening steps.
+        ignore_file (str):      Checks whether the provided file name exists in each 
+                                subdirectory. Structure directories containing this file 
+                                will not be taken into account.
+                                This parameter permits the filtration of structures that did
+                                not pass previous steps. If not provided, a JSON summmary file must 
+                                be given as a replacement in the 'path_to_summary' arg.
+        
+        path_to_summary (str):  Path to a JSON summary file containing results from previous steps.
+                                If not provided, 'ignore_file' arg must be provided a file name to search
+                                in structure directories. If both ignore_file and path_to_summary are provided, 
+                                the ignore file will have priority for performance reasons.
 
     Returns:
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
@@ -715,12 +723,21 @@ def extract_vasp_data_for_convex_hull(
 
     assert isinstance(struct_dir, PathLike)
     assert Path(struct_dir).is_dir()
+    assert ignore_file is not None or path_to_summary is not None
 
     struct_dir: Path = Path(struct_dir)
     files = set(file.name for file in struct_dir.iterdir())
 
     if ignore_file is not None and ignore_file in files:
         return {}
+    
+    elif path_to_summary is not None:
+        import json
+        with open(path_to_summary, 'r') as fp:
+            summary = json.load(fp)
+        struct_data = list(filter(lambda data: data['path'] == struct_dir, summary))[0]
+        if any(data is False for data in struct_data.values()):
+            return {}
 
     struct_name = struct_dir.name
     contcar_path = Path(struct_dir / "CONTCAR")
@@ -739,7 +756,7 @@ def extract_vasp_data_for_convex_hull(
 
 
 def extract_vasp_data_for_delta_sol(
-    struct_dir: PathLike = ".", ignore_file: str = "rejected.txt"
+    struct_dir: PathLike = ".", ignore_file: str|None = None, path_to_summary: str|None = None
 ) -> Tuple[str, Dict[str, Union[Structure, Chgcar, float]]]:
     """
     Extracts VASP data from a previous run for one structure.
@@ -748,10 +765,18 @@ def extract_vasp_data_for_delta_sol(
     Parameters:
         struct_dir (str|Path):  Directory containing a finished VASP calculation on a structure.
 
-        ignore_file (str):      Checks whether the provided file name exists in structure directory.
-                                Structure directories containing this file will return None.
-                                This parameter permits the filtration of structures that did not pass
-                                previous screening steps.
+        ignore_file (str):      Checks whether the provided file name exists in each 
+                                subdirectory. Structure directories containing this file 
+                                will not be taken into account.
+                                This parameter permits the filtration of structures that did
+                                not pass previous steps. If not provided, a JSON summmary file must 
+                                be given as a replacement in the 'path_to_summary' arg.
+        
+        path_to_summary (str):  Path to a JSON summary file containing results from previous steps.
+                                If not provided, 'ignore_file' arg must be provided a file name to search
+                                in structure directories. If both ignore_file and path_to_summary are provided, 
+                                the ignore file will have priority for performance reasons.
+
 
     Returns:
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
@@ -762,12 +787,21 @@ def extract_vasp_data_for_delta_sol(
 
     assert isinstance(struct_dir, PathLike)
     assert Path(struct_dir).is_dir()
+    assert ignore_file is not None or path_to_summary is not None
 
     struct_dir: Path = Path(struct_dir)
     files = set(file.name for file in struct_dir.iterdir())
 
-    if ignore_file in files:
+    if ignore_file is not None and ignore_file in files:
         return {}
+
+    elif path_to_summary is not None:
+        import json
+        with open(path_to_summary, 'r') as fp:
+            summary = json.load(fp)
+        struct_data = list(filter(lambda data: data['path'] == struct_dir, summary))[0]
+        if any(data is False for data in struct_data.values()):
+            return {}
 
     struct_name = struct_dir.name
     contcar_path = Path(struct_dir / "CONTCAR")
@@ -792,7 +826,8 @@ def batch_extract_vasp_data(
         method: Literal['convex_hull', 'delta_sol'], 
         base_dir: PathLike = '.', 
         structs_names: Optional[Sequence[str]] = None, 
-        ignore_file: str = 'rejected.txt', 
+        ignore_file: str = None, 
+        path_to_summary: str = None, 
         workers: int = 1
 ) -> Dict[str, Dict[str, Any]]:
     """
@@ -814,7 +849,13 @@ def batch_extract_vasp_data(
                                 subdirectory. Structure directories containing this file 
                                 will not be taken into account.
                                 This parameter permits the filtration of structures that did
-                                not pass previous steps.
+                                not pass previous steps. If not provided, a JSON summmary file must 
+                                be given as a replacement in the 'path_to_summary' arg.
+        
+        path_to_summary (str):  Path to a JSON summary file containing results from previous steps.
+                                If not provided, 'ignore_file' arg must be provided a file name to search
+                                in structure directories. If both ignore_file and path_to_summary are provided, 
+                                the ignore file will have priority for performance reasons.
 
         workers (int):          Number of parallel processes to spawn.
 
@@ -836,19 +877,21 @@ def batch_extract_vasp_data(
     assert isinstance(base_dir, PathLike)
     assert Path(base_dir).is_dir()
     assert isinstance(ignore_file, str) or ignore_file is None
+    assert isinstance(path_to_summary, str) or path_to_summary is None
+    assert ignore_file is not None or path_to_summary is not None
     assert isinstance(workers, int) and workers >= 1
 
     def is_struct_dir(path: Path) -> bool:
-        return path.is_dir() and path.name[0].isdecimal()
+        return path.is_dir() and re.match(r'\A[0-9]+_[A-Za-z0-9\(\)]+\Z', path.name) is not None
 
     match method:
         case "convex_hull":
             set_vasp_extractor = partial(
-                extract_vasp_data_for_convex_hull, ignore_file=ignore_file
+                extract_vasp_data_for_convex_hull, ignore_file=ignore_file, path_to_summary=path_to_summary
             )
         case "delta_sol":
             set_vasp_extractor = partial(
-                extract_vasp_data_for_delta_sol, ignore_file=ignore_file
+                extract_vasp_data_for_delta_sol, ignore_file=ignore_file, path_to_summary=path_to_summary
             )
         case _:
             raise NotImplementedError(f"Provided method ({method}) is not supported.")
@@ -1118,7 +1161,8 @@ def delta_sol_calculation_init(
             n_star_type=n_star_type
         )
         nelect = N_val + n_ratio if calc_index % 2 == 1 else N_val - n_ratio
-    else: nelect = N_val
+    else:
+        nelect = N_val
 
     run_dict = run_set.as_dict()
     run_dict['INCAR'].update({'NELECT': nelect, 'NBANDS': N_val})
