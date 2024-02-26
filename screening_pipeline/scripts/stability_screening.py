@@ -34,6 +34,7 @@ Possible alternatives:
 
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
+from typing import Dict
 from pathlib import Path
 import os
 import json
@@ -60,7 +61,7 @@ from screening_pipeline.utils import (
 
 def assert_args(args: Namespace) -> None:
 
-    assert Path(args.input_dir).is_dir(), f"{args.input_dir}: No directory found."
+    assert Path(args.run_dir).is_dir(), f"{args.run_dir}: No directory found."
 
     assert (
         args.limit >= 1e-8
@@ -98,20 +99,20 @@ def main():
     )
 
     parser.add_argument(
-        "input_dir",
+        "run_dir",
         type=str,
         help="Base directory containing structure directories.",
     )
     parser.add_argument(
         "-r",
         "--reference",
-        help="If the used want to calculate the energy above the hull from an existing dataset used as a reference (json format).",
+        help="If the user wants to calculate the energy above the hull from an existing dataset used as a reference (json format).",
     )
     parser.add_argument(
         "-a",
         "--accept",
         type=str,
-        default="stability_passed.txt",
+        default=None,
         help="""Defines a file whose presence in a structure directory means it passed this
         screening step successfully and can be kept for further calculations.""",
         metavar="accept_file.txt",
@@ -153,13 +154,16 @@ def main():
         "-s",
         "--summary",
         default="summary.json",
-        help="Output file indicating whether a calculation results in a stable or an unstable crystal (json format).",
+        help=(
+            "Output file indicating calculation results for this step (json format).\n"
+            "Also used by further steps to filter out structures that were rejected in previous steps."
+        ),
     )
     args: Namespace = parser.parse_args()
 
     assert_args(args)
 
-    input_dir = Path(args.input_dir)
+    run_dir = Path(args.run_dir)
     accept_file = args.accept
     ignore_file = args.ignore
     delta_H_limit = round(args.limit, 8)
@@ -169,7 +173,7 @@ def main():
 
     structs_data = batch_extract_vasp_data(
         method="convex_hull",
-        base_dir=input_dir,
+        base_dir=run_dir,
         ignore_file=ignore_file,
         workers=workers,
     )
@@ -200,18 +204,19 @@ def main():
     for struct in stable_structs:
         name = struct[0]
         data = struct[1]
-        accept_msg = f"\
-                    STABILITY TEST PASSED\n\
-                    Instability energy for this structure is estimated at {data['delta_H']} eV/atom,\n \
-                    which is below or equal to the fixed instability limit of {delta_H_limit} eV/atom.\n \
-                    Therefore, it is considered suitable for wanted application,\n \
-                    and should be considered for further screening steps.\n"
-        accept_file_path = Path("/".join((str(input_dir), name, accept_file)))
-        accept_file_path.touch()
-        accept_file_path.write_text(accept_msg)
+        if accept_file is not None:
+            accept_msg = f"\
+                        STABILITY TEST PASSED\n\
+                        Instability energy for this structure is estimated at {data['delta_H']} eV/atom,\n \
+                        which is below or equal to the fixed instability limit of {delta_H_limit} eV/atom.\n \
+                        Therefore, it is considered suitable for wanted application,\n \
+                        and should be considered for further screening steps.\n"
+            accept_file_path = Path("/".join((str(run_dir), name, accept_file)))
+            accept_file_path.touch()
+            accept_file_path.write_text(accept_msg)
         screening_results.append(
             {
-                "path": os.path.join(str(input_dir), name),
+                "path": os.path.join(str(run_dir), name),
                 "energy_above_hull": data["delta_H"],
                 "stable": True,
             }
@@ -227,16 +232,21 @@ def main():
                         which is above the fixed instability limit of {delta_H_limit} eV/atom.\n \
                         Therefore, it is considered not suitable for wanted application,\n \
                         and should not be considered in further screening steps.\n"
-            reject_file_path = Path("/".join((str(input_dir), name, ignore_file)))
+            reject_file_path = Path("/".join((str(run_dir), name, ignore_file)))
             reject_file_path.touch()
             reject_file_path.write_text(reject_msg)
         screening_results.append(
             {
-                "path": os.path.join(str(input_dir), name),
+                "path": os.path.join(str(run_dir), name),
                 "energy_above_hull": data["delta_H"],
                 "stable": False,
             }
         )
+
+    def sort_by_path(dct: Dict) -> str:
+        return dct.get('path')
+
+    screening_results = sorted(screening_results, key=sort_by_path)
 
     with open(args.summary, "w") as fp:
         json.dump(screening_results, fp, indent=4)
