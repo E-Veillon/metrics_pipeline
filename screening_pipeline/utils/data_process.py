@@ -175,7 +175,7 @@ def init_entries_and_group_by_dim_and_comp(
     max_dim = max([len(entry.elements) for entry in entry_list])
     elements = get_elements_from_entries(entry_list)
 
-    elts_entries = [
+    entry_list += [
         PDEntry(
             composition=Composition(str(elt)),
             energy=0.0,
@@ -185,10 +185,7 @@ def init_entries_and_group_by_dim_and_comp(
         for elt in elements
     ]
 
-    groups.append(elts_entries)
-    # At this point, groups = [[], [Elements]]
-
-    for dim in range(2, max_dim + 1):
+    for dim in range(1, max_dim + 1):
         group = list(filter(lambda entry: len(entry.elements) == dim, entry_list))
         group = group_by_stoichiometry(group)
         groups.append(group)
@@ -320,15 +317,15 @@ def phase_diagram_init(
                                     initialized with energy = 0.0 eV. If some entries have
                                     elements not referenced in provided ref_elts, they
                                     will be ignored. This behaviour is particularly
-                                    useful if you need to initialize several diagrams from
+                                    useful if one needs to initialize several diagrams from
                                     different parts of the same entry dataset.
 
-        ref_elts (str|Iterable):    The  elemental references of the new phase diagram.
+        ref_elts (str|Sequence):    The  elemental references of the new phase diagram.
                                     If a single string is provided, it can either
                                     be a raw formula (eg. 'FePO4') or a composition
                                     string containing element symbols separated by
                                     '-' (eg. 'Fe-P-O').
-                                    If an iterable is given, it can contain valid
+                                    If a sequence is given, it can contain valid
                                     element symbols, atomic numbers and/or Element
                                     objects.
                                     If not provided, they are computed from given entries.
@@ -346,7 +343,7 @@ def phase_diagram_init(
         ref_elts = get_elements_from_entries(entries)
 
     else:
-        assert isinstance(ref_elts, Iterable)
+        assert isinstance(ref_elts, Sequence)
         ref_elts = get_elements(ref_elts)
         entries = _get_relevant_entries(entries, ref_elts)
 
@@ -395,11 +392,13 @@ def _calculate_instability_energies(
 
     entry_list = list(set(main_entries + sub_entries))
 
-    convex_hull = phase_diagram_init(entries=entry_list, ref_elts=ref_elts)
-
-    generated_entries = list(
-        filter(lambda entry: entry.attribute == "generated", convex_hull.all_entries)
+    diagram_entries = list(
+        filter(lambda entry: entry.attribute != "generated", entry_list)
     )
+    generated_entries = list(
+        filter(lambda entry: entry.attribute == "generated", entry_list)
+    )
+    convex_hull = phase_diagram_init(entries=diagram_entries, ref_elts=ref_elts)
 
     for entry in generated_entries:
         delta_H = convex_hull.get_e_above_hull(entry, allow_negative=True)

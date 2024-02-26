@@ -769,14 +769,11 @@ def extract_vasp_data_for_delta_sol(
                                 subdirectory. Structure directories containing this file 
                                 will not be taken into account.
                                 This parameter permits the filtration of structures that did
-                                not pass previous steps. If not provided, a JSON summmary file must 
-                                be given as a replacement in the 'path_to_summary' arg.
+                                not pass previous steps.
         
         path_to_summary (str):  Path to a JSON summary file containing results from previous steps.
-                                If not provided, 'ignore_file' arg must be provided a file name to search
-                                in structure directories. If both ignore_file and path_to_summary are provided, 
-                                the ignore file will have priority for performance reasons.
-
+                                If both ignore_file and path_to_summary are provided, 
+                                the ignore file will be checked first for performance reasons.
 
     Returns:
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
@@ -787,7 +784,6 @@ def extract_vasp_data_for_delta_sol(
 
     assert isinstance(struct_dir, PathLike)
     assert Path(struct_dir).is_dir()
-    assert ignore_file is not None or path_to_summary is not None
 
     struct_dir: Path = Path(struct_dir)
     files = set(file.name for file in struct_dir.iterdir())
@@ -799,9 +795,17 @@ def extract_vasp_data_for_delta_sol(
         import json
         with open(path_to_summary, 'r') as fp:
             summary = json.load(fp)
-        struct_data = list(filter(lambda data: data['path'] == struct_dir, summary))[0]
-        if any(data is False for data in struct_data.values()):
-            return {}
+        
+        try:
+            prev_struct_data = next(filter(
+                lambda data: os.path.samefile(data['path'], struct_dir), 
+                summary
+            ))
+        except StopIteration as exc:
+            return exc
+        else:
+            if any(data is False for data in prev_struct_data.values()):
+                return {}
 
     struct_name = struct_dir.name
     contcar_path = Path(struct_dir / "CONTCAR")
