@@ -26,13 +26,13 @@ PMGRelaxSetType = Literal[
 ]
 
 PMGRelaxSet = {
-    MITRelaxSet, 
-    MPRelaxSet, 
-    MPScanRelaxSet, 
-    MPHSERelaxSet, 
-    MPMetalRelaxSet, 
-    MVLRelax52Set, 
-    MVLScanRelaxSet
+    'MITRelaxSet', 
+    'MPRelaxSet', 
+    'MPScanRelaxSet', 
+    'MPHSERelaxSet', 
+    'MPMetalRelaxSet', 
+    'MVLRelax52Set', 
+    'MVLScanRelaxSet'
 }
 
 PMGStaticSetType = Literal[
@@ -42,7 +42,7 @@ PMGStaticSetType = Literal[
 ]
 
 PMGStaticSet = {
-    MPStaticSet, 
-    MatPESStaticSet, 
-    MPScanStaticSet
+    'MPStaticSet', 
+    'MatPESStaticSet', 
+    'MPScanStaticSet'
 }

@@ -122,7 +122,7 @@ def main():
         '-p', 
         '--preset', 
         type=str, 
-        default='MITRelaxSet', 
+        default='MPRelaxSet', 
         help='''The pymatgen preset to use for VASP relaxation.
                 More info on possible presets in pymatgen documentation:
                 https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets.''', 
@@ -155,7 +155,7 @@ def main():
 
     args: Namespace = parser.parse_args()
 
-    assert_args(args)
+    #assert_args(args)
     
     input_file    = args.filename
     exe_path      = args.executable_path

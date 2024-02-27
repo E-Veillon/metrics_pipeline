@@ -386,7 +386,7 @@ def vasp_batch_launch(
 
 def _RelaxSet_init(
     structure: SiteCollection,
-    preset: str = "MITRelaxSet",
+    preset: str = "MPRelaxSet",
     corrections: Optional[Dict] = None,
 ) -> DictSet:
 
@@ -572,7 +572,7 @@ def _StaticSet_init(
 ########################################
 def vasp_relaxation_settings(
     structure: SiteCollection,
-    preset: PMGRelaxSetType = "MITRelaxSet",
+    preset: PMGRelaxSetType = "MPRelaxSet",
     user_corrections: Optional[Dict] = None,
 ) -> VaspInput:
     """
