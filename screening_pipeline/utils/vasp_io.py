@@ -83,7 +83,7 @@ class GenMatRelax54Set(MVLRelax52Set):
         **kwargs:                       Other keywords arguments supported by DictSet.
     '''
     user_potcar_functional: UserPotcarFunctional = "PBE_54"
-    POTCAR_CONFIG = _load_yaml_config("PBE54Base.yaml")
+    POTCAR_CONFIG = _load_yaml_config("PBE54Base")
     CONFIG = MVLRelax52Set.CONFIG.update({
         'POTCAR_FUNCTIONAL': POTCAR_CONFIG.get('POTCAR_FUNCTIONAL'), 
         'POTCAR': POTCAR_CONFIG.get('POTCAR')
