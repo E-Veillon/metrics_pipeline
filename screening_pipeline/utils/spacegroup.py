@@ -134,7 +134,6 @@ def structure_symmetrizer(
 
 def batch_symmetrizer(
         structures: List[Structure], 
-        valid_tol: float = 0.0, 
         symprec: float = 0.01, 
         angle_tolerance: float = 5.0, 
         workers: int = 1
@@ -144,11 +143,6 @@ def batch_symmetrizer(
 
     Parameters:
         structures (List[Structure]):   A list of all structures that need a symmetry analysis.
-
-        valid_tol (float):              Tolerance in relative atomic positions checking in Angstroms.
-                                        If a structure contains atoms that are closer than valid_tol, 
-                                        the function returns None for it. If valid_tol = 0.0, distance 
-                                        checking is disabled. Defaults to 0.0.
 
         symprec (float):                Initial position tolerance for symmetry detection in fractional coordinate.
                                         Defaults to 0.01, which works nicely in most cases.
@@ -171,7 +165,6 @@ def batch_symmetrizer(
     chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
     set_structure_symmetrizer = partial(
         structure_symmetrizer, 
-        valid_tol=valid_tol, 
         symprec=symprec, 
         angle_tolerance=angle_tolerance
     )

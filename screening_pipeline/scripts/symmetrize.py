@@ -89,10 +89,9 @@ def main():
     )
 
     parser.add_argument(
-        'input-file',
+        'input_file',
         type=str,
         help='Name or path to the CIF file containing structure data to process.',
-        dest='input_file'
     )
     parser.add_argument(
         '-o',
@@ -129,7 +128,7 @@ def main():
                 Structures containing atoms that are closer than this value will be discarded.
                 (Default: %(default)s Angstroms).''', 
         metavar='float', 
-        dest='valid_tol'
+        dest='dist_tolerance'
     )
     parser.add_argument(
         '--no-symmetrization', 
@@ -232,8 +231,8 @@ def main():
             None, 
             batch_symmetrizer(
                 structures=structures,  
-                symprec=args.precision, 
-                angle_tolerance=args.angleprec, 
+                symprec=symprec, 
+                angle_tolerance=angleprec, 
                 workers=workers
             )
         ))
