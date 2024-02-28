@@ -16,3 +16,5 @@ oqmd_poscar
 *.json
 slurm-*
 bg_cleaning
+.local
+.cache
