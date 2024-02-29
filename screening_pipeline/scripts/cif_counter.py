@@ -59,7 +59,7 @@ def main():
 
     if cut_nbr is not None and cut_nbr >= nbr_structs:
         print(
-            f"Provided 'cut' arg ({cut_nbr}) is larger or equal to the total number of structures in {filename}.\n"
+            f"Provided 'cut' arg ({cut_nbr}) is larger or equal to the total number of structures in '{filename}'.\n"
             "Therefore, as it will not change anything, the cut option will be deactivated."
         )
 
@@ -74,12 +74,14 @@ def main():
                 idx_same_line = data_breakpoints.index(cut_line)
                 if idx_same_line == cut_nbr:
                     break
+
                 elif idx_same_line < cut_nbr:
                     idx_changed_lines.append(idx_same_line)
                     data_breakpoints[idx_same_line] = f'data_xx{nbr_iter}xx'
                     lines[lines.index(cut_line)] = data_breakpoints[idx_same_line]
                     nbr_iter += 1
                     continue
+
                 else:
                     print(
                         'Unexpected behaviour happened while trying to cut the file.\n'
@@ -91,10 +93,13 @@ def main():
         if not wrong_cut:
             cut_lines = lines[:lines.index(cut_line)]
 
+            if cut_lines[-1] == "# generated using pymatgen":
+                cut_lines = cut_lines[:-1]
+
             for idx in idx_changed_lines:
                 line_to_restore = data_breakpoints[idx]
                 idx_to_restore = lines.index(line_to_restore)
-                lines[idx_to_restore] = cut_line
+                cut_lines[idx_to_restore] = cut_line
 
             cut_text = '\n'.join(cut_lines)
             cut_file = filename.replace('.cif', f'_{cut_nbr}.cif')
