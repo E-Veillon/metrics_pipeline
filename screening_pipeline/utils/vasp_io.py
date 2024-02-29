@@ -30,7 +30,7 @@ from pymatgen.io.vasp import VaspInput, Vasprun
 from pymatgen.io.vasp.inputs import Poscar
 from pymatgen.io.vasp.outputs import Chgcar, Oszicar
 from pymatgen.io.vasp.sets import (
-    DictSet, MITRelaxSet, MVLRelax52Set, _load_yaml_config, UserPotcarFunctional
+    DictSet, MITRelaxSet, MPRelaxSet, MPStaticSet, _load_yaml_config, UserPotcarFunctional
 )
 
 ########################################
@@ -57,7 +57,7 @@ from screening_pipeline.utils.periodic_table import (
 # LOCAL CLASSES
 
 @dataclass
-class GenMatRelax54Set(MVLRelax52Set):
+class GenMatRelax54Set(MPRelaxSet):
     '''
     Implementation of VaspInputSet using the public Materials Project
     parameters with some tweaks for INCAR, exact MP parameters for KPOINTS, 
@@ -66,7 +66,6 @@ class GenMatRelax54Set(MVLRelax52Set):
     The changes from MP parameters are described below:
 
     - INCAR:    'ISMEAR' = 0 for robustness across any type of structure (VASP recommended)
-                'LASPH'  = True for correct description of PAW pseudopotentials
                 'LDAU': Adding a U correction of 5.0 eV on Ti oxydes
                 (A discussion about it can be found in ref: J. Chem. Phys. 135, 054503 (2011).
                 The value used is the one giving best compromise between all studied properties)
@@ -75,52 +74,61 @@ class GenMatRelax54Set(MVLRelax52Set):
 
     - POTCAR: PBE_54 POTCAR files as recommended in pymatgen in 'PBE54Base.yaml' file.
 
-    Parameters:
-        structure (Structure):          The input structure.
-
-        user_potcar_functional (str):   Choose from PBE_54 and PBE_54_W_HASH.
-
-        **kwargs:                       Other keywords arguments supported by DictSet.
+    Args:
+        structure (Structure): The input structure.
+        user_potcar_functional (str): Choose from PBE_54 and PBE_54_W_HASH.
+        **kwargs: kwargs supported by MPRelaxSet.
     '''
     user_potcar_functional: UserPotcarFunctional = "PBE_54"
     POTCAR_CONFIG = _load_yaml_config("PBE54Base")
-    CONFIG = MVLRelax52Set.CONFIG.update({
+    CONFIG: Dict = MPRelaxSet.CONFIG
+    CONFIG.update({
         'POTCAR_FUNCTIONAL': POTCAR_CONFIG.get('POTCAR_FUNCTIONAL'), 
         'POTCAR': POTCAR_CONFIG.get('POTCAR')
-        })
+    })
     _valid_potcars = ('PBE_54', 'PBE_54_W_HASH')
 
     def incar_updates(self) -> Dict:
         """Get updates to the INCAR config for this calculation type."""
+
         ref_config: Dict = super().CONFIG.get('INCAR')
-        new_ldauj: Dict = ref_config['LDAUJ']['O'].update({'Ti': 0.0})
-        new_ldaul: Dict = ref_config['LDAUL']['O'].update({'Ti': 2})
-        new_ldauu: Dict = ref_config['LDAUU']['O'].update({'Ti': 5.0})
+
+        new_ldauj: Dict = ref_config['LDAUJ']['O']
+        new_ldaul: Dict = ref_config['LDAUL']['O']
+        new_ldauu: Dict = ref_config['LDAUU']['O']
+
+        new_ldauj.update({'Ti': 0.0})
+        new_ldaul.update({'Ti': 2})
+        new_ldauu.update({'Ti': 5.0})
+
         updates = {
-            'ISMEAR': 0, 'LASPH': True, 'LDAUJ': new_ldauj, 'LDAUL': new_ldaul, 'LDAUU': new_ldauu,
+            'ISMEAR': 0, 'LDAUJ': new_ldauj, 'LDAUL': new_ldaul, 'LDAUU': new_ldauu,
         }
+
         return updates
 
 
 ########################################
 
 
-class GenMatStatic54Set(GenMatRelax54Set):
+class GenMatStatic54Set(MPStaticSet):
     '''
     Subclass of GenMatRelax54Set to do static calculations after relaxations 
-    done with this set.
+    done with this set. Parameters are pretty much the same as in MPStaticSet, 
+    except that user_potcar_functional only accepts PBE_54 and PBE_54_W_HASH.
 
-    Parameters:
-        structure (Structure):          The input structure.
-
-        user_potcar_functional (str):   It is possible to switch between PBE_54 and PBE_54_W_HASH.
-
-        **kwargs:                       Other keywords arguments supported by DictSet.
+    Args:
+        structure (Structure): Structure from previous run.
+        user_potcar_functional (str): Choose from PBE_54 and PBE_54_W_HASH.
+        **kwargs: kwargs supported by MPStaticSet.
     '''
+    user_potcar_functional: UserPotcarFunctional = "PBE_54"
+    CONFIG: Dict = GenMatRelax54Set.CONFIG
+    _valid_potcars = ('PBE_54', 'PBE_54_W_HASH')
 
     def incar_updates(self) -> Dict:
-        updates = super().incar_updates()
-        updates.update({"NSW": 0, 'ISMEAR': -5, "LCHARG": True, "LORBIT": 11, "LREAL": False})
+        updates = GenMatRelax54Set.incar_updates()
+        updates.update(super().incar_updates())
         return updates
 
 
