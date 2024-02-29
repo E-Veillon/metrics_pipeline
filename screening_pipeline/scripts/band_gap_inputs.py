@@ -1,0 +1,203 @@
+#!/usr/bin/python
+"""
+Parses previous VASP data and launches Δ-Sol static calculations for structures not already rejected.
+"""
+
+########################################
+# SYSTEM I/O MODULES
+
+import os
+import json
+from pathlib import Path
+from datetime import datetime
+from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
+
+########################################
+# PYTHON MATERIALS GENOMICS PACKAGE
+
+
+########################################
+# LOCAL MODULES
+
+from screening_pipeline.utils.utils import _yaml_loader
+from screening_pipeline.utils.typing import PMGStaticSet
+from screening_pipeline.utils.vasp_io import GenMatStatic54Set, extract_vasp_data_for_delta_sol
+
+########################################
+# LOCAL FUNCTIONS
+
+def assert_args(args: Namespace) -> None:
+
+    assert os.path.isdir(args.input_dir), (
+        f"{args.input_dir}: No directory found."
+    )
+    assert os.path.exists(args.executable_path), (
+        f"{args.executable_path}: No such file found."
+    )
+    assert args.task_id >= 0, (
+        "task-id argument must be positive or zero."
+    )
+    assert os.path.isdir(args.output), (
+        f"{args.output}: No directory found."
+    )
+    assert os.path.isfile(args.previous_results) or args.previous_results is None, (
+        f"{args.previous_results}: No such file found."
+    )
+
+    PMGStaticSet.add(GenMatStatic54Set)
+
+    assert args.preset in PMGStaticSet, (
+    "Provided static preset must be one of the following:\n"
+    f"{PMGStaticSet}"
+    )
+    assert os.path.isfile(args.user_settings) or args.user_settings is None, (
+    f"{args.user_settings}: file not found."
+    )
+
+    assert args.user_settings.endswith(".yaml"), (
+    "user settings file must be of .yaml format."
+    )
+
+########################################
+# MAIN FUNCTION
+
+def main():
+    start = datetime.now()
+
+    # ARGUMENTS PARSING BLOCK
+    
+    prog_name = "band_gap_inputs"
+    prog_desc = """
+        Parses previous VASP data and launches Δ-Sol static calculations for structures not already rejected.
+        Uses job arrays properties to maximize the parallelization efficiency.
+
+        Reference for Δ-Sol method:
+            M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
+            (reference 32 in screening_pipeline/Bibliography)
+        """
+    prog_missing_steps = """
+        Missing steps to complete this script:
+            - Mandatory job array id
+            - First verify that corresponding structure is not rejected
+            - If rejected, stop the sub-job with a simple message in output about it
+            - Else, extract the structure, prepare corresponding calculation and launch it
+        """
+    helper_format = RawTextHelpFormatter
+
+    parser = ArgumentParser(
+        prog=prog_name, 
+        description=prog_desc, 
+        epilog=prog_missing_steps, 
+        formatter_class=helper_format
+    )
+
+    parser.add_argument(
+        "input-dir",
+        type=str,
+        help="Base directory containing structure directories.", 
+    )
+    parser.add_argument(
+        "executable-path", 
+        type=str,
+        help="Path to the VASP executable.", 
+        metavar="/path/to/vasp"
+    )
+    parser.add_argument( 
+        "task-id", 
+        type=int, 
+        help=(
+            "Provide here the job array task ID that will treat one calculation for one structure.\n"
+            "The total number of jobs should be the number of structures multiplied by the number of\n"
+            "calculations for one structure (3 for a direct estimation only, 7 with uncertainties)."
+        )
+    )
+    parser.add_argument(
+        "-o", "--output",
+        type=str,
+        default=".",
+        help=(
+            "Path to the output directory where VASP files will be written.\n"
+            "A subdirectory will be created in this directory for each structure processed."
+        ), 
+        metavar="outdir"
+    )
+    parser.add_argument(
+        "-r", "--previous-results",
+        type=str,
+        default=None,
+        help=(
+            "Summary JSON file containing results from previous steps, if they exist.\n"
+            "This arg is used to know which sub-jobs should not run its calculation because of earlier rejection."
+        )
+    )
+    parser.add_argument(
+        "-p", "--preset", 
+        type=callable, 
+        default=GenMatStatic54Set, 
+        help=(
+            "The pymatgen preset to use for VASP static calculations. "
+            "More info on possible presets in pymatgen documentation:\n"
+            "https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets."
+        ), 
+        metavar="StaticSet"
+    )
+    parser.add_argument(
+        "-u", "--user-settings", 
+        type=str, 
+        default=None, 
+        help="Path to the .yaml file containing user defined VASP tags that will override those of the preset.", 
+        metavar="file.yaml",
+    )
+    parser.add_argument(
+        "--with-uncertainties", 
+        action="store_true", 
+        help=(
+            "Pass this flag to enable computation of minimal and maximal Δ-Sol band gaps.\n"
+            "This will need two more VASP static total energy computation for each limit."
+        )
+    )
+
+    args: Namespace = parser.parse_args()
+
+    assert_args(args)
+
+    input_dir = args.input_dir
+    exe_path  = args.executable_path
+    tasks_per_struct = 7 if args.with_uncertainties else 3
+    struct_idx = args.task_id // tasks_per_struct
+    calc_idx = args.task_id % tasks_per_struct
+    outdir = args.output
+    prev_res = args.previous_results
+    preset = args.preset
+    user_settings = args.user_settings
+
+
+    # MAIN BLOCK
+
+    try:
+        struct_data = extract_vasp_data_for_delta_sol(
+            struct_dir=input_dir, path_to_summary=prev_res
+        )
+    except StopIteration:
+        raise ValueError(
+            "There is no structure data corresponding to given 'task-id' argument.\n"
+            f"Given task-id argument: {args.task_id}\n"
+            f"Corresponding structure index: {struct_idx}\n"
+            f"Corresponding calculation ID: {calc_idx}\n"
+            "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
+        )
+    
+    #if prev_res is not None and struct_data == {}:
+    #    already_rejected_msg = (
+    #        f"{os.path.basename(struct_data['path'])} was rejected during a previous step.\n"
+    #        "This job is stopping here."
+    #    )
+    #    print(already_rejected_msg)
+    #    exit(0)
+
+    stop = datetime.now()
+    print(f"elapsed time: {stop-start}")
+
+
+if __name__ == "__main__":
+    main()
