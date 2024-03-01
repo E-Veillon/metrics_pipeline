@@ -700,8 +700,41 @@ def vasp_static_settings(
 ########################################
 
 
+def _check_summary_data(struct_dir: PathLike, summary_file: PathLike) -> bool:
+    """
+    Check if given structure directory is present in the summary file and if it
+    was rejected in the previous step.
+    """
+    import json
+    import warnings
+
+    with open(summary_file, 'r') as fp:
+        summary = json.load(fp)
+    
+    try:
+        prev_struct_data = next(filter(
+            lambda data: os.path.samefile(data['path'], struct_dir), 
+            summary
+        ))
+    except StopIteration:
+        warnings.warn(
+            f"Structure path '{struct_dir}' was not found in the summary file.\n"
+            "You may want to pass it to the previous screening step before this one.\n"
+            "This structure is assumed not viable and is ignored for this step.",
+            stack_level=2
+        )
+        return False
+
+    return not any(value is False for value in prev_struct_data.values())
+
+
+########################################
+
+
 def extract_vasp_data_for_convex_hull(
-    struct_dir: PathLike = ".", ignore_file: str|None = None, path_to_summary: str|None = None
+    struct_dir: PathLike = ".", 
+    ignore_file: Optional[str] = None, 
+    path_to_summary: Optional[PathLike] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
     """
     Extracts VASP data from a previous run for one structure.
@@ -714,13 +747,11 @@ def extract_vasp_data_for_convex_hull(
                                 subdirectory. Structure directories containing this file 
                                 will not be taken into account.
                                 This parameter permits the filtration of structures that did
-                                not pass previous steps. If not provided, a JSON summmary file must 
-                                be given as a replacement in the 'path_to_summary' arg.
+                                not pass previous steps.
         
-        path_to_summary (str):  Path to a JSON summary file containing results from previous steps.
-                                If not provided, 'ignore_file' arg must be provided a file name to search
-                                in structure directories. If both ignore_file and path_to_summary are provided, 
-                                the ignore file will have priority for performance reasons.
+        path_to_summary (str):  Path to a JSON summary file containing results from previous step.
+                                If both ignore_file and path_to_summary are provided, 
+                                the ignore file will be checked first for performance reasons.
 
     Returns:
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
@@ -734,18 +765,14 @@ def extract_vasp_data_for_convex_hull(
     assert ignore_file is not None or path_to_summary is not None
 
     struct_dir: Path = Path(struct_dir)
-    files = set(file.name for file in struct_dir.iterdir())
 
-    if ignore_file is not None and ignore_file in files:
-        return {}
-    
-    elif path_to_summary is not None:
-        import json
-        with open(path_to_summary, 'r') as fp:
-            summary = json.load(fp)
-        struct_data = list(filter(lambda data: data['path'] == struct_dir, summary))[0]
-        if any(data is False for data in struct_data.values()):
+    if ignore_file is not None:
+        files = set(file.name for file in struct_dir.iterdir())
+        if ignore_file in files:
             return {}
+    
+    if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
+        return {}
 
     struct_name = struct_dir.name
     contcar_path = Path(struct_dir / "CONTCAR")
@@ -764,7 +791,9 @@ def extract_vasp_data_for_convex_hull(
 
 
 def extract_vasp_data_for_delta_sol(
-    struct_dir: PathLike = ".", ignore_file: str|None = None, path_to_summary: str|None = None
+    struct_dir: PathLike = ".", 
+    ignore_file: Optional[str] = None, 
+    path_to_summary: Optional[PathLike] = None
 ) -> Tuple[str, Dict[str, Union[Structure, Chgcar, float]]]:
     """
     Extracts VASP data from a previous run for one structure.
@@ -779,7 +808,7 @@ def extract_vasp_data_for_delta_sol(
                                 This parameter permits the filtration of structures that did
                                 not pass previous steps.
         
-        path_to_summary (str):  Path to a JSON summary file containing results from previous steps.
+        path_to_summary (str):  Path to a JSON summary file containing results from previous step.
                                 If both ignore_file and path_to_summary are provided, 
                                 the ignore file will be checked first for performance reasons.
 
@@ -794,26 +823,14 @@ def extract_vasp_data_for_delta_sol(
     assert Path(struct_dir).is_dir()
 
     struct_dir: Path = Path(struct_dir)
-    files = set(file.name for file in struct_dir.iterdir())
 
-    if ignore_file is not None and ignore_file in files:
+    if ignore_file is not None:
+        files = set(file.name for file in struct_dir.iterdir())
+        if ignore_file in files:
+            return {}
+
+    if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
         return {}
-
-    elif path_to_summary is not None:
-        import json
-        with open(path_to_summary, 'r') as fp:
-            summary = json.load(fp)
-        
-        try:
-            prev_struct_data = next(filter(
-                lambda data: os.path.samefile(data['path'], struct_dir), 
-                summary
-            ))
-        except StopIteration as exc:
-            return exc
-        else:
-            if any(data is False for data in prev_struct_data.values()):
-                return {}
 
     struct_name = struct_dir.name
     contcar_path = Path(struct_dir / "CONTCAR")
@@ -838,8 +855,8 @@ def batch_extract_vasp_data(
         method: Literal['convex_hull', 'delta_sol'], 
         base_dir: PathLike = '.', 
         structs_names: Optional[Sequence[str]] = None, 
-        ignore_file: str = None, 
-        path_to_summary: str = None, 
+        ignore_file: Optional[str] = None, 
+        path_to_summary: Optional[PathLike] = None, 
         workers: int = 1
 ) -> Dict[str, Dict[str, Any]]:
     """
@@ -889,8 +906,7 @@ def batch_extract_vasp_data(
     assert isinstance(base_dir, PathLike)
     assert Path(base_dir).is_dir()
     assert isinstance(ignore_file, str) or ignore_file is None
-    assert isinstance(path_to_summary, str) or path_to_summary is None
-    assert ignore_file is not None or path_to_summary is not None
+    assert isinstance(path_to_summary, PathLike) or path_to_summary is None
     assert isinstance(workers, int) and workers >= 1
 
     def is_struct_dir(path: Path) -> bool:
