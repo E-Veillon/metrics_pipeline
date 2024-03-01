@@ -7,8 +7,7 @@ Parses previous VASP data and launches Δ-Sol static calculations for structures
 # SYSTEM I/O MODULES
 
 import os
-import json
-from pathlib import Path
+import sys
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
@@ -21,8 +20,9 @@ from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
 from screening_pipeline.utils.utils import _yaml_loader
 from screening_pipeline.utils.typing import PMGStaticSet
-from screening_pipeline.utils.vasp_io import GenMatStatic54Set, extract_vasp_data_for_delta_sol
-
+from screening_pipeline.utils.vasp_io import (
+    extract_vasp_data_for_delta_sol, delta_sol_calculation_init, vasp_launcher
+)
 ########################################
 # LOCAL FUNCTIONS
 
@@ -44,7 +44,7 @@ def assert_args(args: Namespace) -> None:
         f"{args.previous_results}: No such file found."
     )
 
-    PMGStaticSet.add(GenMatStatic54Set)
+    #PMGStaticSet.add("GenMatStatic54Set")
 
     assert args.preset in PMGStaticSet, (
     "Provided static preset must be one of the following:\n"
@@ -92,18 +92,18 @@ def main():
     )
 
     parser.add_argument(
-        "input-dir",
+        "input_dir",
         type=str,
         help="Base directory containing structure directories.", 
     )
     parser.add_argument(
-        "executable-path", 
+        "executable_path", 
         type=str,
         help="Path to the VASP executable.", 
         metavar="/path/to/vasp"
     )
     parser.add_argument( 
-        "task-id", 
+        "task_id", 
         type=int, 
         help=(
             "Provide here the job array task ID that will treat one calculation for one structure.\n"
@@ -122,18 +122,20 @@ def main():
         metavar="outdir"
     )
     parser.add_argument(
-        "-r", "--previous-results",
+        "-R", "--read-previous-summary",
         type=str,
         default=None,
         help=(
-            "Summary JSON file containing results from previous steps, if they exist.\n"
-            "This arg is used to know which sub-jobs should not run its calculation because of earlier rejection."
-        )
+            "Path to a JSON summary file produced by a previous screening step.\n"
+            "If given, the file will be checked to filter structures that are already rejected."
+        ),
+        metavar="/path/to/summary.json",
+        dest="prev_summary"
     )
     parser.add_argument(
         "-p", "--preset", 
-        type=callable, 
-        default=GenMatStatic54Set, 
+        type=str, 
+        default="MPStaticSet", 
         help=(
             "The pymatgen preset to use for VASP static calculations. "
             "More info on possible presets in pymatgen documentation:\n"
@@ -161,39 +163,67 @@ def main():
 
     assert_args(args)
 
+    # Positional args
     input_dir = args.input_dir
     exe_path  = args.executable_path
-    tasks_per_struct = 7 if args.with_uncertainties else 3
-    struct_idx = args.task_id // tasks_per_struct
-    calc_idx = args.task_id % tasks_per_struct
+    task_id   = args.task_id
+
+    # Optional args
     outdir = args.output
-    prev_res = args.previous_results
+    prev_summary = args.prev_summary or None
     preset = args.preset
-    user_settings = args.user_settings
+    user_settings = _yaml_loader(args.user_settings)
 
-
-    # MAIN BLOCK
+    # Variables coming from args
+    tasks_per_struct = 7 if args.with_uncertainties else 3
+    struct_idx = task_id // tasks_per_struct
+    calc_idx = task_id % tasks_per_struct
 
     try:
-        struct_data = extract_vasp_data_for_delta_sol(
-            struct_dir=input_dir, path_to_summary=prev_res
+        struct_dir = next(
+            filter(
+            lambda dirname: dirname.startswith(f"{struct_idx}_"), 
+            os.listdir(input_dir)
+            )
         )
     except StopIteration:
-        raise ValueError(
-            "There is no structure data corresponding to given 'task-id' argument.\n"
+        print(
+            "No structure directory found with index corresponding to given 'task-id' argument.\n"
+            f"Searched directory: {input_dir}\n"
             f"Given task-id argument: {args.task_id}\n"
             f"Corresponding structure index: {struct_idx}\n"
             f"Corresponding calculation ID: {calc_idx}\n"
             "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
         )
-    
-    #if prev_res is not None and struct_data == {}:
-    #    already_rejected_msg = (
-    #        f"{os.path.basename(struct_data['path'])} was rejected during a previous step.\n"
-    #        "This job is stopping here."
-    #    )
-    #    print(already_rejected_msg)
-    #    exit(0)
+        sys.exit(0)
+
+    struct_path = os.path.join(input_dir, struct_dir)
+
+
+    # MAIN BLOCK
+
+    struct_data = extract_vasp_data_for_delta_sol(
+        struct_dir=struct_path, path_to_summary=prev_summary
+    )
+    if not struct_data:
+        print(
+            "The structure data corresponding to given 'task-id' argument "
+            "was not found or is already rejected in the summary file from previous step.\n"
+            f"Given task-id argument: {args.task_id}\n"
+            f"Corresponding structure index: {struct_idx}\n"
+            f"Corresponding calculation ID: {calc_idx}\n"
+            "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
+        )
+        sys.exit(0)
+
+    input_data = delta_sol_calculation_init(
+        structure=struct_data[1]["structure"], 
+        calc_index=calc_idx, 
+        preset=preset, 
+        user_corrections=user_settings
+    )
+
+    vasp_launcher(vasp_exe=exe_path, path=outdir, vasp_input=input_data)
 
     stop = datetime.now()
     print(f"elapsed time: {stop-start}")
