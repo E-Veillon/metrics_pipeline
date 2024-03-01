@@ -216,7 +216,11 @@ def get_sub_entries(
     assert isinstance(entry_pool, Sequence)
     if not entry_pool:
         return []
-    assert all(isinstance(entry, PDEntry) for entry in entry_pool)
+    assert all(isinstance(entry, PDEntry) for entry in entry_pool), (
+        "Some of given entries in 'entry_pool' arguments are not instances of PDEntry class.\n"
+        "See below the set of types found in the argument:\n"
+        f"{[type(entry) for entry in entry_pool]}"
+    )
 
     sub_entries = list(
         filter(
@@ -491,9 +495,10 @@ def batch_calculate_instability_energies(
     dim_groups = init_entries_and_group_by_dim_and_comp(
         structs_data, ref_structs=structs_ref
     )
-    entry_pool = dim_groups[1]
 
-    for dim_group in dim_groups[2:]:
+    entry_pool = dim_groups[0]
+
+    for dim_group in dim_groups[1:]:
         if dim_group == []:
             continue
 

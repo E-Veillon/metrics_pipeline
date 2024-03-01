@@ -56,80 +56,80 @@ from screening_pipeline.utils.periodic_table import (
 ########################################
 # LOCAL CLASSES
 
-@dataclass
-class GenMatRelax54Set(MPRelaxSet):
-    '''
-    Implementation of VaspInputSet using the public Materials Project
-    parameters with some tweaks for INCAR, exact MP parameters for KPOINTS, 
-    and VASP's recommended PAW potentials for POTCAR (PBE_54).
+#@dataclass
+#class GenMatRelax54Set(MPRelaxSet):
+#    '''
+#    Implementation of VaspInputSet using the public Materials Project
+#    parameters with some tweaks for INCAR, exact MP parameters for KPOINTS, 
+#    and VASP's recommended PAW potentials for POTCAR (PBE_54).
+#
+#    The changes from MP parameters are described below:
+#
+#    - INCAR:    'ISMEAR' = 0 for robustness across any type of structure (VASP recommended)
+#                'LDAU': Adding a U correction of 5.0 eV on Ti oxydes
+#                (A discussion about it can be found in ref: J. Chem. Phys. 135, 054503 (2011).
+#                The value used is the one giving best compromise between all studied properties)
+#
+#    - POTCAR_FUNCTIONAL: 'PBE_54' instead of 'PBE'
+#
+#    - POTCAR: PBE_54 POTCAR files as recommended in pymatgen in 'PBE54Base.yaml' file.
+#
+#    Args:
+#        structure (Structure): The input structure.
+#        user_potcar_functional (str): Choose from PBE_54 and PBE_54_W_HASH.
+#        **kwargs: kwargs supported by MPRelaxSet.
+#    '''
+#    user_potcar_functional: UserPotcarFunctional = "PBE_54"
+#    POTCAR_CONFIG = _load_yaml_config("PBE54Base")
+#    CONFIG: Dict = MPRelaxSet.CONFIG
+#    CONFIG.update({
+#        'POTCAR_FUNCTIONAL': POTCAR_CONFIG.get('POTCAR_FUNCTIONAL'), 
+#        'POTCAR': POTCAR_CONFIG.get('POTCAR')
+#    })
+#    _valid_potcars = ('PBE_54', 'PBE_54_W_HASH')
 
-    The changes from MP parameters are described below:
+#    def incar_updates(self) -> Dict:
+#        """Get updates to the INCAR config for this calculation type."""
 
-    - INCAR:    'ISMEAR' = 0 for robustness across any type of structure (VASP recommended)
-                'LDAU': Adding a U correction of 5.0 eV on Ti oxydes
-                (A discussion about it can be found in ref: J. Chem. Phys. 135, 054503 (2011).
-                The value used is the one giving best compromise between all studied properties)
+#        ref_config: Dict = super().CONFIG.get('INCAR')
 
-    - POTCAR_FUNCTIONAL: 'PBE_54' instead of 'PBE'
+#        new_ldauj: Dict = ref_config['LDAUJ']['O']
+#        new_ldaul: Dict = ref_config['LDAUL']['O']
+#        new_ldauu: Dict = ref_config['LDAUU']['O']
 
-    - POTCAR: PBE_54 POTCAR files as recommended in pymatgen in 'PBE54Base.yaml' file.
+#        new_ldauj.update({'Ti': 0.0})
+#        new_ldaul.update({'Ti': 2})
+#        new_ldauu.update({'Ti': 5.0})
 
-    Args:
-        structure (Structure): The input structure.
-        user_potcar_functional (str): Choose from PBE_54 and PBE_54_W_HASH.
-        **kwargs: kwargs supported by MPRelaxSet.
-    '''
-    user_potcar_functional: UserPotcarFunctional = "PBE_54"
-    POTCAR_CONFIG = _load_yaml_config("PBE54Base")
-    CONFIG: Dict = MPRelaxSet.CONFIG
-    CONFIG.update({
-        'POTCAR_FUNCTIONAL': POTCAR_CONFIG.get('POTCAR_FUNCTIONAL'), 
-        'POTCAR': POTCAR_CONFIG.get('POTCAR')
-    })
-    _valid_potcars = ('PBE_54', 'PBE_54_W_HASH')
-
-    def incar_updates(self) -> Dict:
-        """Get updates to the INCAR config for this calculation type."""
-
-        ref_config: Dict = super().CONFIG.get('INCAR')
-
-        new_ldauj: Dict = ref_config['LDAUJ']['O']
-        new_ldaul: Dict = ref_config['LDAUL']['O']
-        new_ldauu: Dict = ref_config['LDAUU']['O']
-
-        new_ldauj.update({'Ti': 0.0})
-        new_ldaul.update({'Ti': 2})
-        new_ldauu.update({'Ti': 5.0})
-
-        updates = {
-            'ISMEAR': 0, 'LDAUJ': new_ldauj, 'LDAUL': new_ldaul, 'LDAUU': new_ldauu,
-        }
-
-        return updates
-
-
-########################################
+#        updates = {
+#            'ISMEAR': 0, 'LDAUJ': new_ldauj, 'LDAUL': new_ldaul, 'LDAUU': new_ldauu,
+#        }
+#
+#        return updates
 
 
-class GenMatStatic54Set(MPStaticSet):
-    '''
-    Subclass of GenMatRelax54Set to do static calculations after relaxations 
-    done with this set. Parameters are pretty much the same as in MPStaticSet, 
-    except that user_potcar_functional only accepts PBE_54 and PBE_54_W_HASH.
+#########################################
 
-    Args:
-        structure (Structure): Structure from previous run.
-        user_potcar_functional (str): Choose from PBE_54 and PBE_54_W_HASH.
-        **kwargs: kwargs supported by MPStaticSet.
-    '''
-    user_potcar_functional: UserPotcarFunctional = "PBE_54"
-    CONFIG: Dict = GenMatRelax54Set.CONFIG
-    _valid_potcars = ('PBE_54', 'PBE_54_W_HASH')
 
-    def incar_updates(self) -> Dict:
-        updates = GenMatRelax54Set.incar_updates()
-        updates.update(super().incar_updates())
-        return updates
+#class GenMatStatic54Set(MPStaticSet):
+#    '''
+#    Subclass of GenMatRelax54Set to do static calculations after relaxations 
+#    done with this set. Parameters are pretty much the same as in MPStaticSet, 
+#    except that user_potcar_functional only accepts PBE_54 and PBE_54_W_HASH.
+#
+#    Args:
+#        structure (Structure): Structure from previous run.
+#        user_potcar_functional (str): Choose from PBE_54 and PBE_54_W_HASH.
+#        **kwargs: kwargs supported by MPStaticSet.
+#    '''
+#    user_potcar_functional: UserPotcarFunctional = "PBE_54"
+#    CONFIG: Dict = GenMatRelax54Set.CONFIG
+#    _valid_potcars = ('PBE_54', 'PBE_54_W_HASH')
+
+#    def incar_updates(self) -> Dict:
+#        updates = GenMatRelax54Set.incar_updates()
+#        updates.update(super().incar_updates())
+#        return updates
 
 
 ########################################
@@ -762,7 +762,6 @@ def extract_vasp_data_for_convex_hull(
 
     assert isinstance(struct_dir, PathLike)
     assert Path(struct_dir).is_dir()
-    assert ignore_file is not None or path_to_summary is not None
 
     struct_dir: Path = Path(struct_dir)
 
@@ -1136,7 +1135,7 @@ def delta_sol_inputs_init(
 def delta_sol_calculation_init(
         structure: Structure, 
         calc_index: int, 
-        preset: callable = GenMatStatic54Set, 
+        preset: str = "MPStaticSet", 
         user_corrections: Optional[Dict[str, Any]] = None, 
     ) -> VaspInput:
     """
@@ -1148,8 +1147,7 @@ def delta_sol_calculation_init(
                                     1-2 = E(N0 + n), E(N0 - n) respectively, using N*_best, 
                                     3-4 = E(N0 + n), E(N0 - n) respectively, using N*_min, 
                                     5-6 = E(N0 + n), E(N0 - n) respectively, using N*_max.
-        preset (callable):          A pymatgen preset or the custom GenMatStatic54Set specifically
-                                    tuned for this pipeline. Defaults to GenMatStatic54Set.
+        preset (callable):          A pymatgen VASP static preset. Defaults to MPStaticSet.
         user_corrections (dict):    Additional corrections provided by the user in a separate .yaml file.
     
     Returns:
@@ -1158,7 +1156,7 @@ def delta_sol_calculation_init(
 
     assert isinstance(structure, Structure)
     assert isinstance(calc_index, int) and (0 <= calc_index <= 6)
-    assert preset in PMGStaticSet or preset == GenMatStatic54Set
+    assert preset in PMGStaticSet
     assert isinstance(user_corrections, Dict) or user_corrections is None
 
     N_val = get_all_valence_electrons(structure)

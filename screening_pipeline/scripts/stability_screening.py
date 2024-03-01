@@ -63,9 +63,10 @@ def assert_args(args: Namespace) -> None:
 
     assert os.path.isdir(args.run_dir), f"{args.run_dir}: No such directory found."
 
-    assert os.path.isfile(args.prev_summary) or "prev_summary" not in args, (
-        f"{args.prev_summary}: No such file found."
-    )
+    if args.prev_summary is not None:
+        assert os.path.isfile(args.prev_summary), (
+            f"{args.prev_summary}: No such file found."
+        )
 
     assert args.limit >= 1e-8, (
         "Instability energy elimination criterion must be strictly positive.\n"
@@ -194,7 +195,7 @@ def main():
     prev_summary = args.prev_summary or None
     delta_H_limit = round(args.limit, 8)
     workers = args.workers
-    summary = args.summary
+    summary = os.path.join(str(run_dir), args.summary)
 
     # MAIN BLOCK
 
@@ -206,7 +207,7 @@ def main():
         workers=workers,
     )
 
-    if "reference" in args:
+    if args.reference is not None:
         structs_reference = load_phase_diagram_entries(args.reference)
     else:
         structs_reference = None

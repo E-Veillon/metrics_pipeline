@@ -230,7 +230,7 @@ def main():
     prev_summary   = args.prev_summary or None
     workers        = args.workers
     struct_idx     = args.task_index
-    summary        = args.summary
+    summary        = os.path.join(input_dir, args.summary)
 
 
     # MAIN BLOCK
