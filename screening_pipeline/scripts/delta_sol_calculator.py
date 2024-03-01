@@ -11,6 +11,8 @@ Reference for Δ-Sol method:
 # SYSTEM I/O MODULES
 
 import os
+import json
+from typing import Dict
 from pathlib import Path
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
@@ -115,8 +117,7 @@ def main():
         metavar='/path/to/vasp'
     )
     parser.add_argument(
-        '-o',
-        '--output',
+        '-o', '--output',
         type=str,
         default='./',
         help='''Path to the output directory where VASP files will be written.
@@ -125,8 +126,7 @@ def main():
         metavar='outdir'
     )
     parser.add_argument(
-        '-p', 
-        '--preset', 
+        '-p', '--preset', 
         type=str, 
         default='MPStaticSet', 
         help='''The pymatgen preset to use for VASP static calculations.
@@ -135,8 +135,7 @@ def main():
         metavar='StaticSet'
     )
     parser.add_argument(
-        '-u', 
-        '--user-settings', 
+        '-u', '--user-settings', 
         type=str, 
         default='user_settings.yaml', 
         help='Path to the .yaml file containing tags overrides to put over the PMG preset.', 
@@ -144,35 +143,31 @@ def main():
         dest='user_settings'
     )
     parser.add_argument(
-        '-m',
-        '--minimum',
+        '-m', '--minimum',
         type=float,
         default=1.3,
         help='''Minimum acceptable band gap value in eV. Defaults to 1.3 eV.''', 
         metavar='float'
     )
     parser.add_argument(
-        '-M',
-        '--maximum',
+        '-M', '--maximum',
         type=float,
         default=3.6,
         help='''Maximum acceptable band gap value in eV. Defaults to 3.6 eV.''', 
         metavar='float'
     )
     parser.add_argument(
-        '-a', 
-        '--accept', 
+        '-a', '--accept', 
         type=str, 
-        default='band_gap_passed.txt', 
+        default=None, 
         help='''Defines a file whose presence in a structure directory means it passed this
         screening step successfully and can be kept for further calculations.''',  
         metavar='accept_file.txt'
     )
     parser.add_argument(
-        '-i', 
-        '--ignore', 
+        '-i', '--ignore', 
         type=str, 
-        default='rejected.txt', 
+        default=None, 
         help='''Defines a file whose presence in a structure directory means it did not pass
         previous screening steps and should not be used in this calculation. 
         This file will also be written in structure directories that did not pass this step.
@@ -182,19 +177,36 @@ def main():
         metavar='ignore_file.txt'
     )
     parser.add_argument(
-        '-w',
-        '--workers',
+        "-R", "--read-previous-summary",
+        type=str,
+        default=None,
+        help=(
+            "Path to a JSON summary file produced by a previous screening step.\n"
+            "If given, the file will be checked to filter structures that are already rejected."
+        ),
+        metavar="/path/to/summary.json",
+        dest="prev_summary"
+    )
+    parser.add_argument(
+        '-w', '--workers',
         type=int,
         default=1,
         help='Number of parallel processes to spawn for parallelized steps.',
         metavar='int',
     )
     parser.add_argument(
-        '-t', 
-        '--task_index', 
+        '-t', '--task_index', 
         type=int, 
         help='If a job array is used, provide here the structure index to treat according to task IDs\n \
             (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).'
+    )
+    parser.add_argument(
+        "-s", "--summary",
+        default="summary.json",
+        help=(
+            "Output file indicating calculation results for this step (json format).\n"
+            "Also usable by further steps to filter out structures that were rejected in this step."
+        ),
     )
     parser.add_argument(
         '--with-uncertainties', 
@@ -213,10 +225,12 @@ def main():
     preset         = args.preset
     user_settings  = _yaml_loader(args.user_settings, on_error='raise')
     valid_interval = sorted([args.minimum, args.maximum])
-    accept_file    = args.accept
-    ignore_file    = args.ignore
+    accept_file    = args.accept or None
+    ignore_file    = args.ignore or None
+    prev_summary   = args.prev_summary or None
     workers        = args.workers
     struct_idx     = args.task_index
+    summary        = args.summary
 
 
     # MAIN BLOCK
@@ -226,6 +240,7 @@ def main():
         method='delta_sol', 
         base_dir=input_dir, 
         ignore_file=ignore_file, 
+        path_to_summary=prev_summary, 
         workers=workers
     )
 
@@ -249,58 +264,108 @@ def main():
         list(E_band_gaps.items())
     ))
 
+    screening_results = []
+
     # Keep good structures
     for struct in good_bg_structs:
         name       = struct[0]
         bgdict     = struct[1]
         E_band_gap = max(round(bgdict['E_band_gap'], 6), 0.0)
-        accept_msg = [
-            "BAND GAP TEST PASSED", 
-            f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is inside the interval [{min(valid_interval)}, {max(valid_interval)}].", 
-            "Therefore, it is suitable for wanted application, and should be considered for further screening steps."
-        ]
+
+        if accept_file is not None:
+            accept_msg = [
+                "BAND GAP TEST PASSED", 
+                f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is inside the interval [{min(valid_interval)}, {max(valid_interval)}].", 
+                "Therefore, it is suitable for wanted application, and should be considered for further screening steps."
+            ]
+
+            if args.with_uncertainties:
+                E_band_gap_min = max(round(bgdict['E_band_gap_min'], 6), 0.0)
+                E_band_gap_max = max(round(bgdict['E_band_gap_max'], 6), 0.0)
+                accept_msg += [
+                    "\nUncertainty interval (does not affect acception or rejection):", 
+                    f"Band Gap minimum = {E_band_gap_max} eV", 
+                    f"Band Gap maximum = {E_band_gap_min} eV"
+                ]
+
+            accept_msg = "\n".join(accept_msg)
+
+            for calc_dir in filter(lambda path: path.name.startswith(name), Path(outdir).iterdir()):
+                accept_path = os.path.join(calc_dir, accept_file)
+                with open(accept_path, 'wt') as fp:
+                    fp.write(accept_msg)
         
+        struct_dict = {
+                "path": os.path.join(str(input_dir), name),
+                "bandgap": E_band_gap,
+                "valid_gap": True
+        }
+
         if args.with_uncertainties:
             E_band_gap_min = max(round(bgdict['E_band_gap_min'], 6), 0.0)
             E_band_gap_max = max(round(bgdict['E_band_gap_max'], 6), 0.0)
-            accept_msg += [
-                "\nUncertainty interval (does not affect acception or rejection):", 
-                f"Band Gap minimum = {E_band_gap_max} eV", 
-                f"Band Gap maximum = {E_band_gap_min} eV"
-            ]
+            struct_dict.update(
+                {
+                    "bandgap_min": E_band_gap_max,
+                    "bandgap_max": E_band_gap_min
+                }
+            )
 
-        accept_msg = "\n".join(accept_msg)
-
-        for calc_dir in filter(lambda path: path.name.startswith(name), Path(outdir).iterdir()):
-            accept_path = os.path.join(calc_dir, accept_file)
-            with open(accept_path, 'wt') as fp:
-                fp.write(accept_msg)
+        screening_results.append(struct_dict)
 
     # Reject unsuitable structures
     for struct in bad_bg_structs:
         name       = struct[0]
         bgdict     = struct[1]
         E_band_gap = max(round(bgdict['E_band_gap'], 6), 0.0)
-        reject_msg = [
-            "BAND GAP REJECTION", 
-            f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].",
-            "Therefore, it is not suitable for wanted application, and should not be considered in further screening steps."
-        ]
+
+        if ignore_file is not None:
+            reject_msg = [
+                "BAND GAP REJECTION", 
+                f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].",
+                "Therefore, it is not suitable for wanted application, and should not be considered in further screening steps."
+            ]
+
+            if args.with_uncertainties:
+                E_band_gap_min = max(round(bgdict['E_band_gap_min'], 6), 0.0)
+                E_band_gap_max = max(round(bgdict['E_band_gap_max'], 6), 0.0)
+                reject_msg += [
+                    "\nUncertainty interval (does not affect acception or rejection):", 
+                    f"Band Gap minimum = {E_band_gap_max} eV", 
+                    f"Band Gap maximum = {E_band_gap_min} eV"
+                ]
+
+            reject_msg = "\n".join(reject_msg)
+            for calc_dir in filter(lambda path: path.name.startswith(name), Path(outdir).iterdir()):
+                reject_path = os.path.join(calc_dir, ignore_file)
+                with open(reject_path, 'wt') as fp:
+                    fp.write(reject_msg)
+
+        struct_dict = {
+                "path": os.path.join(str(input_dir), name),
+                "bandgap": E_band_gap,
+                "valid_gap": False
+        }
 
         if args.with_uncertainties:
             E_band_gap_min = max(round(bgdict['E_band_gap_min'], 6), 0.0)
             E_band_gap_max = max(round(bgdict['E_band_gap_max'], 6), 0.0)
-            reject_msg += [
-                "\nUncertainty interval (does not affect acception or rejection):", 
-                f"Band Gap minimum = {E_band_gap_max} eV", 
-                f"Band Gap maximum = {E_band_gap_min} eV"
-            ]
+            struct_dict.update(
+                {
+                    "bandgap_min": E_band_gap_max,
+                    "bandgap_max": E_band_gap_min
+                }
+            )
 
-        reject_msg = "\n".join(reject_msg)
-        for calc_dir in filter(lambda path: path.name.startswith(name), Path(outdir).iterdir()):
-            reject_path = os.path.join(calc_dir, ignore_file)
-            with open(reject_path, 'wt') as fp:
-                fp.write(reject_msg)
+        screening_results.append(struct_dict)
+
+    def sort_by_path(dct: Dict) -> str:
+        return dct.get('path')
+
+    screening_results = sorted(screening_results, key=sort_by_path)
+
+    with open(summary, "w") as fp:
+        json.dump(screening_results, fp, indent=4)
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')

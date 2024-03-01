@@ -181,7 +181,7 @@ def main():
         default="summary.json",
         help=(
             "Output file indicating calculation results for this step (json format).\n"
-            "Also used by further steps to filter out structures that were rejected in previous steps."
+            "Also usable by further steps to filter out structures that were rejected in this step."
         ),
     )
     args: Namespace = parser.parse_args()
@@ -194,7 +194,7 @@ def main():
     prev_summary = args.prev_summary or None
     delta_H_limit = round(args.limit, 8)
     workers = args.workers
-    summary_file = args.summary
+    summary = args.summary
 
     # MAIN BLOCK
 
@@ -280,7 +280,7 @@ def main():
 
     screening_results = sorted(screening_results, key=sort_by_path)
 
-    with open(args.summary, "w") as fp:
+    with open(summary, "w") as fp:
         json.dump(screening_results, fp, indent=4)
 
     stop = datetime.now()
