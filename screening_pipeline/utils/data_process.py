@@ -541,9 +541,9 @@ def calculate_delta_sol_band_gap(data: dict) -> Tuple[str, float]:
         data (dict): A dict containing following data about a structure:
                         - Its name, 
                         - The Structure object, 
-                        - Its original relaxed total energy, 
-                        - Its total energy with more electrons, 
-                        - Its total energy with less electrons
+                        - Its total energy with N0 electrons, 
+                        - Its total energy with N0 + n electrons, 
+                        - Its total energy with N0 - n electrons
     Returns:
         Tuple[str, float]: The name of the structure and its band gap value.
     """
@@ -569,8 +569,8 @@ def calculate_delta_sol_band_gap(data: dict) -> Tuple[str, float]:
 
 
 def batch_calculate_delta_sol_band_gaps(
-        structs_data: dict, 
-        bg_structs_data: dict, 
+        #structs_data: dict, 
+        bg_data: dict, 
         with_uncertainties: bool = False, 
         workers: int = 1, 
         /
@@ -590,11 +590,43 @@ def batch_calculate_delta_sol_band_gaps(
         Dict[str, float]: Dict of Band gap values associated with the original structure directory name.
     """
 
-    assert isinstance(structs_data, dict)
-    assert isinstance(bg_structs_data, dict)
+    #assert isinstance(structs_data, dict)
+    assert isinstance(bg_data, dict)
     assert isinstance(with_uncertainties, bool)
     assert isinstance(workers, int) and workers >= 1
 
+    bg_data_names = list(filter(lambda name: "_neutral" in name, bg_data.keys()))
+
+    for idx, name in enumerate(bg_data_names):
+        name: str # type hint
+        bg_data_names[idx] = name.replace("_neutral", "")
+
+    if not with_uncertainties:
+        final_energies = {
+            name: {
+                "name": name,
+                "structure": bg_data[name + "_neutral"]["structure"],
+                "E_N0": bg_data[name + "_neutral"]["final_energy"],
+                "E_N0_plus_n_best": bg_data[name + "_best" + "_plus"]["final_energy"],
+                "E_N0_minus_n_best": bg_data[name + "_best" + "_minus"]["final_energy"],
+            } for name in bg_data_names
+        }
+    
+    else:
+        final_energies = {
+            name: {
+                "name": name,
+                "structure": bg_data[name + "_neutral"]["structure"],
+                "E_N0": bg_data[name + "_neutral"]["final_energy"],
+                "E_N0_plus_n_best": bg_data[name + "_best" + "_plus"]["final_energy"],
+                "E_N0_minus_n_best": bg_data[name + "_best" + "_minus"]["final_energy"],
+                "E_N0_plus_n_min": bg_data[name + "_best" + "_plus"]["final_energy"],
+                "E_N0_minus_n_min": bg_data[name + "_best" + "_minus"]["final_energy"],
+                "E_N0_plus_n_max": bg_data[name + "_best" + "_plus"]["final_energy"],
+                "E_N0_minus_n_max": bg_data[name + "_best" + "_minus"]["final_energy"],
+            } for name in bg_data_names
+        }
+    """
     if not with_uncertainties:
         final_energies = {
             name: {
@@ -620,7 +652,7 @@ def batch_calculate_delta_sol_band_gaps(
                 'E_N0_minus_n_max': bg_structs_data['_'.join((name, 'max', 'minus'))]['final_energy']
             } for name, data in structs_data.items()
         }
-
+    """
     nbr_structs = len(final_energies)
     chunksize = min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1
     data_list = list(final_energies.values())
