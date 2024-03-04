@@ -114,10 +114,12 @@ def main():
     parser.add_argument(
         "-o", "--output",
         type=str,
-        default=".",
+        default=None,
         help=(
             "Path to the output directory where VASP files will be written.\n"
-            "A subdirectory will be created in this directory for each structure processed."
+            "A subdirectory will be created in this directory for each Δ-Sol calculation.\n"
+            "If not provided, a 'Band_gaps' directory is created at the same path as the directory "
+            "provided in the 'input_dir' argument."
         ), 
         metavar="outdir"
     )
@@ -137,11 +139,11 @@ def main():
         type=str, 
         default="MPStaticSet", 
         help=(
-            "The pymatgen preset to use for VASP static calculations. "
+            "The pymatgen preset to use for VASP static calculations.\n"
+            f"Supported presets: {PMGStaticSet}"
             "More info on possible presets in pymatgen documentation:\n"
             "https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets."
-        ), 
-        metavar="StaticSet"
+        )
     )
     parser.add_argument(
         "-u", "--user-settings", 
@@ -169,7 +171,11 @@ def main():
     task_id   = args.task_id
 
     # Optional args
-    outdir = args.output
+    if args.output is None:
+        outdir = os.path.join(os.path.dirname(input_dir), "Band_gaps")
+    else:
+        outdir = args.output
+
     prev_summary = args.prev_summary or None
     preset = args.preset
     user_settings = _yaml_loader(args.user_settings)
