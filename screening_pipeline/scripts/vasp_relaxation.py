@@ -36,39 +36,41 @@ from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_batc
 
 def assert_args(args: Namespace) -> None:
     
-    assert os.path.exists(args.filename), \
+    assert os.path.exists(args.filename), (
     f'{args.filename}: path to input file not found.'
-    
-    assert os.path.isfile(args.filename), \
+    )
+    assert os.path.isfile(args.filename), (
     f'{args.filename} found but it is not a file.'
-
-    assert args.filename.endswith('.cif'), \
+    )
+    assert args.filename.endswith('.cif'), (
     'Input structure data must be in CIF format.'
-
-    assert os.path.exists(args.executable_path), \
+    )
+    assert args.executable_path.startswith("vasp") or os.path.exists(args.executable_path), (
     f'{args.executable_path}: executable file not found.'
-
-    assert os.path.exists(args.output), \
+    )
+    assert os.path.exists(args.output), (
     f'{args.output}: path to output directory not found.'
-
-    assert os.path.isdir(args.output), \
+    )
+    assert os.path.isdir(args.output), (
     f'{args.output} found but it is not a directory.'
-
-    assert args.preset in PMGRelaxSet, \
-    f'Provided relaxation preset must be one of the following:\n \
-    {PMGRelaxSet}'
-
-    assert os.path.isfile(args.user_settings), \
+    )
+    assert args.preset in PMGRelaxSet, (
+    'Provided relaxation preset must be one of the following:\n'
+    f'{PMGRelaxSet}'
+    )
+    assert os.path.isfile(args.user_settings), (
     f'{args.user_settings}: file not found.'
-
-    assert args.user_settings.endswith('.yaml'), \
+    )
+    assert args.user_settings.endswith('.yaml'), (
     'user settings file must be of .yaml format.'
-
-    assert args.workers >= 1, \
+    )
+    assert args.workers >= 1, (
     '"workers" arg must be strictly positive.'
-
-    assert args.task_index >= 0 or args.task_index is None, \
-    '"task_index" arg must be positive or zero.'
+    )
+    if args.task_index is not None:
+        assert args.task_index >= 0 or args.task_index is None, (
+        "'task_index' arg must be positive or zero."
+        )
 
 ########################################
 # MAIN FUNCTION
@@ -155,7 +157,7 @@ def main():
 
     args: Namespace = parser.parse_args()
 
-    #assert_args(args)
+    assert_args(args)
     
     input_file    = args.filename
     exe_path      = args.executable_path

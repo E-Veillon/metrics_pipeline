@@ -37,12 +37,12 @@ def assert_args(args: Namespace) -> None:
 
     assert os.path.isdir(args.input_dir), f"{args.input_dir}: No such directory found."
 
-    if args.mini_maxi is not None:
-        assert all([value >= 0.0 for value in args.mini_maxi]), (
+    if args.valid_interval is not None:
+        assert all([value >= 0.0 for value in args.valid_interval]), (
         f"Acceptable band gap values must be positive or zero."
         )
 
-        assert args.mini_maxi[0] != args.mini_maxi[1], (
+        assert args.valid_interval[0] != args.valid_interval[1], (
         f"Acceptable band gap values cannot have the same value."
         )
 
@@ -99,11 +99,11 @@ def main():
     )
     parser.add_argument(
         "-v", "--valid-interval",
-        narg=2,
+        nargs=2,
         type=float,
         default=None,
         help=(
-            "Valid band gaps interval in eV (default: [1.3 ; 3.6] eV)."
+            "Valid band gaps interval in eV (default: [1.3 ; 3.6] eV).\n"
             "If another interval is given, the min AND max values must be given, even if one "
             "of them matches the default values."
         ), 
@@ -143,8 +143,9 @@ def main():
         help=(
             "Output file indicating calculation results for this step (json format).\n"
             "Also usable by further steps to filter out structures that were rejected in this step.\n"
-            "This arg only changes the file name, its path is automatically in the step directory."
+            "This arg only changes the file name, its path is automatically set in the step directory."
         ),
+        metavar="summary.json"
     )
     parser.add_argument(
         "--with-uncertainties", 
@@ -159,10 +160,10 @@ def main():
 
     input_dir = args.input_dir
 
-    if args.mini_maxi is None:
+    if args.valid_interval is None:
         valid_interval = (1.3, 3.6)
     else:
-        valid_interval = sorted(args.mini_maxi)
+        valid_interval = sorted(args.valid_interval)
 
     accept_file    = args.accept or None
     ignore_file    = args.ignore or None
@@ -174,7 +175,7 @@ def main():
 
     # Extract VASP static calculations results
     bg_data = batch_extract_vasp_data(
-        method="delta_sol", 
+        method="delta_sol_calc", 
         base_dir=input_dir, 
         workers=workers
     )
@@ -213,8 +214,8 @@ def main():
                 E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
                 accept_msg += [
                     "\nUncertainty interval (does not affect acception or rejection):", 
-                    f"Band Gap minimum = {E_band_gap_max} eV", 
-                    f"Band Gap maximum = {E_band_gap_min} eV"
+                    f"Band Gap minimum = {E_band_gap_max} eV", # N*(max) gives the smallest gap
+                    f"Band Gap maximum = {E_band_gap_min} eV"  # N*(min) gives the largest gap
                 ]
 
             accept_msg = "\n".join(accept_msg)
@@ -226,7 +227,7 @@ def main():
         
         struct_dict = {
                 "path": os.path.join(str(input_dir), name),
-                "bandgap": E_band_gap,
+                "bandgap (eV)": E_band_gap,
                 "valid_gap": True
         }
 
@@ -235,8 +236,8 @@ def main():
             E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
             struct_dict.update(
                 {
-                    "bandgap_min": E_band_gap_max,
-                    "bandgap_max": E_band_gap_min
+                    "bandgap_min (eV)": E_band_gap_max, # N*(max) gives the smallest gap
+                    "bandgap_max (eV)": E_band_gap_min  # N*(min) gives the largest gap
                 }
             )
 
@@ -260,8 +261,8 @@ def main():
                 E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
                 reject_msg += [
                     "\nUncertainty interval (does not affect acception or rejection):", 
-                    f"Band Gap minimum = {E_band_gap_max} eV", 
-                    f"Band Gap maximum = {E_band_gap_min} eV"
+                    f"Band Gap minimum = {E_band_gap_max} eV", # N*(max) gives the smallest gap
+                    f"Band Gap maximum = {E_band_gap_min} eV"  # N*(min) gives the largest gap
                 ]
 
             reject_msg = "\n".join(reject_msg)
@@ -272,7 +273,7 @@ def main():
 
         struct_dict = {
                 "path": os.path.join(str(input_dir), name),
-                "bandgap": E_band_gap,
+                "bandgap (eV)": E_band_gap,
                 "valid_gap": False
         }
 
@@ -281,8 +282,8 @@ def main():
             E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
             struct_dict.update(
                 {
-                    "bandgap_min": E_band_gap_max,
-                    "bandgap_max": E_band_gap_min
+                    "bandgap_min (eV)": E_band_gap_max, # N*(max) gives the smallest gap
+                    "bandgap_max (eV)": E_band_gap_min  # N*(min) gives the largest gap
                 }
             )
 

@@ -569,7 +569,6 @@ def calculate_delta_sol_band_gap(data: dict) -> Tuple[str, float]:
 
 
 def batch_calculate_delta_sol_band_gaps(
-        #structs_data: dict, 
         bg_data: dict, 
         with_uncertainties: bool = False, 
         workers: int = 1, 
@@ -580,79 +579,47 @@ def batch_calculate_delta_sol_band_gaps(
     as provided by extract_vasp_data_for_delta_sol function applied on the 3 energy calculations.
 
     Parameters:
-        structs_data (dict):    Dict containing the original data extracted from previous VASP calculation.
+        bg_data (dict):               Dict containing structures data extracted from previous VASP static calculations.
 
-        bg_structs_data (dict): Dict of the calculated data on structures with changed electron numbers.
+        with_uncertainties (bool):    Whether to include uncertainty calculations data in the results.
+                                      Defaults to False.
 
-        workers (int):          The number of parallel processes to spawn. Defaults to 1.
+        workers (int):                The number of parallel processes to spawn. Defaults to 1.
 
     Returns:
         Dict[str, float]: Dict of Band gap values associated with the original structure directory name.
     """
 
-    #assert isinstance(structs_data, dict)
     assert isinstance(bg_data, dict)
     assert isinstance(with_uncertainties, bool)
     assert isinstance(workers, int) and workers >= 1
-
-    bg_data_names = list(filter(lambda name: "_neutral" in name, bg_data.keys()))
-
-    for idx, name in enumerate(bg_data_names):
-        name: str # type hint
-        bg_data_names[idx] = name.replace("_neutral", "")
 
     if not with_uncertainties:
         final_energies = {
             name: {
                 "name": name,
-                "structure": bg_data[name + "_neutral"]["structure"],
-                "E_N0": bg_data[name + "_neutral"]["final_energy"],
-                "E_N0_plus_n_best": bg_data[name + "_best" + "_plus"]["final_energy"],
-                "E_N0_minus_n_best": bg_data[name + "_best" + "_minus"]["final_energy"],
-            } for name in bg_data_names
+                "structure": data["structure"],
+                "E_N0": data[name + "_neutral"],
+                "E_N0_plus_n_best": data[name + "_best_plus"],
+                "E_N0_minus_n_best": data[name + "_best_minus"],
+            } for name, data in bg_data.items()
         }
     
     else:
         final_energies = {
             name: {
                 "name": name,
-                "structure": bg_data[name + "_neutral"]["structure"],
-                "E_N0": bg_data[name + "_neutral"]["final_energy"],
-                "E_N0_plus_n_best": bg_data[name + "_best" + "_plus"]["final_energy"],
-                "E_N0_minus_n_best": bg_data[name + "_best" + "_minus"]["final_energy"],
-                "E_N0_plus_n_min": bg_data[name + "_best" + "_plus"]["final_energy"],
-                "E_N0_minus_n_min": bg_data[name + "_best" + "_minus"]["final_energy"],
-                "E_N0_plus_n_max": bg_data[name + "_best" + "_plus"]["final_energy"],
-                "E_N0_minus_n_max": bg_data[name + "_best" + "_minus"]["final_energy"],
-            } for name in bg_data_names
-        }
-    """
-    if not with_uncertainties:
-        final_energies = {
-            name: {
-                'name': name, 
-                'structure': data['structure'], 
-                'E_N0': bg_structs_data['_'.join((name, 'neutral'))]['final_energy'], 
-                'E_N0_plus_n_best': bg_structs_data['_'.join((name, 'best', 'plus'))]['final_energy'], 
-                'E_N0_minus_n_best': bg_structs_data['_'.join((name, 'best', 'minus'))]['final_energy']
-            } for name, data in structs_data.items()
+                "structure": data["structure"],
+                "E_N0": data[name + "_neutral"],
+                "E_N0_plus_n_best": data[name + "_best_plus"],
+                "E_N0_minus_n_best": data[name + "_best_minus"],
+                "E_N0_plus_n_min": data[name + "_min_plus"],
+                "E_N0_minus_n_min": data[name + "_min_minus"],
+                "E_N0_plus_n_max": data[name + "_max_plus"],
+                "E_N0_minus_n_max": data[name + "_max_minus"],
+            } for name, data in bg_data.items()
         }
 
-    else:
-        final_energies = {
-            name: {
-                'name': name, 
-                'structure': data['structure'], 
-                'E_N0': bg_structs_data['_'.join((name, 'neutral'))]['final_energy'], 
-                'E_N0_plus_n_best': bg_structs_data['_'.join((name, 'best', 'plus'))]['final_energy'], 
-                'E_N0_minus_n_best': bg_structs_data['_'.join((name, 'best', 'minus'))]['final_energy'], 
-                'E_N0_plus_n_min': bg_structs_data['_'.join((name, 'min', 'plus'))]['final_energy'], 
-                'E_N0_minus_n_min': bg_structs_data['_'.join((name, 'min', 'minus'))]['final_energy'], 
-                'E_N0_plus_n_max': bg_structs_data['_'.join((name, 'max', 'plus'))]['final_energy'], 
-                'E_N0_minus_n_max': bg_structs_data['_'.join((name, 'max', 'minus'))]['final_energy']
-            } for name, data in structs_data.items()
-        }
-    """
     nbr_structs = len(final_energies)
     chunksize = min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1
     data_list = list(final_energies.values())

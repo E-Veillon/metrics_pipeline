@@ -789,11 +789,11 @@ def extract_vasp_data_for_convex_hull(
 ########################################
 
 
-def extract_vasp_data_for_delta_sol(
+def extract_vasp_data_for_delta_sol_init(
     struct_dir: PathLike = ".", 
     ignore_file: Optional[str] = None, 
     path_to_summary: Optional[PathLike] = None
-) -> Tuple[str, Dict[str, Union[Structure, Chgcar, float]]]:
+) -> Tuple[str, Dict[str, Union[Structure, float]]]:
     """
     Extracts VASP data from a previous run for one structure.
     Keeps only relevant data for Δ-Sol method.
@@ -819,7 +819,7 @@ def extract_vasp_data_for_delta_sol(
     """
 
     assert isinstance(struct_dir, PathLike)
-    assert Path(struct_dir).is_dir()
+    assert os.path.isdir(str(struct_dir))
 
     struct_dir: Path = Path(struct_dir)
 
@@ -842,6 +842,37 @@ def extract_vasp_data_for_delta_sol(
         "structure": structure,
         "final_energy": final_energy_eV,
     }
+    struct_data = (struct_name, struct_dict)
+
+    return struct_data
+
+
+########################################
+
+
+def extract_vasp_data_for_delta_sol_calc(
+    struct_dir: PathLike = ".", 
+    ignore_file: Optional[str] = None, 
+    path_to_summary: Optional[PathLike] = None
+) -> Tuple[str, Dict[str, Union[Structure, float]]]:
+    """"""
+    assert isinstance(struct_dir, PathLike)
+    assert os.path.isdir(str(struct_dir))
+
+    calc_dirs   = list(filter(lambda path: path.is_dir(), Path(struct_dir).iterdir()))
+    struct_dict = {}
+
+    for calc_dir in calc_dirs:
+        calc_data = extract_vasp_data_for_delta_sol_init(
+            struct_dir=calc_dir, ignore_file=ignore_file, path_to_summary=path_to_summary
+        )
+
+        if "_neutral" in calc_data[0]:
+            struct_dict.update({"structure": calc_data[1]["structure"]})
+
+        struct_dict.update({calc_data[0]: calc_data[1]["final_energy"]})
+
+    struct_name = Path(struct_dir).name
     struct_data = (struct_name, struct_dict)
 
     return struct_data
@@ -903,7 +934,7 @@ def batch_extract_vasp_data(
     """
 
     assert isinstance(base_dir, PathLike)
-    assert Path(base_dir).is_dir()
+    assert os.path.isdir(str(base_dir))
     assert isinstance(ignore_file, str) or ignore_file is None
     assert isinstance(path_to_summary, PathLike) or path_to_summary is None
     assert isinstance(workers, int) and workers >= 1
@@ -916,12 +947,19 @@ def batch_extract_vasp_data(
             set_vasp_extractor = partial(
                 extract_vasp_data_for_convex_hull, ignore_file=ignore_file, path_to_summary=path_to_summary
             )
-        case "delta_sol":
+        case "delta_sol_init":
             set_vasp_extractor = partial(
-                extract_vasp_data_for_delta_sol, ignore_file=ignore_file, path_to_summary=path_to_summary
+                extract_vasp_data_for_delta_sol_init, ignore_file=ignore_file, path_to_summary=path_to_summary
+            )
+        case "delta_sol_calc":
+            set_vasp_extractor = partial(
+                extract_vasp_data_for_delta_sol_calc, ignore_file=ignore_file, path_to_summary=path_to_summary
             )
         case _:
-            raise NotImplementedError(f"Provided method ({method}) is not supported.")
+            raise NotImplementedError(
+                f"Provided method ({method}) is not supported.\n"
+                "Supported methods are: 'convex_hull', 'delta_sol_init', 'delta_sol_calc'."
+            )
 
     base_dir           = Path(base_dir)
     structs_dir_list   = list(filter(is_struct_dir, base_dir.iterdir()))
@@ -1132,6 +1170,20 @@ def delta_sol_inputs_init(
 
 ########################################
 
+
+def _match_calc_index(calc_index: int) -> Union[str, None]:
+    match calc_index:
+        case 0: return None
+        case 1|2: return "BEST"
+        case 3|4: return "MIN"
+        case 5|6: return "MAX"
+        case int(): raise ValueError("calc_index must be between 0 and 6 included.")
+        case _: raise TypeError(f"Expected 'int' type, got '{type(calc_index)}' type instead")
+
+
+########################################
+
+
 def delta_sol_calculation_init(
         structure: Structure, 
         calc_index: int, 
@@ -1174,11 +1226,7 @@ def delta_sol_calculation_init(
             "Recognized functionals are 'LDA', 'PBE', and 'AM05'."
         )
 
-    match calc_index:
-        case 0: n_star_type = None
-        case 1, 2: n_star_type = "BEST"
-        case 3, 4: n_star_type = "MIN"
-        case 5, 6: n_star_type = "MAX"
+    n_star_type = _match_calc_index(calc_index)
 
     if n_star_type is not None:
         n_ratio = get_delta_sol_el_ratio(

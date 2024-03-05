@@ -21,7 +21,7 @@ from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from screening_pipeline.utils.utils import _yaml_loader
 from screening_pipeline.utils.typing import PMGStaticSet
 from screening_pipeline.utils.vasp_io import (
-    extract_vasp_data_for_delta_sol, delta_sol_calculation_init, vasp_launcher
+    extract_vasp_data_for_delta_sol_init, delta_sol_calculation_init, vasp_launcher
 )
 ########################################
 # LOCAL FUNCTIONS
@@ -31,8 +31,8 @@ def assert_args(args: Namespace) -> None:
     assert os.path.isdir(args.input_dir), (
         f"{args.input_dir}: No directory found."
     )
-    assert os.path.exists(args.executable_path), (
-        f"{args.executable_path}: No such file found."
+    assert args.executable_path.startswith("vasp") or os.path.exists(args.executable_path), (
+        f"{args.executable_path}: Executable file not found."
     )
     assert args.task_id >= 0, (
         "task-id argument must be positive or zero."
@@ -40,9 +40,10 @@ def assert_args(args: Namespace) -> None:
     assert os.path.isdir(args.output), (
         f"{args.output}: No directory found."
     )
-    assert os.path.isfile(args.previous_results) or args.previous_results is None, (
-        f"{args.previous_results}: No such file found."
-    )
+    if args.prev_summary is not None:
+        assert os.path.isfile(args.prev_summary), (
+            f"{args.previous_results}: No such file found."
+        )
 
     #PMGStaticSet.add("GenMatStatic54Set")
 
@@ -58,6 +59,16 @@ def assert_args(args: Namespace) -> None:
     "user settings file must be of .yaml format."
     )
 
+def calc_idx_to_dir_name(calc_index: int) -> str:
+    match calc_index:
+        case 0: return "_neutral"
+        case 1: return "_best_plus"
+        case 2: return "_best_minus"
+        case 3: return "_min_plus"
+        case 4: return "_min_minus"
+        case 5: return "_max_plus"
+        case 6: return "_max_minus"
+
 ########################################
 # MAIN FUNCTION
 
@@ -66,7 +77,7 @@ def main():
 
     # ARGUMENTS PARSING BLOCK
     
-    prog_name = "band_gap_inputs"
+    prog_name = "vasp_delta_sol_statics.py"
     prog_desc = """
         Parses previous VASP data and launches Δ-Sol static calculations for structures not already rejected.
         Uses job arrays properties to maximize the parallelization efficiency.
@@ -100,7 +111,6 @@ def main():
         "executable_path", 
         type=str,
         help="Path to the VASP executable.", 
-        metavar="/path/to/vasp"
     )
     parser.add_argument( 
         "task_id", 
@@ -208,7 +218,7 @@ def main():
 
     # MAIN BLOCK
 
-    struct_data = extract_vasp_data_for_delta_sol(
+    struct_data = extract_vasp_data_for_delta_sol_init(
         struct_dir=struct_path, path_to_summary=prev_summary
     )
     if not struct_data:
@@ -222,6 +232,10 @@ def main():
         )
         sys.exit(0)
 
+    dir_name   = f"{struct_idx}_{struct_data[1]['structure'].composition.reduced_formula}"
+    calc_name  = calc_idx_to_dir_name(calc_idx)
+    calc_dir   = os.path.join(outdir, dir_name, ''.join((dir_name, calc_name)))
+
     input_data = delta_sol_calculation_init(
         structure=struct_data[1]["structure"], 
         calc_index=calc_idx, 
@@ -229,7 +243,9 @@ def main():
         user_corrections=user_settings
     )
 
-    vasp_launcher(vasp_exe=exe_path, path=outdir, vasp_input=input_data)
+    os.makedirs(calc_dir, exist_ok=True)
+
+    vasp_launcher(vasp_exe=exe_path, path=calc_dir, vasp_input=input_data)
 
     stop = datetime.now()
     print(f"elapsed time: {stop-start}")
