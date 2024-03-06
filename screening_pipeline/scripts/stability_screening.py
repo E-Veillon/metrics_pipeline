@@ -216,16 +216,12 @@ def main():
         structs_data=structs_data, structs_ref=structs_reference, workers=workers
     )
 
-    stable_structs = list(
-        filter(
+    stable_structs = filter(
             lambda tup: tup[1]["delta_H"] <= delta_H_limit, list(structs_data.items())
-        )
     )
 
-    unstable_structs = list(
-        filter(
+    unstable_structs = filter(
             lambda tup: tup[1]["delta_H"] > delta_H_limit, list(structs_data.items())
-        )
     )
 
     screening_results = []
@@ -241,9 +237,9 @@ def main():
                         which is below or equal to the fixed instability limit of {delta_H_limit} eV/atom.\n \
                         Therefore, it is considered suitable for wanted application,\n \
                         and should be considered for further screening steps.\n"
-            accept_file_path = Path("/".join((str(run_dir), name, accept_file)))
-            accept_file_path.touch()
-            accept_file_path.write_text(accept_msg)
+            accept_file_path = os.path.join(str(run_dir), name, accept_file)
+            with open(accept_file_path, "wt") as fp:
+                fp.write(accept_msg)
 
         screening_results.append(
             {
@@ -264,9 +260,9 @@ def main():
                         which is above the fixed instability limit of {delta_H_limit} eV/atom.\n \
                         Therefore, it is considered not suitable for wanted application,\n \
                         and should not be considered in further screening steps.\n"
-            reject_file_path = Path("/".join((str(run_dir), name, ignore_file)))
-            reject_file_path.touch()
-            reject_file_path.write_text(reject_msg)
+            reject_file_path = os.path.join(str(run_dir), name, ignore_file)
+            with open(reject_file_path, "wt") as fp:
+                fp.write(reject_msg)
 
         screening_results.append(
             {
