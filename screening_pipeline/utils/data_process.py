@@ -5,7 +5,7 @@ Functions to process raw calculation results from VASP and test actual eliminati
 ########################################
 # SYSTEM I/O MODULES
 
-from typing import Dict, Union, Sequence, Tuple, Any, List, Iterable, Optional
+from typing import Dict, Union, Sequence, Tuple, Any, List, Iterable, Optional, Literal
 from pathlib import Path
 
 ########################################
@@ -533,36 +533,54 @@ def batch_calculate_instability_energies(
 # Functions related to Band Gap screening with Δ-Sol method.
 
 
-def calculate_delta_sol_band_gap(data: dict) -> Tuple[str, float]:
+def calculate_delta_sol_band_gap(data: dict) -> Union[Tuple[str, float], Tuple[str, float, float, float]]:
     """
     Calculate Δ-Sol band gap value of a structure, provided a dict containing all necessary data.
 
     Parameters:
-        data (dict): A dict containing following data about a structure:
-                        - Its name, 
+        data (dict): A dict containing at least following data about a structure:
+                        - Its name,
+                        - The DFT functional used for the calculation, 
                         - The Structure object, 
                         - Its total energy with N0 electrons, 
-                        - Its total energy with N0 + n electrons, 
-                        - Its total energy with N0 - n electrons
+                        - Its total energy with N0 + n(best) electrons, 
+                        - Its total energy with N0 - n(best) electrons.
+
+                     It can also contain data for uncertainty calculations:
+                        - Total energy with N0 + n(min) electrons,
+                        - Total energy with N0 - n(min) electrons,
+                        - Total energy with N0 + n(max) electrons,
+                        - Total energy with N0 - n(max) electrons.
+
     Returns:
-        Tuple[str, float]: The name of the structure and its band gap value.
+        The name of the structure and its band gap value(s).
     """
 
-    assert isinstance(data, dict)
-    assert len(data) == 5 or len(data) == 9
+    def has_str_key(dct: Dict, key: str) -> bool:
+        return dct.get(key) is not None
 
-    n_ratio = get_delta_sol_el_ratio(data['structure'])
+    data_keys = ("name","functional","structure","E_N0","E_N0_plus_n_best","E_N0_minus_n_best")
+    supp_keys = ("E_N0_plus_n_min","E_N0_minus_n_min","E_N0_plus_n_max","E_N0_minus_n_max")
+
+    assert isinstance(data, dict)
+    assert all([has_str_key(data, key) for key in data_keys])
+
+    n_ratio_best = get_delta_sol_el_ratio(data["structure"], dft_functional=data["functional"], n_star_type="BEST")
 
     # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap 
     # (Ref 32 in screening_pipeline/Bibliography))
-    E_band_gap = (data['E_N0_plus_n_best'] + data['E_N0_minus_n_best'] - 2*data['E_N0'])/n_ratio
+    E_band_gap = (data["E_N0_plus_n_best"] + data["E_N0_minus_n_best"] - 2*data["E_N0"])/n_ratio_best
 
-    if len(data) == 9: # data have uncertainty keys
-        E_band_gap_min = (data['E_N0_plus_n_min'] + data['E_N0_minus_n_min'] - 2*data['E_N0'])/n_ratio
-        E_band_gap_max = (data['E_N0_plus_n_max'] + data['E_N0_minus_n_max'] - 2*data['E_N0'])/n_ratio
-        return data['name'], E_band_gap, E_band_gap_min, E_band_gap_max
+    if not all([has_str_key(data, key) for key in supp_keys]): # data do not have uncertainty keys
+        return (data["name"], E_band_gap)
 
-    return data['name'], E_band_gap
+    n_ratio_min = get_delta_sol_el_ratio(data["structure"], dft_functional=data["functional"], n_star_type="MIN")
+    n_ratio_max = get_delta_sol_el_ratio(data["structure"], dft_functional=data["functional"], n_star_type="MAX")
+
+    E_band_gap_min = (data["E_N0_plus_n_min"] + data["E_N0_minus_n_min"] - 2*data["E_N0"])/n_ratio_min
+    E_band_gap_max = (data["E_N0_plus_n_max"] + data["E_N0_minus_n_max"] - 2*data["E_N0"])/n_ratio_max
+
+    return (data["name"], E_band_gap, E_band_gap_min, E_band_gap_max)
 
 
 ########################################
@@ -570,6 +588,7 @@ def calculate_delta_sol_band_gap(data: dict) -> Tuple[str, float]:
 
 def batch_calculate_delta_sol_band_gaps(
         bg_data: dict, 
+        dft_functional: Literal["LDA","PBE","AM05"] = "PBE", 
         with_uncertainties: bool = False, 
         workers: int = 1, 
         /
@@ -581,6 +600,9 @@ def batch_calculate_delta_sol_band_gaps(
     Parameters:
         bg_data (dict):               Dict containing structures data extracted from previous VASP static calculations.
 
+        dft_functional (str):         The type of functional used for static calculations. Supported functionals are
+                                      "LDA", "PBE", and "AM05". Defaults to "PBE".
+
         with_uncertainties (bool):    Whether to include uncertainty calculations data in the results.
                                       Defaults to False.
 
@@ -591,6 +613,7 @@ def batch_calculate_delta_sol_band_gaps(
     """
 
     assert isinstance(bg_data, dict)
+    assert dft_functional in {"LDA", "PBE", "AM05"}
     assert isinstance(with_uncertainties, bool)
     assert isinstance(workers, int) and workers >= 1
 
@@ -598,6 +621,7 @@ def batch_calculate_delta_sol_band_gaps(
         final_energies = {
             name: {
                 "name": name,
+                "functional": dft_functional,
                 "structure": data["structure"],
                 "E_N0": data[name + "_neutral"],
                 "E_N0_plus_n_best": data[name + "_best_plus"],
@@ -609,6 +633,7 @@ def batch_calculate_delta_sol_band_gaps(
         final_energies = {
             name: {
                 "name": name,
+                "functional": dft_functional,
                 "structure": data["structure"],
                 "E_N0": data[name + "_neutral"],
                 "E_N0_plus_n_best": data[name + "_best_plus"],

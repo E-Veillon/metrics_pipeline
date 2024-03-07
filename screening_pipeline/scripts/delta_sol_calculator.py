@@ -37,6 +37,11 @@ def assert_args(args: Namespace) -> None:
 
     assert os.path.isdir(args.input_dir), f"{args.input_dir}: No such directory found."
 
+    assert args.functional in {"LDA", "PBE", "AM05"}, (
+        f"{args.functional} is not supported by delta-Sol. "
+        "See --help for valid functional argument values."
+    )
+
     if args.valid_interval is not None:
         assert all([value >= 0.0 for value in args.valid_interval]), (
         f"Acceptable band gap values must be positive or zero."
@@ -95,7 +100,13 @@ def main():
         "input_dir",
         type=str,
         default=None,
-        help="Base directory containing static calculations results directories.",
+        help="Base directory containing structures directories, themself containing static calculations directories.",
+    )
+    parser.add_argument(
+        "-f", "--functional",
+        type=str,
+        default="PBE",
+        help="DFT functional used for static calculations. Can be chosen between 'LDA', 'PBE', and 'AM05' (default: '%(default)s')."
     )
     parser.add_argument(
         "-v", "--valid-interval",
@@ -159,6 +170,7 @@ def main():
     assert_args(args)
 
     input_dir = args.input_dir
+    dft_func  = args.functional
 
     if args.valid_interval is None:
         valid_interval = (1.3, 3.6)
@@ -181,7 +193,7 @@ def main():
     )
 
     E_band_gaps = batch_calculate_delta_sol_band_gaps(
-        bg_data, args.with_uncertainties, workers
+        bg_data, dft_func, args.with_uncertainties, workers
     )
 
     good_bg_structs = list(filter(
@@ -214,8 +226,8 @@ def main():
                 E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
                 accept_msg += [
                     "\nUncertainty interval (does not affect acception or rejection):", 
-                    f"Band Gap minimum = {E_band_gap_max} eV", # N*(max) gives the smallest gap
-                    f"Band Gap maximum = {E_band_gap_min} eV"  # N*(min) gives the largest gap
+                    f"Band Gap minimum = {min(E_band_gap_min, E_band_gap_max)} eV",
+                    f"Band Gap maximum = {max(E_band_gap_min, E_band_gap_max)} eV" 
                 ]
 
             accept_msg = "\n".join(accept_msg)
@@ -236,8 +248,8 @@ def main():
             E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
             struct_dict.update(
                 {
-                    "bandgap_min (eV)": E_band_gap_max, # N*(max) gives the smallest gap
-                    "bandgap_max (eV)": E_band_gap_min  # N*(min) gives the largest gap
+                    "bandgap_min (eV)": min(E_band_gap_min, E_band_gap_max),
+                    "bandgap_max (eV)": max(E_band_gap_min, E_band_gap_max)
                 }
             )
 
@@ -261,8 +273,8 @@ def main():
                 E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
                 reject_msg += [
                     "\nUncertainty interval (does not affect acception or rejection):", 
-                    f"Band Gap minimum = {E_band_gap_max} eV", # N*(max) gives the smallest gap
-                    f"Band Gap maximum = {E_band_gap_min} eV"  # N*(min) gives the largest gap
+                    f"Band Gap minimum = {min(E_band_gap_min, E_band_gap_max)} eV",
+                    f"Band Gap maximum = {max(E_band_gap_min, E_band_gap_max)} eV" 
                 ]
 
             reject_msg = "\n".join(reject_msg)
@@ -282,8 +294,8 @@ def main():
             E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
             struct_dict.update(
                 {
-                    "bandgap_min (eV)": E_band_gap_max, # N*(max) gives the smallest gap
-                    "bandgap_max (eV)": E_band_gap_min  # N*(min) gives the largest gap
+                    "bandgap_min (eV)": min(E_band_gap_min, E_band_gap_max),
+                    "bandgap_max (eV)": max(E_band_gap_min, E_band_gap_max)
                 }
             )
 
