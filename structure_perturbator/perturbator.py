@@ -1,6 +1,6 @@
 #!/usr/bin/python
 """
-A script to generate randomly perturbated structures from given structures in a CIF file.
+A script to generate randomly perturbated structures from structures in a CIF file.
 """
 
 import os
@@ -69,34 +69,35 @@ def main() -> None:
         prog="perturbator.py",
         description="A script to generate randomly perturbated structures from given structures in a CIF file.",
         epilog=(
-            "Usage example: python perturbator.py structs.cif -p sites a b angles -b 0.05 0.1 0.1 2.0."
+            "Usage example: python perturbator.py structs.cif -p sites a b angles -b 0.05 0.1 0.1 2.0\n"
             "This set will perturb randomly:\n"
             "- sites positions from 0 to 0.05 angstroms from their original positions,\n"
             "- length of lattice vector 'a' from 0 to 0.1 angstroms from its original value,\n"
             "- length of lattice vector 'b' from 0 to 0.1 angstroms from its original value,\n"
             "- value of all lattice angles from 0 to 2.0 degrees from their original values.\n"
-        )
+        ),
+        formatter_class=argparse.RawTextHelpFormatter
     )
 
     parser.add_argument(
         "input_file",
         type=str,
-        help="Path to the CIF file containing reference structures."
+        help="Path to the CIF file containing reference structures.\n"
     )
     parser.add_argument(
         "-o","--output",
         type=str,
         default=None,
         help=(
-            "Path to the output CIF file to write perturbed structures."
-            "By default, it is written at the same path as the input file with a '_perturb' suffix in name."
+            "Path to the output CIF file to write perturbed structures.\n"
+            "By default, it is written at the same path as the input file with a '_perturb' suffix in name.\n"
         )
     )
     parser.add_argument(
         "-p", "--parameters",
         nargs="*",
         type=str,
-        default="sites",
+        default=("sites",),
         help=(
             "Defines which parameters will be perturbed. Supported args are listed below:\n"
             "- 'sites': perturbs sites positions in lattice (in angstroms).\n"
@@ -104,10 +105,10 @@ def main() -> None:
             "- 'angles': perturbs all lattice angles in degrees (alpha, beta, gamma) with same limit amplitudes.\n"
             "- 'a', 'b', 'c': perturbs corresponding lattice vector length in angstroms.\n"
             "- 'alpha', 'beta', 'gamma': perturbs corresponding lattice angle in degrees.\n"
-            "Several args can be given at once in any order, they will be combined to perturb specific sets of parameters "
-            "(e.g. '-p sites a b alpha' will perturb sites positions, a, b and alpha lattice parameters)."
-            "If some parameters are overlapping, an error is raised."
-            "By default, only sites will be perturbed and lattice will remain untouched."
+            "Several args can be given at once in any order, they will be combined to perturb specific sets of parameters\n"
+            "(e.g. '-p sites a b alpha' will perturb sites positions, a, b and alpha lattice parameters).\n"
+            "If some parameters are overlapping, an error is raised.\n"
+            "By default, only sites will be perturbed and lattice will remain untouched.\n"
         )
     )
     parser.add_argument(
@@ -116,10 +117,10 @@ def main() -> None:
         type=float,
         default=None,
         help=(
-            "Defines the minimal amplitude of applied perturbations "
-            "(in angstroms for sites positions and lattice vectors, in degrees for lattice angles)."
-            "Each given value is assigned to parameters in the order given in --parameters."
-            "By default, it is set to 0.0 angstrom or 0.0 degree for all given parameters."
+            "Defines the minimal amplitude of applied perturbations\n"
+            "(in angstroms for sites positions and lattice vectors, in degrees for lattice angles).\n"
+            "Each given value is assigned to parameters in the order given in --parameters.\n"
+            "By default, it is set to 0.0 angstrom or 0.0 degree for all given parameters.\n"
         )
     )
     parser.add_argument(
@@ -128,23 +129,23 @@ def main() -> None:
         type=float,
         default=None,
         help=(
-            "Defines the maximal amplitude of applied perturbations "
-            "(in angstroms for sites positions and lattice vectors, in degrees for lattice angles)."
-            "Each given value is assigned to parameters in the order given in --parameters."
-            "By default, it is set to 0.1 angstrom or 1.0 degree for all given parameters."
+            "Defines the maximal amplitude of applied perturbations\n"
+            "(in angstroms for sites positions and lattice vectors, in degrees for lattice angles).\n"
+            "Each given value is assigned to parameters in the order given in --parameters.\n"
+            "By default, it is set to 0.1 angstrom or 1.0 degree for all given parameters.\n"
         )
     )
     parser.add_argument(
         "-n", "--sample-size",
         type=int,
         default=1,
-        help="Number of randomly perturbed structures to generate for each input structure."
+        help="Number of randomly perturbed structures to generate for each input structure.\n"
     )
     parser.add_argument(
         "-w", "--workers",
         type=int,
         default=1,
-        help="Number of parallel processes to spawn for parallelized steps.",
+        help="Number of parallel processes to spawn for parallelized steps.\n",
         metavar="int",
     )
 
