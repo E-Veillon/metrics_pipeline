@@ -9,6 +9,7 @@ The relaxation results then may be used in other scripts for material properties
 # SYSTEM I/O MODULES
 
 import os
+from monty.os import cd
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
@@ -117,7 +118,7 @@ def main():
         default='./',
         help='''Path to the output directory where VASP files will be written.
                 A subdirectory will be created in output directory
-                for each structure found in file.cif.''', 
+                for each structure found in input_file.''', 
         metavar='outdir'
     )
     parser.add_argument(
@@ -220,9 +221,14 @@ def main():
             user_corrections=user_settings
         )
 
-        vasp_launcher(vasp_exe=exe_path, vasp_input=vasp_input, path=os.path.join(outdir, dir_name))
+        #vasp_launcher(vasp_exe=exe_path, vasp_input=vasp_input, path=os.path.join(outdir, dir_name))
+        run_dir = os.path.join(outdir, dir_name)
+        os.makedirs(run_dir, exist_ok=True)
+        vasp_input.write_input(output_dir=run_dir)
+        with cd(run_dir):
+            os.system(f"{exe_path}")
     
-    else: raise AssertionError('"task_index" arg must be positive or zero.')
+    else: raise ValueError('"task_index" arg must be positive or zero.')
 
     stop = datetime.now()
     print(f'Elapsed time: {stop-start}')

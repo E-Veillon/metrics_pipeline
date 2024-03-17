@@ -245,7 +245,10 @@ def main():
 
     os.makedirs(calc_dir, exist_ok=True)
 
-    vasp_launcher(vasp_exe=exe_path, path=calc_dir, vasp_input=input_data)
+    #vasp_launcher(vasp_exe=exe_path, path=calc_dir, vasp_input=input_data)
+    vasp_input.write_input(output_dir=run_dir)
+    with cd(run_dir):
+        os.system(f"{exe_path}")
 
     stop = datetime.now()
     print(f"elapsed time: {stop-start}")
