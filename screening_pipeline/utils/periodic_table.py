@@ -122,7 +122,7 @@ def discard_rare_earth_structures(
     return kept_structs, nbr_discarded
 
 def get_elements(
-        elts_data: Union[str, Iterable[str|int|Element]]
+        elts_data: Union[str, Sequence[Union[str,int,Element]]]
     ) -> List[Element]:
     '''
     Flexible converter to get a list of unique Element objects from a single string or any 
@@ -260,7 +260,7 @@ def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
     grps_list = list(map(get_element_group, elts_list))
     return grps_list
 
-def get_element_valence_electrons(atom: str|Element) -> int:
+def get_element_valence_electrons(atom: Union[str,Element]) -> int:
     '''
     Gets the number of valence electrons of an element according to its group.
 
