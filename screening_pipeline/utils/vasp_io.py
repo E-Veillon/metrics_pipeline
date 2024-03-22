@@ -423,8 +423,7 @@ def _RelaxSet_init(
     potcar_corrections = corrections.get("POTCAR", {})
     potcar_functional_correction = corrections.get("POTCAR_FUNCTIONAL", {})
 
-    match preset:
-        case "MITRelaxSet":
+    if preset == "MITRelaxSet":
             return MITRelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
@@ -432,7 +431,7 @@ def _RelaxSet_init(
                 user_potcar_settings=potcar_corrections,
                 user_potcar_functional=potcar_functional_correction,
             )
-        case "MPRelaxSet":
+    if preset == "MPRelaxSet":
             return MPRelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
@@ -440,7 +439,7 @@ def _RelaxSet_init(
                 user_potcar_settings=potcar_corrections,
                 user_potcar_functional=potcar_functional_correction,
             )
-        case "MPScanRelaxSet":
+    if preset == "MPScanRelaxSet":
             return MPScanRelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
@@ -448,7 +447,7 @@ def _RelaxSet_init(
                 user_potcar_settings=potcar_corrections,
                 user_potcar_functional=potcar_functional_correction,
             )
-        case "MPHSERelaxSet":
+    if preset == "MPHSERelaxSet":
             return MPHSERelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
@@ -456,7 +455,7 @@ def _RelaxSet_init(
                 user_potcar_settings=potcar_corrections,
                 user_potcar_functional=potcar_functional_correction,
             )
-        case "MPMetalRelaxSet":
+    if preset == "MPMetalRelaxSet":
             return MPMetalRelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
@@ -464,7 +463,7 @@ def _RelaxSet_init(
                 user_potcar_settings=potcar_corrections,
                 user_potcar_functional=potcar_functional_correction,
             )
-        case "MVLRelax52Set":
+    if preset == "MVLRelax52Set":
             return MVLRelax52Set(
                 structure=structure,
                 user_incar_settings=incar_corrections,
@@ -472,7 +471,7 @@ def _RelaxSet_init(
                 user_potcar_settings=potcar_corrections,
                 user_potcar_functional=potcar_functional_correction,
             )
-        case "MVLScanRelaxSet":
+    if preset == "MVLScanRelaxSet":
             return MVLScanRelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
@@ -480,12 +479,12 @@ def _RelaxSet_init(
                 user_potcar_settings=potcar_corrections,
                 user_potcar_functional=potcar_functional_correction,
             )
-        case str():
-            raise ValueError(f"Provided string is not a valid preset name ({preset}).")
-        case _:
-            raise TypeError(
-                f'"preset" arg expected a str type, got {type(preset)} instead.'
-            )
+    elif isinstance(preset, str):
+        raise ValueError(f"Provided string is not a valid preset name ({preset}).")
+    else:
+        raise TypeError(
+            f'"preset" arg expected a str type, got {type(preset)} instead.'
+        )
 
 
 ########################################
@@ -510,8 +509,7 @@ def _StaticSet_init(
         dir_path = Path(struct_or_path)
         assert dir_path.is_dir()
 
-        match preset:
-            case "MPStaticSet":
+        if preset == "MPStaticSet":
                 return MPStaticSet.from_prev_calc(
                     prev_calc_dir=dir_path,
                     user_incar_settings=incar_corrections,
@@ -519,7 +517,7 @@ def _StaticSet_init(
                     user_potcar_settings=potcar_corrections,
                     user_potcar_functional=potcar_functional_correction,
                 )
-            case "MatPESStaticSet":
+        if preset == "MatPESStaticSet":
                 return MatPESStaticSet.from_prev_calc(
                     prev_calc_dir=dir_path,
                     user_incar_settings=incar_corrections,
@@ -527,7 +525,7 @@ def _StaticSet_init(
                     user_potcar_settings=potcar_corrections,
                     user_potcar_functional=potcar_functional_correction,
                 )
-            case "MPScanStaticSet":
+        if preset == "MPScanStaticSet":
                 return MPScanStaticSet.from_prev_calc(
                     prev_calc_dir=dir_path,
                     user_incar_settings=incar_corrections,
@@ -535,17 +533,16 @@ def _StaticSet_init(
                     user_potcar_settings=potcar_corrections,
                     user_potcar_functional=potcar_functional_correction,
                 )
-            case str():
-                raise ValueError(
-                    f"Provided string is not a valid preset name ({preset})."
-                )
-            case _:
-                raise TypeError(
-                    f'"preset" arg expected a str type, got {type(preset)} instead.'
-                )
+        elif isinstance(preset, str):
+            raise ValueError(
+                f"Provided string is not a valid preset name ({preset})."
+            )
+        else:
+            raise TypeError(
+                f'"preset" arg expected a str type, got {type(preset)} instead.'
+            )
 
-    match preset:
-        case "MPStaticSet":
+    if preset == "MPStaticSet":
             return MPStaticSet(
                 structure=struct_or_path,
                 user_incar_settings=incar_corrections,
@@ -553,7 +550,7 @@ def _StaticSet_init(
                 user_potcar_settings=potcar_corrections,
                 user_potcar_functional=potcar_functional_correction,
             )
-        case "MatPESStaticSet":
+    if preset == "MatPESStaticSet":
             return MatPESStaticSet(
                 structure=struct_or_path,
                 user_incar_settings=incar_corrections,
@@ -561,7 +558,7 @@ def _StaticSet_init(
                 user_potcar_settings=potcar_corrections,
                 user_potcar_functional=potcar_functional_correction,
             )
-        case "MPScanStaticSet":
+    if preset == "MPScanStaticSet":
             return MPScanStaticSet(
                 structure=struct_or_path,
                 user_incar_settings=incar_corrections,
@@ -569,12 +566,12 @@ def _StaticSet_init(
                 user_potcar_settings=potcar_corrections,
                 user_potcar_functional=potcar_functional_correction,
             )
-        case str():
-            raise ValueError(f"Provided string is not a valid preset name ({preset}).")
-        case _:
-            raise TypeError(
-                f'"preset" arg expected a str type, got {type(preset)} instead.'
-            )
+    elif isinstance(preset, str):
+        raise ValueError(f"Provided string is not a valid preset name ({preset}).")
+    else:
+        raise TypeError(
+            f'"preset" arg expected a str type, got {type(preset)} instead.'
+        )
 
 
 ########################################
@@ -942,24 +939,23 @@ def batch_extract_vasp_data(
     def is_struct_dir(path: Path) -> bool:
         return path.is_dir() and re.match(r'\A[0-9]+_[A-Za-z0-9\(\)]+\Z', path.name) is not None
 
-    match method:
-        case "convex_hull":
-            set_vasp_extractor = partial(
-                extract_vasp_data_for_convex_hull, ignore_file=ignore_file, path_to_summary=path_to_summary
-            )
-        case "delta_sol_init":
-            set_vasp_extractor = partial(
-                extract_vasp_data_for_delta_sol_init, ignore_file=ignore_file, path_to_summary=path_to_summary
-            )
-        case "delta_sol_calc":
-            set_vasp_extractor = partial(
-                extract_vasp_data_for_delta_sol_calc, ignore_file=ignore_file, path_to_summary=path_to_summary
-            )
-        case _:
-            raise NotImplementedError(
-                f"Provided method ({method}) is not supported.\n"
-                "Supported methods are: 'convex_hull', 'delta_sol_init', 'delta_sol_calc'."
-            )
+    if method == "convex_hull":
+        set_vasp_extractor = partial(
+            extract_vasp_data_for_convex_hull, ignore_file=ignore_file, path_to_summary=path_to_summary
+        )
+    elif method == "delta_sol_init":
+        set_vasp_extractor = partial(
+            extract_vasp_data_for_delta_sol_init, ignore_file=ignore_file, path_to_summary=path_to_summary
+        )
+    elif "delta_sol_calc":
+        set_vasp_extractor = partial(
+            extract_vasp_data_for_delta_sol_calc, ignore_file=ignore_file, path_to_summary=path_to_summary
+        )
+    else:
+        raise NotImplementedError(
+            f"Provided method ({method}) is not supported.\n"
+            "Supported methods are: 'convex_hull', 'delta_sol_init', 'delta_sol_calc'."
+        )
 
     base_dir           = Path(base_dir)
     structs_dir_list   = list(filter(is_struct_dir, base_dir.iterdir()))
@@ -1172,13 +1168,12 @@ def delta_sol_inputs_init(
 
 
 def _match_calc_index(calc_index: int) -> Union[str, None]:
-    match calc_index:
-        case 0: return None
-        case 1|2: return "BEST"
-        case 3|4: return "MIN"
-        case 5|6: return "MAX"
-        case int(): raise ValueError("calc_index must be between 0 and 6 included.")
-        case _: raise TypeError(f"Expected 'int' type, got '{type(calc_index)}' type instead")
+    if calc_index == 0: return None
+    if calc_index == 1 or calc_index == 2: return "BEST"
+    if calc_index == 3 or calc_index == 4: return "MIN"
+    if calc_index == 5 or calc_index == 6: return "MAX"
+    if isinstance(calc_index, int): raise ValueError("calc_index must be between 0 and 6 included.")
+    else: raise TypeError(f"Expected 'int' type, got '{type(calc_index)}' type instead")
 
 
 ########################################

@@ -61,14 +61,15 @@ def assert_args(args: Namespace) -> None:
     )
 
 def calc_idx_to_dir_name(calc_index: int) -> str:
-    match calc_index:
-        case 0: return "_neutral"
-        case 1: return "_best_plus"
-        case 2: return "_best_minus"
-        case 3: return "_min_plus"
-        case 4: return "_min_minus"
-        case 5: return "_max_plus"
-        case 6: return "_max_minus"
+    assert isinstance(calc_index, int), f"Expected 'int' type, got '{type(calc_index)}' instead."
+    if calc_index == 0: return "_neutral"
+    if calc_index == 1: return "_best_plus"
+    if calc_index == 2: return "_best_minus"
+    if calc_index == 3: return "_min_plus"
+    if calc_index == 4: return "_min_minus"
+    if calc_index == 5: return "_max_plus"
+    if calc_index == 6: return "_max_minus"
+    else: raise ValueError(f"Only int from 0 to 6 supported, got {calc_index}")
 
 ########################################
 # MAIN FUNCTION
