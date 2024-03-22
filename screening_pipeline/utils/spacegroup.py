@@ -11,6 +11,7 @@ from typing import List
 ########################################
 # OPTIMIZATION MODULES
 
+import warnings
 from tqdm.contrib.concurrent import process_map
 
 ########################################
@@ -26,6 +27,10 @@ from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stde
 
 ########################################
 # LOCAL FUNCTIONS
+
+class SymmNotFoundWarning(UserWarning):
+    """Warning for symmetry searching returning None."""
+
 
 def _retry_get_symmetrized_structure(
         structure: Structure,
@@ -119,12 +124,17 @@ def structure_symmetrizer(
             spglib_result = struct_analyzer.get_symmetry_dataset()
 
             if spglib_result is None:
-
-                return _retry_get_symmetrized_structure(
-                    structure=structure, 
-                    symprec=symprec, 
-                    angle_tolerance=angle_tolerance
+                warnings.warn(
+                        "spglib could not find any symmetry group for this structure, "
+                        "maybe it contains some too short interatomic distances.",
+                        SymmNotFoundWarning
                 )
+                return structure
+                    #_retry_get_symmetrized_structure(
+                    #structure=structure, 
+                    #symprec=symprec, 
+                    #angle_tolerance=angle_tolerance
+                    #)
 
             raise exc
 

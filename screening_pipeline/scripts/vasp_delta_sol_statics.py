@@ -8,6 +8,7 @@ Parses previous VASP data and launches Δ-Sol static calculations for structures
 
 import os
 import sys
+from monty.os import cd
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
@@ -246,8 +247,8 @@ def main():
     os.makedirs(calc_dir, exist_ok=True)
 
     #vasp_launcher(vasp_exe=exe_path, path=calc_dir, vasp_input=input_data)
-    vasp_input.write_input(output_dir=run_dir)
-    with cd(run_dir):
+    input_data.write_input(output_dir=calc_dir)
+    with cd(calc_dir):
         os.system(f"{exe_path}")
 
     stop = datetime.now()
