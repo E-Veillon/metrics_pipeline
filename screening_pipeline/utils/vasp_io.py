@@ -37,7 +37,7 @@ from pymatgen.io.vasp.sets import (
 # LOCAL MODULES
 
 from screening_pipeline.utils.utils import is_float
-from screening_pipeline.utils.typing import (
+from screening_pipeline.utils.custom_types import (
     PathLike,
     PMGRelaxSetType,
     PMGStaticSetType,

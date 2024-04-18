@@ -28,7 +28,7 @@ from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 # LOCAL MODULES
 
 from screening_pipeline.utils.utils import flatten
-from screening_pipeline.utils.typing import PathLike, FormulaLike
+from screening_pipeline.utils.custom_types import PathLike, FormulaLike
 from screening_pipeline.utils.matcher import group_by_stoichiometry
 from screening_pipeline.utils.periodic_table import get_elements, get_delta_sol_el_ratio
 

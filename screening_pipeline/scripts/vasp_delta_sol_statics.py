@@ -20,7 +20,7 @@ from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 # LOCAL MODULES
 
 from screening_pipeline.utils.utils import _yaml_loader
-from screening_pipeline.utils.typing import PMGStaticSet
+from screening_pipeline.utils.custom_types import PMGStaticSet
 from screening_pipeline.utils.vasp_io import (
     extract_vasp_data_for_delta_sol_init, delta_sol_calculation_init, vasp_launcher
 )

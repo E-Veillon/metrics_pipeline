@@ -28,7 +28,7 @@ from pymatgen.core.structure import SiteCollection
 # LOCAL MODULES
 
 from screening_pipeline.utils.utils import _yaml_loader
-from screening_pipeline.utils.typing import PMGRelaxSet
+from screening_pipeline.utils.custom_types import PMGRelaxSet
 from screening_pipeline.utils.cif_io import read_cif
 from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_batch_launch, vasp_launcher
 
