@@ -52,7 +52,7 @@ def _retry_get_symmetrized_structure(
 
     Returns:
         A Pymatgen SymmetrizedStructure object if symmetry detection worked properly,
-        or a Structure object with default P1 spacegroup if it could not detect any.
+        or the original Structure object if it could not detect any symmetry.
     '''
     for precision_factor in [2, 3, 5, 10]:
 
@@ -102,8 +102,7 @@ def structure_symmetrizer(
 
     Returns:
         A Pymatgen SymmetrizedStructure object if symmetry detection worked properly,
-        the original Structure object if it could not detect any symmetry, 
-        or None if distance checking is enabled and triggered.
+        or the original Structure object if it could not detect any symmetry.
     '''
 
     assert isinstance(structure, Structure)

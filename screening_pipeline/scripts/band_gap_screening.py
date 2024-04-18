@@ -22,7 +22,7 @@ from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 # LOCAL MODULES
 
 from screening_pipeline.utils.utils import _yaml_loader
-from screening_pipeline.utils.typing import PMGStaticSet
+from screening_pipeline.utils.custom_types import PMGStaticSet
 from screening_pipeline.utils.vasp_io import vasp_batch_launch, vasp_launcher, batch_extract_vasp_data, \
                                              delta_sol_inputs_init
 from screening_pipeline.utils.data_process import batch_calculate_delta_sol_band_gaps
