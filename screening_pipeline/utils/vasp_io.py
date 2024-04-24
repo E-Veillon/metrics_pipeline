@@ -297,7 +297,7 @@ def vasp_launcher(vasp_exe: PathLike, path: PathLike, vasp_input: VaspInput) -> 
         vasp_input (VaspInput): The VaspInput object containing all necessary data to run VASP.
     '''
     assert isinstance(vasp_exe, (Path, str))
-    assert isinstance(path, PathLike)
+    assert isinstance(path, (Path, str))
     assert isinstance(vasp_input, VaspInput)
     assert vasp_input.get('INCAR') is not None, \
     f'vasp_launcher: There is no INCAR defined in the input !'
@@ -371,7 +371,7 @@ def vasp_batch_launch(
     base_dir = Path(base_dir)
 
     assert base_dir.is_dir()
-    assert all(isinstance(subdir_name, PathLike) for subdir_name in inputs_data.keys())
+    assert all(isinstance(subdir_name, (Path, str)) for subdir_name in inputs_data.keys())
     #assert len(vasp_inputs) == len(subdir_names)
     assert isinstance(workers, int) and workers >= 1
 
@@ -662,9 +662,9 @@ def vasp_static_settings(
     It must be one of the allowed pymatgen static presets:\n\
     {PMGStaticSet}.'
 
-    assert (
-        isinstance(user_corrections, dict) or user_corrections is None
-    ), "user_corrections must be a dict or None"
+    assert isinstance(user_corrections, dict) or user_corrections is None, (
+        "user_corrections must be a dict or None"
+    )
 
     if not from_prev_calc:
         vasp_input = _StaticSet_init(
@@ -674,9 +674,9 @@ def vasp_static_settings(
         ).get_input_set()
     
     else:
-        assert isinstance(
-            prev_calc_dir, PathLike
-        ), "from_prev_calc was set to True, prev_calc_dir must be provided as str or Path object."
+        assert isinstance(prev_calc_dir, (Path, str)), (
+            "'from_prev_calc' was set to True, prev_calc_dir must be provided as 'str' or 'Path' type."
+        )
 
         prev_calc_dir = Path(prev_calc_dir)
 
@@ -757,7 +757,7 @@ def extract_vasp_data_for_convex_hull(
                                     - structure final energy (in eV).
     """
 
-    assert isinstance(struct_dir, PathLike)
+    assert isinstance(struct_dir, (Path, str))
     assert Path(struct_dir).is_dir()
 
     struct_dir: Path = Path(struct_dir)
@@ -815,8 +815,12 @@ def extract_vasp_data_for_delta_sol_init(
                                     - its final energy (in eV).
     """
 
-    assert isinstance(struct_dir, PathLike)
-    assert os.path.isdir(str(struct_dir))
+    assert isinstance(struct_dir, (Path, str)), (
+        TypeError(f"'struct_dir' argument expected 'Path' or 'str' type, got '{type(struct_dir)}' instead.")
+    )
+    assert os.path.isdir(str(struct_dir)), (
+        ValueError(f"{struct_dir}: No such directory found.")
+    )
 
     struct_dir: Path = Path(struct_dir)
 
@@ -853,7 +857,7 @@ def extract_vasp_data_for_delta_sol_calc(
     path_to_summary: Optional[PathLike] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
     """"""
-    assert isinstance(struct_dir, PathLike)
+    assert isinstance(struct_dir, (Path, str))
     assert os.path.isdir(str(struct_dir))
 
     calc_dirs   = list(filter(lambda path: path.is_dir(), Path(struct_dir).iterdir()))
@@ -930,10 +934,10 @@ def batch_extract_vasp_data(
                                     - final energy of the relaxation in eV, used as E(N0).
     """
 
-    assert isinstance(base_dir, PathLike)
+    assert isinstance(base_dir, (Path, str))
     assert os.path.isdir(str(base_dir))
     assert isinstance(ignore_file, str) or ignore_file is None
-    assert isinstance(path_to_summary, PathLike) or path_to_summary is None
+    assert isinstance(path_to_summary, (Path, str)) or path_to_summary is None
     assert isinstance(workers, int) and workers >= 1
 
     def is_struct_dir(path: Path) -> bool:
@@ -995,7 +999,7 @@ def vasp_output_structure(struct_dir: str) -> Structure:
         The output structure.
     """
 
-    assert isinstance(struct_dir, PathLike)
+    assert isinstance(struct_dir, (Path, str))
     assert Path(struct_dir).is_dir()
 
     contcar_path = os.path.join(struct_dir, "CONTCAR")
