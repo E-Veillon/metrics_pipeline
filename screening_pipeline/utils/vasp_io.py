@@ -1009,6 +1009,9 @@ def vasp_output_structure(struct_dir: str) -> Structure:
     vasprun = Vasprun(vasprun_path)
 
     if vasprun.converged:
+        # TODO: Condition probablement insuffisante, ne semble pas tenir compte des arrêts sur erreur ou timeout.
+        # TODO: Vérifier que l'exception ET.ParseError de Vasprun capture toutes ces possibilités et soit capturée 
+        # TODO: ici pour retourner la valeur par défaut également dans ces situations.
         in_struct = Poscar.from_file(poscar_path).structure
         out_struct = Poscar.from_file(contcar_path).structure
 
