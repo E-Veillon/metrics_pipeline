@@ -23,9 +23,10 @@ from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
 from screening_pipeline.utils.utils import _yaml_loader
 from screening_pipeline.utils.typing import PMGStaticSet
-from screening_pipeline.utils.vasp_io import vasp_batch_launch, vasp_launcher, batch_extract_vasp_data, \
-                                             delta_sol_inputs_init
-from screening_pipeline.utils.data_process import batch_calculate_delta_sol_band_gaps
+from screening_pipeline.utils.vasp_io import (
+    vasp_launcher, batch_extract_vasp_data, 
+    delta_sol_inputs_init, delta_sol_calculation_init
+)
 
 ########################################
 # LOCAL FUNCTIONS
@@ -51,10 +52,10 @@ def assert_args(args: Namespace) -> None:
     assert args.user_settings.endswith('.yaml'), \
     'user settings file must be of .yaml format.'
 
-    assert args.minimum >= 0.0 and args.maximum >= 0.0, \
+    assert args.mini_maxi[0] >= 0.0 and args.mini_maxi[1] >= 0.0, \
     f"Acceptable band gap values must be positive or zero."
 
-    assert args.minimum != args.maximum, \
+    assert args.mini_maxi[0] != args.mini_maxi[1], \
     f"Acceptable band gap values cannot have the same value."
 
     assert args.accept.endswith('.txt'), \
@@ -144,25 +145,18 @@ def main():
     )
     parser.add_argument(
         '-m',
-        '--minimum',
+        '--mini-maxi',
+        nargs=2,
         type=float,
-        default=1.3,
-        help='''Minimum acceptable band gap value in eV. Defaults to 1.3 eV.''', 
-        metavar='float'
-    )
-    parser.add_argument(
-        '-M',
-        '--maximum',
-        type=float,
-        default=3.6,
-        help='''Maximum acceptable band gap value in eV. Defaults to 3.6 eV.''', 
-        metavar='float'
+        default=[1.3, 3.6],
+        help='''Acceptable interval of band gap values in eV (Defaults: %(default)s eV).''', 
+        metavar='float float'
     )
     parser.add_argument(
         '-a', 
         '--accept', 
         type=str, 
-        default='band_gap_passed.txt', 
+        default=None, 
         help='''Defines a file whose presence in a structure directory means it passed this
         screening step successfully and can be kept for further calculations.''',  
         metavar='accept_file.txt'
@@ -171,7 +165,7 @@ def main():
         '-i', 
         '--ignore', 
         type=str, 
-        default='rejected.txt', 
+        default=None, 
         help='''Defines a file whose presence in a structure directory means it did not pass
         previous screening steps and should not be used in this calculation. 
         This file will also be written in structure directories that did not pass this step.
@@ -179,6 +173,15 @@ def main():
         If the name of this file is overwritten, care must be taken that it is the same file
         throughout every used screening steps to make sure rejected structures don't go further.''', 
         metavar='ignore_file.txt'
+    )
+    parser.add_argument(
+        "-s",
+        "--summary",
+        default="summary.json",
+        help=(
+            "Output file indicating calculation results for this step (json format).\n"
+            "Also used by further steps to filter out structures that were rejected in previous steps."
+        ),
     )
     parser.add_argument(
         '-w',
@@ -190,13 +193,13 @@ def main():
     )
     parser.add_argument(
         '-t', 
-        '--task_index', 
+        '--task-index', 
         type=int, 
         help='If a job array is used, provide here the structure index to treat according to task IDs\n \
             (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).'
     )
     parser.add_argument(
-        '--with_uncertainties', 
+        '--with-uncertainties', 
         action='store_true', 
         help='Pass this flag to enable computation of minimal and maximal Δ-Sol band gaps.\n\
               This will need one full VASP static total energy computation for each limit.'
@@ -211,11 +214,11 @@ def main():
     outdir         = args.output
     preset         = args.preset
     user_settings  = _yaml_loader(args.user_settings, on_error='raise')
-    valid_interval = sorted([args.minimum, args.maximum])
+    valid_interval = sorted(args.mini_maxi)
     accept_file    = args.accept
     ignore_file    = args.ignore
+    summary_file   = args.summary
     workers        = args.workers
-    struct_idx     = args.task_index if args.task_index is not None else 0
 
 
     # MAIN BLOCK
@@ -225,28 +228,48 @@ def main():
         method='delta_sol', 
         base_dir=input_dir, 
         ignore_file=ignore_file, 
+        path_to_summary=summary_file, 
         workers=workers
     )
 
-    try: struct_name = next(filter(
-        lambda key: key.startswith(f'{struct_idx}_'), 
-        structs_data.keys()
-        ))
-    except StopIteration:
-        raise ValueError(f'Provided "task_index" arg is out of the range of indexed structures.')
+    if 'task_index' in args: # Initialize input and run VASP on it
+        task_index       = args.task_index
+        tasks_per_struct = 7 if args.with_uncertainties else 3
+        struct_idx       = task_index // tasks_per_struct
+        calc_idx         = task_index % tasks_per_struct
+
+        try:
+            struct_name = next(filter(
+                lambda key: key.startswith(f'{struct_idx}_'), 
+                structs_data.keys()
+            ))
+        except StopIteration:
+            raise ValueError(
+                "Provided 'task_index' arg is out of the range of indexed structures, "
+                "or the corresponding structure is already rejected."
+            )
     
-    structs_data = {struct_name: structs_data.get(struct_name)}
+        input_data = delta_sol_calculation_init(
+            structure=structs_data[struct_name].get('structure'), 
+            calc_index=calc_idx, 
+            preset=preset, 
+            user_corrections=user_settings
+        )
+        vasp_launcher(vasp_exe=exe_path, path=outdir, vasp_input=input_data)
 
-    inputs_data = delta_sol_inputs_init(
-        structs_data=structs_data, 
-        preset=preset, 
-        user_corrections=user_settings or None, 
-        with_uncertainties=args.with_uncertainties
-    )
+    elif not "task_index" in args: # Write inputs only
+        structs_data = {struct_name: structs_data.get(struct_name)}
 
-    for name, vasp_input in inputs_data.items():
-        run_dir = os.path.join(outdir, name)
-        vasp_input.write_input(output_dir=run_dir)
+        inputs_data = delta_sol_inputs_init(
+            structs_data=structs_data, 
+            preset=preset, 
+            user_corrections=user_settings or None, 
+            with_uncertainties=args.with_uncertainties
+        )
+
+        for name, vasp_input in inputs_data.items():
+            run_dir = os.path.join(outdir, name)
+            vasp_input.write_input(output_dir=run_dir)
 
     stop = datetime.now()
     print(f'elapsed time: {stop-start}')

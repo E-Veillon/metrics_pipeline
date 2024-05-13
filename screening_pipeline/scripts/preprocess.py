@@ -89,9 +89,9 @@ def main():
     )
 
     parser.add_argument(
-        'input-file',
+        'input_file',
         type=str,
-        help='Name or path to the CIF file containing structure data to process.'
+        help='Name or path to the CIF file containing structure data to process.',
     )
     parser.add_argument(
         '-o',
@@ -104,17 +104,20 @@ def main():
     parser.add_argument(
         '--no-rare-gas-check',
         action='store_true',
-        help='A flag to disable elimination of structures containing rare gas elements.'
+        help='A flag to disable elimination of structures containing rare gas elements.',
+        dest='no_rare_gas_check'
     )
     parser.add_argument(
         '--no-rare-earth-check',
         action='store_true',
-        help='A flag to disable elimination of structures containing f-block elements.'
+        help='A flag to disable elimination of structures containing f-block elements.',
+        dest='no_rare_earth_check'
     )
     parser.add_argument(
         '--no-dist-check', 
         action='store_true', 
-        help='A flag to disable structures interatomic distances checking.'
+        help='A flag to disable structures interatomic distances checking.',
+        dest='no_dist_check'
     )
     parser.add_argument(
         '-d', 
@@ -125,12 +128,13 @@ def main():
                 Structures containing atoms that are closer than this value will be discarded.
                 (Default: %(default)s Angstroms).''', 
         metavar='float', 
-        dest='valid_tol'
+        dest='dist_tolerance'
     )
     parser.add_argument(
         '--no-symmetrization', 
         action='store_true', 
-        help='A flag to disable search of structures symmetry space groups.'
+        help='A flag to disable search of structures symmetry space groups.',
+        dest='no_symmetrization'
     )
     parser.add_argument(
         '-s',
@@ -151,7 +155,8 @@ def main():
     parser.add_argument(
         '--no-equiv-match',
         action='store_true',
-        help='A flag to disable structure matching and elimination of duplicates.'
+        help='A flag to disable structure matching and elimination of duplicates.',
+        dest='no_equiv_match'
     )
     parser.add_argument(
         '-w',
@@ -226,8 +231,8 @@ def main():
             None, 
             batch_symmetrizer(
                 structures=structures,  
-                symprec=args.precision, 
-                angle_tolerance=args.angleprec, 
+                symprec=symprec, 
+                angle_tolerance=angleprec, 
                 workers=workers
             )
         ))

@@ -33,7 +33,7 @@ from .data_process import (
     calculate_delta_sol_band_gap,
     batch_calculate_delta_sol_band_gaps,
 )
-from .typing import PathLike, FormulaLike, PMGRelaxSetType, PMGStaticSetType
+from .custom_types import PathLike, FormulaLike, PMGRelaxSetType, PMGStaticSetType
 from .dataset import load_phase_diagram_entries
 
 __all__ = [

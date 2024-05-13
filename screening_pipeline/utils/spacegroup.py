@@ -6,11 +6,12 @@ Functions to find spacegroup symmetry on pymatgen Structure objects.
 ########################################
 # TYPE HINTING
 
-from typing import List
+from typing import List, Union
 
 ########################################
 # OPTIMIZATION MODULES
 
+import warnings
 from tqdm.contrib.concurrent import process_map
 
 ########################################
@@ -26,6 +27,10 @@ from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stde
 
 ########################################
 # LOCAL FUNCTIONS
+
+class SymmNotFoundWarning(UserWarning):
+    """Warning for symmetry searching returning None."""
+
 
 def _retry_get_symmetrized_structure(
         structure: Structure,
@@ -47,7 +52,7 @@ def _retry_get_symmetrized_structure(
 
     Returns:
         A Pymatgen SymmetrizedStructure object if symmetry detection worked properly,
-        or a Structure object with default P1 spacegroup if it could not detect any.
+        or the original Structure object if it could not detect any symmetry.
     '''
     for precision_factor in [2, 3, 5, 10]:
 
@@ -76,7 +81,7 @@ def structure_symmetrizer(
         structure: Structure,  
         symprec: float = 0.01, 
         angle_tolerance: float = 5.0
-    ) -> Structure | SymmetrizedStructure | None:
+    ) -> Union[Structure, SymmetrizedStructure, None]:
     '''
     Try to find spacegroup symmetry of a structure using spglib via pymatgen.
     If the first try does not work, it will retry several times with loosened tolerances.
@@ -97,8 +102,7 @@ def structure_symmetrizer(
 
     Returns:
         A Pymatgen SymmetrizedStructure object if symmetry detection worked properly,
-        the original Structure object if it could not detect any symmetry, 
-        or None if distance checking is enabled and triggered.
+        or the original Structure object if it could not detect any symmetry.
     '''
 
     assert isinstance(structure, Structure)
@@ -119,12 +123,17 @@ def structure_symmetrizer(
             spglib_result = struct_analyzer.get_symmetry_dataset()
 
             if spglib_result is None:
-
-                return _retry_get_symmetrized_structure(
-                    structure=structure, 
-                    symprec=symprec, 
-                    angle_tolerance=angle_tolerance
+                warnings.warn(
+                        "spglib could not find any symmetry group for this structure, "
+                        "maybe it contains some too short interatomic distances.",
+                        SymmNotFoundWarning
                 )
+                return structure
+                    #_retry_get_symmetrized_structure(
+                    #structure=structure, 
+                    #symprec=symprec, 
+                    #angle_tolerance=angle_tolerance
+                    #)
 
             raise exc
 
@@ -134,7 +143,6 @@ def structure_symmetrizer(
 
 def batch_symmetrizer(
         structures: List[Structure], 
-        valid_tol: float = 0.0, 
         symprec: float = 0.01, 
         angle_tolerance: float = 5.0, 
         workers: int = 1
@@ -144,11 +152,6 @@ def batch_symmetrizer(
 
     Parameters:
         structures (List[Structure]):   A list of all structures that need a symmetry analysis.
-
-        valid_tol (float):              Tolerance in relative atomic positions checking in Angstroms.
-                                        If a structure contains atoms that are closer than valid_tol, 
-                                        the function returns None for it. If valid_tol = 0.0, distance 
-                                        checking is disabled. Defaults to 0.0.
 
         symprec (float):                Initial position tolerance for symmetry detection in fractional coordinate.
                                         Defaults to 0.01, which works nicely in most cases.
@@ -171,7 +174,6 @@ def batch_symmetrizer(
     chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
     set_structure_symmetrizer = partial(
         structure_symmetrizer, 
-        valid_tol=valid_tol, 
         symprec=symprec, 
         angle_tolerance=angle_tolerance
     )

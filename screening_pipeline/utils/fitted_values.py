@@ -5,7 +5,7 @@ Global variables for storing experimental fits and values used in the pipeline.
 
 ########################################
 
-E_O2_FIT = 1 #TODO: Modify it when the calculation is done
+E_O2_FIT = -1,36 # eV per O2 in the formation reaction
 
 '''
 O2 Energy as fitted with Wang et al. method.
@@ -36,7 +36,7 @@ U_VALUES = {
     }}
 
 '''
-Values of the Hubbard U correction in GGA + U framework.
+Values of the Hubbard U correction used in GGA + U framework.
 
 Reference:
     A. Jain, G. Hautier, C.J. Moore, S.P. Ong, 
@@ -300,7 +300,8 @@ EL_PER_XC_VOL = {
 
 '''
 Values of N* (the number of electrons per exchange-correlation volume) 
-used by M.K.Y. Chan and G. Ceder in their presentation of Δ-Sol method.
+used by M.K.Y. Chan and G. Ceder to determine n the number of electrons 
+to add to or remove from the simulated structure in the Δ-Sol method.
 
 Reference:
     M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)

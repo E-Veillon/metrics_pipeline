@@ -9,6 +9,7 @@ The relaxation results then may be used in other scripts for material properties
 # SYSTEM I/O MODULES
 
 import os
+from monty.os import cd
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
@@ -27,7 +28,7 @@ from pymatgen.core.structure import SiteCollection
 # LOCAL MODULES
 
 from screening_pipeline.utils.utils import _yaml_loader
-from screening_pipeline.utils.typing import PMGRelaxSet
+from screening_pipeline.utils.custom_types import PMGRelaxSet
 from screening_pipeline.utils.cif_io import read_cif
 from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_batch_launch, vasp_launcher
 
@@ -36,39 +37,41 @@ from screening_pipeline.utils.vasp_io import vasp_relaxation_settings, vasp_batc
 
 def assert_args(args: Namespace) -> None:
     
-    assert os.path.exists(args.filename), \
+    assert os.path.exists(args.filename), (
     f'{args.filename}: path to input file not found.'
-    
-    assert os.path.isfile(args.filename), \
+    )
+    assert os.path.isfile(args.filename), (
     f'{args.filename} found but it is not a file.'
-
-    assert args.filename.endswith('.cif'), \
+    )
+    assert args.filename.endswith('.cif'), (
     'Input structure data must be in CIF format.'
-
-    assert os.path.exists(args.executable_path), \
+    )
+    assert args.executable_path.startswith("vasp") or os.path.exists(args.executable_path), (
     f'{args.executable_path}: executable file not found.'
-
-    assert os.path.exists(args.output), \
+    )
+    assert os.path.exists(args.output), (
     f'{args.output}: path to output directory not found.'
-
-    assert os.path.isdir(args.output), \
+    )
+    assert os.path.isdir(args.output), (
     f'{args.output} found but it is not a directory.'
-
-    assert args.preset in PMGRelaxSet, \
-    f'Provided relaxation preset must be one of the following:\n \
-    {PMGRelaxSet}'
-
-    assert os.path.isfile(args.user_settings), \
+    )
+    assert args.preset in PMGRelaxSet, (
+    'Provided relaxation preset must be one of the following:\n'
+    f'{PMGRelaxSet}'
+    )
+    assert os.path.isfile(args.user_settings), (
     f'{args.user_settings}: file not found.'
-
-    assert args.user_settings.endswith('.yaml'), \
+    )
+    assert args.user_settings.endswith('.yaml'), (
     'user settings file must be of .yaml format.'
-
-    assert args.workers >= 1, \
+    )
+    assert args.workers >= 1, (
     '"workers" arg must be strictly positive.'
-
-    assert args.task_index >= 0 or args.task_index is None, \
-    '"task_index" arg must be positive or zero.'
+    )
+    if args.task_index is not None:
+        assert args.task_index >= 0 or args.task_index is None, (
+        "'task_index' arg must be positive or zero."
+        )
 
 ########################################
 # MAIN FUNCTION
@@ -115,14 +118,14 @@ def main():
         default='./',
         help='''Path to the output directory where VASP files will be written.
                 A subdirectory will be created in output directory
-                for each structure found in file.cif.''', 
+                for each structure found in input_file.''', 
         metavar='outdir'
     )
     parser.add_argument(
         '-p', 
         '--preset', 
         type=str, 
-        default='MITRelaxSet', 
+        default='MPRelaxSet', 
         help='''The pymatgen preset to use for VASP relaxation.
                 More info on possible presets in pymatgen documentation:
                 https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets.''', 
@@ -218,9 +221,14 @@ def main():
             user_corrections=user_settings
         )
 
-        vasp_launcher(vasp_exe=exe_path, vasp_input=vasp_input, path=os.path.join(outdir, dir_name))
+        #vasp_launcher(vasp_exe=exe_path, vasp_input=vasp_input, path=os.path.join(outdir, dir_name))
+        run_dir = os.path.join(outdir, dir_name)
+        os.makedirs(run_dir, exist_ok=True)
+        vasp_input.write_input(output_dir=run_dir)
+        with cd(run_dir):
+            os.system(f"{exe_path}")
     
-    else: raise AssertionError('"task_index" arg must be positive or zero.')
+    else: raise ValueError('"task_index" arg must be positive or zero.')
 
     stop = datetime.now()
     print(f'Elapsed time: {stop-start}')

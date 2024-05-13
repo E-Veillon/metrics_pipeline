@@ -4,7 +4,7 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(
-        "A command line tool to calculate S.U.N. and RSMD metrics"
+        "A command line tool to calculate S.U.N. and RMSD metrics"
     )
 
     parser.add_argument(
@@ -35,6 +35,12 @@ def main():
         help="Number of parallel processes to spawn for parallelized steps.",
         metavar="int",
     )
+    parser.add_argument(
+        "-t",
+        "--threshold",
+        default=0.9,
+        type=float,
+    )
 
     args = parser.parse_args()
 
@@ -47,6 +53,15 @@ def main():
     from screening_pipeline.utils.vasp_io import batch_extract_vasp_structures
     from screening_pipeline.utils.cif_io import read_cif, extract_cif_from_file
     from screening_pipeline.utils.matcher import remove_equivalent
+    from screening_pipeline.utils.ml_vectors import vectors_from_alignn
+    from screening_pipeline.utils.distribution import (
+        recall,
+        precision,
+        frechet_distance,
+        wasserstein_distance,
+    )
+    from screening_pipeline.utils.density import get_densities
+    from screening_pipeline.utils.rmsd import rmsd_from_structures
 
     generated, _, _ = read_cif(
         args.generated, keep_rare_gases=True, keep_rare_earths=True
@@ -90,29 +105,44 @@ def main():
     num_novel_unique_stable = sum(map(lambda x: x["stable"], summary))
 
     # RMSD
-    rmsd_list = []
-    matcher = StructureMatcher()
-    for in_struct, out_struct in vasp_structures:
-        if in_struct is None or out_struct is None:
-            continue
+    in_structs = [s for s, _ in vasp_structures]
+    out_structs = [s for _, s in vasp_structures]
+    rmsd = np.mean(rmsd_from_structures(in_structs, out_structs))
 
-        rms = matcher.get_rms_dist(in_struct, out_struct)
+    # machine learning
+    latent_dataset = vectors_from_alignn(dataset,output="latent")
+    latent_gen = vectors_from_alignn(generated,output="latent")
 
-        if rms is not None:
-            normalize = (out_struct.volume / out_struct.num_sites) ** (
-                1 / 3
-            )  # denormalize
-            rmsd_list.append(rms[0] * normalize)
-    rmsd = float(np.mean(rmsd_list))
+    p = precision(latent_gen, latent_dataset, args.threshold)
+    r = recall(latent_gen, latent_dataset, args.threshold)
+    fd = frechet_distance(latent_gen, latent_dataset)
+
+    energy_dataset = vectors_from_alignn(dataset,output="energy")
+    energy_gen = vectors_from_alignn(generated,output="energy")
+    emd_energy = wasserstein_distance(energy_dataset,energy_gen)
+
+    densities_dataset=get_densities(dataset)
+    densities_generated=get_densities(generated)
+    emd_density = wasserstein_distance(densities_dataset,densities_generated)
+
 
     metrics = {
-        "num_generated": num_generated,
-        "num_unique": num_unique,
-        "num_novel": num_novel,
-        "num_novel_unique": num_novel_unique,
-        "num_novel_unique_stable": num_novel_unique_stable,
-        "SUN": num_novel_unique_stable / num_generated,
-        "RMSD": rmsd,
+        "dft": {
+            "num_generated": num_generated,
+            "num_unique": num_unique,
+            "num_novel": num_novel,
+            "num_novel_unique": num_novel_unique,
+            "num_novel_unique_stable": num_novel_unique_stable,
+            "SUN": num_novel_unique_stable / num_generated,
+            "RMSD": rmsd,
+        },
+        "ml": {
+            "precision": p,
+            "recall": r,
+            "frechet_distance": fd,
+            "EMD_energy":emd_energy,
+            "EMD_density":emd_density
+        },
     }
 
     with open(args.output, "w") as fp:

@@ -9,7 +9,7 @@ import itertools
 from ruamel.yaml import YAML
 import warnings
 
-from screening_pipeline.utils.typing import PathLike
+from screening_pipeline.utils.custom_types import PathLike
 
 class BadYamlWarning(UserWarning):
     '''Class of warnings related to .yaml files reading.'''

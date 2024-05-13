@@ -134,7 +134,7 @@ def struct_to_cif_str(
 
     # Extract symmetry infos from the SymmetrizedStructure object
     struct_spg          = structure.spacegroup
-    xyz_ops             = [op.as_xyz_string() for op in struct_spg]
+    xyz_ops             = [op.as_xyz_str() for op in struct_spg]
     equiv_sites         = structure.equivalent_sites
 
     # Get the ordering for species listing

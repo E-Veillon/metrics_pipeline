@@ -5,7 +5,7 @@ Functions to process raw calculation results from VASP and test actual eliminati
 ########################################
 # SYSTEM I/O MODULES
 
-from typing import Dict, Union, Sequence, Tuple, Any, List, Iterable, Optional
+from typing import Dict, Union, Sequence, Tuple, Any, List, Iterable, Optional, Literal
 from pathlib import Path
 
 ########################################
@@ -28,7 +28,7 @@ from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 # LOCAL MODULES
 
 from screening_pipeline.utils.utils import flatten
-from screening_pipeline.utils.typing import PathLike, FormulaLike
+from screening_pipeline.utils.custom_types import PathLike, FormulaLike
 from screening_pipeline.utils.matcher import group_by_stoichiometry
 from screening_pipeline.utils.periodic_table import get_elements, get_delta_sol_el_ratio
 
@@ -175,7 +175,7 @@ def init_entries_and_group_by_dim_and_comp(
     max_dim = max([len(entry.elements) for entry in entry_list])
     elements = get_elements_from_entries(entry_list)
 
-    elts_entries = [
+    entry_list += [
         PDEntry(
             composition=Composition(str(elt)),
             energy=0.0,
@@ -185,10 +185,7 @@ def init_entries_and_group_by_dim_and_comp(
         for elt in elements
     ]
 
-    groups.append(elts_entries)
-    # At this point, groups = [[], [Elements]]
-
-    for dim in range(2, max_dim + 1):
+    for dim in range(1, max_dim + 1):
         group = list(filter(lambda entry: len(entry.elements) == dim, entry_list))
         group = group_by_stoichiometry(group)
         groups.append(group)
@@ -219,7 +216,11 @@ def get_sub_entries(
     assert isinstance(entry_pool, Sequence)
     if not entry_pool:
         return []
-    assert all(isinstance(entry, PDEntry) for entry in entry_pool)
+    assert all(isinstance(entry, PDEntry) for entry in entry_pool), (
+        "Some of given entries in 'entry_pool' arguments are not instances of PDEntry class.\n"
+        "See below the set of types found in the argument:\n"
+        f"{[type(entry) for entry in entry_pool]}"
+    )
 
     sub_entries = list(
         filter(
@@ -320,15 +321,15 @@ def phase_diagram_init(
                                     initialized with energy = 0.0 eV. If some entries have
                                     elements not referenced in provided ref_elts, they
                                     will be ignored. This behaviour is particularly
-                                    useful if you need to initialize several diagrams from
+                                    useful if one needs to initialize several diagrams from
                                     different parts of the same entry dataset.
 
-        ref_elts (str|Iterable):    The  elemental references of the new phase diagram.
+        ref_elts (str|Sequence):    The  elemental references of the new phase diagram.
                                     If a single string is provided, it can either
                                     be a raw formula (eg. 'FePO4') or a composition
                                     string containing element symbols separated by
                                     '-' (eg. 'Fe-P-O').
-                                    If an iterable is given, it can contain valid
+                                    If a sequence is given, it can contain valid
                                     element symbols, atomic numbers and/or Element
                                     objects.
                                     If not provided, they are computed from given entries.
@@ -346,7 +347,7 @@ def phase_diagram_init(
         ref_elts = get_elements_from_entries(entries)
 
     else:
-        assert isinstance(ref_elts, Iterable)
+        assert isinstance(ref_elts, Sequence)
         ref_elts = get_elements(ref_elts)
         entries = _get_relevant_entries(entries, ref_elts)
 
@@ -395,11 +396,13 @@ def _calculate_instability_energies(
 
     entry_list = list(set(main_entries + sub_entries))
 
-    convex_hull = phase_diagram_init(entries=entry_list, ref_elts=ref_elts)
-
-    generated_entries = list(
-        filter(lambda entry: entry.attribute == "generated", convex_hull.all_entries)
+    diagram_entries = list(
+        filter(lambda entry: entry.attribute != "generated", entry_list)
     )
+    generated_entries = list(
+        filter(lambda entry: entry.attribute == "generated", entry_list)
+    )
+    convex_hull = phase_diagram_init(entries=diagram_entries, ref_elts=ref_elts)
 
     for entry in generated_entries:
         delta_H = convex_hull.get_e_above_hull(entry, allow_negative=True)
@@ -492,9 +495,10 @@ def batch_calculate_instability_energies(
     dim_groups = init_entries_and_group_by_dim_and_comp(
         structs_data, ref_structs=structs_ref
     )
-    entry_pool = dim_groups[1]
 
-    for dim_group in dim_groups[2:]:
+    entry_pool = dim_groups[0]
+
+    for dim_group in dim_groups[1:]:
         if dim_group == []:
             continue
 
@@ -529,92 +533,116 @@ def batch_calculate_instability_energies(
 # Functions related to Band Gap screening with Δ-Sol method.
 
 
-def calculate_delta_sol_band_gap(data: dict) -> Tuple[str, float]:
+def calculate_delta_sol_band_gap(data: dict) -> Union[Tuple[str, float], Tuple[str, float, float, float]]:
     """
     Calculate Δ-Sol band gap value of a structure, provided a dict containing all necessary data.
 
     Parameters:
-        data (dict): A dict containing following data about a structure:
-                        - Its name, 
+        data (dict): A dict containing at least following data about a structure:
+                        - Its name,
+                        - The DFT functional used for the calculation, 
                         - The Structure object, 
-                        - Its original relaxed total energy, 
-                        - Its total energy with more electrons, 
-                        - Its total energy with less electrons
+                        - Its total energy with N0 electrons, 
+                        - Its total energy with N0 + n(best) electrons, 
+                        - Its total energy with N0 - n(best) electrons.
+
+                     It can also contain data for uncertainty calculations:
+                        - Total energy with N0 + n(min) electrons,
+                        - Total energy with N0 - n(min) electrons,
+                        - Total energy with N0 + n(max) electrons,
+                        - Total energy with N0 - n(max) electrons.
+
     Returns:
-        Tuple[str, float]: The name of the structure and its band gap value.
+        The name of the structure and its band gap value(s).
     """
 
-    assert isinstance(data, dict)
-    assert len(data) == 5 or len(data) == 9
+    def has_str_key(dct: Dict, key: str) -> bool:
+        return dct.get(key) is not None
 
-    n_ratio = get_delta_sol_el_ratio(data['structure'])
+    data_keys = ("name","functional","structure","E_N0","E_N0_plus_n_best","E_N0_minus_n_best")
+    supp_keys = ("E_N0_plus_n_min","E_N0_minus_n_min","E_N0_plus_n_max","E_N0_minus_n_max")
+
+    assert isinstance(data, dict)
+    assert all([has_str_key(data, key) for key in data_keys])
+
+    n_ratio_best = get_delta_sol_el_ratio(data["structure"], dft_functional=data["functional"], n_star_type="BEST")
 
     # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap 
     # (Ref 32 in screening_pipeline/Bibliography))
-    E_band_gap = (data['E_N0_plus_n_best'] + data['E_N0_minus_n_best'] - 2*data['E_N0'])/n_ratio
+    E_band_gap = (data["E_N0_plus_n_best"] + data["E_N0_minus_n_best"] - 2*data["E_N0"])/n_ratio_best
 
-    if len(data) == 9: # data have uncertainty keys
-        E_band_gap_min = (data['E_N0_plus_n_min'] + data['E_N0_minus_n_min'] - 2*data['E_N0'])/n_ratio
-        E_band_gap_max = (data['E_N0_plus_n_max'] + data['E_N0_minus_n_max'] - 2*data['E_N0'])/n_ratio
-        return data['name'], E_band_gap, E_band_gap_min, E_band_gap_max
+    if not all([has_str_key(data, key) for key in supp_keys]): # data do not have uncertainty keys
+        return (data["name"], E_band_gap)
 
-    return data['name'], E_band_gap
+    n_ratio_min = get_delta_sol_el_ratio(data["structure"], dft_functional=data["functional"], n_star_type="MIN")
+    n_ratio_max = get_delta_sol_el_ratio(data["structure"], dft_functional=data["functional"], n_star_type="MAX")
+
+    E_band_gap_min = (data["E_N0_plus_n_min"] + data["E_N0_minus_n_min"] - 2*data["E_N0"])/n_ratio_min
+    E_band_gap_max = (data["E_N0_plus_n_max"] + data["E_N0_minus_n_max"] - 2*data["E_N0"])/n_ratio_max
+
+    return (data["name"], E_band_gap, E_band_gap_min, E_band_gap_max)
 
 
 ########################################
 
 
 def batch_calculate_delta_sol_band_gaps(
-        structs_data: dict, 
-        bg_structs_data: dict, 
+        bg_data: dict, 
+        dft_functional: Literal["LDA","PBE","AM05"] = "PBE", 
         with_uncertainties: bool = False, 
         workers: int = 1, 
         /
     ) -> Dict[str, float]:
-    '''
+    """
     Calculate Δ-Sol band gap value for every structure in a batch from their data,
     as provided by extract_vasp_data_for_delta_sol function applied on the 3 energy calculations.
 
     Parameters:
-        structs_data (dict):    Dict containing the original data extracted from previous VASP calculation.
+        bg_data (dict):               Dict containing structures data extracted from previous VASP static calculations.
 
-        bg_structs_data (dict): Dict of the calculated data on structures with changed electron numbers.
+        dft_functional (str):         The type of functional used for static calculations. Supported functionals are
+                                      "LDA", "PBE", and "AM05". Defaults to "PBE".
 
-        workers (int):          The number of parallel processes to spawn. Defaults to 1.
+        with_uncertainties (bool):    Whether to include uncertainty calculations data in the results.
+                                      Defaults to False.
+
+        workers (int):                The number of parallel processes to spawn. Defaults to 1.
 
     Returns:
         Dict[str, float]: Dict of Band gap values associated with the original structure directory name.
     """
 
-    assert isinstance(structs_data, dict)
-    assert isinstance(bg_structs_data, dict)
+    assert isinstance(bg_data, dict)
+    assert dft_functional in {"LDA", "PBE", "AM05"}
     assert isinstance(with_uncertainties, bool)
     assert isinstance(workers, int) and workers >= 1
 
     if not with_uncertainties:
         final_energies = {
             name: {
-                'name': name, 
-                'structure': data['structure'], 
-                'E_N0': bg_structs_data['_'.join((name, 'best', 'neutral'))]['final_energy'], 
-                'E_N0_plus_n_best': bg_structs_data['_'.join((name, 'best', 'plus'))]['final_energy'], 
-                'E_N0_minus_n_best': bg_structs_data['_'.join((name, 'best', 'minus'))]['final_energy']
-            } for name, data in structs_data.items()
+                "name": name,
+                "functional": dft_functional,
+                "structure": data["structure"],
+                "E_N0": data[name + "_neutral"],
+                "E_N0_plus_n_best": data[name + "_best_plus"],
+                "E_N0_minus_n_best": data[name + "_best_minus"],
+            } for name, data in bg_data.items()
         }
-
-    elif with_uncertainties:
+    
+    else:
         final_energies = {
             name: {
-                'name': name, 
-                'structure': data['structure'], 
-                'E_N0': bg_structs_data['_'.join((name, 'best', 'neutral'))]['final_energy'], 
-                'E_N0_plus_n_best': bg_structs_data['_'.join((name, 'best', 'plus'))]['final_energy'], 
-                'E_N0_minus_n_best': bg_structs_data['_'.join((name, 'best', 'minus'))]['final_energy'], 
-                'E_N0_plus_n_min': bg_structs_data['_'.join((name, 'min', 'plus'))]['final_energy'], 
-                'E_N0_minus_n_min': bg_structs_data['_'.join((name, 'min', 'minus'))]['final_energy'], 
-                'E_N0_plus_n_max': bg_structs_data['_'.join((name, 'max', 'plus'))]['final_energy'], 
-                'E_N0_minus_n_max': bg_structs_data['_'.join((name, 'max', 'minus'))]['final_energy']
-            } for name, data in structs_data.items()
+                "name": name,
+                "functional": dft_functional,
+                "structure": data["structure"],
+                "E_N0": data[name + "_neutral"],
+                "E_N0_plus_n_best": data[name + "_best_plus"],
+                "E_N0_minus_n_best": data[name + "_best_minus"],
+                "E_N0_plus_n_min": data[name + "_min_plus"],
+                "E_N0_minus_n_min": data[name + "_min_minus"],
+                "E_N0_plus_n_max": data[name + "_max_plus"],
+                "E_N0_minus_n_max": data[name + "_max_minus"],
+            } for name, data in bg_data.items()
         }
 
     nbr_structs = len(final_energies)
@@ -629,15 +657,20 @@ def batch_calculate_delta_sol_band_gaps(
     ))
 
     if not with_uncertainties:
-        return dict(E_band_gaps)
+        E_band_gaps = {
+            tup[0]: {
+                'E_band_gap': tup[1]
+            } for tup in E_band_gaps
+        }
 
-    E_band_gaps = {
-        tup[0]: {
-            'E_band_gap': tup[1], 
-            'E_band_gap_min': tup[2], 
-            'E_band_gap_max': tup[3]
-        } for tup in E_band_gaps
-    }
+    else:
+        E_band_gaps = {
+            tup[0]: {
+                'E_band_gap': tup[1], 
+                'E_band_gap_min': tup[2], 
+                'E_band_gap_max': tup[3]
+            } for tup in E_band_gaps
+        }
 
     return E_band_gaps
 

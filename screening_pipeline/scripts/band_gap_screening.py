@@ -22,7 +22,7 @@ from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 # LOCAL MODULES
 
 from screening_pipeline.utils.utils import _yaml_loader
-from screening_pipeline.utils.typing import PMGStaticSet
+from screening_pipeline.utils.custom_types import PMGStaticSet
 from screening_pipeline.utils.vasp_io import vasp_batch_launch, vasp_launcher, batch_extract_vasp_data, \
                                              delta_sol_inputs_init
 from screening_pipeline.utils.data_process import batch_calculate_delta_sol_band_gaps
@@ -182,7 +182,7 @@ def main():
             (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID).'
     )
     parser.add_argument(
-        '--with_uncertainties', 
+        '--with-uncertainties', 
         action='store_true', 
         help='Pass this flag to enable computation of minimal and maximal Δ-Sol band gaps.\n\
               This will need one full VASP static total energy computation for each limit.'
