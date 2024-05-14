@@ -60,6 +60,7 @@ from screening_pipeline.utils import (
 
 
 def assert_args(args: Namespace) -> None:
+    """Asserting input arguments validity."""
 
     assert os.path.isdir(args.run_dir), f"{args.run_dir}: No such directory found."
 
@@ -81,6 +82,7 @@ def assert_args(args: Namespace) -> None:
 
 
 def main():
+    """Main function."""
     start = datetime.now()
 
     # ARGUMENTS PARSING BLOCK
@@ -122,11 +124,12 @@ def main():
         type=str,
         default=None,
         help=(
-            "Defines an optional file whose presence in a structure directory means it passed this "
-            "screening step successfully and can be kept for further calculations.\n"
-            "This file would contain a small text giving result of the step for the corresponding structure."
+            "Defines an optional file whose presence in a structure directory means it passed "
+            "this screening step successfully and can be kept for further calculations.\n"
+            "This file contains a small text giving result of the step "
+            "for the corresponding structure."
         ),
-        metavar="accept_file.txt",
+        metavar="filename",
     )
     parser.add_argument(
         "-i",
@@ -138,8 +141,8 @@ def main():
             "previous screening steps and should not be used in this calculation.\n" 
             "This file will also be written in structure directories that did not pass this step.\n"
             "WARNING:\n" 
-            "If the name of this file is overwritten, care must be taken that it is the same file "
-            "throughout every used screening steps to make sure rejected structures don't go further."
+            "If this feature is used, care must be taken that the same file name is used throughout"
+            "every screening steps to make sure rejected structures don't go further."
         ),
         metavar="ignore_file.txt",
     )
@@ -160,10 +163,12 @@ def main():
         type=float,
         default=0.1,
         help=(
-            "Maximum value of ΔH (in eV/atom) above which structures are considered too unstable and rejected.\n"
+            "Maximum value of ΔH (in eV/atom) above which structures "
+            "are considered too unstable and rejected.\n"
             "Defaults to 36 meV/atom, as used in the following paper, and seems fairly strict:\n" 
             "Y. Wu, P. Lazic, G. Hautier, K. Persson, and G. Ceder,\n"
-            "First principles high throughput screening of oxynitrides for water-splitting photocatalysts,\n" 
+            "First principles high throughput screening of oxynitrides "
+            "for water-splitting photocatalysts,\n" 
             "Energy & Environmental Science 6, no. 1 (2012) 157."
         ),
         metavar="float",
@@ -238,7 +243,7 @@ def main():
                         Therefore, it is considered suitable for wanted application,\n \
                         and should be considered for further screening steps.\n"
             accept_file_path = os.path.join(str(run_dir), name, accept_file)
-            with open(accept_file_path, "wt") as fp:
+            with open(accept_file_path, mode="wt", encoding="utf-8") as fp:
                 fp.write(accept_msg)
 
         screening_results.append(
@@ -261,7 +266,7 @@ def main():
                         Therefore, it is considered not suitable for wanted application,\n \
                         and should not be considered in further screening steps.\n"
             reject_file_path = os.path.join(str(run_dir), name, ignore_file)
-            with open(reject_file_path, "wt") as fp:
+            with open(reject_file_path, mode="wt", encoding="utf-8") as fp:
                 fp.write(reject_msg)
 
         screening_results.append(
@@ -273,11 +278,11 @@ def main():
         )
 
     def sort_by_path(dct: Dict) -> str:
-        return dct.get('path')
+        return dct.get("path")
 
     screening_results = sorted(screening_results, key=sort_by_path)
 
-    with open(summary, "w") as fp:
+    with open(summary, mode="w", encoding="utf-8") as fp:
         json.dump(screening_results, fp, indent=4)
 
     stop = datetime.now()
