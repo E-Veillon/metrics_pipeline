@@ -1,6 +1,7 @@
 #!/usr/bin/python
 """
-Parses previous VASP data and launches Δ-Sol static calculations for structures not already rejected.
+Parses previous VASP data and launches Δ-Sol static calculations 
+for structures not already rejected.
 """
 
 ########################################
@@ -8,9 +9,9 @@ Parses previous VASP data and launches Δ-Sol static calculations for structures
 
 import os
 import sys
-from monty.os import cd
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
+from monty.os import cd
 
 ########################################
 # PYTHON MATERIALS GENOMICS PACKAGE
@@ -19,15 +20,16 @@ from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils.utils import _yaml_loader
-from screening_pipeline.utils.custom_types import PMGStaticSet
-from screening_pipeline.utils.vasp_io import (
-    extract_vasp_data_for_delta_sol_init, delta_sol_calculation_init, vasp_launcher
+from screening_pipeline.utils import (
+    _yaml_loader, PMGStaticSet, extract_vasp_data_for_delta_sol_init,
+    delta_sol_calculation_init
 )
+
 ########################################
 # LOCAL FUNCTIONS
 
 def assert_args(args: Namespace) -> None:
+    """Asserting input arguments validity."""
 
     assert os.path.isdir(args.input_dir), (
         f"{args.input_dir}: No directory found."
@@ -61,24 +63,33 @@ def assert_args(args: Namespace) -> None:
     )
 
 def calc_idx_to_dir_name(calc_index: int) -> str:
+    """Maps calculation index to corresponding calculation name."""
     assert isinstance(calc_index, int), f"Expected 'int' type, got '{type(calc_index)}' instead."
-    if calc_index == 0: return "_neutral"
-    if calc_index == 1: return "_best_plus"
-    if calc_index == 2: return "_best_minus"
-    if calc_index == 3: return "_min_plus"
-    if calc_index == 4: return "_min_minus"
-    if calc_index == 5: return "_max_plus"
-    if calc_index == 6: return "_max_minus"
-    else: raise ValueError(f"Only int from 0 to 6 supported, got {calc_index}")
+    if calc_index == 0:
+        return "_neutral"
+    if calc_index == 1:
+        return "_best_plus"
+    if calc_index == 2:
+        return "_best_minus"
+    if calc_index == 3:
+        return "_min_plus"
+    if calc_index == 4:
+        return "_min_minus"
+    if calc_index == 5:
+        return "_max_plus"
+    if calc_index == 6:
+        return "_max_minus"
+    raise ValueError(f"Only int from 0 to 6 supported, got {calc_index}")
 
 ########################################
 # MAIN FUNCTION
 
-def main():
+def main() -> None:
+    """Main function."""
     start = datetime.now()
 
     # ARGUMENTS PARSING BLOCK
-    
+
     prog_name = "vasp_delta_sol_statics.py"
     prog_desc = """
         Parses previous VASP data and launches Δ-Sol static calculations for structures not already rejected.
@@ -98,29 +109,31 @@ def main():
     helper_format = RawTextHelpFormatter
 
     parser = ArgumentParser(
-        prog=prog_name, 
-        description=prog_desc, 
-        epilog=prog_missing_steps, 
+        prog=prog_name,
+        description=prog_desc,
+        epilog=prog_missing_steps,
         formatter_class=helper_format
     )
 
     parser.add_argument(
         "input_dir",
         type=str,
-        help="Base directory containing structure directories.", 
+        help="Base directory containing structure directories.",
     )
     parser.add_argument(
-        "executable_path", 
+        "executable_path",
         type=str,
-        help="Path to the VASP executable.", 
+        help="Path to the VASP executable.",
     )
-    parser.add_argument( 
-        "task_id", 
-        type=int, 
+    parser.add_argument(
+        "task_id",
+        type=int,
         help=(
-            "Provide here the job array task ID that will treat one calculation for one structure.\n"
-            "The total number of jobs should be the number of structures multiplied by the number of\n"
-            "calculations for one structure (3 for a direct estimation only, 7 with uncertainties)."
+            "Provide here the job array task ID that will treat "
+            "one calculation for one structure.\n"
+            "The total number of jobs should be the number of structures "
+            "multiplied by the number of calculations for one structure "
+            "(3 for a direct estimation only, 7 with uncertainties)."
         )
     )
     parser.add_argument(
@@ -132,7 +145,7 @@ def main():
             "A subdirectory will be created in this directory for each Δ-Sol calculation.\n"
             "If not provided, a 'Band_gaps' directory is created at the same path as the directory "
             "provided in the 'input_dir' argument."
-        ), 
+        ),
         metavar="outdir"
     )
     parser.add_argument(
@@ -147,9 +160,9 @@ def main():
         dest="prev_summary"
     )
     parser.add_argument(
-        "-p", "--preset", 
-        type=str, 
-        default="MPStaticSet", 
+        "-p", "--preset",
+        type=str,
+        default="MPStaticSet",
         help=(
             "The pymatgen preset to use for VASP static calculations.\n"
             f"Supported presets: {PMGStaticSet}"
@@ -158,15 +171,18 @@ def main():
         )
     )
     parser.add_argument(
-        "-u", "--user-settings", 
-        type=str, 
-        default=None, 
-        help="Path to the .yaml file containing user defined VASP tags that will override those of the preset.", 
+        "-u", "--user-settings",
+        type=str,
+        default=None,
+        help=(
+            "Path to the .yaml file containing user defined VASP tags "
+            "that will override those of the preset."
+        ),
         metavar="file.yaml",
     )
     parser.add_argument(
-        "--with-uncertainties", 
-        action="store_true", 
+        "--with-uncertainties",
+        action="store_true",
         help=(
             "Pass this flag to enable computation of minimal and maximal Δ-Sol band gaps.\n"
             "This will need two more VASP static total energy computation for each limit."
@@ -200,7 +216,7 @@ def main():
     try:
         struct_dir = next(
             filter(
-            lambda dirname: dirname.startswith(f"{struct_idx}_"), 
+            lambda dirname: dirname.startswith(f"{struct_idx}_"),
             os.listdir(input_dir)
             )
         )
@@ -239,9 +255,9 @@ def main():
     calc_dir   = os.path.join(outdir, dir_name, ''.join((dir_name, calc_name)))
 
     input_data = delta_sol_calculation_init(
-        structure=struct_data[1]["structure"], 
-        calc_index=calc_idx, 
-        preset=preset, 
+        structure=struct_data[1]["structure"],
+        calc_index=calc_idx,
+        preset=preset,
         user_corrections=user_settings
     )
 
