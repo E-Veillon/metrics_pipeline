@@ -9,10 +9,14 @@ authors = [
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 pymatgen = ">=2023.10.11"
 spglib = ">=2.0.0"
-torch = "^2.3.0"
+torch = "~2.3.0"
+torch-cluster = {version = "^1.6.3+pt23cpu", source = "pytorch-geometric"}
+torch-scatter = {version = "^2.1.2+pt23cpu", source = "pytorch-geometric"}
+torch-geometric = "^2.3.0"
+materials-toolkit = { git = "https://github.com/materials-toolkits/pymaterials.git", branch = "pre-release", rev="c777b3a" }
 
 [tool.poetry.scripts]
 cif_counter = 'screening_pipeline.scripts.cif_counter:main'
@@ -24,6 +28,11 @@ band_gap_screening = 'screening_pipeline.scripts.band_gap_screening:main'
 delta_sol_inputs_writer = 'screening_pipeline.scripts.delta_sol_inputs_writer:main'
 vasp_delta_sol_statics = 'screening_pipeline.scripts.vasp_delta_sol_statics:main'
 delta_sol_calculator = 'screening_pipeline.scripts.delta_sol_calculator:main'
+
+[[tool.poetry.source]]
+name = "pytorch-geometric"
+url = "https://data.pyg.org/whl/torch-2.3.0+cpu.html"
+priority = "explicit"
 
 [build-system]
 requires = ["poetry-core"]
