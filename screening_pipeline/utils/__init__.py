@@ -26,6 +26,7 @@ from .spacegroup import structure_symmetrizer, batch_symmetrizer
 from .fitted_values import E_O2_FIT, U_VALUES, DELTA_E_M, EXP_DELTA_H, EL_PER_XC_VOL
 from .paths import add_new_dir, batch_add_new_dirs
 from .data_process import (
+    check_interatomic_distances,
     get_elements_from_entries,
     init_entries_and_group_by_dim_and_comp,
     get_sub_entries,

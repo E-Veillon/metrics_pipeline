@@ -12,6 +12,7 @@ readme = "README.md"
 python = "^3.9"
 pymatgen = ">=2023.10.11"
 spglib = ">=2.0.0"
+torch = "^2.3.0"
 
 [tool.poetry.scripts]
 cif_counter = 'screening_pipeline.scripts.cif_counter:main'

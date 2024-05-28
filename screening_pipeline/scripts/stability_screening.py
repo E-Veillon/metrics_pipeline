@@ -236,12 +236,13 @@ def main():
         data = struct[1]
 
         if accept_file is not None:
-            accept_msg = f"\
-                        STABILITY TEST PASSED\n\
-                        Instability energy for this structure is estimated at {data['delta_H']} eV/atom,\n \
-                        which is below or equal to the fixed instability limit of {delta_H_limit} eV/atom.\n \
-                        Therefore, it is considered suitable for wanted application,\n \
-                        and should be considered for further screening steps.\n"
+            accept_msg = (
+                "STABILITY TEST PASSED\n"
+                f"Instability energy for this structure is estimated at {data['delta_H']} eV/atom,\n"
+                f"which is below or equal to the fixed instability limit of {delta_H_limit} eV/atom.\n"
+                "Therefore, it is considered suitable for wanted application, "
+                "and should be considered for further screening steps.\n"
+            )
             accept_file_path = os.path.join(str(run_dir), name, accept_file)
             with open(accept_file_path, mode="wt", encoding="utf-8") as fp:
                 fp.write(accept_msg)
@@ -259,12 +260,13 @@ def main():
         data = struct[1]
 
         if ignore_file is not None:
-            reject_msg = f"\
-                        STABILITY REJECTION\n\
-                        Instability energy for this structure is estimated at {data['delta_H']} eV/atom,\n \
-                        which is above the fixed instability limit of {delta_H_limit} eV/atom.\n \
-                        Therefore, it is considered not suitable for wanted application,\n \
-                        and should not be considered in further screening steps.\n"
+            reject_msg = (
+                "STABILITY REJECTION\n"
+                f"Instability energy for this structure is estimated at {data['delta_H']} eV/atom,\n"
+                f"which is above the fixed instability limit of {delta_H_limit} eV/atom.\n"
+                "Therefore, it is considered not suitable for wanted application, "
+                "and should not be considered in further screening steps.\n"
+            )
             reject_file_path = os.path.join(str(run_dir), name, ignore_file)
             with open(reject_file_path, mode="wt", encoding="utf-8") as fp:
                 fp.write(reject_msg)
