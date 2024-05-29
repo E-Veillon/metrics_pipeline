@@ -10,6 +10,7 @@ from monty.os.path import zpath
 from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal, Any
 from pathlib import Path
 from dataclasses import dataclass
+import xml.etree.ElementTree as ET
 
 ########################################
 # OPTIMIZATION MODULES
@@ -731,6 +732,42 @@ def _check_summary_data(struct_dir: PathLike, summary_file: PathLike) -> bool:
 
 ########################################
 
+def run_is_converged(struct_path: PathLike) -> bool:
+    """
+    Check whether the VASP run terminated normally and converged.
+    
+    Parameters:
+        struct_dir (Path|str):  Path to the directory containing the VASP calculation.
+    
+    Returns:
+        True if no error, timeout nor max ionic step reached was issued, False otherwise.
+    """
+    if not isinstance(struct_path, (Path,str)):
+        raise TypeError(
+            "Given 'struct-dir' argument value expected 'Path' or 'str', "
+            f"got '{type(struct_path)}' instead."
+        )
+    if not os.path.isdir(struct_path):
+        raise ValueError(f"{struct_path}: No such directory found.")
+
+    vasprun_path = os.path.join(struct_path, "vasprun.xml")
+
+    if not os.path.isfile(vasprun_path):
+        raise ValueError(
+            f"{struct_path}: No vasprun.xml file found at this location."
+            "Make sure this file is present in its run directory."
+        )
+
+    try:
+        vasprun = Vasprun(vasprun_path)
+    except ET.ParseError:
+        return False
+    
+    return vasprun.converged
+
+
+########################################
+
 
 def extract_vasp_data_for_convex_hull(
     struct_dir: PathLike = ".", 
@@ -766,6 +803,9 @@ def extract_vasp_data_for_convex_hull(
 
     struct_dir: Path = Path(struct_dir)
 
+    if not run_is_converged(struct_dir):
+        return {}
+
     if ignore_file is not None:
         files = set(file.name for file in struct_dir.iterdir())
         if ignore_file in files:
@@ -774,13 +814,14 @@ def extract_vasp_data_for_convex_hull(
     if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
         return {}
 
-    struct_name = struct_dir.name
+    struct_name  = struct_dir.name
     contcar_path = Path(struct_dir / "CONTCAR")
     oszicar_path = Path(struct_dir / "OSZICAR")
 
     structure = Poscar.from_file(contcar_path).structure
     composition = Composition(structure.formula)
     final_energy_eV: float = Oszicar(oszicar_path).final_energy
+
     struct_dict = {"composition": composition, "final_energy": final_energy_eV}
     struct_data = (struct_name, struct_dict)
 
@@ -992,36 +1033,32 @@ def batch_extract_vasp_data(
     return structs_data
 
 
-def vasp_output_structure(struct_dir: str) -> Structure:
+def vasp_output_structure(struct_dir: str) -> Tuple[Structure,Structure]|Tuple[None,None]:
     """
-    Get a pymatgen Structure from the output of a VASP calculation
+    Get a pymatgen Structure from the input and output of a VASP calculation.
+    If the calculation did not converge, either by reaching max ionic steps, 
+    by terminating on an error or by timeout, Tuple[None,None] is returned instead.
 
     Parameters:
         struct_dir (str):  Path to the calculation.
 
     Returns: (Structure)
-        The output structure.
+        The input (POSCAR) and output (CONTCAR) structures if the calculation converged.
     """
 
     assert isinstance(struct_dir, (Path, str))
     assert Path(struct_dir).is_dir()
 
-    contcar_path = os.path.join(struct_dir, "CONTCAR")
+    if not run_is_converged(struct_dir):
+        return (None, None)
+
     poscar_path = os.path.join(struct_dir, "POSCAR")
-    vasprun_path = os.path.join(struct_dir, "vasprun.xml")
+    contcar_path = os.path.join(struct_dir, "CONTCAR")
 
-    vasprun = Vasprun(vasprun_path)
+    in_struct = Poscar.from_file(poscar_path).structure
+    out_struct = Poscar.from_file(contcar_path).structure
 
-    if vasprun.converged:
-        # TODO: Condition probablement insuffisante, ne semble pas tenir compte des arrêts sur erreur ou timeout.
-        # TODO: Vérifier que l'exception ET.ParseError de Vasprun capture toutes ces possibilités et soit capturée 
-        # TODO: ici pour retourner la valeur par défaut également dans ces situations.
-        in_struct = Poscar.from_file(poscar_path).structure
-        out_struct = Poscar.from_file(contcar_path).structure
-
-        return in_struct, out_struct
-
-    return (None, None)
+    return in_struct, out_struct
 
 
 def batch_extract_vasp_structures(
@@ -1038,12 +1075,15 @@ def batch_extract_vasp_structures(
         List of loaded structures.
     """
 
-    return process_map(
-        vasp_output_structure,
-        calc_dirs,
-        max_workers=workers,
-        desc="Extracting structures from VASP output",
-    )
+    return list(filter(
+        lambda tup: tup != (None, None),
+        process_map(
+            vasp_output_structure,
+            calc_dirs,
+            max_workers=workers,
+            desc="Extracting structures from VASP output",
+        )
+    ))
 
 
 ########################################

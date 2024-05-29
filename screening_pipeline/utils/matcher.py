@@ -1,6 +1,6 @@
-'''
+"""
 Functions to sort structures by stoichiometry and discard duplicates.
-'''
+"""
 
 
 ########################################
@@ -31,7 +31,7 @@ from screening_pipeline.utils.utils import flatten
 # LOCAL FUNCTIONS
 
 def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
-    '''
+    """
     Generate a hash from the fractional composition of a compatible pymatgen object, 
     ie. a Composition object or an object having a .composition attribute returning a
     Composition object.
@@ -42,10 +42,10 @@ def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
 
     Returns:
         int: The hash.
-    '''
+    """
 
     assert isinstance(comp, (Composition, Entry, SiteCollection)), \
-    f'Given object type is not supported ({type(comp)}).'
+    f"Given object type is not supported ({type(comp)})."
     
     if isinstance(comp, Composition):
         return hash(comp.fractional_composition)
@@ -57,7 +57,7 @@ def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
 def group_by_stoichiometry(
         comps: Sequence[Union[Composition, Entry, SiteCollection]]
         ) -> List[List[Union[Composition, Entry, SiteCollection]]]:
-    '''
+    """
     Group Composition objects or objects having a .composition attribute by fractional 
     composition using the `hash_stoichiometry` hash function. Note that objects from 
     different classes but having their respective associated composition equal will be
@@ -69,7 +69,7 @@ def group_by_stoichiometry(
 
     Returns:
         A list containing lists of objects with the same fractionnal composition.
-    '''
+    """
 
     assert isinstance(comps, Sequence)
     if not comps: return []
@@ -83,29 +83,72 @@ def group_by_stoichiometry(
 
 ########################################
 
-def group_by_equivalence(structures: List[Structure]) -> List[List[Structure]]:
-    '''
-    Group structure by equivalence using the StructureMatcher object.
+def _group_by_equivalence(structures: List[Structure]) -> List[List[Structure]]:
+    """
+    Group structures by equivalence using the StructureMatcher object.
 
     Parameters:
         structure (List[Structure]): The list of structure to match.
 
     Returns:
         List[List[Structure]]: A list containing lists of equivalent structures.
-    '''
+    """
 
     matcher = StructureMatcher()
     return matcher.group_structures(structures)
 
 ########################################
 
+def batch_group_by_equivalence(
+        structures: Sequence[Structure],
+        workers: int = 1,
+        comment: str = None
+    ) -> List[List[Structure]]:
+    """
+    Group structures by equivalence in two steps:
+    First, groups by stoichiometry, then pass each sub-group in
+    the pymatgen StructureMatcher in parallel for efficiency.
+
+
+    Parameters:
+        structures ([Structure]):   The list of structures to match.
+
+        workers (int):              Number of parallel processes to spawn.
+                                    Defaults to 1.
+
+        comment (str):              Optional message to print next to tqdm"s
+                                    progression bar.
+
+    Returns:
+        List[List[Structure]]: A list containing lists of equivalent structures.
+    """
+
+    nbr_struct    = len(structures)
+    chunksize     = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
+
+    grouped_structs = group_by_stoichiometry(structures)
+
+    equivalent_structs = process_map(
+        _group_by_equivalence,
+        grouped_structs,
+        max_workers=workers,
+        chunksize=chunksize,
+        desc=comment
+    )
+
+    return equivalent_structs
+
+
+########################################
+
+
 def remove_equivalent(
     structures: List[Structure], 
     workers: int = 1, 
     keep_equivalent: bool = False
 ) -> Tuple[List[Structure], int]:
-    '''
-    Group structures by equivalence using multiple processes.
+    """
+    Group structures by equivalence using multiple processes, then discards the duplicates.
 
     Parameters:
         structures (List[Structure]): The list of structures to match.
@@ -114,28 +157,21 @@ def remove_equivalent(
                                       Defaults to 1.
 
         keep_equivalent (bool):       Whether to keep equivalent structures.
-                                      If True, structures will be sorted by equivalence but not be discarded.
-                                      Defaults to False.
+                                      If True, structures will be sorted by equivalence but
+                                      not be discarded. Defaults to False.
 
     Returns:
-        List[Structure]: The list of unique structures (or sorted structures if keep_equivalent = True).
+        List[Structure]: The list of unique (or sorted) structures.
         Int: The number of discarded structures.
-    '''
+    """
 
-    nbr_struct    = len(structures)
-    chunksize     = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
-    nbr_discarded = 0
+    process_description = ("removing duplicates" if not keep_equivalent else "sorting structures")
 
-    grouped_structs     = group_by_stoichiometry(structures)
-    process_description = ('removing duplicates' if not keep_equivalent else 'sorting structures')
-
-    equivalent_structs = process_map(
-        group_by_equivalence,
-        grouped_structs,
-        max_workers=workers,
-        chunksize=chunksize,
-        desc=process_description
+    equivalent_structs = batch_group_by_equivalence(
+        structures=structures, workers=workers, comment=process_description
     )
+
+    nbr_discarded = 0
 
     if keep_equivalent:
         sorted_structs = flatten(equivalent_structs, level_of_flattening=2)
@@ -145,5 +181,6 @@ def remove_equivalent(
     nbr_discarded  = sum([len(sublist) - 1 for sublist in sorted_structs])
     unique_structs = [sublist[0] for sublist in sorted_structs]
     return unique_structs, nbr_discarded
+
 
 ########################################
