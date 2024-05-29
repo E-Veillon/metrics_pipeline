@@ -10,6 +10,7 @@ for structures not already rejected.
 import os
 import sys
 from datetime import datetime
+from typing import Tuple
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from monty.os import cd
 
@@ -21,7 +22,7 @@ from monty.os import cd
 # LOCAL MODULES
 
 from screening_pipeline.utils import (
-    _yaml_loader, PMGStaticSet, extract_vasp_data_for_delta_sol_init,
+    _yaml_loader, PathLike, PMGStaticSet, extract_vasp_data_for_delta_sol_init,
     delta_sol_calculation_init
 )
 
@@ -48,8 +49,6 @@ def assert_args(args: Namespace) -> None:
             f"{args.previous_results}: No such file found."
         )
 
-    #PMGStaticSet.add("GenMatStatic54Set")
-
     assert args.preset in PMGStaticSet, (
     "Provided static preset must be one of the following:\n"
     f"{PMGStaticSet}"
@@ -61,6 +60,51 @@ def assert_args(args: Namespace) -> None:
     assert args.user_settings.endswith(".yaml"), (
     "user settings file must be of .yaml format."
     )
+
+def get_struct_dir(
+        path: PathLike, task_id: int, with_uncertainties: bool = False
+        ) -> Tuple[str, int, int]:
+    """
+    Determines structure index and calculation ID from the task ID,
+    then finds corresponding structure directory.
+
+    Parameters:
+        path (Path|str):            Where to search for the structure directory.
+
+        task_id (int):              The ID of the task in the job array.
+
+        with_uncertainties (bool):  Whether to take into account uncertainty calculations.
+                                    Defaults to False.
+
+    Returns:
+        Tuple[str, int, int]:
+        path to the structure directory, structure index and calculation ID.
+    """
+
+    tasks_per_struct = 7 if with_uncertainties else 3
+    struct_idx = task_id // tasks_per_struct
+    calc_idx = task_id % tasks_per_struct
+
+    try:
+        struct_dir = next(
+            filter(
+            lambda dirname: dirname.startswith(f"{struct_idx}_"),
+            os.listdir(path)
+            )
+        )
+    except StopIteration:
+        raise ValueError(
+            "No structure directory found with index corresponding to given 'task-id' argument.\n"
+            f"Searched directory: {path}\n"
+            f"Given task-id argument: {task_id}\n"
+            f"Corresponding structure index: {struct_idx}\n"
+            f"Corresponding calculation ID: {calc_idx}\n"
+            "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
+        )
+
+    struct_path = os.path.join(path, struct_dir)
+
+    return struct_path, struct_idx, calc_idx
 
 def calc_idx_to_dir_name(calc_index: int) -> str:
     """Maps calculation index to corresponding calculation name."""
@@ -208,30 +252,10 @@ def main() -> None:
     preset = args.preset
     user_settings = _yaml_loader(args.user_settings)
 
-    # Variables coming from args
-    tasks_per_struct = 7 if args.with_uncertainties else 3
-    struct_idx = task_id // tasks_per_struct
-    calc_idx = task_id % tasks_per_struct
-
-    try:
-        struct_dir = next(
-            filter(
-            lambda dirname: dirname.startswith(f"{struct_idx}_"),
-            os.listdir(input_dir)
-            )
-        )
-    except StopIteration:
-        print(
-            "No structure directory found with index corresponding to given 'task-id' argument.\n"
-            f"Searched directory: {input_dir}\n"
-            f"Given task-id argument: {args.task_id}\n"
-            f"Corresponding structure index: {struct_idx}\n"
-            f"Corresponding calculation ID: {calc_idx}\n"
-            "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
-        )
-        sys.exit(0)
-
-    struct_path = os.path.join(input_dir, struct_dir)
+    # Variables deduced from args
+    struct_path, struct_idx, calc_idx = get_struct_dir(
+        input_dir, task_id, with_uncertainties=args.with_uncertainties
+    )
 
 
     # MAIN BLOCK
@@ -240,7 +264,7 @@ def main() -> None:
         struct_dir=struct_path, path_to_summary=prev_summary
     )
     if not struct_data:
-        print(
+        raise ValueError(
             "The structure data corresponding to given 'task-id' argument "
             "was not found or is already rejected in the summary file from previous step.\n"
             f"Given task-id argument: {args.task_id}\n"
@@ -248,7 +272,6 @@ def main() -> None:
             f"Corresponding calculation ID: {calc_idx}\n"
             "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
         )
-        sys.exit(0)
 
     dir_name   = f"{struct_idx}_{struct_data[1]['structure'].composition.reduced_formula}"
     calc_name  = calc_idx_to_dir_name(calc_idx)

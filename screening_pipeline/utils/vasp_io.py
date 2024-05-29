@@ -299,14 +299,18 @@ def vasp_launcher(vasp_exe: PathLike, path: PathLike, vasp_input: VaspInput) -> 
     assert isinstance(vasp_exe, (Path, str))
     assert isinstance(path, (Path, str))
     assert isinstance(vasp_input, VaspInput)
-    assert vasp_input.get('INCAR') is not None, \
+    assert vasp_input.get('INCAR') is not None, (
     f'vasp_launcher: There is no INCAR defined in the input !'
-    assert vasp_input.get('POSCAR') is not None
+    )
+    assert vasp_input.get('POSCAR') is not None, (
     f'vasp_launcher: There is no POSCAR defined in the input !'
-    assert vasp_input.get('KPOINTS') is not None or vasp_input['INCAR'].get('KSPACING') is not None
+    )
+    assert vasp_input.get('KPOINTS') is not None or vasp_input['INCAR'].get('KSPACING') is not None, (
     f'vasp_launcher: There is no KPOINTS or KSPACING tag defined in the input !'
-    assert vasp_input.get('POTCAR') is not None
+    )
+    assert vasp_input.get('POTCAR') is not None, (
     f'vasp_launcher: There is no POTCAR defined in the input !'
+    )
 
 
     vasp_exe_list = list((vasp_exe,)) # Necessary for subprocess to take it as a full command
@@ -722,7 +726,7 @@ def _check_summary_data(struct_dir: PathLike, summary_file: PathLike) -> bool:
         )
         return False
 
-    return not any(value is False for value in prev_struct_data.values())
+    return prev_struct_data.get("stable") is True
 
 
 ########################################
