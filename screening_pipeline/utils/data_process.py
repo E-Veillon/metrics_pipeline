@@ -96,6 +96,53 @@ def get_elements_from_entries(entries: Sequence[PDEntry]) -> List[Element]:
 ########################################
 
 
+def filter_database_entries(
+        entries: Dict[str,Any]|List[PDEntry],
+        max_dim: Optional[int] = None,
+        ref_elts: Optional[List[Element]] = None
+    ) -> List[PDEntry]:
+    """
+    Filter out entries in database file that are useless for generated data.
+
+    Parameters:
+        entries (dict):                 entries to filter.
+
+        max_dim (int):                  max dimension of entries to keep.
+
+        elements_to_keep ([Element]):   list of useful Elements to keep in the dataset.
+                                        All structures containing other elements are discarded.
+
+    Returns:
+        List[PDEntry]: List of useful entries.
+    """
+
+    assert isinstance(entries, (Dict, List))
+    assert isinstance(max_dim, int) or max_dim is None
+    assert isinstance(ref_elts, List) or ref_elts is None
+
+    if isinstance(entries, Dict):
+        entry_list = [
+                PDEntry(
+                    composition=data["composition"],
+                    energy=data["final_energy"],
+                    name=name,
+                    attribute="struct_ref",
+                )
+                for name, data in entries.items()
+        ]
+
+    entry_list = list(filter(
+        lambda entry: len(entry["composition"]) <= max_dim,
+        entry_list
+    ))
+    entry_list = _get_relevant_entries(entry_list, ref_elts)
+
+    return entry_list
+
+
+########################################
+
+
 def init_entries_and_group_by_dim_and_comp(
     structs_data: Dict[str, Dict[str, Any]],
     ref_structs: Optional[Dict[str, Dict[str, Any]]] = None,
@@ -145,27 +192,6 @@ def init_entries_and_group_by_dim_and_comp(
         for name, data in structs_data.items()
     )
 
-    if not ref_structs:
-        ref_entry_list = []
-    else:
-        assert isinstance(ref_structs, dict)
-        assert all(
-            isinstance(name, str) and isinstance(data, dict)
-            for name, data in ref_structs.items()
-        )
-
-        ref_entry_list = [
-            PDEntry(
-                composition=data["composition"],
-                energy=data["final_energy"],
-                name=name,
-                attribute="struct_ref",
-            )
-            for name, data in ref_structs.items()
-        ]
-
-    groups = [[]]  # fill the index 0 to match indexes and entries dimensionality
-
     entry_list = [
         PDEntry(
             composition=data["composition"],
@@ -174,23 +200,34 @@ def init_entries_and_group_by_dim_and_comp(
             attribute="generated",
         )
         for name, data in structs_data.items()
-    ] + ref_entry_list
+    ]
 
     max_dim = max([len(entry.elements) for entry in entry_list])
     elements = get_elements_from_entries(entry_list)
 
-    entry_list += [
-        PDEntry(
-            composition=Composition(str(elt)),
-            energy=0.0,
-            name=elt.symbol,
-            attribute="element_ref",
+    if ref_structs:
+        assert isinstance(ref_structs, dict)
+        assert all(
+            isinstance(name, str) and isinstance(data, dict)
+            for name, data in ref_structs.items()
         )
-        for elt in elements
-    ]
+
+        ref_entry_list = filter_database_entries(
+            entries=ref_structs, max_dim=max_dim, ref_elts=elements
+        )
+    else:
+        ref_entry_list = []
+
+    elt_entries = _get_lacking_elts_entries(
+        entries=entry_list, ref_elts=elements
+    )
+
+    full_entry_list = entry_list + ref_entry_list + elt_entries
+
+    groups = [[]]  # fill the index 0 to match indexes and entries dimensionality
 
     for dim in range(1, max_dim + 1):
-        group = list(filter(lambda entry: len(entry.elements) == dim, entry_list))
+        group = list(filter(lambda entry: len(entry.elements) == dim, full_entry_list))
         group = group_by_stoichiometry(group)
         groups.append(group)
 
@@ -299,7 +336,7 @@ def _get_lacking_elts_entries(
             composition=Composition(str(elt)),
             energy=0.0,
             name=elt.symbol,
-            attribute="auto_elt_ref",
+            attribute="element_ref",
         )
         for elt in lacking_elts
     ]
