@@ -87,7 +87,7 @@ def main():
 
     # ARGUMENTS PARSING BLOCK
 
-    prog_name = "stability_screening"
+    prog_name = "stability_screening.py"
     prog_description = "A script using previous VASP relaxations to compute the relative \
                           stability of given structures."
     prog_missing_steps = """

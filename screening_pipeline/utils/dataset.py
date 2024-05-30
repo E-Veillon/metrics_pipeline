@@ -1,10 +1,9 @@
 import json
-
-from pymatgen.core import Element
-from pymatgen.core.structure import Structure, SiteCollection, Composition
+from pymatgen.core.structure import Composition
 
 
 def load_phase_diagram_entries(filename: str) -> dict:
+    """Load entries data from a JSON file."""
     with open(filename, "r") as fp:
         entries = json.load(fp)
 
@@ -12,3 +11,5 @@ def load_phase_diagram_entries(filename: str) -> dict:
         entry["composition"] = Composition.from_dict(entry["composition"])
 
     return entries
+
+
