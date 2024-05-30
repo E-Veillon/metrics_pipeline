@@ -8,7 +8,7 @@ Global variables for storing experimental fits and values used in the pipeline.
 E_O2_FIT = -1,36 # eV per O2 in the formation reaction
 
 '''
-O2 Energy as fitted with Wang et al. method.
+O2 Energy as fitted by Wang et al.
 
 Reference: 
    L. Wang, T. Maxisch, G. Ceder, 
@@ -36,7 +36,7 @@ U_VALUES = {
     }}
 
 '''
-Values of the Hubbard U correction used in GGA + U framework.
+Values of the Hubbard U correction used in GGA + U framework, as fitted by Jain et al.
 
 Reference:
     A. Jain, G. Hautier, C.J. Moore, S.P. Ong, 
@@ -46,8 +46,8 @@ Reference:
 '''
 
 ########################################
-
-DELTA_E_M = { #TODO: Modify it when values are fitted
+#NOTE: Unused for now.
+DELTA_E_M = {
     'F': {
         'Ag': 0.0, 'Co': 0.0, 'Cr': 0.0, 'Cu': 0.0, 
         'Fe': 0.0, 'Mn': 0.0, 'Mo': 0.0, 'Nb': 0.0, 
@@ -62,7 +62,7 @@ DELTA_E_M = { #TODO: Modify it when values are fitted
     }, 
     'S': {
         'Fe': 0.0, 'Mn': 0.0
-    }}
+}}
 
 '''
 Additional correction ΔE_M to consider on GGA + U calculations,
@@ -76,7 +76,7 @@ Reference:
 '''
 
 ########################################
-
+#NOTE: Unused for now.
 EXP_DELTA_H = {
     'F': {
         'Ag': {

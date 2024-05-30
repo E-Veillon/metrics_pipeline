@@ -167,11 +167,7 @@ def main():
         help=(
             "Maximum value of ΔH (in eV/atom) above which structures "
             "are considered too unstable and rejected.\n"
-            "Defaults to 36 meV/atom, as used in the following paper, and seems fairly strict:\n" 
-            "Y. Wu, P. Lazic, G. Hautier, K. Persson, and G. Ceder,\n"
-            "First principles high throughput screening of oxynitrides "
-            "for water-splitting photocatalysts,\n" 
-            "Energy & Environmental Science 6, no. 1 (2012) 157."
+            "Defaults to 0.1 eV/atom, as it is commonly assumed to be sufficient."
         ),
         metavar="float",
     )
