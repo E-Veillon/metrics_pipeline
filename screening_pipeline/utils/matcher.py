@@ -30,6 +30,7 @@ from screening_pipeline.utils.utils import flatten
 ########################################
 # LOCAL FUNCTIONS
 
+
 def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
     """
     Generate a hash from the fractional composition of a compatible pymatgen object, 
@@ -72,13 +73,68 @@ def group_by_stoichiometry(
     """
 
     assert isinstance(comps, Sequence)
-    if not comps: return []
+    if not comps:
+        return []
 
     sorted_comps = sorted(comps, key=hash_stoichiometry)
 
     return [
         list(grouped)
         for _, grouped in itertools.groupby(sorted_comps, hash_stoichiometry)
+    ]
+
+########################################
+
+def hash_composition(comp: Union[Composition, Entry, SiteCollection]) -> int:
+    """
+    Generate a hash from the fractional composition of a compatible pymatgen object, 
+    ie. a Composition object or an object having a .composition attribute returning a
+    Composition object.
+
+    Parameters:
+        comp (Entry|SiteCollection|Composition):    A pymatgen object containing a 
+                                                    composition formula.
+
+    Returns:
+        int: The hash.
+    """
+
+    assert isinstance(comp, (Composition, Entry, SiteCollection)), \
+    f"Given object type is not supported ({type(comp)})."
+    
+    if isinstance(comp, Composition):
+        return hash(comp)
+    
+    return hash(comp.composition)
+
+########################################
+
+def group_by_composition(
+        comps: Sequence[Union[Composition, Entry, SiteCollection]]
+        ) -> List[List[Union[Composition, Entry, SiteCollection]]]:
+    """
+    Group Composition objects or objects having a .composition attribute by
+    their contained element types. Note that objects from different classes
+    but having their respective associated composition equal will be grouped
+    together anyway.
+
+    Parameters:
+        comps ([Composition|Entry|SiteCollection]): The sequence of objects to group by
+                                                    their composition.
+
+    Returns:
+        A list of lists of objects containing the same elements.
+    """
+
+    assert isinstance(comps, Sequence)
+    if not comps:
+        return []
+
+    sorted_comps = sorted(comps, key=hash_composition)
+
+    return [
+        list(grouped)
+        for _, grouped in itertools.groupby(sorted_comps, hash_composition)
     ]
 
 ########################################

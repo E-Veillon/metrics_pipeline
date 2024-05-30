@@ -29,7 +29,7 @@ from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 from screening_pipeline.utils.utils import flatten
 from screening_pipeline.utils.custom_types import PathLike, FormulaLike
-from screening_pipeline.utils.matcher import group_by_stoichiometry
+from screening_pipeline.utils.matcher import group_by_composition
 from screening_pipeline.utils.periodic_table import get_elements, get_delta_sol_el_ratio
 
 ########################################
@@ -119,7 +119,7 @@ def filter_database_entries(
     assert isinstance(entries, (Dict, List))
     assert isinstance(max_dim, int) or max_dim is None
     assert isinstance(ref_elts, List) or ref_elts is None
-
+    print("Filtering reference data...")
     if isinstance(entries, Dict):
         entry_list = [
                 PDEntry(
@@ -132,11 +132,11 @@ def filter_database_entries(
         ]
 
     entry_list = list(filter(
-        lambda entry: len(entry["composition"]) <= max_dim,
+        lambda entry: len(entry.elements) <= max_dim,
         entry_list
     ))
     entry_list = _get_relevant_entries(entry_list, ref_elts)
-
+    print("Filtering done.")
     return entry_list
 
 
@@ -191,7 +191,7 @@ def init_entries_and_group_by_dim_and_comp(
         isinstance(name, str) and isinstance(data, dict)
         for name, data in structs_data.items()
     )
-
+    print("Converting generated data to entries...")
     entry_list = [
         PDEntry(
             composition=data["composition"],
@@ -201,6 +201,7 @@ def init_entries_and_group_by_dim_and_comp(
         )
         for name, data in structs_data.items()
     ]
+    print("Conversion done.")
 
     max_dim = max([len(entry.elements) for entry in entry_list])
     elements = get_elements_from_entries(entry_list)
@@ -211,6 +212,7 @@ def init_entries_and_group_by_dim_and_comp(
             isinstance(name, str) and isinstance(data, dict)
             for name, data in ref_structs.items()
         )
+        print("reference dataset detected.")
 
         ref_entry_list = filter_database_entries(
             entries=ref_structs, max_dim=max_dim, ref_elts=elements
@@ -224,12 +226,16 @@ def init_entries_and_group_by_dim_and_comp(
 
     full_entry_list = entry_list + ref_entry_list + elt_entries
 
+    print("Grouping data by dim and composition...")
     groups = [[]]  # fill the index 0 to match indexes and entries dimensionality
 
     for dim in range(1, max_dim + 1):
+        print(f"filling dim group {dim}...")
         group = list(filter(lambda entry: len(entry.elements) == dim, full_entry_list))
-        group = group_by_stoichiometry(group)
+        group = group_by_composition(group)
         groups.append(group)
+        print("group filled.")
+    print("Grouping done.")
 
     return groups
 
@@ -394,6 +400,8 @@ def phase_diagram_init(
 
     entry_list = _get_lacking_elts_entries(entries, ref_elts) + list(entries)
 
+    pd_name = "-".join(list(map(str, ref_elts)))
+    print(f"Initializing phase diagram '{pd_name}'")
     new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
 
     return new_pd
@@ -443,6 +451,10 @@ def _calculate_instability_energies(
     generated_entries = list(
         filter(lambda entry: entry.attribute == "generated", entry_list)
     )
+    if not generated_entries:
+        comp = "-".join(list(map(str, ref_elts)))
+        return energies
+
     convex_hull = phase_diagram_init(entries=diagram_entries, ref_elts=ref_elts)
 
     for entry in generated_entries:
@@ -527,7 +539,7 @@ def batch_calculate_instability_energies(
                                 the composition and total energy.
 
     Returns:
-        Dict: The same data dict with all ΔH calculated in 'delta_H' keys.
+        Dict: The same structs_data dict with all ΔH calculated in 'delta_H' keys.
     """
 
     assert isinstance(structs_data, dict) and len(structs_data) > 0, (
