@@ -212,22 +212,29 @@ def main():
     for struct in good_bg_structs:
         name       = struct[0]
         bgdict     = struct[1]
-        E_band_gap = max(round(bgdict["E_band_gap"], 6), 0.0)
+        E_band_gap = round(bgdict["E_band_gap"], 6)
+        E_band_gap_rectified = max(E_band_gap, 0.0)
+        true_neg_bg = f" (true measurement: {E_band_gap})" if E_band_gap_rectified == 0.0 else ""
 
         if accept_file is not None:
             accept_msg = [
                 "BAND GAP TEST PASSED", 
-                f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is inside the interval [{min(valid_interval)}, {max(valid_interval)}].", 
+                f"Δ-Sol band gap was estimated to {E_band_gap_rectified}{true_neg_bg} eV, which is inside the interval [{min(valid_interval)}, {max(valid_interval)}].", 
                 "Therefore, it is suitable for wanted application, and should be considered for further screening steps."
             ]
-
             if args.with_uncertainties:
-                E_band_gap_min = max(round(bgdict["E_band_gap_min"], 6), 0.0)
-                E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
+                E_band_gap_min = round(bgdict["E_band_gap_min"], 6)
+                E_band_gap_max = round(bgdict["E_band_gap_max"], 6)
+                E_band_gap_min_rectified = max(E_band_gap_min, 0.0)
+                E_band_gap_max_rectified = max(E_band_gap_max, 0.0)
+                E_min = min(E_band_gap_min_rectified, E_band_gap_max_rectified)
+                E_max = max(E_band_gap_min_rectified, E_band_gap_max_rectified)
+                true_neg_bg_min = f" (true measurement: {min(E_band_gap_min, E_band_gap_max)})" if E_min == 0.0 else ""
+                true_neg_bg_max = f" (true measurement: {max(E_band_gap_min, E_band_gap_max)})" if E_max == 0.0 else ""
                 accept_msg += [
                     "\nUncertainty interval (does not affect acception or rejection):", 
-                    f"Band Gap minimum = {min(E_band_gap_min, E_band_gap_max)} eV",
-                    f"Band Gap maximum = {max(E_band_gap_min, E_band_gap_max)} eV" 
+                    f"Band Gap minimum = {E_min}{true_neg_bg_min} eV",
+                    f"Band Gap maximum = {E_max}{true_neg_bg_max} eV" 
                 ]
 
             accept_msg = "\n".join(accept_msg)
@@ -239,17 +246,23 @@ def main():
         
         struct_dict = {
                 "path": os.path.join(str(input_dir), name),
-                "bandgap (eV)": E_band_gap,
+                "bandgap (eV)": f"{E_band_gap_rectified}{true_neg_bg}",
                 "valid_gap": True
         }
 
         if args.with_uncertainties:
-            E_band_gap_min = max(round(bgdict["E_band_gap_min"], 6), 0.0)
-            E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
+            E_band_gap_min = round(bgdict["E_band_gap_min"], 6)
+            E_band_gap_max = round(bgdict["E_band_gap_max"], 6)
+            E_band_gap_min_rectified = max(E_band_gap_min, 0.0)
+            E_band_gap_max_rectified = max(E_band_gap_max, 0.0)
+            E_min = min(E_band_gap_min_rectified, E_band_gap_max_rectified)
+            E_max = max(E_band_gap_min_rectified, E_band_gap_max_rectified)
+            true_neg_bg_min = f" (true measurement: {min(E_band_gap_min, E_band_gap_max)})" if E_min == 0.0 else ""
+            true_neg_bg_max = f" (true measurement: {max(E_band_gap_min, E_band_gap_max)})" if E_max == 0.0 else ""
             struct_dict.update(
                 {
-                    "bandgap_min (eV)": min(E_band_gap_min, E_band_gap_max),
-                    "bandgap_max (eV)": max(E_band_gap_min, E_band_gap_max)
+                    "bandgap_min (eV)": f"{E_min}{true_neg_bg_min}",
+                    "bandgap_max (eV)": f"{E_max}{true_neg_bg_max}"
                 }
             )
 
@@ -259,22 +272,30 @@ def main():
     for struct in bad_bg_structs:
         name       = struct[0]
         bgdict     = struct[1]
-        E_band_gap = max(round(bgdict["E_band_gap"], 6), 0.0)
+        E_band_gap = round(bgdict["E_band_gap"], 6)
+        E_band_gap_rectified = max(E_band_gap, 0.0)
+        true_neg_bg = f" (true measurement: {E_band_gap})" if E_band_gap_rectified == 0.0 else ""
 
         if ignore_file is not None:
             reject_msg = [
                 "BAND GAP REJECTION", 
-                f"Δ-Sol band gap was estimated to {E_band_gap} eV, which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].",
+                f"Δ-Sol band gap was estimated to {E_band_gap_rectified}{true_neg_bg} eV, which is not inside the interval [{min(valid_interval)}, {max(valid_interval)}].",
                 "Therefore, it is not suitable for wanted application, and should not be considered in further screening steps."
             ]
 
             if args.with_uncertainties:
-                E_band_gap_min = max(round(bgdict["E_band_gap_min"], 6), 0.0)
-                E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
+                E_band_gap_min = round(bgdict["E_band_gap_min"], 6)
+                E_band_gap_max = round(bgdict["E_band_gap_max"], 6)
+                E_band_gap_min_rectified = max(E_band_gap_min, 0.0)
+                E_band_gap_max_rectified = max(E_band_gap_max, 0.0)
+                E_min = min(E_band_gap_min_rectified, E_band_gap_max_rectified)
+                E_max = max(E_band_gap_min_rectified, E_band_gap_max_rectified)
+                true_neg_bg_min = f" (true measurement: {min(E_band_gap_min, E_band_gap_max)})" if E_min == 0.0 else ""
+                true_neg_bg_max = f" (true measurement: {max(E_band_gap_min, E_band_gap_max)})" if E_max == 0.0 else ""
                 reject_msg += [
                     "\nUncertainty interval (does not affect acception or rejection):", 
-                    f"Band Gap minimum = {min(E_band_gap_min, E_band_gap_max)} eV",
-                    f"Band Gap maximum = {max(E_band_gap_min, E_band_gap_max)} eV" 
+                    f"Band Gap minimum = {E_min}{true_neg_bg_min} eV",
+                    f"Band Gap maximum = {E_max}{true_neg_bg_max} eV" 
                 ]
 
             reject_msg = "\n".join(reject_msg)
@@ -285,17 +306,23 @@ def main():
 
         struct_dict = {
                 "path": os.path.join(str(input_dir), name),
-                "bandgap (eV)": E_band_gap,
+                "bandgap (eV)": f"{E_band_gap_rectified}{true_neg_bg}",
                 "valid_gap": False
         }
 
         if args.with_uncertainties:
-            E_band_gap_min = max(round(bgdict["E_band_gap_min"], 6), 0.0)
-            E_band_gap_max = max(round(bgdict["E_band_gap_max"], 6), 0.0)
+            E_band_gap_min = round(bgdict["E_band_gap_min"], 6)
+            E_band_gap_max = round(bgdict["E_band_gap_max"], 6)
+            E_band_gap_min_rectified = max(E_band_gap_min, 0.0)
+            E_band_gap_max_rectified = max(E_band_gap_max, 0.0)
+            E_min = min(E_band_gap_min_rectified, E_band_gap_max_rectified)
+            E_max = max(E_band_gap_min_rectified, E_band_gap_max_rectified)
+            true_neg_bg_min = f" (true measurement: {min(E_band_gap_min, E_band_gap_max)})" if E_min == 0.0 else ""
+            true_neg_bg_max = f" (true measurement: {max(E_band_gap_min, E_band_gap_max)})" if E_max == 0.0 else ""
             struct_dict.update(
                 {
-                    "bandgap_min (eV)": min(E_band_gap_min, E_band_gap_max),
-                    "bandgap_max (eV)": max(E_band_gap_min, E_band_gap_max)
+                    "bandgap_min (eV)": f"{E_min}{true_neg_bg_min}",
+                    "bandgap_max (eV)": f"{E_max}{true_neg_bg_max}"
                 }
             )
 
