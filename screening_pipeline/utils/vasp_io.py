@@ -795,6 +795,7 @@ def extract_vasp_data_for_convex_hull(
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
                                 containing following data, used in stability calculation:
                                     - structure chemical composition as Composition object,
+                                    - structure energy at the end of the first ionic step,
                                     - structure final energy (in eV).
     """
 
@@ -820,9 +821,14 @@ def extract_vasp_data_for_convex_hull(
 
     structure = Poscar.from_file(contcar_path).structure
     composition = Composition(structure.formula)
+    first_ionic_energy: float = Oszicar(oszicar_path).ionic_steps[0]["E0"]
     final_energy_eV: float = Oszicar(oszicar_path).final_energy
 
-    struct_dict = {"composition": composition, "final_energy": final_energy_eV}
+    struct_dict = {
+        "composition": composition,
+        "first_ionic_energy": first_ionic_energy,
+        "final_energy": final_energy_eV
+    }
     struct_data = (struct_name, struct_dict)
 
     return struct_data
@@ -928,7 +934,7 @@ def extract_vasp_data_for_delta_sol_calc(
 
 
 def batch_extract_vasp_data(
-        method: Literal['convex_hull', 'delta_sol'], 
+        method: Literal['convex_hull', 'delta_sol_init', "delta_sol_calc"], 
         base_dir: PathLike = '.', 
         structs_names: Optional[Sequence[str]] = None, 
         ignore_file: Optional[str] = None, 
@@ -942,7 +948,8 @@ def batch_extract_vasp_data(
     Parameters:
         method (str):           Name of the method that will use the data, used to know
                                 which data should be extracted.
-                                Actual methods supported: 'convex_hull', 'delta_sol'.
+                                Actual methods supported: 'convex_hull', 'delta_sol_init',
+                                'delta_sol_calc'.
 
         base_dir (str|Path):    Directory containing structures subdirs to extract data from.
 
@@ -971,12 +978,12 @@ def batch_extract_vasp_data(
 
                                 Data returned for 'convex_hull' method:
                                     - composition of the formula unit,
+                                    - first ionic step energy in eV,
                                     - final energy of the relaxation in eV.
 
                                 Data returned for 'delta_sol' method:
                                     - structure itself,
-                                    - its CHGCAR file (to modify charge density),
-                                    - final energy of the relaxation in eV, used as E(N0).
+                                    - final energy of the relaxation in eV.
     """
 
     assert isinstance(base_dir, (Path, str))

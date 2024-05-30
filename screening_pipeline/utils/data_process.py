@@ -109,10 +109,10 @@ def init_entries_and_group_by_dim_and_comp(
     In other words, one gets something of the form:
     groups = [
               [],
-              [Elements],
-              [[Binary 1 (eg. all "Fe-O")], [Binary 2 (eg. all "Mn-O")], ...],
-              [[Ternary 1 (eg. all "Fe-Mn-O")], [Ternary 2 (eg. all "Fe-Co-O")], ...],
-              ...
+              [[Unary 1 (e.g. all "Fe")], [Unary 2 (e.g. all "Mn")]], ...],
+              [[Binary 1 (e.g. all "Fe-O")], [Binary 2 (e.g. all "Mn-O")], ...],
+              [[Ternary 1 (e.g. all "Fe-Mn-O")], [Ternary 2 (e.g. all "Fe-Co-O")], ...],
+              ...etc
             ]
 
     Parameters:
@@ -133,7 +133,11 @@ def init_entries_and_group_by_dim_and_comp(
         All structures data grouped by structure dimensionality and composition.
     """
 
-    assert isinstance(structs_data, dict)
+    if not isinstance(structs_data, dict):
+        raise TypeError(
+            "'struct_data' argument expected a 'dict', "
+            f"got '{type(structs_data)}' instead."
+        )
     if not structs_data:
         return []
     assert all(
@@ -165,7 +169,7 @@ def init_entries_and_group_by_dim_and_comp(
     entry_list = [
         PDEntry(
             composition=data["composition"],
-            energy=data["final_energy"],
+            energy=data["first_ionic_energy"],
             name=name,
             attribute="generated",
         )
@@ -478,20 +482,22 @@ def batch_calculate_instability_energies(
         structs_data (dict):    A dict containing following data about each structure:
                                     - its name (dict's keys),
                                     - its composition as a Composition object,
+                                    - its energy after the first ionic step,
                                     - its relaxed energy (in eV).
 
-        structs_ref (dict):     Reference data as a dictionnary where each key is the name of the structure and each value is another dictionnary containing the composition and total energy.
+        structs_ref (dict):     Reference data as a dictionnary where each key is the name
+                                of the structure and each value is another dictionnary containing
+                                the composition and total energy.
 
     Returns:
         Dict: The same data dict with all ΔH calculated in 'delta_H' keys.
     """
 
-    assert (
-        isinstance(structs_data, dict) and len(structs_data) > 0
-    ), f"""Invalid input provided, it either was not a dict or was empty.
-        Detected type: {type(structs_data)}.
-        Detected length: {len(structs_data)}."""
-
+    assert isinstance(structs_data, dict) and len(structs_data) > 0, (
+        "Invalid input provided, it either was not a dict or was empty.\n"
+        f"Detected type: {type(structs_data)}.\n"
+        f"Detected length: {len(structs_data)}.\n"
+    )
     dim_groups = init_entries_and_group_by_dim_and_comp(
         structs_data, ref_structs=structs_ref
     )
