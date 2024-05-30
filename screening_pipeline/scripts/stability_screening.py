@@ -114,8 +114,10 @@ def main():
         "-r",
         "--reference",
         help=(
-            "If the user wants to calculate the energy above the hull from an existing dataset "
-            "used as a reference (json format)."
+            "dataset of already known structure to construct a reference convex hull "
+            "and compare generated structure against it (json format).\n"
+            "If not given, the default reference hull will be defined only with elemental "
+            "entries of energy 0.0 eV/atom."
         ),
     )
     parser.add_argument(
