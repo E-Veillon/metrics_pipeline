@@ -737,7 +737,7 @@ def run_is_converged(struct_path: PathLike) -> bool:
     Check whether the VASP run terminated normally and converged.
     
     Parameters:
-        struct_dir (Path|str):  Path to the directory containing the VASP calculation.
+        struct_path (Path|str):  Path to the directory containing the VASP calculation.
     
     Returns:
         True if no error, timeout nor max ionic step reached was issued, False otherwise.
@@ -770,8 +770,7 @@ def run_is_converged(struct_path: PathLike) -> bool:
 
 
 def extract_vasp_data_for_convex_hull(
-    struct_dir: PathLike = ".", 
-    ignore_file: Optional[str] = None, 
+    struct_dir: PathLike = ".",
     path_to_summary: Optional[PathLike] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
     """
@@ -780,54 +779,44 @@ def extract_vasp_data_for_convex_hull(
 
     Parameters:
         struct_dir (str|Path):  Directory containing a finished VASP calculation on a structure.
-
-        ignore_file (str):      Checks whether the provided file name exists in each 
-                                subdirectory. Structure directories containing this file 
-                                will not be taken into account.
-                                This parameter permits the filtration of structures that did
-                                not pass previous steps.
         
         path_to_summary (str):  Path to a JSON summary file containing results from previous step.
-                                If both ignore_file and path_to_summary are provided, 
-                                the ignore file will be checked first for performance reasons.
+                                Used to not consider structures that failed before.
+                                If not provided, all structure subdirs will be extracted.
 
     Returns:
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
                                 containing following data, used in stability calculation:
+                                    - structure directory name,
                                     - structure chemical composition as Composition object,
-                                    - structure energy at the end of the first ionic step,
-                                    - structure final energy (in eV).
+                                    - generated structure energy (in eV),
     """
 
     assert isinstance(struct_dir, (Path, str))
-    assert Path(struct_dir).is_dir()
+    assert os.path.isdir(str(struct_dir))
 
-    struct_dir: Path = Path(struct_dir)
+    struct_dir: str = str(struct_dir)
 
     if not run_is_converged(struct_dir):
         return {}
-
-    if ignore_file is not None:
-        files = set(file.name for file in struct_dir.iterdir())
-        if ignore_file in files:
-            return {}
     
     if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
         return {}
 
-    struct_name  = struct_dir.name
-    contcar_path = Path(struct_dir / "CONTCAR")
-    oszicar_path = Path(struct_dir / "OSZICAR")
+    struct_name  = os.path.basename(struct_dir)
+    contcar_path = os.path.join(struct_dir, "CONTCAR")
+    oszicar_path = os.path.join(struct_dir, "OSZICAR")
 
     structure = Poscar.from_file(contcar_path).structure
     composition = Composition(structure.formula)
-    first_ionic_energy: float = Oszicar(oszicar_path).ionic_steps[0]["E0"]
-    final_energy_eV: float = Oszicar(oszicar_path).final_energy
+
+    # We want the energy of the generated structure, not the relaxed one.
+    generated_energy: float = Oszicar(oszicar_path).ionic_steps[0]["E0"]
 
     struct_dict = {
+        "entry_id": struct_name,
         "composition": composition,
-        "first_ionic_energy": first_ionic_energy,
-        "final_energy": final_energy_eV
+        "final_energy": generated_energy
     }
     struct_data = (struct_name, struct_dict)
 
@@ -839,7 +828,6 @@ def extract_vasp_data_for_convex_hull(
 
 def extract_vasp_data_for_delta_sol_init(
     struct_dir: PathLike = ".", 
-    ignore_file: Optional[str] = None, 
     path_to_summary: Optional[PathLike] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
     """
@@ -848,20 +836,15 @@ def extract_vasp_data_for_delta_sol_init(
 
     Parameters:
         struct_dir (str|Path):  Directory containing a finished VASP calculation on a structure.
-
-        ignore_file (str):      Checks whether the provided file name exists in each 
-                                subdirectory. Structure directories containing this file 
-                                will not be taken into account.
-                                This parameter permits the filtration of structures that did
-                                not pass previous steps.
         
         path_to_summary (str):  Path to a JSON summary file containing results from previous step.
-                                If both ignore_file and path_to_summary are provided, 
-                                the ignore file will be checked first for performance reasons.
+                                Used to not consider structures that failed before.
+                                If not provided, all structure subdirs will be extracted.
+
 
     Returns:
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
-                                containing following data, used in Δ-Sol method:
+                                containing following data, used for Δ-Sol method:
                                     - structure itself,
                                     - its final energy (in eV).
     """
@@ -874,11 +857,6 @@ def extract_vasp_data_for_delta_sol_init(
     )
 
     struct_dir: Path = Path(struct_dir)
-
-    if ignore_file is not None:
-        files = set(file.name for file in struct_dir.iterdir())
-        if ignore_file in files:
-            return {}
 
     if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
         return {}
@@ -903,20 +881,35 @@ def extract_vasp_data_for_delta_sol_init(
 
 
 def extract_vasp_data_for_delta_sol_calc(
-    struct_dir: PathLike = ".", 
-    ignore_file: Optional[str] = None, 
+    struct_dir: PathLike = ".",
     path_to_summary: Optional[PathLike] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
-    """"""
+    """
+    Extract the results of Δ-Sol computations.
+    
+    Parameters:
+        struct_dir (str|Path):  Structure directory containing subdirs of Δ-Sol computations.
+        
+        path_to_summary (str):  Path to a JSON summary file containing results from previous step.
+                                Used to not consider structures that failed before.
+                                If not provided, all structure subdirs will be extracted.
+
+
+    Returns:
+        Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
+                                containing following data, used for Δ-Sol method:
+                                    - structure itself,
+                                    - its final energy (in eV).
+    """
     assert isinstance(struct_dir, (Path, str))
     assert os.path.isdir(str(struct_dir))
 
-    calc_dirs   = list(filter(lambda path: path.is_dir(), Path(struct_dir).iterdir()))
+    calc_dirs   = list(filter(lambda path: os.path.isdir(path), os.listdir(struct_dir)))
     struct_dict = {}
 
     for calc_dir in calc_dirs:
         calc_data = extract_vasp_data_for_delta_sol_init(
-            struct_dir=calc_dir, ignore_file=ignore_file, path_to_summary=path_to_summary
+            struct_dir=calc_dir, path_to_summary=path_to_summary
         )
 
         if "_neutral" in calc_data[0]:
@@ -936,9 +929,8 @@ def extract_vasp_data_for_delta_sol_calc(
 def batch_extract_vasp_data(
         method: Literal['convex_hull', 'delta_sol_init', "delta_sol_calc"], 
         base_dir: PathLike = '.', 
-        structs_names: Optional[Sequence[str]] = None, 
-        ignore_file: Optional[str] = None, 
-        path_to_summary: Optional[PathLike] = None, 
+        structs_names: Optional[Sequence[str]] = None,
+        path_to_summary: Optional[PathLike] = None,
         workers: int = 1
 ) -> Dict[str, Dict[str, Any]]:
     """
@@ -956,18 +948,10 @@ def batch_extract_vasp_data(
         structs_names ([str]):  Provide specific structures sub-directories to extract data from.
                                 If specified, only specified subdirs in base_dir are checked.
                                 If not, all subdirs in base_dir are checked.
-
-        ignore_file (str):      Checks whether the provided file name exists in each 
-                                subdirectory. Structure directories containing this file 
-                                will not be taken into account.
-                                This parameter permits the filtration of structures that did
-                                not pass previous steps. If not provided, a JSON summmary file must 
-                                be given as a replacement in the 'path_to_summary' arg.
         
         path_to_summary (str):  Path to a JSON summary file containing results from previous steps.
-                                If not provided, 'ignore_file' arg must be provided a file name to search
-                                in structure directories. If both ignore_file and path_to_summary are provided, 
-                                the ignore file will have priority for performance reasons.
+                                Used to not consider structures that failed before.
+                                If not provided, all structure subdirs will be extracted.
 
         workers (int):          Number of parallel processes to spawn.
 
@@ -978,8 +962,7 @@ def batch_extract_vasp_data(
 
                                 Data returned for 'convex_hull' method:
                                     - composition of the formula unit,
-                                    - first ionic step energy in eV,
-                                    - final energy of the relaxation in eV.
+                                    - energy of the unrelaxed structure in eV.
 
                                 Data returned for 'delta_sol' method:
                                     - structure itself,
@@ -988,24 +971,30 @@ def batch_extract_vasp_data(
 
     assert isinstance(base_dir, (Path, str))
     assert os.path.isdir(str(base_dir))
-    assert isinstance(ignore_file, str) or ignore_file is None
+    assert os.listdir(str(base_dir))
     assert isinstance(path_to_summary, (Path, str)) or path_to_summary is None
     assert isinstance(workers, int) and workers >= 1
 
     def is_struct_dir(path: Path) -> bool:
-        return path.is_dir() and re.match(r'\A[0-9]+_[A-Za-z0-9\(\)]+\Z', path.name) is not None
+        #NOTE: Do not change type hint here, os.listdir() is not appropriate.
+        return os.path.isdir(path) and re.match(
+            r"\A[0-9]+_[A-Za-z0-9\(\)]+\Z", os.path.basename(path)
+        ) is not None
 
     if method == "convex_hull":
         set_vasp_extractor = partial(
-            extract_vasp_data_for_convex_hull, ignore_file=ignore_file, path_to_summary=path_to_summary
+            extract_vasp_data_for_convex_hull,
+            path_to_summary=path_to_summary
         )
     elif method == "delta_sol_init":
         set_vasp_extractor = partial(
-            extract_vasp_data_for_delta_sol_init, ignore_file=ignore_file, path_to_summary=path_to_summary
+            extract_vasp_data_for_delta_sol_init,
+            path_to_summary=path_to_summary
         )
     elif "delta_sol_calc":
         set_vasp_extractor = partial(
-            extract_vasp_data_for_delta_sol_calc, ignore_file=ignore_file, path_to_summary=path_to_summary
+            extract_vasp_data_for_delta_sol_calc,
+            path_to_summary=path_to_summary
         )
     else:
         raise NotImplementedError(
@@ -1013,14 +1002,16 @@ def batch_extract_vasp_data(
             "Supported methods are: 'convex_hull', 'delta_sol_init', 'delta_sol_calc'."
         )
 
-    base_dir           = Path(base_dir)
-    structs_dir_list   = list(filter(is_struct_dir, base_dir.iterdir()))
+    structs_dir_list = list(filter(is_struct_dir, Path(base_dir).iterdir()))
 
     if structs_names:
-        structs_dir_list = list(filter(lambda path: path.name in structs_names, structs_dir_list))
-    
-    nbr_structs        = len(structs_dir_list)
-    chunksize          = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
+        structs_dir_list = list(filter(
+            lambda path: os.path.basename(path) in structs_names,
+            structs_dir_list
+        ))
+
+    nbr_structs = len(structs_dir_list)
+    chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
 
     structs_data_list = list(
         filter(
@@ -1038,6 +1029,9 @@ def batch_extract_vasp_data(
     structs_data = dict(structs_data_list)
 
     return structs_data
+
+
+########################################
 
 
 def vasp_output_structure(struct_dir: str) -> Tuple[Structure,Structure]|Tuple[None,None]:
