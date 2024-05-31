@@ -121,18 +121,16 @@ def init_entries_from_dict(
     assert isinstance(entries_dict, Dict)
     assert isinstance(workers, int)
     
-    nbr_structs = len(entries_dict)
-    chunksize = min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1
-    converter = partial(_dict_to_entry, attribute=attribute)
-
-    entries_list = process_map(
-        converter,
-        entries_dict.values(),
-        max_workers=workers,
-        chunksize=chunksize,
-        desc=f"Conversion of '{attribute}' structures to entries"
-    )
-
+    print(f"Convert {len(entries_dict)} '{attribute}' structures to entries...")
+    entries_list = [
+        PDEntry(
+            composition=entry["composition"],
+            energy=entry["final_energy"],
+            name=entry["entry_id"],
+            attribute=attribute
+        ) for entry in entries_dict.values()
+    ]
+    print("Conversion finished.")
     return entries_list
 
 
@@ -526,7 +524,7 @@ def phase_diagram_init(
     print(f"Initializing phase diagram '{pd_name}'")
     new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
     print(f"{pd_name} diagram contains following entries:")
-    for entry in new_pd.all_entries:
+    for entry in new_pd.qhull_entries:
         print(f"{entry}")
 
     return new_pd
