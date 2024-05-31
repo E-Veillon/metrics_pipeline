@@ -762,7 +762,10 @@ def run_is_converged(struct_path: PathLike) -> bool:
         vasprun = Vasprun(vasprun_path)
     except ET.ParseError:
         return False
-    
+    except UnicodeDecodeError:
+        print(f"UnicodeDecodeError: file '{vasprun_path}'.")
+        return False
+
     return vasprun.converged
 
 
