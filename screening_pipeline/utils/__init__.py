@@ -10,7 +10,7 @@ from .periodic_table import (
     get_all_valence_electrons,
 )
 from .cif_io import read_cif, write_cif, extract_cif_from_file, cif_str_to_struct
-from .matcher import remove_equivalent
+from .matcher import remove_equivalent, group_by_composition
 from .vasp_io import (
     vasp_relaxation_settings,
     vasp_static_settings,
@@ -27,12 +27,15 @@ from .fitted_values import E_O2_FIT, U_VALUES, DELTA_E_M, EXP_DELTA_H, EL_PER_XC
 from .paths import add_new_dir, batch_add_new_dirs
 from .data_process import (
     check_interatomic_distances,
+    get_max_dim,
+    init_entries_from_dict,
+    filter_database_entries,
     get_elements_from_entries,
+    group_by_dim_and_comp,
     init_entries_and_group_by_dim_and_comp,
     get_sub_entries,
-    phase_diagram_init,
-    calculate_instability_energies,
-    batch_calculate_instability_energies,
+    get_lacking_elts_entries,
+    batch_compute_e_above_hull,
     calculate_delta_sol_band_gap,
     batch_calculate_delta_sol_band_gaps,
 )

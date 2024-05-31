@@ -67,9 +67,121 @@ def check_interatomic_distances(
 
     return valid_structs, nbr_discarded
 
+
 ########################################
 
-# Functions related to phase stability screening with Convex Hull construction method.
+
+def get_max_dim(entries: Sequence[PDEntry]) -> int:
+    """Search for the maximum number of distinct elements in given entries."""
+    return max([len(entry.elements) for entry in entries])
+
+
+########################################
+
+
+def _dict_to_entry(
+        data: Dict[str, Union[str, Composition, float]],
+        attribute: Optional[str] = None
+    ) -> PDEntry:
+        """
+        Parameters:
+            data (dict): dict containing data for one structure.
+        
+        Returns:
+            PDEntry: Entry containing given data.
+        """
+        return PDEntry(
+                composition=data["composition"],
+                energy=data["final_energy"],
+                name=data["entry_id"],
+                attribute=attribute,
+        )
+#---------------------------------------
+def init_entries_from_dict(
+        entries_dict: Dict[str, Dict], attribute: Optional[str] = None, workers: int = 1
+    ) -> List[PDEntry]:
+    """
+    Convert structures data into PDEntry objects compatible with phase diagrams.
+    Can be parallelised with multiprocess workers.
+
+    Parameters:
+        entries_dict (dict):    Dict of dicts containing following structure data keys:
+                                - entry_id (either dataset ID or generated name),
+                                - composition (Composition object),
+                                - final_energy (float).
+
+        attribute (str):        Label to put as attribute in the entries.
+
+        workers (int):          Number of parallel processes to spawn.
+    
+    Returns:
+        List[PDEntry]: The list of phase diagram entries.
+    """
+
+    assert isinstance(entries_dict, Dict)
+    assert isinstance(workers, int)
+    
+    nbr_structs = len(entries_dict)
+    chunksize = min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1
+    converter = partial(_dict_to_entry, attribute=attribute)
+
+    entries_list = process_map(
+        converter,
+        entries_dict.values(),
+        max_workers=workers,
+        chunksize=chunksize,
+        desc=f"Conversion of '{attribute}' structures to entries"
+    )
+
+    return entries_list
+
+
+########################################
+
+
+def filter_database_entries(
+        entries: Dict[str,Any]|List[PDEntry],
+        max_dim: Optional[int] = None,
+        ref_elts: Optional[List[Element]] = None,
+        workers: int = 1
+    ) -> List[PDEntry]:
+    """
+    Filter out entries in database file that are useless for generated data.
+    Data format conversion can be parallelized.
+
+    Parameters:
+        entries (dict):         Entries to filter.
+
+        max_dim (int):          Max dimension of entries to keep.
+
+        ref_elts ([Element]):   List of useful Elements to keep in the dataset.
+                                All structures containing other elements are discarded.
+        
+        workers (int):          Number of parallel processes to spawn.
+
+    Returns:
+        List[PDEntry]: List of useful entries.
+    """
+
+    assert isinstance(entries, (Dict, List))
+    assert isinstance(max_dim, int) or max_dim is None
+    assert isinstance(ref_elts, List) or ref_elts is None
+
+    print("Filtering reference dataset...")
+
+    if isinstance(entries, Dict):
+        entries = init_entries_from_dict(entries, attribute="ref_struct", workers=workers)
+
+    entries = _get_relevant_entries(entries, ref_elts)
+    entries = list(filter(
+        lambda entry: len(entry.elements) <= max_dim,
+        entries
+    ))
+    print(f"Filtering done, {len(entries)} entries left.")
+    return entries
+
+
+########################################
 
 
 def get_elements_from_entries(entries: Sequence[PDEntry]) -> List[Element]:
@@ -96,48 +208,53 @@ def get_elements_from_entries(entries: Sequence[PDEntry]) -> List[Element]:
 ########################################
 
 
-def filter_database_entries(
-        entries: Dict[str,Any]|List[PDEntry],
-        max_dim: Optional[int] = None,
-        ref_elts: Optional[List[Element]] = None
-    ) -> List[PDEntry]:
+def group_by_dim_and_comp(
+        entries: Sequence[PDEntry], max_dim: Optional[int] = None, workers: int = 1
+    ) -> List[List[List[PDEntry]]]:
     """
-    Filter out entries in database file that are useless for generated data.
+    Group entries in sublists according to the number of elements,
+    then group entries in each sublist in subsublists according to
+    their elemental composition. Can be parallelized over each dim.
 
     Parameters:
-        entries (dict):                 entries to filter.
+        entries ([PDEntry]):    entries to sort out.
 
-        max_dim (int):                  max dimension of entries to keep.
+        max_dim (int):          the highest number of elements an entry can have.
+                                If some entries have higher dim than given max_dim,
+                                they will be discarded. If max_dim is higher than the
+                                actual highest dim in entries, empty sublists will be
+                                put in the additional list indexes. If max_dim is not
+                                given, it will be infered from given entries.
 
-        elements_to_keep ([Element]):   list of useful Elements to keep in the dataset.
-                                        All structures containing other elements are discarded.
+        workers (int):          Number of parallel processes to spawn.
 
     Returns:
-        List[PDEntry]: List of useful entries.
+        List[List[List[PDEntry]]]: List of lists of entries of same dimension sorted
+        in sublists according to their composition.
     """
 
-    assert isinstance(entries, (Dict, List))
-    assert isinstance(max_dim, int) or max_dim is None
-    assert isinstance(ref_elts, List) or ref_elts is None
-    print("Filtering reference data...")
-    if isinstance(entries, Dict):
-        entry_list = [
-                PDEntry(
-                    composition=data["composition"],
-                    energy=data["final_energy"],
-                    name=name,
-                    attribute="struct_ref",
-                )
-                for name, data in entries.items()
-        ]
+    def _group_one_dim(entries: Sequence[PDEntry], dim: int):
+        dim_group = list(filter(lambda entry: len(entry.elements) == dim, entries))
+        grouped_entries = group_by_composition(dim_group)
+        return grouped_entries
 
-    entry_list = list(filter(
-        lambda entry: len(entry.elements) <= max_dim,
-        entry_list
-    ))
-    entry_list = _get_relevant_entries(entry_list, ref_elts)
-    print("Filtering done.")
-    return entry_list
+    initial_group = [[]]  # fill the index 0 to match indexes and entries dimensionality
+
+    if max_dim is None:
+        max_dim = get_max_dim(entries)
+    
+    grouper = partial(_group_one_dim, entries=entries)
+
+    grouped_entries = process_map(
+        grouper,
+        list(range(1, max_dim + 1)),
+        max_workers=workers,
+        chunksize=1,
+        desc="Grouping entries by dim and comp"
+    )
+
+    grouped_entries = initial_group + grouped_entries
+    return grouped_entries
 
 
 ########################################
@@ -203,7 +320,7 @@ def init_entries_and_group_by_dim_and_comp(
     ]
     print("Conversion done.")
 
-    max_dim = max([len(entry.elements) for entry in entry_list])
+    max_dim = get_max_dim(entry_list)
     elements = get_elements_from_entries(entry_list)
 
     if ref_structs:
@@ -220,7 +337,7 @@ def init_entries_and_group_by_dim_and_comp(
     else:
         ref_entry_list = []
 
-    elt_entries = _get_lacking_elts_entries(
+    elt_entries = get_lacking_elts_entries(
         entries=entry_list, ref_elts=elements
     )
 
@@ -266,7 +383,7 @@ def get_sub_entries(
     assert all(isinstance(entry, PDEntry) for entry in entry_pool), (
         "Some of given entries in 'entry_pool' arguments are not instances of PDEntry class.\n"
         "See below the set of types found in the argument:\n"
-        f"{[type(entry) for entry in entry_pool]}"
+        f"{set([type(entry) for entry in entry_pool])}"
     )
 
     sub_entries = list(
@@ -309,7 +426,7 @@ def _get_relevant_entries(
 ########################################
 
 
-def _get_lacking_elts_entries(
+def get_lacking_elts_entries(
     entries: Sequence[PDEntry], ref_elts: Union[Sequence[Element], set[Element]]
 ) -> List[PDEntry]:
     """
@@ -325,15 +442,20 @@ def _get_lacking_elts_entries(
         A list of auto-defined elemental entries.
     """
 
-    user_elt_entries = list(
-        filter(
-            lambda entry: entry.is_element and entry.elements[0] in ref_elts, entries
+    if not entries:
+        user_elt_entries = []
+    else:
+        user_elt_entries = list(
+            filter(
+                lambda entry: entry.is_element and entry.elements[0] in ref_elts,
+                entries
+            )
         )
-    )
 
     lacking_elts = list(
         filter(
-            lambda elt: elt not in get_elements_from_entries(user_elt_entries), ref_elts
+            lambda elt: elt not in get_elements_from_entries(user_elt_entries),
+            ref_elts
         )
     )
 
@@ -398,13 +520,94 @@ def phase_diagram_init(
         ref_elts = get_elements(ref_elts)
         entries = _get_relevant_entries(entries, ref_elts)
 
-    entry_list = _get_lacking_elts_entries(entries, ref_elts) + list(entries)
+    entry_list = get_lacking_elts_entries(entries, ref_elts) + list(entries)
 
     pd_name = "-".join(list(map(str, ref_elts)))
     print(f"Initializing phase diagram '{pd_name}'")
     new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
+    print(f"{pd_name} diagram contains following entries:")
+    for entry in new_pd.all_entries:
+        print(f"{entry}")
 
     return new_pd
+
+
+########################################
+
+
+def _compute_e_above_hull(
+        entries_to_compute: List[PDEntry], ref_entries: List[PDEntry],
+        stable_limit: float = 0.1
+    ) -> List[Tuple[str, float, bool]]:
+    """
+    Initialize a phase diagram and compute above hull energies of given entries.
+    """
+    results = []
+    comp_refs = get_sub_entries(main_entry=entries_to_compute[0], entry_pool=ref_entries)
+    pd = phase_diagram_init(entries=comp_refs)
+
+    # Compute energy above hull for each generated entry
+    for entry in entries_to_compute:
+        e_above_hull = pd.get_e_above_hull(entry, allow_negative=True)
+        is_stable = e_above_hull <= stable_limit
+        print(f"Entry '{entry.name}':")
+        print(f"- e_above_hull: {e_above_hull}")
+        print(f"- is_stable: {is_stable}")
+        results.append(
+            {
+                "name": entry.name,
+                "e_above_hull": e_above_hull,
+                "stable": str(is_stable)
+            }
+        )
+    return results
+#---------------------------------------
+def batch_compute_e_above_hull(
+        entries_to_compute: List[List[PDEntry]],
+        ref_entries: List[PDEntry],
+        stable_limit: float = 0.1,
+        workers: int = 1
+    ) -> List[Dict[str, Union[str, float, bool]]]:
+    """
+    For each sublist, build the minimal phase diagram using the reference entries,
+    then computes the energy above hull of all entries in the sublist.
+    Can be parallelized over phase diagram initialization, one diagram per process.
+
+    Parameters:
+        entries_to_compute ([[PDEntry]]):   List of entry sublists whose energy is needed.
+                                            One phase diagram is built for each sublist.
+
+        ref_entries ([PDEntry]):            reference entries used to build the diagrams.
+                                            Each diagram is built with only necessary
+                                            entries from this sequence.
+
+        stable_limit (float):               Threshold of the energy above hull above which
+                                            the entry is considered unstable, in eV/atom.
+                                            Defaults to 0.1 eV/atom.
+
+        workers (int):                      Number of parallel processes to spawn.
+        
+    Returns:
+        List[Dict[str, str|float|bool]]: List of dicts containing the name, energy above hull
+        and stability test boolean for one entry structure each.
+    """
+
+    energy_computer = partial(
+        _compute_e_above_hull,
+        ref_entries=ref_entries,
+        stable_limit=stable_limit
+    )
+
+    computed_energies = process_map(
+        energy_computer,
+        entries_to_compute,
+        max_workers=workers,
+        chunksize=1,
+        desc="Compute above hull energies"
+    )
+    computed_energies = flatten(computed_energies)
+
+    return computed_energies
 
 
 ########################################
@@ -584,7 +787,6 @@ def batch_calculate_instability_energies(
 
 
 ########################################
-
 # Functions related to Band Gap screening with Δ-Sol method.
 
 
