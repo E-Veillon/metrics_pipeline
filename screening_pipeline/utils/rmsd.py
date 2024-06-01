@@ -18,6 +18,7 @@ def _get_shortest_paths(
     x_dst: torch.FloatTensor,
     num_atoms: torch.LongTensor,
 ) -> Tuple[torch.LongTensor, torch.FloatTensor]:
+    """"""
     idx = torch.arange(num_atoms.shape[0], dtype=torch.long, device=num_atoms.device)
     batch = idx.repeat_interleave(num_atoms)
 
@@ -48,6 +49,7 @@ def _center_around_zero(x: torch.FloatTensor) -> torch.FloatTensor:
 
 
 def polar(a: torch.FloatTensor) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
+    """"""
     w, s, vh = torch.linalg.svd(a)
     u = w @ vh
     return u, (vh.mT.conj() * s[:, None, :]) @ vh
@@ -60,6 +62,7 @@ def rmsd(
     x_dst: torch.FloatTensor,
     num_atoms: torch.LongTensor,
 ) -> torch.FloatTensor:
+    """"""
     batch_atoms = torch.arange(cell_src.shape[0], dtype=torch.long).repeat_interleave(
         num_atoms
     )
@@ -84,6 +87,7 @@ def rmsd(
 def rmsd_from_structures(
     struct1: List[Structure], struct2: List[Structure]
 ) -> np.ndarray:
+    """"""
     num_atoms = torch.tensor([len(s) for s in struct1], dtype=torch.long)
 
     assert (

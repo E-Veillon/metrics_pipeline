@@ -159,7 +159,7 @@ def batch_group_by_equivalence(
         structures: Sequence[Structure],
         workers: int = 1,
         comment: str = None
-    ) -> List[List[Structure]]:
+    ) -> List[List[List[Structure]]]:
     """
     Group structures by equivalence in two steps:
     First, groups by stoichiometry, then pass each sub-group in
@@ -172,11 +172,12 @@ def batch_group_by_equivalence(
         workers (int):              Number of parallel processes to spawn.
                                     Defaults to 1.
 
-        comment (str):              Optional message to print next to tqdm"s
+        comment (str):              Optional message to print next to tqdm
                                     progression bar.
 
     Returns:
-        List[List[Structure]]: A list containing lists of equivalent structures.
+        List[List[List[Structure]]]: A list containing lists of same composition
+        containing lists of equivalent structures.
     """
 
     nbr_struct    = len(structures)

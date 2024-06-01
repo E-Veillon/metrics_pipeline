@@ -726,7 +726,11 @@ def _check_summary_data(struct_dir: PathLike, summary_file: PathLike) -> bool:
         )
         return False
 
-    return "True" in prev_struct_data.values() or True in prev_struct_data.values()
+    is_good_struct = (
+        "True" in prev_struct_data.values() or
+        "true" in prev_struct_data.values()
+    )
+    return is_good_struct
 
 
 ########################################
@@ -1084,8 +1088,14 @@ def vasp_output_structure(struct_dir: str) -> Tuple[Structure,Structure]|Tuple[N
         The initial and final structures if the calculation converged.
     """
 
-    assert isinstance(struct_dir, (Path, str))
-    assert Path(struct_dir).is_dir()
+    if not isinstance(struct_dir, str):
+        raise TypeError(
+            f"'struct_dir' arg expected a 'str', got '{type(struct_dir)}' instead."
+        )
+    if not os.path.isdir(struct_dir):
+        raise ValueError(
+            f"{struct_dir}: No such directory found."
+        )
 
     vasprun = converged_Vasprun(
         struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
