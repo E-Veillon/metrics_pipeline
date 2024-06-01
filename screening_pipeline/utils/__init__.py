@@ -17,7 +17,6 @@ from .vasp_io import (
     vasp_launcher,
     vasp_batch_launch,
     batch_extract_vasp_data,
-    chgcar_density_switch,
     delta_sol_inputs_init,
     extract_vasp_data_for_delta_sol_init,
     delta_sol_calculation_init,

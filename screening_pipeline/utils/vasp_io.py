@@ -6,6 +6,7 @@ Functions to write VASP input files, launch VASP calculations and manage VASP ou
 # SYSTEM I/O MODULES
 
 import os
+import warnings
 from monty.os.path import zpath
 from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal, Any
 from pathlib import Path
@@ -16,8 +17,8 @@ import xml.etree.ElementTree as ET
 # OPTIMIZATION MODULES
 
 import re
-from scipy.constants import elementary_charge
-from itertools import chain, starmap, repeat
+#from scipy.constants import elementary_charge
+from itertools import starmap, repeat#, chain
 from functools import partial
 from tqdm.contrib.concurrent import process_map
 
@@ -28,16 +29,15 @@ from pymatgen.core.structure import Structure, SiteCollection, Composition
 from pymatgen.core import SETTINGS
 from pymatgen.io.vasp.inputs import PotcarSingle
 from pymatgen.io.vasp import VaspInput, Vasprun
-from pymatgen.io.vasp.inputs import Poscar
-from pymatgen.io.vasp.outputs import Chgcar, Oszicar
+#from pymatgen.io.vasp.inputs import Poscar
+#from pymatgen.io.vasp.outputs import Chgcar, Oszicar
 from pymatgen.io.vasp.sets import (
-    DictSet, MITRelaxSet, MPRelaxSet, MPStaticSet, _load_yaml_config, UserPotcarFunctional
+    DictSet, MITRelaxSet#, MPRelaxSet, MPStaticSet, _load_yaml_config, UserPotcarFunctional
 )
 
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils.utils import is_float
 from screening_pipeline.utils.custom_types import (
     PathLike,
     PMGRelaxSetType,
@@ -708,9 +708,8 @@ def _check_summary_data(struct_dir: PathLike, summary_file: PathLike) -> bool:
     was rejected in the previous step.
     """
     import json
-    import warnings
 
-    with open(summary_file, 'r') as fp:
+    with open(summary_file, 'rt') as fp:
         summary = json.load(fp)
     
     try:
@@ -727,46 +726,69 @@ def _check_summary_data(struct_dir: PathLike, summary_file: PathLike) -> bool:
         )
         return False
 
-    return prev_struct_data.get("stable") is True
+    return "True" in prev_struct_data.values() or True in prev_struct_data.values()
 
 
 ########################################
 
-def run_is_converged(struct_path: PathLike) -> bool:
+def converged_Vasprun(run_path: PathLike, **kwargs) -> Vasprun|None:
     """
-    Check whether the VASP run terminated normally and converged.
+    Read and parse vasprun.xml file at given VASP run directory.
+    Check whether the VASP run terminated and converged correctly.
+    Returns a Vasprun object if it is the case, or None otherwise.
     
     Parameters:
-        struct_path (Path|str):  Path to the directory containing the VASP calculation.
+        run_path (Path|str):    Path to the directory containing the VASP calculation.
+
+        **kwargs:               Additional keyword arguments to pass to pymatgen Vasprun class.
     
     Returns:
-        True if no error, timeout nor max ionic step reached was issued, False otherwise.
+        Vasprun object if no error, timeout nor max ionic step reached was issued,
+        None otherwise.
     """
-    if not isinstance(struct_path, (Path,str)):
+    if not isinstance(run_path, (Path,str)):
         raise TypeError(
             "Given 'struct-dir' argument value expected 'Path' or 'str', "
-            f"got '{type(struct_path)}' instead."
+            f"got '{type(run_path)}' instead."
         )
-    if not os.path.isdir(struct_path):
-        raise ValueError(f"{struct_path}: No such directory found.")
+    if not os.path.isdir(run_path):
+        raise ValueError(f"{run_path}: No such directory found.")
 
-    vasprun_path = os.path.join(struct_path, "vasprun.xml")
+    vasprun_path = os.path.join(run_path, "vasprun.xml")
 
     if not os.path.isfile(vasprun_path):
         raise ValueError(
-            f"{struct_path}: No vasprun.xml file found at this location."
+            f"{run_path}: No vasprun.xml file found at this location."
             "Make sure this file is present in its run directory."
         )
 
     try:
-        vasprun = Vasprun(vasprun_path)
+        vasprun = Vasprun(
+            filename=vasprun_path,
+            ionic_step_skip=kwargs.pop("ionic_step_skip", None),
+            ionic_step_offset=kwargs.pop("ionic_step_offset", int(0)),
+            parse_dos=kwargs.pop("parse_dos", True),
+            parse_eigen=kwargs.pop("parse_eigen", True),
+            parse_projected_eigen=kwargs.pop("parse_projected_eigen", False),
+            parse_potcar_file=kwargs.pop("parse_potcar_file", True),
+            occu_tol=kwargs.pop("occu_tol", float(1e-8)),
+            separate_spins=kwargs.pop("separate_spins", False),
+            exception_on_bad_xml=kwargs.pop("exception_on_bad_xml", True)
+        )
     except ET.ParseError:
-        return False
+        return None
     except UnicodeDecodeError:
-        print(f"UnicodeDecodeError: file '{vasprun_path}'.")
-        return False
+        warn_msg = f"WARNING: vasprun.xml file at {run_path} contains "
+        warn_msg += "unreadable characters for 'utf-8' codec.\n"
+        warn_msg += "Associated data is therefore considered erroneous and "
+        warn_msg += "is not parsed further."
+        warnings.warn(warn_msg)
+        return None
 
-    return vasprun.converged
+    if not vasprun.converged:
+        return None
+    
+    return vasprun
 
 
 ########################################
@@ -799,22 +821,21 @@ def extract_vasp_data_for_convex_hull(
     assert os.path.isdir(str(struct_dir))
 
     struct_dir: str = str(struct_dir)
-
-    if not run_is_converged(struct_dir):
-        return {}
     
     if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
         return {}
 
+    vasprun = converged_Vasprun(
+        struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
+    )
+
+    if vasprun is None:
+         return {}
+
+    # We want data of the generated structure for convex hulls, not the relaxed one
     struct_name  = os.path.basename(struct_dir)
-    contcar_path = os.path.join(struct_dir, "CONTCAR")
-    oszicar_path = os.path.join(struct_dir, "OSZICAR")
-
-    structure = Poscar.from_file(contcar_path).structure
-    composition = Composition(structure.formula)
-
-    # We want the energy of the generated structure, not the relaxed one.
-    generated_energy: float = Oszicar(oszicar_path).ionic_steps[0]["E0"]
+    generated_energy: float = vasprun.ionic_steps[0]["e_0_energy"]
+    composition = vasprun.initial_structure.composition
 
     struct_dict = {
         "entry_id": struct_name,
@@ -864,12 +885,15 @@ def extract_vasp_data_for_delta_sol_init(
     if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
         return {}
 
-    struct_name = struct_dir.name
-    contcar_path = Path(struct_dir / "CONTCAR")
-    oszicar_path = Path(struct_dir / "OSZICAR")
+    vasprun = converged_Vasprun(
+        struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
+    )
+    if vasprun is None:
+        return {}
 
-    structure = Poscar.from_file(contcar_path).structure
-    final_energy_eV = Oszicar(oszicar_path).final_energy
+    struct_name = struct_dir.name
+    structure = vasprun.final_structure
+    final_energy_eV = vasprun.final_energy
 
     struct_dict = {
         "structure": structure,
@@ -911,11 +935,20 @@ def extract_vasp_data_for_delta_sol_calc(
     struct_dict = {}
 
     for calc_dir in calc_dirs:
+        if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
+            return {}
+
         calc_data = extract_vasp_data_for_delta_sol_init(
             struct_dir=calc_dir, path_to_summary=path_to_summary
         )
+        if not calc_data:
+            msg = f"WARNING: {calc_dir} could not be parsed, either because the "
+            msg += "VASP run terminated on an error, on a timeout limit "
+            msg += "or it did not converge after the maximum ionic step was reached."
+            warnings.warn(msg)
+            continue
 
-        if "_neutral" in calc_data[0]:
+        if struct_dict.get("structure") is None:
             struct_dict.update({"structure": calc_data[1]["structure"]})
 
         struct_dict.update({calc_data[0]: calc_data[1]["final_energy"]})
@@ -994,7 +1027,7 @@ def batch_extract_vasp_data(
             extract_vasp_data_for_delta_sol_init,
             path_to_summary=path_to_summary
         )
-    elif "delta_sol_calc":
+    elif method == "delta_sol_calc":
         set_vasp_extractor = partial(
             extract_vasp_data_for_delta_sol_calc,
             path_to_summary=path_to_summary
@@ -1005,6 +1038,7 @@ def batch_extract_vasp_data(
             "Supported methods are: 'convex_hull', 'delta_sol_init', 'delta_sol_calc'."
         )
 
+    #NOTE: Do not change the Path object here, os.listdir() is not appropriate
     structs_dir_list = list(filter(is_struct_dir, Path(base_dir).iterdir()))
 
     if structs_names:
@@ -1046,21 +1080,21 @@ def vasp_output_structure(struct_dir: str) -> Tuple[Structure,Structure]|Tuple[N
     Parameters:
         struct_dir (str):  Path to the calculation.
 
-    Returns: (Structure)
-        The input (POSCAR) and output (CONTCAR) structures if the calculation converged.
+    Returns: (Structure, Structure)
+        The initial and final structures if the calculation converged.
     """
 
     assert isinstance(struct_dir, (Path, str))
     assert Path(struct_dir).is_dir()
 
-    if not run_is_converged(struct_dir):
+    vasprun = converged_Vasprun(
+        struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
+    )
+    if vasprun is None:
         return (None, None)
 
-    poscar_path = os.path.join(struct_dir, "POSCAR")
-    contcar_path = os.path.join(struct_dir, "CONTCAR")
-
-    in_struct = Poscar.from_file(poscar_path).structure
-    out_struct = Poscar.from_file(contcar_path).structure
+    in_struct = vasprun.initial_structure
+    out_struct = vasprun.final_structure
 
     return in_struct, out_struct
 
@@ -1088,23 +1122,6 @@ def batch_extract_vasp_structures(
             desc="Extracting structures from VASP output",
         )
     ))
-
-
-########################################
-
-
-def chgcar_density_switch(chgcar: Chgcar, delta: float):
-    """
-    Modifies provided Chgcar object's charge density by +/- delta,
-    then returns the two resulting Chgcar objects.
-    """
-
-    e = elementary_charge  # Exact value in Coulomb
-    chgcar_plus, chgcar_minus = chgcar.copy(), chgcar.copy()
-    chgcar_plus.data["total"] += delta * e
-    chgcar_minus.data["total"] -= delta * e
-
-    return chgcar_plus, chgcar_minus
 
 
 ########################################
