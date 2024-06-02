@@ -37,14 +37,17 @@ def _get_shortest_paths(
 
 
 def _to_euc(x: torch.FloatTensor, cell: torch.FloatTensor, batch: torch.LongTensor):
+    """"""
     return torch.einsum("ij,ijk->ik", x, cell[batch])
 
 
 def _to_inner(x: torch.FloatTensor, cell: torch.FloatTensor, batch: torch.LongTensor):
+    """"""
     return torch.einsum("ij,ijk->ik", x, cell[batch].inverse())
 
 
 def _center_around_zero(x: torch.FloatTensor) -> torch.FloatTensor:
+    """"""
     return (x + 0.5) % 1.0 + 0.5
 
 

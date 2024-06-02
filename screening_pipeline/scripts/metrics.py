@@ -222,6 +222,9 @@ def main():
 
         dft_metrics["num_stable_unique_novel"] = len(sun_structs)
         print("S.U.N. metrics computed.")
+        for key, val in dft_metrics.items():
+            if key == "RMSD": continue
+            print(f"{key} = {val}")
 
     if args.summary is not None:
         # RMSD metric
@@ -230,6 +233,7 @@ def main():
         out_structs = [s for _, s in vasp_structures]
         dft_metrics["rmsd"] = np.mean(rmsd_from_structures(in_structs, out_structs))
         print("RMSD metric computed.")
+        print(f"RMSD = {dft_metrics['RMSD']}")
 
     if args.dataset is not None and args.generated is not None:
         # machine learning metrics (COV-R, COV-P, energy EMD, density EMD)
@@ -241,6 +245,9 @@ def main():
         ml_metrics["recall"] = recall(latent_gen, latent_dataset, args.threshold)
         ml_metrics["frechet_distance"] = frechet_distance(latent_gen, latent_dataset)
         print("Latent space metrics computed.")
+        print(f"COV-P = {ml_metrics['precision']}")
+        print(f"COV-R = {ml_metrics['recall']}")
+        print(f"Frechet Distance = {ml_metrics['frechet_distance']}")
 
         print("Computing properties EMD metrics...")
         energy_dataset = vectors_from_alignn(dataset,output="energy")
@@ -251,6 +258,8 @@ def main():
         densities_generated=get_densities(full_generated)
         ml_metrics["EMD_density"] = wasserstein_distance(densities_dataset,densities_generated)
         print("Properties EMD metrics computed.")
+        print(f"Density EMD = {ml_metrics['EMD_density']}")
+        print(f"Energy EMD = {ml_metrics['EMD_energy']}")
 
     metrics = {"dft": dft_metrics, "ml": ml_metrics}
 

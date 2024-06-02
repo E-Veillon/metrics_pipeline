@@ -50,7 +50,7 @@ def vectors_from_alignn(
     structures: List[Structure],
     batch_size: int = 128,
     device: torch.device = None,
-    model_name: str = "mp_e_form_alignn",
+    model_name: str = "mp/e_form",
     output: Literal["latent","energy"]="latent"
 ) -> np.ndarray:
     assert output in ("latent","energy")
