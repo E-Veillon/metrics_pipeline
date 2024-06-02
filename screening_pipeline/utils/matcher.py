@@ -12,6 +12,7 @@ from typing import Tuple, List, Union, Sequence
 # OPTIMIZATION MODULES
 
 import itertools
+from functools import partial
 from tqdm.contrib.concurrent import process_map
 
 ########################################
@@ -241,3 +242,70 @@ def remove_equivalent(
 
 
 ########################################
+
+
+def _get_novel_structures(
+        structures: List[List[Structure]],
+        dataset: List[Structure]
+):
+    """
+    Filter out structures that are neither coming from the given dataset nor 
+    equivalent to one of them.
+
+    Parameters:
+        structures ([[[Structure]]]):   Nested list of structures as the output from
+                                        batch_group_by_equivalence().
+
+        dataset ([Structure]):          Reference dataset of non-novel structures.
+    
+    Returns: List[Structure]
+    The list of novel structures not seen in the dataset.
+    """
+    return flatten(
+        list(
+            filter(
+                lambda l: len(l) == 1 and l[0] not in dataset,
+                structures
+            )
+        )
+    )
+#----------------------------------------
+def batch_get_novel_structures(
+        structures: List[List[List[Structure]]],
+        dataset: List[Structure],
+        workers: int = 1
+    ) -> List[Structure]:
+    """
+    Filter out structures that are neither coming from the given dataset nor 
+    equivalent to one of them. Can be parallelized over compositional lists.
+
+    Parameters:
+        structures ([[[Structure]]]):   Nested list of structures as the output from
+                                        batch_group_by_equivalence().
+
+        dataset ([Structure]):          Reference dataset of non-novel structures.
+
+        workers (int):                  Number of parallel processes to spawn.
+    
+    Returns: List[Structure]
+    The list of novel structures not seen in the dataset.
+    """
+    if not isinstance(workers, int):
+        raise TypeError(
+            f"'workers arg expected a type 'int', got {type(workers)} instead."
+        )
+    if not workers > 0:
+        raise ValueError(
+            f"'workers' arg must be strictly positive (got {workers})."
+        )
+    
+    get_novel_structs = partial(_get_novel_structures, dataset=dataset)
+
+    novel_structs = process_map(
+        get_novel_structs,
+        structures,
+        max_workers=workers,
+        desc="search for novel structures"
+    )
+    novel_structs = flatten(novel_structs)
+    return novel_structs

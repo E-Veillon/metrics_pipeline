@@ -75,20 +75,22 @@ def main():
 
     import numpy as np
     from pymatgen.io.vasp.inputs import Poscar
-    from pymatgen.analysis.structure_matcher import StructureMatcher
 
-    from screening_pipeline.utils.vasp_io import batch_extract_vasp_structures, converged_Vasprun
-    from screening_pipeline.utils.cif_io import read_cif
-    from screening_pipeline.utils.matcher import batch_group_by_equivalence, remove_equivalent, flatten
-    from screening_pipeline.utils.ml_vectors import vectors_from_alignn
-    from screening_pipeline.utils.distribution import (
+    from screening_pipeline.utils import (
+        batch_extract_vasp_structures,
+        converged_Vasprun,
+        read_cif,
+        batch_group_by_equivalence,
+        remove_equivalent, flatten,
+        batch_get_novel_structures,
+        vectors_from_alignn,
         recall,
         precision,
         frechet_distance,
         wasserstein_distance,
+        get_densities,
+        rmsd_from_structures,
     )
-    from screening_pipeline.utils.density import get_densities
-    from screening_pipeline.utils.rmsd import rmsd_from_structures
 
     if args.dataset is not None:
         print("Loading test set...")
@@ -211,14 +213,9 @@ def main():
             comment="Comparing known and generated structures"
         )
 
-        sun_structs = []
-
-        for comp_group in concat_sun:
-            sun_structs += list(filter(
-                lambda l: len(l) == 1 and l[0] not in dataset,
-                comp_group
-            ))
-        sun_structs = flatten(sun_structs)
+        sun_structs = batch_get_novel_structures(
+            structures=concat_sun, dataset=dataset, workers=args.workers
+        )
 
         dft_metrics["num_stable_unique_novel"] = len(sun_structs)
         print("S.U.N. metrics computed.")

@@ -10,13 +10,21 @@ from .periodic_table import (
     get_all_valence_electrons,
 )
 from .cif_io import read_cif, write_cif, extract_cif_from_file, cif_str_to_struct
-from .matcher import remove_equivalent, group_by_composition
+from .matcher import (
+    flatten,
+    remove_equivalent,
+    group_by_composition,
+    batch_group_by_equivalence,
+    batch_get_novel_structures
+)
 from .vasp_io import (
     vasp_relaxation_settings,
     vasp_static_settings,
     vasp_launcher,
     vasp_batch_launch,
+    converged_Vasprun,
     batch_extract_vasp_data,
+    batch_extract_vasp_structures,
     delta_sol_inputs_init,
     extract_vasp_data_for_delta_sol_init,
     delta_sol_calculation_init,
@@ -43,6 +51,15 @@ from .custom_types import (
     PMGRelaxSet, PMGStaticSet
 )
 from .dataset import load_phase_diagram_entries
+from .ml_vectors import vectors_from_alignn
+from .distribution import (
+        recall,
+        precision,
+        frechet_distance,
+        wasserstein_distance,
+)
+from .density import get_densities
+from .rmsd import rmsd_from_structures
 from .utils import _yaml_loader
 
 __all__ = [
