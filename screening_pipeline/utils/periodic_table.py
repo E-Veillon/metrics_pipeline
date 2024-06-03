@@ -199,7 +199,7 @@ def get_element_group(
         atom (str|Element):         The element to find the group for.
 
         return_type ('int'|'str'):  Whether to return the group number as an int
-                                    (from 1 to 18, returns, 19 for Lanthanides and
+                                    (from 1 to 18, returns 19 for Lanthanides and
                                     20 for Actinides), or as a str representing the 
                                     group relative to electronic structure ('S1', 
                                     'S2', then from 'D1' to 'D10', then from 'P1' 
@@ -220,15 +220,35 @@ def get_element_group(
 
     try: atom = Element(atom)
     except TypeError:
-        sys.exit(f"Provided 'atom' argument should be a str or Element, got {type(atom)} instead.")
+        raise TypeError(
+            f"'atom' arg expected a 'str' or 'Element' type, got {type(atom)} instead."
+        )
     except ValueError:
-        sys.exit(f'Provided str ({atom}) is not recognized as an element.')
+        raise ValueError(
+            f"'atom' arg value '{atom}' is not recognized as an element."
+        )
 
-    if atom.block == 's': return ((atom.block.upper() + str(atom.group)) if return_type == 'str' else atom.group)
-    elif atom.block == 'p': return ((atom.block.upper() + str(atom.group - 12)) if return_type == 'str' else atom.group)
-    elif atom.block == 'd': return ((atom.block.upper() + str(atom.group - 2)) if return_type == 'str' else atom.group)
-    elif atom.block == 'f': return (('L' if return_type == 'str' else 19) if atom.row == 6 else ('A' if return_type == 'str' else 20))
-    else: return None
+    if atom.block == 's':
+        return (
+            (atom.block.upper() + str(atom.group)) 
+            if return_type == 'str' else atom.group
+        )
+    elif atom.block == 'p':
+        return (
+            (atom.block.upper() + str(atom.group - 12)) 
+            if return_type == 'str' else atom.group
+        )
+    elif atom.block == 'd':
+        return (
+            (atom.block.upper() + str(atom.group - 2)) 
+            if return_type == 'str' else atom.group
+        )
+    elif atom.block == 'f':
+        return (
+            ('L' if return_type == 'str' else 19) 
+            if atom.row == 6 else ('A' if return_type == 'str' else 20)
+        )
+    else: raise NotImplementedError(f"{atom.block}: Unrecognized Periodic Table block.")
 
 def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
     '''
@@ -270,25 +290,22 @@ def get_element_valence_electrons(atom: Union[str,Element]) -> int:
     Returns:
         int: The number of valence electrons corresponding to the element's group.
     '''
-    group = get_element_group(atom)
-    if group == 'S1': return 1
-    if group == 'S2': return 2
-    if group == 'D1' or group == 'P1': return 3
-    if group == 'D2' or group == 'P2': return 4
-    if group == 'D3' or group == 'P3': return 5
-    if group == 'D4' or group == 'P4': return 6
-    if group == 'D5' or group == 'P5': return 7
-    if group == 'D6' or group == 'P6': return 8
-    if group == 'D7': return 9
-    if group == 'D8': return 10
-    if group == 'D9': return 11
-    if group == 'D10': return 12
+    group = get_element_group(atom, return_type='str')
+
+    if group.startswith("S"):
+        nb_val_elec = int(group[1])
+
+    elif group.startswith("D") or group.startswith("P"):
+        nb_val_elec = int(group[1]) + 2
         # Δ-Sol method counts all outermost s and d electrons in transition metals, 
         # even for d10 ones.
-    if group == 'L' or group == 'A': raise NotImplementedError(
-            'f-block elements are not taken into account yet.'
-            )
-    else: raise ValueError('Provided string is not a recognized element')
+    elif group == 'L' or group == 'A':
+        raise NotImplementedError(
+            'f-block elements are not yet supported.'
+        )
+    else: raise ValueError('Provided string is not a recognized element group.')
+
+    return nb_val_elec
 
 def get_all_valence_electrons(structure: SiteCollection) -> int:
     '''
@@ -305,7 +322,7 @@ def get_all_valence_electrons(structure: SiteCollection) -> int:
     elts_dict    = structure.composition.element_composition.as_dict()
 
     for elt, number in elts_dict.items():
-        nbr_val_elec += get_element_valence_electrons(elt)*int(number)
+        nbr_val_elec += get_element_valence_electrons(elt) * int(number)
     
     nbr_val_elec -= structure.charge #e.g. a charge of +1 means there is 1 less electron
     
@@ -329,12 +346,19 @@ def get_delta_sol_el_ratio(
     val_elec_type = 'sp'
 
     for elt in structure.elements:
-        if elt.block == 's' or elt.block == 'p': continue
+        if elt.block == 's' or elt.block == 'p':
+            continue
         elif elt.block == 'd': 
             val_elec_type = 'spd'
             break
-        elif elt.block == 'f': raise NotImplementedError('f-block elements are not taken into accoount in Δ-Sol method.')
-        else: raise ValueError('Something is wrong with this loop or Element objects "block" property.')
+        elif elt.block == 'f':
+            raise NotImplementedError(
+                'f-block elements are not supported in Δ-Sol method.'
+            )
+        else:
+            raise ValueError(
+                'Something is wrong with this function or Element objects "block" property.'
+            )
     
     N_0        = get_all_valence_electrons(structure)
     value_name = '_'.join((dft_functional, val_elec_type))
