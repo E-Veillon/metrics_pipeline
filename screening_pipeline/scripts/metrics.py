@@ -81,7 +81,7 @@ def main():
         converged_Vasprun,
         read_cif,
         batch_group_by_equivalence,
-        remove_equivalent, flatten,
+        remove_equivalent,
         batch_get_novel_structures,
         vectors_from_alignn,
         recall,
@@ -187,7 +187,7 @@ def main():
 
         # novel + unique count
         concat_novel_unique, _ = remove_equivalent(
-            structures=symmetrized + dataset, workers=args.workers, keep_equivalent=False
+            structures=preprocessed + dataset, workers=args.workers, keep_equivalent=False
         )
         dft_metrics["num_novel_unique"] = len(concat_novel_unique) - len(dataset)
 
@@ -228,7 +228,7 @@ def main():
         print("Computing RMSD metric...")
         in_structs = [s for s, _ in vasp_structures]
         out_structs = [s for _, s in vasp_structures]
-        dft_metrics["rmsd"] = np.mean(rmsd_from_structures(in_structs, out_structs))
+        dft_metrics["RMSD"] = np.mean(rmsd_from_structures(in_structs, out_structs)).item()
         print("RMSD metric computed.")
         print(f"RMSD = {dft_metrics['RMSD']}")
 
