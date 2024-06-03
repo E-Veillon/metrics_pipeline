@@ -43,7 +43,6 @@ from screening_pipeline.utils import (
     get_elements_from_entries,
     get_lacking_elts_entries,
     group_by_composition,
-    get_sub_entries,
     batch_compute_e_above_hull,
     batch_extract_vasp_data,
     load_phase_diagram_entries,
@@ -169,11 +168,9 @@ def main():
 
     assert_args(args)
 
-    run_dir = args.run_dir
     prev_summary = args.prev_summary or None
     delta_H_limit = round(args.limit, 8)
-    workers = args.workers
-    summary = os.path.join(run_dir, args.summary)
+    summary = os.path.join(args.run_dir, args.summary)
 
 
     # MAIN BLOCK
@@ -181,12 +178,12 @@ def main():
     # Extract generated data
     structs_data = batch_extract_vasp_data(
         method="convex_hull",
-        base_dir=run_dir,
+        base_dir=args.run_dir,
         path_to_summary=prev_summary,
-        workers=workers,
+        workers=args.workers,
     )
     generated_entries = init_entries_from_dict(
-        entries_dict=structs_data, attribute="generated", workers=workers
+        entries_dict=structs_data, attribute="generated", workers=args.workers
     )
     max_dim_generated = get_max_dim(generated_entries)
     used_elts = get_elements_from_entries(generated_entries)
@@ -195,7 +192,7 @@ def main():
     if args.reference is not None:
         ref_data = load_phase_diagram_entries(args.reference)
         ref_entries = init_entries_from_dict(
-            entries_dict=ref_data, attribute="ref_structs", workers=workers
+            entries_dict=ref_data, attribute="ref_structs", workers=args.workers
         )
         ref_entries = filter_database_entries(
             entries=ref_entries,
@@ -215,11 +212,11 @@ def main():
     # Compute energy above hulls in each group
     screening_results = batch_compute_e_above_hull(
         entries_to_compute=grouped_entries, ref_entries=ref_entries,
-        stable_limit=delta_H_limit, workers=workers
+        stable_limit=delta_H_limit, workers=args.workers
     )
 
     for dct in screening_results:
-        path = os.path.join(run_dir, dct["name"])
+        path = os.path.join(args.run_dir, dct["name"])
         dct.update({"path": path})
 
     def sort_by_path(dct: dict) -> str:

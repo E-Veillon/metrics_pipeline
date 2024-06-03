@@ -39,7 +39,7 @@ from .data_process import (
     filter_database_entries,
     get_elements_from_entries,
     group_by_dim_and_comp,
-    init_entries_and_group_by_dim_and_comp,
+    #init_entries_and_group_by_dim_and_comp,
     get_sub_entries,
     get_lacking_elts_entries,
     batch_compute_e_above_hull,

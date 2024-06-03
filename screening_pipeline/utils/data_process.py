@@ -79,30 +79,11 @@ def get_max_dim(entries: Sequence[PDEntry]) -> int:
 ########################################
 
 
-def _dict_to_entry(
-        data: Dict[str, Union[str, Composition, float]],
-        attribute: Optional[str] = None
-    ) -> PDEntry:
-        """
-        Parameters:
-            data (dict): dict containing data for one structure.
-        
-        Returns:
-            PDEntry: Entry containing given data.
-        """
-        return PDEntry(
-                composition=data["composition"],
-                energy=data["final_energy"],
-                name=data["entry_id"],
-                attribute=attribute,
-        )
-#---------------------------------------
 def init_entries_from_dict(
         entries_dict: Dict[str, Dict], attribute: Optional[str] = None, workers: int = 1
     ) -> List[PDEntry]:
     """
-    Convert structures data into PDEntry objects compatible with phase diagrams.
-    Can be parallelised with multiprocess workers.
+    Convert structures data dict into a list of PDEntry objects compatible with phase diagrams.
 
     Parameters:
         entries_dict (dict):    Dict of dicts containing following structure data keys:
@@ -111,15 +92,14 @@ def init_entries_from_dict(
                                 - final_energy (float).
 
         attribute (str):        Label to put as attribute in the entries.
-
-        workers (int):          Number of parallel processes to spawn.
     
     Returns:
         List[PDEntry]: The list of phase diagram entries.
     """
-
-    assert isinstance(entries_dict, Dict)
-    assert isinstance(workers, int)
+    if not isinstance(entries_dict, Dict):
+        raise TypeError(
+            f"'entries_dict' arg expected a type 'dict', got '{type(entries_dict)}' instead."
+        )
     
     print(f"Convert {len(entries_dict)} '{attribute}' structures to entries...")
     entries_list = [
@@ -258,101 +238,101 @@ def group_by_dim_and_comp(
 ########################################
 
 
-def init_entries_and_group_by_dim_and_comp(
-    structs_data: Dict[str, Dict[str, Any]],
-    ref_structs: Optional[Dict[str, Dict[str, Any]]] = None,
-) -> List[List[Union[PDEntry, List[PDEntry]]]]:
-    """
-    Initialize entries from given data and group them inside nested lists
-    according to the minimal phase diagram necessary for each one.
-    Each index of the bigger list represent the dimension
-    (ie. number of distinct elements) of structures inside each sublist.
-    Moreover, each sublist contains one subsublist for each composition type.
-    In other words, one gets something of the form:
-    groups = [
-              [],
-              [[Unary 1 (e.g. all "Fe")], [Unary 2 (e.g. all "Mn")]], ...],
-              [[Binary 1 (e.g. all "Fe-O")], [Binary 2 (e.g. all "Mn-O")], ...],
-              [[Ternary 1 (e.g. all "Fe-Mn-O")], [Ternary 2 (e.g. all "Fe-Co-O")], ...],
-              ...etc
-            ]
-
-    Parameters:
-        structs_data (dict):    Structure data as extracted from VASP with
-                                batch_extract_vasp_data function. This arg
-                                is for relaxed structures that need a ΔH
-                                computation (generated structures).
-
-        ref_structs (dict):     Structure data as extracted from VASP with
-                                batch_extract_vasp_data function. This arg
-                                is for structures extracted from a dataset,
-                                that can give some reference about previously
-                                found energies in the space of interest.
-                                The ΔH energy of these structures will not
-                                be computed nor returned. Defaults to None.
-
-    Returns:
-        All structures data grouped by structure dimensionality and composition.
-    """
-
-    if not isinstance(structs_data, dict):
-        raise TypeError(
-            "'struct_data' argument expected a 'dict', "
-            f"got '{type(structs_data)}' instead."
-        )
-    if not structs_data:
-        return []
-    assert all(
-        isinstance(name, str) and isinstance(data, dict)
-        for name, data in structs_data.items()
-    )
-    print("Converting generated data to entries...")
-    entry_list = [
-        PDEntry(
-            composition=data["composition"],
-            energy=data["first_ionic_energy"],
-            name=name,
-            attribute="generated",
-        )
-        for name, data in structs_data.items()
-    ]
-    print("Conversion done.")
-
-    max_dim = get_max_dim(entry_list)
-    elements = get_elements_from_entries(entry_list)
-
-    if ref_structs:
-        assert isinstance(ref_structs, dict)
-        assert all(
-            isinstance(name, str) and isinstance(data, dict)
-            for name, data in ref_structs.items()
-        )
-        print("reference dataset detected.")
-
-        ref_entry_list = filter_database_entries(
-            entries=ref_structs, max_dim=max_dim, ref_elts=elements
-        )
-    else:
-        ref_entry_list = []
-
-    elt_entries = get_lacking_elts_entries(
-        entries=entry_list, ref_elts=elements
-    )
-
-    full_entry_list = entry_list + ref_entry_list + elt_entries
-
-    print("Grouping data by dim and composition...")
-    groups = [[]]  # fill the index 0 to match indexes and entries dimensionality
-
-    for dim in range(1, max_dim + 1):
-        print(f"filling dim group {dim}...")
-        group = list(filter(lambda entry: len(entry.elements) == dim, full_entry_list))
-        group = group_by_composition(group)
-        groups.append(group)
-        print("group filled.")
-    print("Grouping done.")
-
-    return groups
+#def init_entries_and_group_by_dim_and_comp(
+#    structs_data: Dict[str, Dict[str, Any]],
+#    ref_structs: Optional[Dict[str, Dict[str, Any]]] = None,
+#) -> List[List[Union[PDEntry, List[PDEntry]]]]:
+#    """
+#    Initialize entries from given data and group them inside nested lists
+#    according to the minimal phase diagram necessary for each one.
+#    Each index of the bigger list represent the dimension
+#    (ie. number of distinct elements) of structures inside each sublist.
+#    Moreover, each sublist contains one subsublist for each composition type.
+#    In other words, one gets something of the form:
+#    groups = [
+#              [],
+#              [[Unary 1 (e.g. all "Fe")], [Unary 2 (e.g. all "Mn")]], ...],
+#              [[Binary 1 (e.g. all "Fe-O")], [Binary 2 (e.g. all "Mn-O")], ...],
+#              [[Ternary 1 (e.g. all "Fe-Mn-O")], [Ternary 2 (e.g. all "Fe-Co-O")], ...],
+#              ...etc
+#            ]
+#
+#    Parameters:
+#        structs_data (dict):    Structure data as extracted from VASP with
+#                                batch_extract_vasp_data function. This arg
+#                                is for relaxed structures that need a ΔH
+#                                computation (generated structures).
+#
+#        ref_structs (dict):     Structure data as extracted from VASP with
+#                                batch_extract_vasp_data function. This arg
+#                                is for structures extracted from a dataset,
+#                                that can give some reference about previously
+#                                found energies in the space of interest.
+#                                The ΔH energy of these structures will not
+#                                be computed nor returned. Defaults to None.
+#
+#    Returns:
+#        All structures data grouped by structure dimensionality and composition.
+#    """
+#
+#    if not isinstance(structs_data, dict):
+#        raise TypeError(
+#            "'struct_data' argument expected a 'dict', "
+#            f"got '{type(structs_data)}' instead."
+#        )
+#    if not structs_data:
+#        return []
+#    assert all(
+#        isinstance(name, str) and isinstance(data, dict)
+#        for name, data in structs_data.items()
+#    )
+#    print("Converting generated data to entries...")
+#    entry_list = [
+#        PDEntry(
+#            composition=data["composition"],
+#            energy=data["first_ionic_energy"],
+#            name=name,
+#            attribute="generated",
+#        )
+#        for name, data in structs_data.items()
+#    ]
+#    print("Conversion done.")
+#
+#    max_dim = get_max_dim(entry_list)
+#    elements = get_elements_from_entries(entry_list)
+#
+#    if ref_structs:
+#        assert isinstance(ref_structs, dict)
+#        assert all(
+#            isinstance(name, str) and isinstance(data, dict)
+#            for name, data in ref_structs.items()
+#        )
+#        print("reference dataset detected.")
+#
+#        ref_entry_list = filter_database_entries(
+#            entries=ref_structs, max_dim=max_dim, ref_elts=elements
+#        )
+#    else:
+#        ref_entry_list = []
+#
+#    elt_entries = get_lacking_elts_entries(
+#        entries=entry_list, ref_elts=elements
+#    )
+#
+#    full_entry_list = entry_list + ref_entry_list + elt_entries
+#
+#    print("Grouping data by dim and composition...")
+#    groups = [[]]  # fill the index 0 to match indexes and entries dimensionality
+#
+#    for dim in range(1, max_dim + 1):
+#        print(f"filling dim group {dim}...")
+#        group = list(filter(lambda entry: len(entry.elements) == dim, full_entry_list))
+#        group = group_by_composition(group)
+#        groups.append(group)
+#        print("group filled.")
+#    print("Grouping done.")
+#
+#    return groups
 
 
 ########################################
@@ -536,7 +516,7 @@ def phase_diagram_init(
 def _compute_e_above_hull(
         entries_to_compute: List[PDEntry], ref_entries: List[PDEntry],
         stable_limit: float = 0.1
-    ) -> List[Tuple[str, float, bool]]:
+    ) -> List[Dict[str, str|float]]:
     """
     Initialize a phase diagram and compute above hull energies of given entries.
     """
@@ -555,7 +535,7 @@ def _compute_e_above_hull(
             {
                 "name": entry.name,
                 "e_above_hull": e_above_hull,
-                "stable": str(is_stable)
+                "stable": is_stable.item()
             }
         )
     return results
@@ -565,7 +545,7 @@ def batch_compute_e_above_hull(
         ref_entries: List[PDEntry],
         stable_limit: float = 0.1,
         workers: int = 1
-    ) -> List[Dict[str, Union[str, float, bool]]]:
+    ) -> List[Dict[str, Union[str, float]]]:
     """
     For each sublist, build the minimal phase diagram using the reference entries,
     then computes the energy above hull of all entries in the sublist.
@@ -586,8 +566,9 @@ def batch_compute_e_above_hull(
         workers (int):                      Number of parallel processes to spawn.
         
     Returns:
-        List[Dict[str, str|float|bool]]: List of dicts containing the name, energy above hull
-        and stability test boolean for one entry structure each.
+        List[Dict[str, str|float]]: List of dicts containing the name, energy above hull
+        and stringified (for JSON serailization) stability test boolean for one entry
+        structure each.
     """
 
     energy_computer = partial(
@@ -611,177 +592,177 @@ def batch_compute_e_above_hull(
 ########################################
 
 
-def _calculate_instability_energies(
-    main_entries: Sequence[PDEntry], sub_entries_pool: Sequence[PDEntry]
-) -> List[Tuple[str, float]]:
-    """
-    Initialize a PhaseDiagram from given entries, then calculate relative
-    instability energies ΔH for each generated entry in the diagram, ie.
-    non-elemental nor reference structures. Entries that need to have
-    their ΔH calculated must have the string 'generated' as entry.attribute.
-    The PhaseDiagram's reference elements are automatically initialized
-    from given entries at energy = 0.0 eV if not provided.
-
-    Parameters:
-        main_entries ([PDEntry]):       Entries of the highest dimension that will
-                                        serve as reference to define the space of
-                                        the diagram.
-
-        sub_entries_pool ([PDEntry]):   All other entries that should be put into
-                                        the diagram. If an entry in this argument
-                                        contains elements that are not referenced
-                                        in any main entry, it will not be put in
-                                        the diagram and its energy will not be
-                                        computed.
-
-    Returns:
-        List[Tuple[str,float]]: A list of tuples each containing the name of the entry
-                                and corresponding ΔH energy in eV/atom.
-    """
-
-    energies = []
-    ref_elts = get_elements_from_entries(main_entries)
-
-    sub_entries = _get_relevant_entries(entries=sub_entries_pool, ref_elts=ref_elts)
-
-    entry_list = list(set(main_entries + sub_entries))
-
-    diagram_entries = list(
-        filter(lambda entry: entry.attribute != "generated", entry_list)
-    )
-    generated_entries = list(
-        filter(lambda entry: entry.attribute == "generated", entry_list)
-    )
-    if not generated_entries:
-        comp = "-".join(list(map(str, ref_elts)))
-        return energies
-
-    convex_hull = phase_diagram_init(entries=diagram_entries, ref_elts=ref_elts)
-
-    for entry in generated_entries:
-        delta_H = convex_hull.get_e_above_hull(entry, allow_negative=True)
-        energies.append((entry.name, delta_H))
-
-    return energies
-
-
-########################################
-
-
-def calculate_instability_energies(
-    entries: Sequence[PDEntry], ref_elts: Optional[Sequence[PDEntry]] = None
-) -> List[Tuple[str, float]]:
-    """
-    Initialize a PhaseDiagram from given entries, then calculate relative
-    instability energies ΔH for each generated entry in the diagram, ie.
-    non-elemental nor reference structures. Entries that need to have
-    their ΔH calculated must have the string 'generated' as entry.attribute.
-    The PhaseDiagram's reference elements are automatically initialized
-    from given entries at energy = 0.0 eV if not provided.
-
-    parameters:
-        entries ([PDEntry]):    The entries that will be put into the PhaseDiagram.
-
-        ref_elts ([PDEntry]):   Elemental entries that are references for the PhaseDiagram.
-                                If not provided or incomplete, lacking references are
-                                automatically initialized with energy = 0.0 eV from given
-                                entries. If some provided elements are not used in the entries,
-                                they will be ignored to get minimal diagram dimension and save
-                                calculation time and memory.
-                                This argument is specifically designed in case non-zero elemental
-                                energy references are needed, and can be ignored in other cases.
-
-    Returns:
-        List[Tuple[str,float]]: A list of tuples each containing the name of the entry and
-                                corresponding ΔH energy in eV/atom.
-    """
-
-    assert isinstance(entries, Sequence)
-    if not entries:
-        return []
-    assert all(isinstance(entry, PDEntry) for entry in entries)
-
-    if ref_elts:
-        assert isinstance(ref_elts, Sequence)
-        assert all(
-            isinstance(entry, PDEntry) and entry.is_element for entry in ref_elts
-        )
-
-    else:
-        ref_elts = []
-
-    return _calculate_instability_energies(entries, ref_elts)
+#def _calculate_instability_energies(
+#    main_entries: Sequence[PDEntry], sub_entries_pool: Sequence[PDEntry]
+#) -> List[Tuple[str, float]]:
+#    """
+#    Initialize a PhaseDiagram from given entries, then calculate relative
+#    instability energies ΔH for each generated entry in the diagram, ie.
+#    non-elemental nor reference structures. Entries that need to have
+#    their ΔH calculated must have the string 'generated' as entry.attribute.
+#    The PhaseDiagram's reference elements are automatically initialized
+#    from given entries at energy = 0.0 eV if not provided.
+#
+#    Parameters:
+#        main_entries ([PDEntry]):       Entries of the highest dimension that will
+#                                        serve as reference to define the space of
+#                                        the diagram.
+#
+#        sub_entries_pool ([PDEntry]):   All other entries that should be put into
+#                                        the diagram. If an entry in this argument
+#                                        contains elements that are not referenced
+#                                        in any main entry, it will not be put in
+#                                        the diagram and its energy will not be
+#                                        computed.
+#
+#    Returns:
+#        List[Tuple[str,float]]: A list of tuples each containing the name of the entry
+#                                and corresponding ΔH energy in eV/atom.
+#    """
+#
+#    energies = []
+#    ref_elts = get_elements_from_entries(main_entries)
+#
+#    sub_entries = _get_relevant_entries(entries=sub_entries_pool, ref_elts=ref_elts)
+#
+#    entry_list = list(set(main_entries + sub_entries))
+#
+#    diagram_entries = list(
+#        filter(lambda entry: entry.attribute != "generated", entry_list)
+#    )
+#    generated_entries = list(
+#        filter(lambda entry: entry.attribute == "generated", entry_list)
+#    )
+#    if not generated_entries:
+#        comp = "-".join(list(map(str, ref_elts)))
+#        return energies
+#
+#    convex_hull = phase_diagram_init(entries=diagram_entries, ref_elts=ref_elts)
+#
+#    for entry in generated_entries:
+#        delta_H = convex_hull.get_e_above_hull(entry, allow_negative=True)
+#        energies.append((entry.name, delta_H))
+#
+#    return energies
 
 
 ########################################
 
 
-def batch_calculate_instability_energies(
-    structs_data: dict,
-    structs_ref: Optional[Dict[str, Dict[str, Any]]] = None,
-    workers: int = 1,
-):
-    """
-    Construct an adaptive convex hull for each structure according to their composition.
-    A binary structure does not need comparison with higher order structures.
-    However, for a higher order structure, convex hulls of smaller order can be useful to
-    determine its critical formation energy. Therefore, this function constructs the minimal
-    convex hull for each compositional group.
+#def calculate_instability_energies(
+#    entries: Sequence[PDEntry], ref_elts: Optional[Sequence[PDEntry]] = None
+#) -> List[Tuple[str, float]]:
+#    """
+#    Initialize a PhaseDiagram from given entries, then calculate relative
+#    instability energies ΔH for each generated entry in the diagram, ie.
+#    non-elemental nor reference structures. Entries that need to have
+#    their ΔH calculated must have the string 'generated' as entry.attribute.
+#    The PhaseDiagram's reference elements are automatically initialized
+#    from given entries at energy = 0.0 eV if not provided.
+#
+#    parameters:
+#        entries ([PDEntry]):    The entries that will be put into the PhaseDiagram.
+#
+#        ref_elts ([PDEntry]):   Elemental entries that are references for the PhaseDiagram.
+#                                If not provided or incomplete, lacking references are
+#                                automatically initialized with energy = 0.0 eV from given
+#                                entries. If some provided elements are not used in the entries,
+#                                they will be ignored to get minimal diagram dimension and save
+#                                calculation time and memory.
+#                                This argument is specifically designed in case non-zero elemental
+#                                energy references are needed, and can be ignored in other cases.
+#
+#    Returns:
+#        List[Tuple[str,float]]: A list of tuples each containing the name of the entry and
+#                                corresponding ΔH energy in eV/atom.
+#    """
+#
+#    assert isinstance(entries, Sequence)
+#    if not entries:
+#        return []
+#    assert all(isinstance(entry, PDEntry) for entry in entries)
+#
+#    if ref_elts:
+#        assert isinstance(ref_elts, Sequence)
+#        assert all(
+#            isinstance(entry, PDEntry) and entry.is_element for entry in ref_elts
+#        )
+#
+#    else:
+#        ref_elts = []
+#
+#    return _calculate_instability_energies(entries, ref_elts)
 
-    Parameters:
-        structs_data (dict):    A dict containing following data about each structure:
-                                    - its name (dict's keys),
-                                    - its composition as a Composition object,
-                                    - its energy after the first ionic step,
-                                    - its relaxed energy (in eV).
 
-        structs_ref (dict):     Reference data as a dictionnary where each key is the name
-                                of the structure and each value is another dictionnary containing
-                                the composition and total energy.
+########################################
 
-    Returns:
-        Dict: The same structs_data dict with all ΔH calculated in 'delta_H' keys.
-    """
 
-    assert isinstance(structs_data, dict) and len(structs_data) > 0, (
-        "Invalid input provided, it either was not a dict or was empty.\n"
-        f"Detected type: {type(structs_data)}.\n"
-        f"Detected length: {len(structs_data)}.\n"
-    )
-    dim_groups = init_entries_and_group_by_dim_and_comp(
-        structs_data, ref_structs=structs_ref
-    )
-
-    entry_pool = dim_groups[0]
-
-    for dim_group in dim_groups[1:]:
-        if dim_group == []:
-            continue
-
-        setup_calc_inst_energs = partial(
-            _calculate_instability_energies, sub_entries_pool=entry_pool
-        )
-
-        energies = flatten(
-            list(
-                process_map(
-                    setup_calc_inst_energs,
-                    dim_group,
-                    max_workers=workers,
-                    chunksize=1,
-                    desc=f"computing ΔH for structs of order {dim_groups.index(dim_group)}",
-                )
-            )
-        )
-
-        for energy in energies:
-            name = energy[0]
-            delta_H = energy[1]
-            structs_data[name]["delta_H"] = delta_H
-
-        entry_pool += flatten(dim_group)
-
-    return structs_data
+#def batch_calculate_instability_energies(
+#    structs_data: dict,
+#    structs_ref: Optional[Dict[str, Dict[str, Any]]] = None,
+#    workers: int = 1,
+#):
+#    """
+#    Construct an adaptive convex hull for each structure according to their composition.
+#    A binary structure does not need comparison with higher order structures.
+#    However, for a higher order structure, convex hulls of smaller order can be useful to
+#    determine its critical formation energy. Therefore, this function constructs the minimal
+#    convex hull for each compositional group.
+#
+#    Parameters:
+#        structs_data (dict):    A dict containing following data about each structure:
+#                                    - its name (dict's keys),
+#                                    - its composition as a Composition object,
+#                                    - its energy after the first ionic step,
+#                                    - its relaxed energy (in eV).
+#
+#        structs_ref (dict):     Reference data as a dictionnary where each key is the name
+#                                of the structure and each value is another dictionnary containing
+#                                the composition and total energy.
+#
+#    Returns:
+#        Dict: The same structs_data dict with all ΔH calculated in 'delta_H' keys.
+#    """
+#
+#    assert isinstance(structs_data, dict) and len(structs_data) > 0, (
+#        "Invalid input provided, it either was not a dict or was empty.\n"
+#        f"Detected type: {type(structs_data)}.\n"
+#        f"Detected length: {len(structs_data)}.\n"
+#    )
+#    dim_groups = init_entries_and_group_by_dim_and_comp(
+#        structs_data, ref_structs=structs_ref
+#    )
+#
+#    entry_pool = dim_groups[0]
+#
+#    for dim_group in dim_groups[1:]:
+#        if dim_group == []:
+#            continue
+#
+#        setup_calc_inst_energs = partial(
+#            _calculate_instability_energies, sub_entries_pool=entry_pool
+#        )
+#
+#        energies = flatten(
+#            list(
+#                process_map(
+#                    setup_calc_inst_energs,
+#                    dim_group,
+#                    max_workers=workers,
+#                    chunksize=1,
+#                    desc=f"computing ΔH for structs of order {dim_groups.index(dim_group)}",
+#                )
+#            )
+#        )
+#
+#        for energy in energies:
+#            name = energy[0]
+#            delta_H = energy[1]
+#            structs_data[name]["delta_H"] = delta_H
+#
+#        entry_pool += flatten(dim_group)
+#
+#    return structs_data
 
 
 ########################################
