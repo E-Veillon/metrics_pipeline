@@ -1,15 +1,83 @@
 # Configuration of VASP input files for Δ-Sol computations with PBE 5.4 PAW pseudopotentials.
+# Reference of the Δ-Sol method: M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010).
+#
+# DFT+U corrections are the ones proposed in 2011 by Jain et al.:
+# A. Jain, G. Hautier, C.J. Moore, S.P. Ong, C.C. Fischer, T. Mueller, K.A. Persson, and G. Ceder, 
+# Computational Materials Science, 50, 2295-2310 (2011).
 
-PARENT: VaspIncarBase
+
 INCAR:
   ALGO: Normal
   EDIFF: 0.00001
   ISMEAR: -5
+  MAGMOM: ~
   NELM: 200
   NSW: 0
   PREC: Accurate
+  LDAU: true
+  LDAUTYPE: 2
+  LDAUPRINT: 1
+  LDAUJ:
+    F:
+      Co: 0
+      Cr: 0
+      Fe: 0
+      Mn: 0
+      Mo: 0
+      Ni: 0
+      V: 0
+      W: 0
+    O:
+      Co: 0
+      Cr: 0
+      Fe: 0
+      Mn: 0
+      Mo: 0
+      Ni: 0
+      V: 0
+      W: 0
+  LDAUL:
+    F:
+      Co: 2
+      Cr: 2
+      Fe: 2
+      Mn: 2
+      Mo: 2
+      Ni: 2
+      V: 2
+      W: 2
+    O:
+      Co: 2
+      Cr: 2
+      Fe: 2
+      Mn: 2
+      Mo: 2
+      Ni: 2
+      V: 2
+      W: 2
+  LDAUU:
+    F:
+      Co: 3.32
+      Cr: 3.7
+      Fe: 5.3
+      Mn: 3.9
+      Mo: 3.5
+      Ni: 6.2
+      V: 3.25
+      W: 6.2
+    O:
+      Co: 3.32
+      Cr: 3.7
+      Fe: 5.3
+      Mn: 3.9
+      Mo: 3.5
+      Ni: 6.2
+      V: 3.25
+      W: 6.2
 
-KPOINTS: 
+KPOINTS:
+  reciprocal_density: 10000
+
 POTCAR_FUNCTIONAL: PBE_54_W_HASH
 POTCAR:
   Ac: Ac
@@ -106,8 +174,6 @@ POTCAR:
   W: W_sv
   Xe: Xe
   Y: Y_sv
-  # 2023-05-02: change Yb_2 to Yb_3 as Yb_2 gives incorrect thermodynamics for most systems with Yb3+
-  # https://github.com/materialsproject/pymatgen/issues/2968
   Yb: Yb_3
   Zn: Zn
   Zr: Zr_sv
