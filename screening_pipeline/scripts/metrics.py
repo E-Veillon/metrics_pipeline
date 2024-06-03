@@ -1,6 +1,8 @@
 #!/usr/bin/python
 import argparse
 
+from screening_pipeline.utils.crystalnn import to_crystalnn_fingerprint
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -26,7 +28,7 @@ def main():
             "in the generated structures set.\n"
             "This flag should only be used if it was also used for the preprocessing step."
         ),
-        dest="no_rare_gas_check"
+        dest="no_rare_gas_check",
     )
     parser.add_argument(
         "--no-rare-earth-check",
@@ -36,13 +38,14 @@ def main():
             "in the generated structures set.\n"
             "This flag should only be used if it was also used for the preprocessing step."
         ),
-        dest="no_rare_earth_check"
+        dest="no_rare_earth_check",
     )
     parser.add_argument(
         "-p", "--preprocessed", help="Cif file containing the preprocessed structures."
     )
     parser.add_argument(
-        "-s", "--summary",
+        "-s",
+        "--summary",
         help="Json file containing the summary generated after the stability screening.",
     )
     parser.add_argument(
@@ -64,7 +67,7 @@ def main():
         "--threshold",
         default=0.9,
         type=float,
-        help="Threshold for the computation of coverage recall and coverage precision metrics."
+        help="Threshold for the computation of coverage recall and coverage precision metrics.",
     )
 
     args = parser.parse_args()
@@ -98,12 +101,12 @@ def main():
             filename=args.dataset,
             workers=args.workers,
             keep_rare_gases=True,
-            keep_rare_earths=True
+            keep_rare_earths=True,
         )
         print("Test set loaded.")
         # remove duplicate structures from the dataset
         dataset, _ = remove_equivalent(
-        structures=dataset, workers=args.workers, keep_equivalent=False
+            structures=dataset, workers=args.workers, keep_equivalent=False
         )
 
     if args.generated is not None:
@@ -112,7 +115,7 @@ def main():
             filename=args.generated,
             workers=args.workers,
             keep_rare_gases=True,
-            keep_rare_earths=True
+            keep_rare_earths=True,
         )
         print("Generated structures loaded.")
         if not args.no_rare_gas_check or not args.no_rare_earth_check:
@@ -121,7 +124,7 @@ def main():
                 filename=args.generated,
                 workers=args.workers,
                 keep_rare_gases=args.no_rare_gas_check,
-                keep_rare_earths=args.no_rare_earth_check
+                keep_rare_earths=args.no_rare_earth_check,
             )
             print("Pruning finished.")
         else:
@@ -133,7 +136,7 @@ def main():
             filename=args.preprocessed,
             workers=args.workers,
             keep_rare_gases=True,
-            keep_rare_earths=True
+            keep_rare_earths=True,
         )
         print("Preprocessed structures loaded.")
 
@@ -145,29 +148,33 @@ def main():
 
         print("Convert data from summary file to structures...")
         vasp_structures = batch_extract_vasp_structures(
-            calc_dirs=[struct["path"] for struct in summary],
-            workers=args.workers
+            calc_dirs=[struct["path"] for struct in summary], workers=args.workers
         )
         print("Data converted.")
 
     dft_metrics = dict.fromkeys(
         (
-            "num_generated", "num_generated_wo_rare", "num_unique",
-            #"num_novel", "num_novel_unique",
-            "num_stable_unique", "num_stable_unique_novel",
-            "SUN", "RMSD"
+            "num_generated",
+            "num_generated_wo_rare",
+            "num_unique",
+            # "num_novel", "num_novel_unique",
+            "num_stable_unique",
+            "num_stable_unique_novel",
+            "SUN",
+            "RMSD",
         )
     )
 
     ml_metrics = dict.fromkeys(
-        (
-            "precision", "recall", "frechet_distance",
-            "EMD_energy", "EMD_density"
-        )
+        ("precision", "recall", "frechet_distance", "EMD_energy", "EMD_density")
     )
 
-    if (args.dataset is not None and args.generated is not None and
-        args.preprocessed is not None and args.summary is not None):
+    if (
+        args.dataset is not None
+        and args.generated is not None
+        and args.preprocessed is not None
+        and args.summary is not None
+    ):
         # S.U.N. metrics
         print("Computing S.U.N. metrics...")
 
@@ -196,21 +203,23 @@ def main():
         """
 
         # Stable + Unique count
-        paths_stable_unique = list(filter(lambda data: data["stable"].lower() == "true", summary))
+        paths_stable_unique = list(
+            filter(lambda data: data["stable"].lower() == "true", summary)
+        )
         dft_metrics["num_stable_unique"] = len(paths_stable_unique)
 
         # Stable + Unique + Novel count (S.U.N.)
         structs_stable_unique = list(
             map(
                 lambda data: converged_Vasprun(data["path"]).initial_structure,
-                paths_stable_unique
+                paths_stable_unique,
             )
         )
 
         concat_sun = batch_group_by_equivalence(
             structures=structs_stable_unique + dataset,
             workers=args.workers,
-            comment="Comparing known and generated structures"
+            comment="Comparing known and generated structures",
         )
 
         sun_structs = batch_get_novel_structures(
@@ -220,7 +229,8 @@ def main():
         dft_metrics["num_stable_unique_novel"] = len(sun_structs)
         print("S.U.N. metrics computed.")
         for key, val in dft_metrics.items():
-            if key == "RMSD": continue
+            if key == "RMSD":
+                continue
             print(f"{key} = {val}")
 
     if args.summary is not None:
@@ -228,18 +238,34 @@ def main():
         print("Computing RMSD metric...")
         in_structs = [s for s, _ in vasp_structures]
         out_structs = [s for _, s in vasp_structures]
-        dft_metrics["RMSD"] = np.mean(rmsd_from_structures(in_structs, out_structs)).item()
+        dft_metrics["RMSD"] = np.mean(
+            rmsd_from_structures(in_structs, out_structs)
+        ).item()
         print("RMSD metric computed.")
         print(f"RMSD = {dft_metrics['RMSD']}")
 
     if args.dataset is not None and args.generated is not None:
         # machine learning metrics (COV-R, COV-P, energy EMD, density EMD)
         print("Computing latent space metrics (COV-R, COV-P)...")
-        latent_dataset = vectors_from_alignn(dataset,output="latent")
-        latent_gen = vectors_from_alignn(full_generated,output="latent")
+        fingerprint_dataset = to_crystalnn_fingerprint(dataset)
+        fingerprint_gen = to_crystalnn_fingerprint(full_generated)
 
-        ml_metrics["precision"] = precision(latent_gen, latent_dataset, args.threshold)
-        ml_metrics["recall"] = recall(latent_gen, latent_dataset, args.threshold)
+        fingerprint_dataset, fingerprint_gen = zip(
+            *filter(
+                lambda x: x[0] is not None and x[1] is not None,
+                zip(fingerprint_dataset, fingerprint_gen),
+            )
+        )
+
+        ml_metrics["precision"] = precision(
+            fingerprint_gen, fingerprint_dataset, args.threshold
+        )
+        ml_metrics["recall"] = recall(
+            fingerprint_gen, fingerprint_dataset, args.threshold
+        )
+
+        latent_dataset = vectors_from_alignn(dataset, output="latent")
+        latent_gen = vectors_from_alignn(full_generated, output="latent")
         ml_metrics["frechet_distance"] = frechet_distance(latent_gen, latent_dataset)
         print("Latent space metrics computed.")
         print(f"COV-P = {ml_metrics['precision']}")
@@ -247,13 +273,15 @@ def main():
         print(f"Frechet Distance = {ml_metrics['frechet_distance']}")
 
         print("Computing properties EMD metrics...")
-        energy_dataset = vectors_from_alignn(dataset,output="energy")
-        energy_gen = vectors_from_alignn(full_generated,output="energy")
-        ml_metrics["EMD_energy"] = wasserstein_distance(energy_dataset,energy_gen)
+        energy_dataset = vectors_from_alignn(dataset, output="energy")
+        energy_gen = vectors_from_alignn(full_generated, output="energy")
+        ml_metrics["EMD_energy"] = wasserstein_distance(energy_dataset, energy_gen)
 
-        densities_dataset=get_densities(dataset)
-        densities_generated=get_densities(full_generated)
-        ml_metrics["EMD_density"] = wasserstein_distance(densities_dataset,densities_generated)
+        densities_dataset = get_densities(dataset)
+        densities_generated = get_densities(full_generated)
+        ml_metrics["EMD_density"] = wasserstein_distance(
+            densities_dataset, densities_generated
+        )
         print("Properties EMD metrics computed.")
         print(f"Density EMD = {ml_metrics['EMD_density']}")
         print(f"Energy EMD = {ml_metrics['EMD_energy']}")
