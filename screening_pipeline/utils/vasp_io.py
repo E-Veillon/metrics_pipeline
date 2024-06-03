@@ -32,7 +32,7 @@ from pymatgen.io.vasp import VaspInput, Vasprun
 #from pymatgen.io.vasp.inputs import Poscar
 #from pymatgen.io.vasp.outputs import Chgcar, Oszicar
 from pymatgen.io.vasp.sets import (
-    DictSet, MITRelaxSet#, MPRelaxSet, MPStaticSet, _load_yaml_config, UserPotcarFunctional
+    DictSet, MITRelaxSet#, _load_yaml_config, MPRelaxSet, MPStaticSet, UserPotcarFunctional
 )
 
 ########################################
@@ -45,6 +45,7 @@ from screening_pipeline.utils.custom_types import (
     PMGRelaxSet,
     PMGStaticSet,
 )
+from screening_pipeline.utils.utils import _yaml_loader
 from screening_pipeline.utils.matcher import flatten
 from screening_pipeline.utils.fitted_values import U_VALUES
 from screening_pipeline.utils.paths import batch_add_new_dirs
@@ -55,82 +56,32 @@ from screening_pipeline.utils.periodic_table import (
 
 
 ########################################
-# LOCAL CLASSES
-
-#@dataclass
-#class GenMatRelax54Set(MPRelaxSet):
-#    '''
-#    Implementation of VaspInputSet using the public Materials Project
-#    parameters with some tweaks for INCAR, exact MP parameters for KPOINTS, 
-#    and VASP's recommended PAW potentials for POTCAR (PBE_54).
-#
-#    The changes from MP parameters are described below:
-#
-#    - INCAR:    'ISMEAR' = 0 for robustness across any type of structure (VASP recommended)
-#                'LDAU': Adding a U correction of 5.0 eV on Ti oxydes
-#                (A discussion about it can be found in ref: J. Chem. Phys. 135, 054503 (2011).
-#                The value used is the one giving best compromise between all studied properties)
-#
-#    - POTCAR_FUNCTIONAL: 'PBE_54' instead of 'PBE'
-#
-#    - POTCAR: PBE_54 POTCAR files as recommended in pymatgen in 'PBE54Base.yaml' file.
-#
-#    Args:
-#        structure (Structure): The input structure.
-#        user_potcar_functional (str): Choose from PBE_54 and PBE_54_W_HASH.
-#        **kwargs: kwargs supported by MPRelaxSet.
-#    '''
-#    user_potcar_functional: UserPotcarFunctional = "PBE_54"
-#    POTCAR_CONFIG = _load_yaml_config("PBE54Base")
-#    CONFIG: Dict = MPRelaxSet.CONFIG
-#    CONFIG.update({
-#        'POTCAR_FUNCTIONAL': POTCAR_CONFIG.get('POTCAR_FUNCTIONAL'), 
-#        'POTCAR': POTCAR_CONFIG.get('POTCAR')
-#    })
-#    _valid_potcars = ('PBE_54', 'PBE_54_W_HASH')
-
-#    def incar_updates(self) -> Dict:
-#        """Get updates to the INCAR config for this calculation type."""
-
-#        ref_config: Dict = super().CONFIG.get('INCAR')
-
-#        new_ldauj: Dict = ref_config['LDAUJ']['O']
-#        new_ldaul: Dict = ref_config['LDAUL']['O']
-#        new_ldauu: Dict = ref_config['LDAUU']['O']
-
-#        new_ldauj.update({'Ti': 0.0})
-#        new_ldaul.update({'Ti': 2})
-#        new_ldauu.update({'Ti': 5.0})
-
-#        updates = {
-#            'ISMEAR': 0, 'LDAUJ': new_ldauj, 'LDAUL': new_ldaul, 'LDAUU': new_ldauu,
-#        }
-#
-#        return updates
+# LOCAL CLASS
 
 
-#########################################
+@dataclass
+class DeltaSolStaticSet(DictSet):
+    """
+    Initialize VASP input files for Δ-Sol method computations using
+    PBE_54_W_HASH pymatgen set of POTCAR files. Parameters are as 
+    described in Δ-Sol method original work by Chan et al. in 2010.
+    DFT+U corrections are used as proposed by Jain et al. in 2011.
 
+    References:
+        - M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010).
+        (Ref 32 in screening_pipeline/Bibliography)
 
-#class GenMatStatic54Set(MPStaticSet):
-#    '''
-#    Subclass of GenMatRelax54Set to do static calculations after relaxations 
-#    done with this set. Parameters are pretty much the same as in MPStaticSet, 
-#    except that user_potcar_functional only accepts PBE_54 and PBE_54_W_HASH.
-#
-#    Args:
-#        structure (Structure): Structure from previous run.
-#        user_potcar_functional (str): Choose from PBE_54 and PBE_54_W_HASH.
-#        **kwargs: kwargs supported by MPStaticSet.
-#    '''
-#    user_potcar_functional: UserPotcarFunctional = "PBE_54"
-#    CONFIG: Dict = GenMatRelax54Set.CONFIG
-#    _valid_potcars = ('PBE_54', 'PBE_54_W_HASH')
+        - A. Jain, G. Hautier, C.J. Moore, S.P. Ong, C.C. Fischer, T. Mueller, 
+        K.A. Persson, and G. Ceder, Computational Materials Science, 50, 2295-2310 (2011).
+        (Ref 14 in screening_pipeline/Bibliography)
 
-#    def incar_updates(self) -> Dict:
-#        updates = GenMatRelax54Set.incar_updates()
-#        updates.update(super().incar_updates())
-#        return updates
+    Args:
+        structure (Structure): Structure to compute.
+        **kwargs: kwargs supported by DictSet.
+    """
+    base_path = os.path.dirname(os.getcwd())
+    path = os.path.join(base_path, "config", "DeltaSolStaticSet.yaml")
+    CONFIG = _yaml_loader(path, on_error='raise')
 
 
 ########################################
@@ -513,31 +464,38 @@ def _StaticSet_init(
     if from_prev_calc:
         dir_path = Path(struct_or_path)
         assert dir_path.is_dir()
-
+        if preset == "DeltaSolStaticSet":
+            return MPStaticSet.from_prev_calc(
+                prev_calc_dir=dir_path,
+                user_incar_settings=incar_corrections,
+                user_kpoints_settings=kpoints_corrections,
+                user_potcar_settings=potcar_corrections,
+                user_potcar_functional=potcar_functional_correction,
+            )
         if preset == "MPStaticSet":
-                return MPStaticSet.from_prev_calc(
-                    prev_calc_dir=dir_path,
-                    user_incar_settings=incar_corrections,
-                    user_kpoints_settings=kpoints_corrections,
-                    user_potcar_settings=potcar_corrections,
-                    user_potcar_functional=potcar_functional_correction,
-                )
+            return MPStaticSet.from_prev_calc(
+                prev_calc_dir=dir_path,
+                user_incar_settings=incar_corrections,
+                user_kpoints_settings=kpoints_corrections,
+                user_potcar_settings=potcar_corrections,
+                user_potcar_functional=potcar_functional_correction,
+            )
         if preset == "MatPESStaticSet":
-                return MatPESStaticSet.from_prev_calc(
-                    prev_calc_dir=dir_path,
-                    user_incar_settings=incar_corrections,
-                    user_kpoints_settings=kpoints_corrections,
-                    user_potcar_settings=potcar_corrections,
-                    user_potcar_functional=potcar_functional_correction,
-                )
+            return MatPESStaticSet.from_prev_calc(
+                prev_calc_dir=dir_path,
+                user_incar_settings=incar_corrections,
+                user_kpoints_settings=kpoints_corrections,
+                user_potcar_settings=potcar_corrections,
+                user_potcar_functional=potcar_functional_correction,
+            )
         if preset == "MPScanStaticSet":
-                return MPScanStaticSet.from_prev_calc(
-                    prev_calc_dir=dir_path,
-                    user_incar_settings=incar_corrections,
-                    user_kpoints_settings=kpoints_corrections,
-                    user_potcar_settings=potcar_corrections,
-                    user_potcar_functional=potcar_functional_correction,
-                )
+            return MPScanStaticSet.from_prev_calc(
+                prev_calc_dir=dir_path,
+                user_incar_settings=incar_corrections,
+                user_kpoints_settings=kpoints_corrections,
+                user_potcar_settings=potcar_corrections,
+                user_potcar_functional=potcar_functional_correction,
+            )
         elif isinstance(preset, str):
             raise ValueError(
                 f"Provided string is not a valid preset name ({preset})."
@@ -546,31 +504,38 @@ def _StaticSet_init(
             raise TypeError(
                 f'"preset" arg expected a str type, got {type(preset)} instead.'
             )
-
+    if preset == "DeltaSolStaticSet":
+        return MPStaticSet.from_prev_calc(
+            prev_calc_dir=dir_path,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
     if preset == "MPStaticSet":
-            return MPStaticSet(
-                structure=struct_or_path,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
+        return MPStaticSet(
+            structure=struct_or_path,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
     if preset == "MatPESStaticSet":
-            return MatPESStaticSet(
-                structure=struct_or_path,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
+        return MatPESStaticSet(
+            structure=struct_or_path,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
     if preset == "MPScanStaticSet":
-            return MPScanStaticSet(
-                structure=struct_or_path,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
+        return MPScanStaticSet(
+            structure=struct_or_path,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
     elif isinstance(preset, str):
         raise ValueError(f"Provided string is not a valid preset name ({preset}).")
     else:
@@ -626,7 +591,7 @@ def vasp_relaxation_settings(
 
 def vasp_static_settings(
     structure: Optional[SiteCollection] = None,
-    preset: PMGStaticSetType = "MPStaticSet",
+    preset: PMGStaticSetType|"DeltaSolStaticSet" = "MPStaticSet",
     from_prev_calc: bool = False,
     prev_calc_dir: Optional[PathLike] = None,
     user_corrections: Optional[dict] = None,
@@ -649,11 +614,12 @@ def vasp_static_settings(
                                         If set to True, a directory to extract data from must be provided,
                                         and structure argument is ignored. Defaults to False.
 
-        prev_calc_dir (str|Path):       Directory to extract previous VASP run data from when from_prev_calc is True.
-                                        If from_prev_calc is False, this argument is ignored.
+        prev_calc_dir (str|Path):       Directory to extract previous VASP run data from when 
+                                        from_prev_calc is True. Otherwise, this argument is ignored.
 
-        user_corrections (dict):        User defined settings. It allows to override some of the preset INCAR, KPOINTS
-                                        or POTCAR settings if necessary. Defaults to None.
+        user_corrections (dict):        User defined settings. It allows to override some of 
+                                        the preset INCAR, KPOINTS or POTCAR settings if necessary.
+                                        Defaults to None.
     """
 
     assert (
@@ -1181,6 +1147,10 @@ def delta_sol_inputs_init(
 
         preset (PMGStaticSet):      One of the pymatgen static VASP preset labeled 'StaticSet'.
 
+        user_corrections (dict):    User defined settings. It allows to override some of 
+                                    the preset INCAR, KPOINTS or POTCAR settings if necessary.
+                                    Defaults to None.
+
         with_uncertainties (bool):  Whether to also compute uncertainty boundaries of Δ-Sol method.
                                     Defaults to False.
 
@@ -1205,13 +1175,13 @@ def delta_sol_inputs_init(
         elif 'AM05' in pot_func: delta_sol_functional = 'AM05'
         else:
             raise NotImplementedError(
-                "Provided POTCAR functional is not implemented for Δ-Sol method. \
-                Recognized functionals are the ones having 'LDA', 'PBE' or 'AM05' in the name."
+                "Provided POTCAR functional is not implemented for Δ-Sol method.\n"
+                "Supported functionals are 'LDA', 'PBE' and 'AM05'."
             )
 
         n_star_types = ('BEST', 'MIN', 'MAX') if with_uncertainties else ('BEST',)
         run_N0_dict = run_set.as_dict()
-        run_N0_dict['INCAR'].update({'NELECT': N_val, 'NBANDS': N_val})
+        run_N0_dict['INCAR'].update({'NELECT': N_val})
         run_N0 = VaspInput.from_dict(run_N0_dict)
         run_N0_path = '_'.join((name , 'neutral'))
         struct_runs_list = [(run_N0_path, run_N0)]
@@ -1228,8 +1198,8 @@ def delta_sol_inputs_init(
 
             run_plus, run_minus = run_set.as_dict(), run_set.as_dict()
 
-            run_plus['INCAR'].update({'NELECT': N_val + n_ratio, 'NBANDS': N_val})
-            run_minus['INCAR'].update({'NELECT': N_val - n_ratio, 'NBANDS': N_val})
+            run_plus['INCAR'].update({'NELECT': N_val + n_ratio})
+            run_minus['INCAR'].update({'NELECT': N_val - n_ratio})
 
             run_plus    = VaspInput.from_dict(run_plus)
             run_minus   = VaspInput.from_dict(run_minus)
