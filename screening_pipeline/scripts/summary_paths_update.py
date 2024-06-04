@@ -32,6 +32,7 @@ def main() -> None:
 
     import os
     import json
+    from functools import partial
     from typing import List, Dict
     from tqdm.contrib.concurrent import process_map
 
@@ -60,10 +61,21 @@ def main() -> None:
     else:
         new_path = args.new_path
     
-    for struct in data:
-        old_path = struct["path"]
+    def _update_path(struct_dict: Dict, new_path: str) -> Dict:
+        old_path = struct_dict["path"]
         struct_name = os.path.basename(old_path)
         struct["path"] = os.path.join(new_path, struct_name)
+
+    nb_structs = len(data)
+    chunksize = (min(nb_structs // 100, 10) if nb_structs >= 200 else 1)
+    path_updater = partial(_update_path, new_path=new_path)
+
+    data = process_map(
+            path_updater,
+            data,
+            max_workers=args.workers,
+            chunksize=chunksize
+    )
     
     with open(args.input_file, "wt") as fp:
         json.dump(data, fp, indent=4)
