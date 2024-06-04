@@ -7,6 +7,7 @@ Functions to write VASP input files, launch VASP calculations and manage VASP ou
 
 import os
 import warnings
+from copy import deepcopy
 from monty.os.path import zpath
 from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal, Any
 from pathlib import Path
@@ -130,6 +131,9 @@ if __name__ == '__main__':
     dset = DeltaSolStaticSet(struct).get_input_set()
     with open(os.path.join(DeltaSolStaticSet.base_path, "DeltaVaspInput.txt"), "wt") as out:
         out.write(str(dset))
+    print(dset.incar_nelect)
+    dset.incar_nelect = 58
+    print(dset.incar_nelect)
 
 ########################################
 # LOCAL FUNCTIONS
@@ -497,9 +501,10 @@ def _StaticSet_init(
     struct_or_path: Union[SiteCollection, PathLike],
     from_prev_calc: bool = False,
     preset: str = "MPStaticSet",
+    nelect: float|None = None,
     corrections: Optional[Dict] = None,
 ) -> DictSet:
-
+    """"""
     from pymatgen.io.vasp.sets import MPStaticSet, MatPESStaticSet, MPScanStaticSet
 
     corrections = corrections or {}
@@ -512,7 +517,7 @@ def _StaticSet_init(
         dir_path = Path(struct_or_path)
         assert dir_path.is_dir()
         if preset == "DeltaSolStaticSet":
-            return MPStaticSet.from_prev_calc(
+            return DeltaSolStaticSet.from_prev_calc(
                 prev_calc_dir=dir_path,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -552,8 +557,9 @@ def _StaticSet_init(
                 f'"preset" arg expected a str type, got {type(preset)} instead.'
             )
     if preset == "DeltaSolStaticSet":
-        return MPStaticSet.from_prev_calc(
-            prev_calc_dir=dir_path,
+        return DeltaSolStaticSet(
+            structure=struct_or_path,
+            incar_nelect=nelect,
             user_incar_settings=incar_corrections,
             user_kpoints_settings=kpoints_corrections,
             user_potcar_settings=potcar_corrections,
@@ -641,6 +647,7 @@ def vasp_static_settings(
     preset: PMGStaticSetType|"DeltaSolStaticSet" = "MPStaticSet",
     from_prev_calc: bool = False,
     prev_calc_dir: Optional[PathLike] = None,
+    nelect: float|None = None,
     user_corrections: Optional[dict] = None,
 ) -> VaspInput:
     """
@@ -650,19 +657,26 @@ def vasp_static_settings(
         structure (SiteCollection):     The structure to write VASP inputs for.
 
         preset (str):                   The pymatgen preset to use for VASP inputs initialization.
+                                        Can also be the homemade "DeltaSolStaticSet" if Δ-Sol
+                                        method by Chan et al. (2010) is used.
 
         from_prev_calc (bool):          Whether to get final structure, INCAR and KPOINTS settings
-                                        from a previous VASP run.
-                                        INCAR tags will still be managed to fit a static calculation
-                                        if previous run is a relaxation.
+                                        from a previous VASP run. INCAR tags will still be managed
+                                        to fit a static calculation if previous run is a relaxation.
                                         For the sake of consistency, it is recommended to use the
-                                        static preset corresponding to previous relaxation preset in
-                                        this case (e.g. MPStaticSet for a relaxation with MPRelaxSet).
-                                        If set to True, a directory to extract data from must be provided,
-                                        and structure argument is ignored. Defaults to False.
+                                        static preset corresponding to previous relaxation preset
+                                        in this case (e.g. MPStaticSet for a relaxation with
+                                        MPRelaxSet). If set to True, a directory to extract data
+                                        from must be provided and structure argument is ignored.
+                                        Defaults to False.
 
         prev_calc_dir (str|Path):       Directory to extract previous VASP run data from when 
-                                        from_prev_calc is True. Otherwise, this argument is ignored.
+                                        from_prev_calc is True. Otherwise, this argument is
+                                        ignored.
+
+        nelect (float):                 Only useful if DeltaSolStaticSet is used.
+                                        Sets the NELECT tag in INCAR file.
+                                        Ignored if from_prev_calc is True.
 
         user_corrections (dict):        User defined settings. It allows to override some of 
                                         the preset INCAR, KPOINTS or POTCAR settings if necessary.
@@ -686,8 +700,9 @@ def vasp_static_settings(
 
     if not from_prev_calc:
         vasp_input = _StaticSet_init(
-            struct_or_path=structure, 
-            preset=preset, 
+            struct_or_path=structure,
+            preset=preset,
+            nelect=nelect,
             corrections=user_corrections
         ).get_input_set()
     
@@ -1150,33 +1165,9 @@ def batch_extract_vasp_structures(
 ########################################
 
 
-def struct_charge_switch(structure: Structure, new_charge: float):
-    """
-    Modifies overall charge of provided structure by +/- charge,
-    then returns the two resulting structures.
-
-    Parameters:
-        structure (Structure):  Neutral base structure on which charges will be added.
-
-        new_charge (float):     Value of the charge to apply.
-
-    Returns:
-        Two copies of the input structure, with a positive and negative charge, respectively.
-    """
-
-    pos_struct, neg_struct = structure.copy(), structure.copy()
-    pos_struct.set_charge(structure.charge + new_charge)
-    neg_struct.set_charge(structure.charge - new_charge)
-
-    return pos_struct, neg_struct
-
-
-########################################
-
-
 def delta_sol_inputs_init(
     structs_data: dict,
-    preset: PMGStaticSetType = "MPStaticSet",
+    preset: PMGStaticSetType|"DeltaSolStaticSet" = "DeltaSolStaticSet",
     user_corrections: Optional[Dict] = None,
     with_uncertainties: bool = False,
 ) -> Tuple[List]:
@@ -1192,7 +1183,8 @@ def delta_sol_inputs_init(
         structs_data (dict):        Dict containing relevant VASP data from a previous relaxation,
                                     as provided by the batch_extract_vasp_data function.
 
-        preset (PMGStaticSet):      One of the pymatgen static VASP preset labeled 'StaticSet'.
+        preset (PMGStaticSet):      One of the pymatgen static VASP preset labeled 'StaticSet', or
+                                    the homemade DeltaSolStaticSet. Defaults to DeltaSolStaticSet.
 
         user_corrections (dict):    User defined settings. It allows to override some of 
                                     the preset INCAR, KPOINTS or POTCAR settings if necessary.
@@ -1227,9 +1219,14 @@ def delta_sol_inputs_init(
             )
 
         n_star_types = ('BEST', 'MIN', 'MAX') if with_uncertainties else ('BEST',)
-        run_N0_dict = run_set.as_dict()
-        run_N0_dict['INCAR'].update({'NELECT': N_val})
-        run_N0 = VaspInput.from_dict(run_N0_dict)
+        
+        if preset != "DeltaSolStaticSet":
+            run_N0_dict = run_set.as_dict()
+            run_N0_dict['INCAR'].update({'NELECT': N_val})
+            run_N0 = VaspInput.from_dict(run_N0_dict)
+        else:
+            run_N0 = deepcopy(run_set)
+
         run_N0_path = '_'.join((name , 'neutral'))
         struct_runs_list = [(run_N0_path, run_N0)]
 
@@ -1242,14 +1239,27 @@ def delta_sol_inputs_init(
                 dft_functional=delta_sol_functional,
                 n_star_type=n_star_type
             )
+            if preset != "DeltaSolStaticSet":
+                run_plus, run_minus = run_set.as_dict(), run_set.as_dict()
 
-            run_plus, run_minus = run_set.as_dict(), run_set.as_dict()
+                run_plus['INCAR'].update({'NELECT': N_val + n_ratio})
+                run_minus['INCAR'].update({'NELECT': N_val - n_ratio})
 
-            run_plus['INCAR'].update({'NELECT': N_val + n_ratio})
-            run_minus['INCAR'].update({'NELECT': N_val - n_ratio})
-
-            run_plus    = VaspInput.from_dict(run_plus)
-            run_minus   = VaspInput.from_dict(run_minus)
+                run_plus  = VaspInput.from_dict(run_plus)
+                run_minus = VaspInput.from_dict(run_minus)
+            else:
+                run_plus = vasp_static_settings(
+                    structure=structure,
+                    preset=preset,
+                    nelect=N_val + n_ratio,
+                    user_corrections=user_corrections
+                )
+                run_minus = vasp_static_settings(
+                    structure=structure,
+                    preset=preset,
+                    nelect=N_val - n_ratio,
+                    user_corrections=user_corrections
+                )
 
             run_plus_path    = '_'.join((name , n_star_type.lower(), 'plus'))
             run_minus_path   = '_'.join((name , n_star_type.lower(), 'minus'))
@@ -1266,14 +1276,29 @@ def delta_sol_inputs_init(
 ########################################
 
 
-def _match_calc_index(calc_index: int) -> Union[str, None]:
-    if calc_index == 0: return None
-    if calc_index == 1 or calc_index == 2: return "BEST"
-    if calc_index == 3 or calc_index == 4: return "MIN"
-    if calc_index == 5 or calc_index == 6: return "MAX"
-    if isinstance(calc_index, int): raise ValueError("calc_index must be between 0 and 6 included.")
-    else: raise TypeError(f"Expected 'int' type, got '{type(calc_index)}' type instead")
+def _match_calc_index(calc_index: int) -> str|None:
+    if calc_index == 0:
+        return None
+    if 1 <= calc_index <= 2:
+        return "BEST"
+    if 3 <= calc_index <= 4:
+        return "MIN"
+    if 5 <= calc_index <= 6:
+        return "MAX"
+    if isinstance(calc_index, int):
+        raise ValueError("calc_index must be between 0 and 6 included.")
+    else:
+        raise TypeError(f"Expected 'int' type, got '{type(calc_index)}' type instead.")
 
+if __name__ == '__main__':
+    """Unit test for _match_calc_index()."""
+    print("Wanted output:")
+    print("None\nBEST BEST\nMIN MIN\nMAX MAX")
+    print("Actual output:")
+    print(_match_calc_index(0))
+    print(_match_calc_index(1), _match_calc_index(2))
+    print(_match_calc_index(3), _match_calc_index(4))
+    print(_match_calc_index(5), _match_calc_index(6))
 
 ########################################
 
@@ -1281,19 +1306,23 @@ def _match_calc_index(calc_index: int) -> Union[str, None]:
 def delta_sol_calculation_init(
         structure: Structure, 
         calc_index: int, 
-        preset: str = "MPStaticSet", 
+        preset: str = "DeltaSolStaticSet", 
         user_corrections: Optional[Dict[str, Any]] = None, 
     ) -> VaspInput:
     """
     Initializes one of the static calculations used for delta-sol method for one structure.
     Parameters:
         structure (Structure):      The input structure.
+
         calc_index (int):           An integer corresponding to a delta-sol static calculation:
                                     0 = E(N0), 
                                     1-2 = E(N0 + n), E(N0 - n) respectively, using N*_best, 
                                     3-4 = E(N0 + n), E(N0 - n) respectively, using N*_min, 
                                     5-6 = E(N0 + n), E(N0 - n) respectively, using N*_max.
-        preset (callable):          A pymatgen VASP static preset. Defaults to MPStaticSet.
+
+        preset (str):               A pymatgen VASP static preset, or the homemade DeltaSolStaticSet.
+                                    Defaults to DeltaSolStaticSet.
+
         user_corrections (dict):    Additional corrections provided by the user in a separate .yaml file.
     
     Returns:
@@ -1302,7 +1331,7 @@ def delta_sol_calculation_init(
 
     assert isinstance(structure, Structure)
     assert isinstance(calc_index, int) and (0 <= calc_index <= 6)
-    assert preset in PMGStaticSet
+    assert preset in PMGStaticSet or preset == "DeltaSolStaticSet"
     assert isinstance(user_corrections, Dict) or user_corrections is None
 
     N_val = get_all_valence_electrons(structure)
@@ -1329,11 +1358,17 @@ def delta_sol_calculation_init(
             n_star_type=n_star_type
         )
         nelect = N_val + n_ratio if calc_index % 2 == 1 else N_val - n_ratio
+
+        if preset == "DeltaSolStaticSet":
+            run_set = vasp_static_settings(
+                structure, preset, incar_nelect=nelect, user_corrections=user_corrections
+            )
     else:
         nelect = N_val
 
-    run_dict = run_set.as_dict()
-    run_dict['INCAR'].update({'NELECT': nelect, 'NBANDS': N_val})
-    run_set = VaspInput.from_dict(run_dict)
+    if preset != "DeltaSolStaticSet":
+        run_dict = run_set.as_dict()
+        run_dict['INCAR'].update({'NELECT': nelect})
+        run_set = VaspInput.from_dict(run_dict)
 
     return run_set
