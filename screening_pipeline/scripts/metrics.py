@@ -40,7 +40,10 @@ def main():
         dest="no_rare_earth_check",
     )
     parser.add_argument(
-        "-p", "--preprocessed", help="Cif file containing the preprocessed structures."
+        "-u", "--uniques", help="Cif file containing the preprocessed unique structures."
+    )
+    parser.add_argument(
+        "-v", "--valid", help="Cif file containing the preprocessed valid structures."
     )
     parser.add_argument(
         "-s",
@@ -125,15 +128,25 @@ def main():
         #else:
         #    pruned_generated = deepcopy(full_generated)
 
-    if args.preprocessed is not None:
-        print("Loading preprocessed structures...")
-        preprocessed, _, _ = read_cif(
-            filename=args.preprocessed,
+    if args.uniques is not None:
+        print("Loading preprocessed uniques structures...")
+        uniques, _, _ = read_cif(
+            filename=args.uniques,
             workers=args.workers,
             keep_rare_gases=True,
             keep_rare_earths=True,
         )
-        print("Preprocessed structures loaded.")
+        print("Preprocessed uniques structures loaded.")
+
+    if args.valid is not None:
+        print("Loading preprocessed valid structures...")
+        valids, _, _ = read_cif(
+            filename=args.valid,
+            workers=args.workers,
+            keep_rare_gases=True,
+            keep_rare_earths=True,
+        )
+        print("Preprocessed valid structures loaded.")
 
     if args.summary is not None:
         print("Loading summary file...")
@@ -149,8 +162,8 @@ def main():
 
     dft_metrics = dict.fromkeys(
         (
-            "num_generated",
-            #"num_generated_wo_rare",
+            "num_generated",#"num_generated_wo_rare",
+            "num_valid", "percent_valid",
             "num_unique", "num_novel",
             "num_unique_novel", "percent_unique_novel",
             "num_stable", "percent_stable",
@@ -163,10 +176,14 @@ def main():
         ("precision", "recall", "frechet_distance", "EMD_energy", "EMD_density")
     )
 
+    if args.valid is not None:
+        dft_metrics["num_valid"] = len(valids)
+        dft_metrics["percent_valid"] = len(valids) / len(full_generated)
+
     if (
         args.dataset is not None
         and args.generated is not None
-        and args.preprocessed is not None
+        and args.uniques is not None
         and args.summary is not None
     ):
         # S.U.N. metrics
@@ -177,7 +194,7 @@ def main():
         #dft_metrics["num_generated_wo_rare"] = len(pruned_generated)
 
         # Unique count
-        dft_metrics["num_unique"] = len(preprocessed)
+        dft_metrics["num_unique"] = len(uniques)
 
         # novel count
         concat_novel, _ = remove_equivalent(
@@ -187,7 +204,7 @@ def main():
 
         # novel + unique count
         concat_novel_unique, _ = remove_equivalent(
-            structures=preprocessed + dataset, workers=args.workers, keep_equivalent=False
+            structures=uniques + dataset, workers=args.workers, keep_equivalent=False
         )
         dft_metrics["num_unique_novel"] = len(concat_novel_unique) - len(dataset)
         dft_metrics["percent_unique_novel"] = dft_metrics["num_unique_novel"] / len(full_generated)
