@@ -88,7 +88,7 @@ def get_struct_dir(
     try:
         struct_dir = next(
             filter(
-            lambda dirname: dirname.startswith(f"{struct_idx}_"),
+            lambda dirname: os.path.isdir(dirname) and dirname.startswith(f"{struct_idx}_"),
             os.listdir(path)
             )
         )
@@ -106,23 +106,23 @@ def get_struct_dir(
 
     return struct_path, struct_idx, calc_idx
 
-def calc_idx_to_dir_name(calc_index: int) -> str:
+def calc_idx_to_dir_name(struct_dir_name: str, calc_index: int) -> str:
     """Maps calculation index to corresponding calculation name."""
     assert isinstance(calc_index, int), f"Expected 'int' type, got '{type(calc_index)}' instead."
     if calc_index == 0:
-        return "_neutral"
+        return "_".join(struct_dir_name, "neutral")
     if calc_index == 1:
-        return "_best_plus"
+        return "_".join(struct_dir_name, "best_plus")
     if calc_index == 2:
-        return "_best_minus"
+        return "_".join(struct_dir_name, "best_minus")
     if calc_index == 3:
-        return "_min_plus"
+        return "_".join(struct_dir_name, "min_plus")
     if calc_index == 4:
-        return "_min_minus"
+        return "_".join(struct_dir_name, "min_minus")
     if calc_index == 5:
-        return "_max_plus"
+        return "_".join(struct_dir_name, "max_plus")
     if calc_index == 6:
-        return "_max_minus"
+        return "_".join(struct_dir_name, "max_minus")
     raise ValueError(f"Only int from 0 to 6 supported, got {calc_index}")
 
 ########################################
@@ -274,8 +274,8 @@ def main() -> None:
         )
 
     dir_name   = f"{struct_idx}_{struct_data[1]['structure'].composition.reduced_formula}"
-    calc_name  = calc_idx_to_dir_name(calc_idx)
-    calc_dir   = os.path.join(outdir, dir_name, ''.join((dir_name, calc_name)))
+    calc_name  = calc_idx_to_dir_name(dir_name, calc_idx)
+    calc_dir   = os.path.join(outdir, dir_name, calc_name)
 
     input_data = delta_sol_calculation_init(
         structure=struct_data[1]["structure"],
