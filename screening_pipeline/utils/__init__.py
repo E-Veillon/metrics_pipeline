@@ -60,6 +60,7 @@ from .distribution import (
 )
 from .density import get_densities
 from .rmsd import rmsd_from_structures
+from .crystalnn import to_crystalnn_fingerprint
 from .utils import _yaml_loader
 
 __all__ = [

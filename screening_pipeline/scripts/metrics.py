@@ -1,11 +1,10 @@
 #!/usr/bin/python
 import argparse
 
-from screening_pipeline.utils.crystalnn import to_crystalnn_fingerprint
-
 
 def main():
     parser = argparse.ArgumentParser(
+        description=
         "A command line tool to compute S.U.N., RMSD, Coverage Recall and Precision "
         "(COV-R, COV-P), and Earth Mover's Distance (EMD) on densities and energies.\n"
         "S.U.N. metrics require --dataset, --generated, --summary and --preprocessed args.\n"
@@ -72,20 +71,15 @@ def main():
 
     args = parser.parse_args()
 
-    import os
     import json
     from copy import deepcopy
 
     import numpy as np
-    from pymatgen.io.vasp.inputs import Poscar
 
     from screening_pipeline.utils import (
         batch_extract_vasp_structures,
-        converged_Vasprun,
         read_cif,
-        batch_group_by_equivalence,
         remove_equivalent,
-        batch_get_novel_structures,
         vectors_from_alignn,
         recall,
         precision,
@@ -93,6 +87,7 @@ def main():
         wasserstein_distance,
         get_densities,
         rmsd_from_structures,
+        to_crystalnn_fingerprint
     )
 
     if args.dataset is not None:
