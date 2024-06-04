@@ -82,9 +82,11 @@ def rmsd(
 
     avg_path = scatter_mean(paths, batch_atoms, dim=0, dim_size=num_atoms.shape[0])
 
-    distance = (paths - avg_path[batch_atoms]).norm(dim=1)
+    distance = (paths - avg_path[batch_atoms]).pow(2).sum(dim=1)
 
-    return scatter_mean(distance, batch_atoms, dim=0, dim_size=num_atoms.shape[0])
+    return scatter_mean(
+        distance, batch_atoms, dim=0, dim_size=num_atoms.shape[0]
+    ).sqrt()
 
 
 def rmsd_from_structures(
@@ -97,10 +99,14 @@ def rmsd_from_structures(
         num_atoms == torch.tensor([len(s) for s in struct2], dtype=torch.long)
     ).all()
 
-    x_src = torch.cat([torch.tensor(s.frac_coords, dtype=torch.float32) for s in struct1],dim=0)
+    x_src = torch.cat(
+        [torch.tensor(s.frac_coords, dtype=torch.float32) for s in struct1], dim=0
+    )
     cell_src = torch.tensor([s.lattice.matrix for s in struct1], dtype=torch.float32)
 
-    x_dst = torch.cat([torch.tensor(s.frac_coords, dtype=torch.float32) for s in struct2], dim=0)
+    x_dst = torch.cat(
+        [torch.tensor(s.frac_coords, dtype=torch.float32) for s in struct2], dim=0
+    )
     cell_dst = torch.tensor([s.lattice.matrix for s in struct2], dtype=torch.float32)
 
     return rmsd(cell_src, x_src, cell_dst, x_dst, num_atoms).numpy()
