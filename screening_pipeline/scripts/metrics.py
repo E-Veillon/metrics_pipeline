@@ -113,17 +113,17 @@ def main():
             keep_rare_earths=True,
         )
         print("Generated structures loaded.")
-        if not args.no_rare_gas_check or not args.no_rare_earth_check:
-            print("Pruning undesirable elements from generated structures...")
-            pruned_generated, _, _ = read_cif(
-                filename=args.generated,
-                workers=args.workers,
-                keep_rare_gases=args.no_rare_gas_check,
-                keep_rare_earths=args.no_rare_earth_check,
-            )
-            print("Pruning finished.")
-        else:
-            pruned_generated = deepcopy(full_generated)
+        #if not args.no_rare_gas_check or not args.no_rare_earth_check:
+        #    print("Pruning undesirable elements from generated structures...")
+        #    pruned_generated, _, _ = read_cif(
+        #        filename=args.generated,
+        #        workers=args.workers,
+        #        keep_rare_gases=args.no_rare_gas_check,
+        #        keep_rare_earths=args.no_rare_earth_check,
+        #    )
+        #    print("Pruning finished.")
+        #else:
+        #    pruned_generated = deepcopy(full_generated)
 
     if args.preprocessed is not None:
         print("Loading preprocessed structures...")
@@ -150,7 +150,7 @@ def main():
     dft_metrics = dict.fromkeys(
         (
             "num_generated",
-            "num_generated_wo_rare",
+            #"num_generated_wo_rare",
             "num_unique", "num_novel",
             "num_unique_novel", "percent_unique_novel",
             "num_stable", "percent_stable",
@@ -174,14 +174,14 @@ def main():
 
         # total count
         dft_metrics["num_generated"] = len(full_generated)
-        dft_metrics["num_generated_wo_rare"] = len(pruned_generated)
+        #dft_metrics["num_generated_wo_rare"] = len(pruned_generated)
 
         # Unique count
         dft_metrics["num_unique"] = len(preprocessed)
 
         # novel count
         concat_novel, _ = remove_equivalent(
-            structures=pruned_generated + dataset, workers=args.workers, keep_equivalent=False
+            structures=full_generated + dataset, workers=args.workers, keep_equivalent=False
         )
         dft_metrics["num_novel"] = len(concat_novel) - len(dataset)
 
@@ -190,11 +190,11 @@ def main():
             structures=preprocessed + dataset, workers=args.workers, keep_equivalent=False
         )
         dft_metrics["num_unique_novel"] = len(concat_novel_unique) - len(dataset)
-        dft_metrics["percent_unique_novel"] = dft_metrics["num_unique_novel"] / len(pruned_generated)
+        dft_metrics["percent_unique_novel"] = dft_metrics["num_unique_novel"] / len(full_generated)
 
         # stable count
         dft_metrics["num_stable"] = sum(map(lambda x: x["stable"], summary))
-        dft_metrics["percent_stable"] = dft_metrics["num_stable"] / len(vasp_structures)
+        dft_metrics["percent_stable"] = dft_metrics["num_stable"] / 64 # nb DFT structures per batch
 
         # S.U.N. percentage
         dft_metrics["SUN"] = dft_metrics["percent_stable"] * dft_metrics["percent_unique_novel"]
