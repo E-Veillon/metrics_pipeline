@@ -32,7 +32,7 @@ from pymatgen.io.vasp import VaspInput, Vasprun
 #from pymatgen.io.vasp.inputs import Poscar
 #from pymatgen.io.vasp.outputs import Chgcar, Oszicar
 from pymatgen.io.vasp.sets import (
-    DictSet, MITRelaxSet#, _load_yaml_config, MPRelaxSet, MPStaticSet, UserPotcarFunctional
+    DictSet, MITRelaxSet, MPRelaxSet#, _load_yaml_config, MPStaticSet, UserPotcarFunctional
 )
 
 ########################################
@@ -60,7 +60,7 @@ from screening_pipeline.utils.periodic_table import (
 
 
 @dataclass
-class DeltaSolStaticSet(DictSet):
+class DeltaSolStaticSet(MPRelaxSet):
     """
     Initialize VASP input files for Δ-Sol method computations using
     PBE_54_W_HASH pymatgen set of POTCAR files. Parameters are as 
@@ -76,13 +76,60 @@ class DeltaSolStaticSet(DictSet):
         (Ref 14 in screening_pipeline/Bibliography)
 
     Args:
-        structure (Structure): Structure to compute.
-        **kwargs: kwargs supported by DictSet.
+        structure (Structure):  The Structure to create inputs for. If None, the input
+                                set is initialized without a Structure but one must be
+                                set separately before the inputs are generated.
+
+        nelect (float):         The number of electrons to put in the NELECT INCAR tag.
+                                In Δ-Sol, several computations with distinct number of 
+                                electrons are done, this is a convenient arg to set that.
+                                If not given, infers the Δ-Sol N0 electrons calculation 
+                                from the given structure.
+
+        **kwargs:               kwargs supported by DictSet.
+    
+    Raises: ValueError if neither structure nor nelect are given at instanciation time.
     """
-    base_path = os.path.dirname(os.getcwd())
+    base_path = os.path.dirname(os.path.dirname(__file__))
     path = os.path.join(base_path, "config", "DeltaSolStaticSet.yaml")
     CONFIG = _yaml_loader(path, on_error='raise')
 
+    def __init__(
+            self,
+            structure: Structure|None = None,
+            incar_nelect: float|None = None,
+            **kwargs
+        ) -> None:
+        """DeltaSolStaticSet init."""
+        super().__init__(structure, **kwargs)
+
+        if incar_nelect is None:
+            try:
+                incar_nelect = get_all_valence_electrons(structure)
+            except TypeError:
+                raise ValueError(f"Either structure or nelect must be set.")
+
+        self.incar_nelect = incar_nelect
+
+    @property
+    def incar_updates(self) -> Dict:
+        """Get updates to the INCAR config for this calculation type."""
+        updates: Dict[str, Any] = {"MAGMOM": None, "NELECT": self.incar_nelect}
+        return updates
+
+if __name__ == '__main__':
+    """
+    Test for the DeltaSolStaticSet class. You may have to change the given path
+    to one pointing at a valid CIF structure file for it to work properly.
+    You'll also need to set PMG_VASP_PSP_DIR for POTCAR files in .pmgrc.yaml.
+    """
+    from pymatgen.io.cif import CifParser
+    path = "/home/elohan/screening-pipeline/screening_pipeline/_benchmarks/TiO2.cif"
+    with open(path, "rt") as fp:
+        struct = CifParser(fp).parse_structures()[0]
+    dset = DeltaSolStaticSet(struct).get_input_set()
+    with open(os.path.join(DeltaSolStaticSet.base_path, "DeltaVaspInput.txt"), "wt") as out:
+        out.write(str(dset))
 
 ########################################
 # LOCAL FUNCTIONS

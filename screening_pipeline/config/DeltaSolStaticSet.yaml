@@ -9,8 +9,8 @@
 INCAR:
   ALGO: Normal
   EDIFF: 0.00001
+  ENCUT: 520
   ISMEAR: -5
-  MAGMOM: ~
   NELM: 200
   NSW: 0
   PREC: Accurate

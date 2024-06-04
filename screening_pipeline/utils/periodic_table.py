@@ -317,7 +317,11 @@ def get_all_valence_electrons(structure: SiteCollection) -> int:
     Returns:
         int: The number of valence electrons in the unit cell.
     '''
-    
+    if not isinstance(structure, SiteCollection):
+        raise TypeError(
+            "'structure' arg expected a type 'pymatgen.core.structure.SiteCollection', "
+            f"got '{type(structure)}' instead."
+        )
     nbr_val_elec = 0
     elts_dict    = structure.composition.element_composition.as_dict()
 
