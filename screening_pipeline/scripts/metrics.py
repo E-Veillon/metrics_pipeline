@@ -110,7 +110,7 @@ def main():
         )
 
     if args.generated is not None:
-        print("Loading genrated structures...")
+        print("Loading generated structures...")
         full_generated, _, _ = read_cif(
             filename=args.generated,
             workers=args.workers,
@@ -156,12 +156,11 @@ def main():
         (
             "num_generated",
             "num_generated_wo_rare",
-            "num_unique",
-            # "num_novel", "num_novel_unique",
-            "num_stable_unique",
-            "num_stable_unique_novel",
+            "num_unique", "num_novel",
+            "num_unique_novel", "percent_unique_novel",
+            "num_stable", "percent_stable",
             "SUN",
-            "RMSD",
+            "RMSD"
         )
     )
 
@@ -185,7 +184,6 @@ def main():
         # Unique count
         dft_metrics["num_unique"] = len(preprocessed)
 
-        """
         # novel count
         concat_novel, _ = remove_equivalent(
             structures=pruned_generated + dataset, workers=args.workers, keep_equivalent=False
@@ -196,37 +194,16 @@ def main():
         concat_novel_unique, _ = remove_equivalent(
             structures=preprocessed + dataset, workers=args.workers, keep_equivalent=False
         )
-        dft_metrics["num_novel_unique"] = len(concat_novel_unique) - len(dataset)
+        dft_metrics["num_unique_novel"] = len(concat_novel_unique) - len(dataset)
+        dft_metrics["percent_unique_novel"] = dft_metrics["num_unique_novel"] / len(pruned_generated)
 
-        # novel + unique + stable count
-        num_novel_unique_stable = sum(map(lambda x: x["stable"], summary))
-        """
+        # stable count
+        dft_metrics["num_stable"] = sum(map(lambda x: x["stable"], summary))
+        dft_metrics["percent_stable"] = dft_metrics["num_stable"] / len(vasp_structures)
 
-        # Stable + Unique count
-        paths_stable_unique = list(
-            filter(lambda data: data["stable"].lower() == "true", summary)
-        )
-        dft_metrics["num_stable_unique"] = len(paths_stable_unique)
+        # S.U.N. percentage
+        dft_metrics["SUN"] = dft_metrics["percent_stable"] * dft_metrics["percent_unique_novel"]
 
-        # Stable + Unique + Novel count (S.U.N.)
-        structs_stable_unique = list(
-            map(
-                lambda data: converged_Vasprun(data["path"]).initial_structure,
-                paths_stable_unique,
-            )
-        )
-
-        concat_sun = batch_group_by_equivalence(
-            structures=structs_stable_unique + dataset,
-            workers=args.workers,
-            comment="Comparing known and generated structures",
-        )
-
-        sun_structs = batch_get_novel_structures(
-            structures=concat_sun, dataset=dataset, workers=args.workers
-        )
-
-        dft_metrics["num_stable_unique_novel"] = len(sun_structs)
         print("S.U.N. metrics computed.")
         for key, val in dft_metrics.items():
             if key == "RMSD":
@@ -247,15 +224,15 @@ def main():
     if args.dataset is not None and args.generated is not None:
         # machine learning metrics (COV-R, COV-P, energy EMD, density EMD)
         print("Computing latent space metrics (COV-R, COV-P)...")
-        fingerprint_dataset = to_crystalnn_fingerprint(dataset)
-        fingerprint_gen = to_crystalnn_fingerprint(full_generated)
+        fingerprint_dataset = to_crystalnn_fingerprint(dataset, workers=args.workers)
+        fingerprint_gen = to_crystalnn_fingerprint(full_generated, workers=args.workers)
 
-        fingerprint_dataset, fingerprint_gen = zip(
+        fingerprint_dataset, fingerprint_gen = map(np.array,zip(
             *filter(
                 lambda x: x[0] is not None and x[1] is not None,
                 zip(fingerprint_dataset, fingerprint_gen),
             )
-        )
+        ))
 
         ml_metrics["precision"] = precision(
             fingerprint_gen, fingerprint_dataset, args.threshold
