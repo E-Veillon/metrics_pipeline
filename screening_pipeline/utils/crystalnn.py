@@ -34,10 +34,14 @@ def to_crystalnn_fingerprint(
     Returns: List[ndarray]:
         List of CrystalNN fingerprints corresponding to given structures.
     """
+    nb_structs = len(structures)
+    chunksize = (min(nb_structs // 100, 10) if nb_structs >= 200 else 1)
+
     fingerprints = process_map(
         _structure_to_fingerprint,
         structures,
         max_workers=workers,
+        chunksize=chunksize,
         desc="Convert structures to CrystalNN fingerprints"
     )
     return fingerprints
