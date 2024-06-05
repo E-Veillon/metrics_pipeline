@@ -162,7 +162,7 @@ def main():
             "Phase diagrams will be fetched from the Materials Project API "
             "instead of being initialized internally. In that case you must provide "
             "a valid MP API key in the --mp-api-key argument for the program to be able "
-            "to retrieve data."
+            "to retrieve data. If passed, data in --reference becomes useless."
         )
     )
     parser.add_argument(

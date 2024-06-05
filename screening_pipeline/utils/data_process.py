@@ -492,7 +492,9 @@ def phase_diagram_init(
 
         from_mp_api (bool):         Whether to get the phase diagram from the Materials 
                                     Project REST API. If set to True, a MP API key must be
-                                    given in mp_api_key arg. Defaults to False.
+                                    given in mp_api_key arg. In that case, ref_elts arg is
+                                    used to get the chemical space to query, and entries arg
+                                    is ignored. Defaults to False.
 
         mp_api_key (str):           The MP API key to use to query phase diagrams from the
                                     Materials Project REST API. If from_mp_api is set to
@@ -517,10 +519,11 @@ def phase_diagram_init(
 
     pd_name = "-".join(list(map(str, ref_elts)))
     print(f"Initializing phase diagram '{pd_name}'")
+
     if from_mp_api:
         with MPRester(mp_api_key) as mpr:
             new_pd = mpr.materials.thermo.get_phase_diagram_from_chemsys(
-                chemsys="Li-Fe-O", thermo_type=ThermoType.GGA_GGA_U
+                chemsys=pd_name, thermo_type=ThermoType.GGA_GGA_U
             )
     else:
         new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
@@ -546,8 +549,14 @@ def _compute_e_above_hull(
     Initialize a phase diagram and compute above hull energies of given entries.
     """
     results = []
+    # entries_to_compute is one composition group here,
+    # all structures contain the same elements
     comp_refs = get_sub_entries(main_entry=entries_to_compute[0], entry_pool=ref_entries)
-    pd = phase_diagram_init(entries=comp_refs)
+    pd = phase_diagram_init(
+        entries=comp_refs,
+        from_mp_api=from_mp_api,
+        mp_api_key=mp_api_key
+    )
 
     # Compute energy above hull for each generated entry
     for entry in entries_to_compute:
@@ -590,9 +599,11 @@ def batch_compute_e_above_hull(
                                             the entry is considered unstable, in eV/atom.
                                             Defaults to 0.1 eV/atom.
 
-        from_mp_api (bool):                 Whether to get the phase diagram from the Materials
+        from_mp_api (bool):                 Whether to get the phase diagram from the Materials 
                                             Project REST API. If set to True, a MP API key must
-                                            be given in mp_api_key arg. Defaults to False.
+                                            be given in mp_api_key arg. In that case, ref_elts
+                                            arg is used to get the chemical space to query, and
+                                            ref_entries arg is ignored. Defaults to False.
 
         mp_api_key (str):                   The MP API key to use to query phase diagrams from
                                             the Materials Project REST API. If from_mp_api is
