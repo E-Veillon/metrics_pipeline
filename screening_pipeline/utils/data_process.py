@@ -6,7 +6,6 @@ Functions to process raw calculation results from VASP and test actual eliminati
 # SYSTEM I/O MODULES
 
 from typing import Dict, Union, Sequence, Tuple, Any, List, Iterable, Optional, Literal
-from pathlib import Path
 
 ########################################
 # OPTIMIZATION MODULES
@@ -23,6 +22,13 @@ from pymatgen.core.periodic_table import Element
 from pymatgen.core.composition import Composition
 from pymatgen.core.structure import SiteCollection
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
+
+
+########################################
+# THE MATERIALS PROJECT REST API
+
+from mp_api.client import MPRester
+from emmet.core.thermo import ThermoType
 
 ########################################
 # LOCAL MODULES
@@ -456,6 +462,8 @@ def get_lacking_elts_entries(
 def phase_diagram_init(
     entries: Sequence[PDEntry],
     ref_elts: Optional[FormulaLike] = None,
+    from_mp_api: bool = False,
+    mp_api_key: str|None = None
 ) -> PhaseDiagram:
     """
     Compute a new PhaseDiagram object from given elements and entries.
@@ -475,14 +483,21 @@ def phase_diagram_init(
                                     If a single string is provided, it can either
                                     be a raw formula (eg. 'FePO4') or a composition
                                     string containing element symbols separated by
-                                    '-' (eg. 'Fe-P-O').
-                                    If a sequence is given, it can contain valid
-                                    element symbols, atomic numbers and/or Element
-                                    objects.
-                                    If not provided, they are computed from given entries.
-                                    In that case, all provided entries are checked, so the
-                                    phase diagram will be of the minimal dimension that
-                                    contains all entries.
+                                    '-' (eg. 'Fe-P-O'). If a sequence is given, it can 
+                                    contain valid element symbols, atomic numbers and/or 
+                                    Element objects. If not provided, they are computed from 
+                                    given entries. In that case, all provided entries are 
+                                    checked, so the phase diagram will be of the minimal 
+                                    chemical space that contains all entries.
+
+        from_mp_api (bool):         Whether to get the phase diagram from the Materials 
+                                    Project REST API. If set to True, a MP API key must be
+                                    given in mp_api_key arg. Defaults to False.
+
+        mp_api_key (str):           The MP API key to use to query phase diagrams from the
+                                    Materials Project REST API. If from_mp_api is set to
+                                    False, this argument is ignored.
+
     Returns:
         The constructed PhaseDiagram object.
     """
@@ -502,10 +517,17 @@ def phase_diagram_init(
 
     pd_name = "-".join(list(map(str, ref_elts)))
     print(f"Initializing phase diagram '{pd_name}'")
-    new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
+    if from_mp_api:
+        with MPRester(mp_api_key) as mpr:
+            new_pd = mpr.materials.thermo.get_phase_diagram_from_chemsys(
+                chemsys="Li-Fe-O", thermo_type=ThermoType.GGA_GGA_U
+            )
+    else:
+        new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
+
     print(f"{pd_name} diagram contains following entries:")
     for entry in new_pd.qhull_entries:
-        print(f"{entry}")
+        print(f"{PDEntry(entry.composition, entry.energy)}")
 
     return new_pd
 
@@ -514,8 +536,11 @@ def phase_diagram_init(
 
 
 def _compute_e_above_hull(
-        entries_to_compute: List[PDEntry], ref_entries: List[PDEntry],
-        stable_limit: float = 0.1
+        entries_to_compute: List[PDEntry],
+        ref_entries: List[PDEntry],
+        stable_limit: float = 0.1,
+        from_mp_api: bool = False,
+        mp_api_key: str|None = None
     ) -> List[Dict[str, str|float]]:
     """
     Initialize a phase diagram and compute above hull energies of given entries.
@@ -544,6 +569,8 @@ def batch_compute_e_above_hull(
         entries_to_compute: List[List[PDEntry]],
         ref_entries: List[PDEntry],
         stable_limit: float = 0.1,
+        from_mp_api: bool = False,
+        mp_api_key: str|None = None,
         workers: int = 1
     ) -> List[Dict[str, Union[str, float]]]:
     """
@@ -563,6 +590,14 @@ def batch_compute_e_above_hull(
                                             the entry is considered unstable, in eV/atom.
                                             Defaults to 0.1 eV/atom.
 
+        from_mp_api (bool):                 Whether to get the phase diagram from the Materials
+                                            Project REST API. If set to True, a MP API key must
+                                            be given in mp_api_key arg. Defaults to False.
+
+        mp_api_key (str):                   The MP API key to use to query phase diagrams from
+                                            the Materials Project REST API. If from_mp_api is
+                                            set to False, this argument is ignored.
+
         workers (int):                      Number of parallel processes to spawn.
         
     Returns:
@@ -574,7 +609,9 @@ def batch_compute_e_above_hull(
     energy_computer = partial(
         _compute_e_above_hull,
         ref_entries=ref_entries,
-        stable_limit=stable_limit
+        stable_limit=stable_limit,
+        from_mp_api=from_mp_api,
+        mp_api_key=mp_api_key
     )
 
     computed_energies = process_map(

@@ -156,6 +156,24 @@ def main():
         metavar="float",
     )
     parser.add_argument(
+        "--from-mp-api",
+        action="store_true",
+        help=(
+            "Phase diagrams will be fetched from the Materials Project API "
+            "instead of being initialized internally. In that case you must provide "
+            "a valid MP API key in the --mp-api-key argument for the program to be able "
+            "to retrieve data."
+        )
+    )
+    parser.add_argument(
+        "-k", "--mp-api-key",
+        help=(
+            "If the --from-mp-api flag is passed, you must provide here a valid MP API "
+            "key for the program to be able to fetch the phase diagrams from the Materials "
+            "Project API."
+        )
+    )
+    parser.add_argument(
         "-w",
         "--workers",
         type=int,
@@ -211,8 +229,12 @@ def main():
 
     # Compute energy above hulls in each group
     screening_results = batch_compute_e_above_hull(
-        entries_to_compute=grouped_entries, ref_entries=ref_entries,
-        stable_limit=delta_H_limit, workers=args.workers
+        entries_to_compute=grouped_entries,
+        ref_entries=ref_entries,
+        stable_limit=delta_H_limit,
+        from_mp_api=args.from_mp_api,
+        mp_api_key=args.mp_api_key,
+        workers=args.workers
     )
 
     for dct in screening_results:
