@@ -59,8 +59,10 @@ def assert_args(args: argparse.Namespace) -> None:
 
     assert os.path.isdir(args.run_dir), f"{args.run_dir}: No such directory found."
 
-    assert os.path.isfile(args.reference), f"{args.reference}: No such file found."
-
+    if args.reference is not None:
+        assert os.path.isfile(args.reference), (
+            f"{args.reference}: No such file found."
+        )
     if args.prev_summary is not None:
         assert os.path.isfile(args.prev_summary), (
             f"{args.prev_summary}: No such file found."
