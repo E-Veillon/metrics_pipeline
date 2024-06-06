@@ -234,7 +234,7 @@ def main():
 
     for dct in screening_results:
         path = os.path.join(args.run_dir, dct["name"])
-        dct.update({"path": path})
+        dct.update({"path": os.path.abspath(path)})
 
     def sort_by_path(dct: dict) -> str:
         return dct.get("path")
