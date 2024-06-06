@@ -549,7 +549,8 @@ def phase_diagram_init(
 
     print(f"{pd_name} diagram contains following entries:")
     for entry in new_pd.qhull_entries:
-        print(f"{PDEntry(entry.composition, entry.energy)}")
+        entry = PDEntry(entry.composition, entry.energy)
+        print(f"{entry}, energy_per_atom = {entry.energy_per_atom}")
 
     return new_pd
 
@@ -582,6 +583,7 @@ def _compute_e_above_hull(
         e_above_hull = pd.get_e_above_hull(entry, allow_negative=True)
         is_stable = e_above_hull <= stable_limit
         print(f"Entry '{entry.name}':")
+        print(f"- energy_per_atom: {entry.energy_per_atom}")
         print(f"- e_above_hull: {e_above_hull}")
         print(f"- is_stable: {is_stable}")
         results.append(
