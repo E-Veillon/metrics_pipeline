@@ -18,6 +18,7 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # PYTHON MATERIAL GENOMICS PACKAGE
 
+from pymatgen.core import SETTINGS
 from pymatgen.core.periodic_table import Element
 from pymatgen.core.composition import Composition
 from pymatgen.core.structure import SiteCollection
@@ -493,8 +494,9 @@ def phase_diagram_init(
         from_mp_api (bool):         Whether to get the phase diagram from the Materials 
                                     Project REST API. If set to True, a MP API key must be
                                     given in mp_api_key arg. In that case, ref_elts arg is
-                                    used to get the chemical space to query, and entries arg
-                                    is ignored. Defaults to False.
+                                    used to get the chemical space to query. If no valid
+                                    phase diagram could be fetched from MP, reverts back to
+                                    normal initialization. Defaults to False.
 
         mp_api_key (str):           The MP API key to use to query phase diagrams from the
                                     Materials Project REST API. If from_mp_api is set to
@@ -521,10 +523,27 @@ def phase_diagram_init(
     print(f"Initializing phase diagram '{pd_name}'")
 
     if from_mp_api:
-        with MPRester(mp_api_key) as mpr:
-            new_pd = mpr.materials.thermo.get_phase_diagram_from_chemsys(
-                chemsys=pd_name, thermo_type=ThermoType.GGA_GGA_U
+        mp_api_key = mp_api_key or SETTINGS.get("PMG_MAPI_KEY", None)
+        if not mp_api_key:
+            raise ValueError(
+                "'from-mp-api' was set to True but no 'mp-api-key' was defined. "
+                "You can define it either by entering the key manually or "
+                "add PMG_MAPI_KEY to .pmgrc.yaml."
             )
+        try:
+            with MPRester(mp_api_key) as mpr:
+                new_pd = mpr.materials.thermo.get_phase_diagram_from_chemsys(
+                    chemsys=pd_name, thermo_type=ThermoType.GGA_GGA_U
+                )
+        except Exception:
+            # Building a default phase diagram after all
+            new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
+            return new_pd
+
+        if not new_pd.all_entries: # No explicit exception but 0 entry in the diagram
+            new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
+            return new_pd
+
     else:
         new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
 
@@ -602,8 +621,10 @@ def batch_compute_e_above_hull(
         from_mp_api (bool):                 Whether to get the phase diagram from the Materials 
                                             Project REST API. If set to True, a MP API key must
                                             be given in mp_api_key arg. In that case, ref_elts
-                                            arg is used to get the chemical space to query, and
-                                            ref_entries arg is ignored. Defaults to False.
+                                            arg is used to get the chemical space to query.
+                                            If no valid phase diagram could be fetched from MP,
+                                            reverts back to normal initialization.
+                                            Defaults to False.
 
         mp_api_key (str):                   The MP API key to use to query phase diagrams from
                                             the Materials Project REST API. If from_mp_api is

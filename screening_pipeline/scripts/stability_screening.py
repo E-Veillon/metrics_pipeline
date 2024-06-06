@@ -93,19 +93,10 @@ def main():
     prog_name = "stability_screening.py"
     prog_description = "A script using previous VASP relaxations to compute the relative \
                           stability of given structures."
-    prog_missing_steps = """
-        Missing steps to complete the script:
-            - Determine the critical formation reaction of the structure
-            - (Relax reference structures for calculations consistency)
-            - Compare structure energy with the sum of reference structure energies
-        """
-    helper_format = argparse.RawTextHelpFormatter
 
     parser = argparse.ArgumentParser(
         prog=prog_name,
-        description=prog_description,
-        epilog=prog_missing_steps,
-        formatter_class=helper_format,
+        description=prog_description
     )
 
     parser.add_argument(
@@ -153,7 +144,7 @@ def main():
         help=(
             "Maximum value of ΔH (in eV/atom) above which structures "
             "are considered too unstable and rejected.\n"
-            "Defaults to 0.1 eV/atom, as it is commonly assumed to be sufficient."
+            "Defaults to 0.1 eV/atom, as it is commonly assumed to be sufficient.\n"
         ),
         metavar="float",
     )
@@ -164,15 +155,17 @@ def main():
             "Phase diagrams will be fetched from the Materials Project API "
             "instead of being initialized internally. In that case you must provide "
             "a valid MP API key in the --mp-api-key argument for the program to be able "
-            "to retrieve data. If passed, data in --reference becomes useless."
+            "to retrieve data. If there is no MP phase diagram correponding to some "
+            "needed chemical spaces, the phase diagram will still be initialized "
+            "internally using entries in --reference as usual."
         )
     )
     parser.add_argument(
         "-k", "--mp-api-key",
         help=(
-            "If the --from-mp-api flag is passed, you must provide here a valid MP API "
-            "key for the program to be able to fetch the phase diagrams from the Materials "
-            "Project API."
+            "If the --from-mp-api flag is passed, you can either enter manually a valid MP "
+            "API key here or set 'PMG_MAPI_KEY' in .pmgrc.yaml for the program to be able "
+            "to fetch the phase diagrams from the Materials Project API."
         )
     )
     parser.add_argument(
