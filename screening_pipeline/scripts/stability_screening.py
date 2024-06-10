@@ -176,6 +176,11 @@ def main():
         help="Number of parallel processes to spawn for parallelized steps.",
         metavar="int",
     )
+    parser.add_argument(
+        "--pause-after-init",
+        action="store_true",
+        help="Pauses the program after finishing data preparations. Press Enter to unpause."
+    )
 
     args: argparse.Namespace = parser.parse_args()
 
@@ -214,6 +219,9 @@ def main():
         )
     else:
         ref_entries = []
+
+    if args.pause_after_init:
+        input("Tap Enter to continue:")
 
     # Generate and add default elemental references if they are not in the reference dataset
     auto_elts_entries = get_lacking_elts_entries(ref_entries, ref_elts=used_elts)
