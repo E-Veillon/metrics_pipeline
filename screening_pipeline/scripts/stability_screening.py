@@ -177,6 +177,11 @@ def main():
         metavar="int",
     )
     parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Whether to print each reference entry used when building a phase diagram."
+    )
+    parser.add_argument(
         "--pause-after-init",
         action="store_true",
         help="Pauses the program after finishing data preparations. Press Enter to unpause."
@@ -237,7 +242,8 @@ def main():
         stable_limit=delta_H_limit,
         from_mp_api=args.from_mp_api,
         mp_api_key=args.mp_api_key,
-        workers=args.workers
+        workers=args.workers,
+        verbose=args.verbose
     )
 
     for dct in screening_results:

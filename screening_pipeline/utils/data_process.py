@@ -464,7 +464,8 @@ def phase_diagram_init(
     entries: Sequence[PDEntry],
     ref_elts: Optional[FormulaLike] = None,
     from_mp_api: bool = False,
-    mp_api_key: str|None = None
+    mp_api_key: str|None = None,
+    verbose: bool = False
 ) -> PhaseDiagram:
     """
     Compute a new PhaseDiagram object from given elements and entries.
@@ -501,6 +502,9 @@ def phase_diagram_init(
         mp_api_key (str):           The MP API key to use to query phase diagrams from the
                                     Materials Project REST API. If from_mp_api is set to
                                     False, this argument is ignored.
+
+        verbose (bool):             Whether to print each reference entry used when
+                                    building a phase diagram.
 
     Returns:
         The constructed PhaseDiagram object.
@@ -547,10 +551,11 @@ def phase_diagram_init(
     else:
         new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
 
-    print(f"{pd_name} diagram contains following entries:")
-    for entry in new_pd.qhull_entries:
-        entry = PDEntry(entry.composition, entry.energy)
-        print(f"{entry}, energy_per_atom = {entry.energy_per_atom}")
+    if verbose:
+        print(f"{pd_name} diagram contains following entries:")
+        for entry in new_pd.qhull_entries:
+            entry = PDEntry(entry.composition, entry.energy)
+            print(f"{entry}, energy_per_atom = {entry.energy_per_atom}")
 
     return new_pd
 
@@ -563,7 +568,8 @@ def _compute_e_above_hull(
         ref_entries: List[PDEntry],
         stable_limit: float = 0.1,
         from_mp_api: bool = False,
-        mp_api_key: str|None = None
+        mp_api_key: str|None = None,
+        verbose: bool = False
     ) -> List[Dict[str, str|float]]:
     """
     Initialize a phase diagram and compute above hull energies of given entries.
@@ -575,7 +581,8 @@ def _compute_e_above_hull(
     pd = phase_diagram_init(
         entries=comp_refs,
         from_mp_api=from_mp_api,
-        mp_api_key=mp_api_key
+        mp_api_key=mp_api_key,
+        verbose=verbose
     )
 
     # Compute energy above hull for each generated entry
@@ -601,7 +608,8 @@ def batch_compute_e_above_hull(
         stable_limit: float = 0.1,
         from_mp_api: bool = False,
         mp_api_key: str|None = None,
-        workers: int = 1
+        workers: int = 1,
+        verbose: bool = False
     ) -> List[Dict[str, Union[str, float]]]:
     """
     For each sublist, build the minimal phase diagram using the reference entries,
@@ -609,31 +617,34 @@ def batch_compute_e_above_hull(
     Can be parallelized over phase diagram initialization, one diagram per process.
 
     Parameters:
-        entries_to_compute ([[PDEntry]]):   List of entry sublists whose energy is needed.
-                                            One phase diagram is built for each sublist.
+        entries ([[PDEntry]]):      List of entry sublists whose energy is needed.
+                                    One phase diagram is built for each sublist.
 
-        ref_entries ([PDEntry]):            reference entries used to build the diagrams.
-                                            Each diagram is built with only necessary
-                                            entries from this sequence.
+        ref_entries ([PDEntry]):    reference entries used to build the diagrams.
+                                    Each diagram is built with only necessary
+                                    entries from this sequence.
 
-        stable_limit (float):               Threshold of the energy above hull above which
-                                            the entry is considered unstable, in eV/atom.
-                                            Defaults to 0.1 eV/atom.
+        stable_limit (float):       Threshold of the energy above hull above which
+                                    the entry is considered unstable, in eV/atom.
+                                    Defaults to 0.1 eV/atom.
 
-        from_mp_api (bool):                 Whether to get the phase diagram from the Materials 
-                                            Project REST API. If set to True, a MP API key must
-                                            be given in mp_api_key arg. In that case, ref_elts
-                                            arg is used to get the chemical space to query.
-                                            If no valid phase diagram could be fetched from MP,
-                                            reverts back to normal initialization.
-                                            Defaults to False.
+        from_mp_api (bool):         Whether to get the phase diagram from the Materials 
+                                    Project REST API. If set to True, a MP API key must
+                                    be given in mp_api_key arg. In that case, ref_elts
+                                    arg is used to get the chemical space to query.
+                                    If no valid phase diagram could be fetched from MP,
+                                    reverts back to normal initialization.
+                                    Defaults to False.
 
-        mp_api_key (str):                   The MP API key to use to query phase diagrams from
-                                            the Materials Project REST API. If from_mp_api is
-                                            set to False, this argument is ignored.
+        mp_api_key (str):           The MP API key to use to query phase diagrams from
+                                    the Materials Project REST API. If from_mp_api is
+                                    set to False, this argument is ignored.
 
-        workers (int):                      Number of parallel processes to spawn.
-        
+        workers (int):              Number of parallel processes to spawn.
+
+        verbose (bool):             Whether to print each reference entry used when
+                                    building a phase diagram.
+
     Returns:
         List[Dict[str, str|float]]: List of dicts containing the name, energy above hull
         and stringified (for JSON serailization) stability test boolean for one entry
@@ -645,7 +656,8 @@ def batch_compute_e_above_hull(
         ref_entries=ref_entries,
         stable_limit=stable_limit,
         from_mp_api=from_mp_api,
-        mp_api_key=mp_api_key
+        mp_api_key=mp_api_key,
+        verbose=verbose
     )
 
     computed_energies = process_map(

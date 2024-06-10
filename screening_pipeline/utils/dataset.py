@@ -56,7 +56,7 @@ def mp_api_download(path: str, api_key: str|None = None) -> None:
         api_key=api_key,
         use_document_model=False
         ) as mpr:
-        data = mpr.materials.thermo.search(thermo_types=ThermoType.GGA_GGA_U,
+        data = mpr.materials.thermo.search(thermo_types=[ThermoType.GGA_GGA_U],
             all_fields=False, fields=["material_id","composition","energy_per_atom"]
         )
         print(f"Number of Materials Project entries downloaded: {len(data)}")
@@ -75,7 +75,7 @@ def mp_api_download(path: str, api_key: str|None = None) -> None:
             )
 
     with open(path,"wt") as fp:
-        json.dump(data, fp)
+        json.dump(final_data, fp)
 
 
 ########################################
@@ -145,7 +145,7 @@ def process_oqmd_json_file(path: str) -> None:
                     "'entry_id', 'composition', 'natoms', 'delta_e'."
                 )
 
-        entry_id: str = struct.get("entry_id")
+        entry_id: str = str(struct.get("entry_id"))
 
         if isinstance(struct.get("composition"), Dict):
             composition: Dict[str, int] = struct.get("composition")
