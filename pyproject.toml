@@ -31,6 +31,7 @@ delta_sol_inputs_writer = 'screening_pipeline.scripts.delta_sol_inputs_writer:ma
 vasp_delta_sol_statics = 'screening_pipeline.scripts.vasp_delta_sol_statics:main'
 delta_sol_calculator = 'screening_pipeline.scripts.delta_sol_calculator:main'
 summary_paths_update = 'screening_pipeline.scripts.summary_paths_update:main'
+process_dataset = 'screening_pipeline.scripts.process_dataset:main'
 
 [[tool.poetry.source]]
 name = "pytorch-geometric"
