@@ -50,7 +50,7 @@ from .custom_types import (
     PathLike, FormulaLike, PMGRelaxSetType, PMGStaticSetType,
     PMGRelaxSet, PMGStaticSet
 )
-from .dataset import load_phase_diagram_entries
+from .dataset import load_phase_diagram_entries, mp_api_download, process_oqmd_json_file
 from .ml_vectors import vectors_from_alignn
 from .distribution import (
         recall,
