@@ -1,8 +1,10 @@
 #!/usr/bin/python
+
 import argparse
 
 
-def main():
+def main() -> None:
+    """Main entry point."""
     parser = argparse.ArgumentParser(
         description=
         "A command line tool to compute S.U.N., RMSD, Coverage Recall and Precision "
@@ -75,8 +77,6 @@ def main():
     args = parser.parse_args()
 
     import json
-    from copy import deepcopy
-
     import numpy as np
 
     from screening_pipeline.utils import (
