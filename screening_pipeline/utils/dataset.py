@@ -30,7 +30,7 @@ def _mp_api_key_check(api_key: str|None = None) -> str:
     if not api_key:
         raise APIKeyNotFoundError(
             "An API key must be given to access MP API. "
-            "Configure it in .pmgrc.yaml as 'PMG_MAPI_KEY' or pass it manually."
+            "Configure it in .pmgrc.yaml in 'PMG_MAPI_KEY' keyword or pass it manually."
         )
     return api_key
 
@@ -59,7 +59,7 @@ def mp_api_download(path: str, api_key: str|None = None) -> None:
         data = mpr.materials.thermo.search(thermo_types=ThermoType.GGA_GGA_U,
             all_fields=False, fields=["material_id","composition","energy_per_atom"]
         )
-        print(f"{len(data)=}")
+        print(f"Number of Materials Project entries downloaded: {len(data)}")
 
         final_data = {}
         for entry in data:
