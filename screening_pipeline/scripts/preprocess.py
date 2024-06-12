@@ -180,6 +180,16 @@ def main() -> None:
         dest="no_equiv_match"
     )
     parser.add_argument(
+        "--test-min-vol",
+        action="store_true",
+        help=(
+            "A debug flag to assume unicity of unlikely structures having a volume under "
+            "1 Angström^3 without passing them into structure matching, which could cause "
+            "the program to be softlocked. Only pass it if such problems were to arise when "
+            "--no-dist-check flag is passed and not --no-equiv-match flag."
+        )
+    )
+    parser.add_argument(
         "-w",
         "--workers",
         type=int,
@@ -257,6 +267,7 @@ def main() -> None:
     kept_structs, nbr_equivalent = remove_equivalent(
             structures=symmetrized_structs,
             workers=args.workers,
+            test_volume=args.test_min_vol,
             keep_equivalent=args.no_equiv_match
     )
 

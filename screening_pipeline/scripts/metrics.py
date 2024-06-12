@@ -67,9 +67,19 @@ def main() -> None:
         metavar="int",
     )
     parser.add_argument(
+        "--test-min-vol",
+        action="store_true",
+        help=(
+            "A debug flag to assume unicity of unlikely structures having a volume under "
+            "1 Angström^3 without passing them into structure matching, which could cause "
+            "the program to be softlocked during S.U.N. computations. Only pass it if such "
+            "problems were to arise."
+        ),
+    )
+    parser.add_argument(
         "-t",
         "--threshold",
-        default=0.9,
+        default=0.4,
         type=float,
         help="Threshold for the computation of coverage recall and coverage precision metrics.",
     )
@@ -197,17 +207,29 @@ def main() -> None:
         dft_metrics["num_unique"] = len(uniques)
 
         # novel count
-        concat_novel, _ = remove_equivalent(
-            structures=full_generated + dataset, workers=args.workers, keep_equivalent=False
+        concat_novel, _, nbr_unmatched = remove_equivalent(
+            structures=full_generated + dataset,
+            workers=args.workers,
+            test_volume=args.test_min_vol,
+            keep_equivalent=False
         )
         dft_metrics["num_novel"] = len(concat_novel) - len(dataset)
 
+        if nbr_unmatched != 0:
+            dft_metrics["unmatched_novel"] = nbr_unmatched
+
         # novel + unique count
-        concat_novel_unique, _ = remove_equivalent(
-            structures=uniques + dataset, workers=args.workers, keep_equivalent=False
+        concat_novel_unique, _, nbr_unmatched = remove_equivalent(
+            structures=uniques + dataset,
+            workers=args.workers,
+            test_volume=args.test_min_vol,
+            keep_equivalent=False
         )
         dft_metrics["num_unique_novel"] = len(concat_novel_unique) - len(dataset)
         dft_metrics["percent_unique_novel"] = dft_metrics["num_unique_novel"] / len(full_generated)
+
+        if nbr_unmatched != 0:
+            dft_metrics["unmatched_novel_unique"] = nbr_unmatched
 
         # stable count
         dft_metrics["num_stable"] = sum(map(lambda x: x["stable"], summary))
