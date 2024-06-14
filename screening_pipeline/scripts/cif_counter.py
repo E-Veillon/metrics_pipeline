@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-"""Counts the number of structures in a given CIF file."""
+"""Counts the number of structures in given CIF files."""
 
 import os
 from argparse import ArgumentParser
@@ -97,13 +97,13 @@ def main() -> None:
 
     parser = ArgumentParser(
         prog="cif_counter.py",
-        description="Counts the number of structures in a given CIF file."
+        description="Counts the number of structures in given CIF files."
     )
 
     parser.add_argument(
-        "filename", 
-        type=str,
-        help="file to count structures in."
+        "filenames", 
+        nargs="+",
+        help="files to count structures in."
     )
     parser.add_argument(
         "--cut",
@@ -119,31 +119,31 @@ def main() -> None:
     args = parser.parse_args()
     cut_nbr = args.cut if isinstance(args.cut, int) and (args.cut >= 1) else None
 
-    assert os.path.isfile(args.filename) and args.filename.endswith(".cif"), (
-    "Provided filename must be a valid file in CIF format."
-    )
 
+    for file in args.filenames:
 
-    # MAIN BLOCK
-
-    with open(args.filename, mode="r", encoding="utf-8") as data:
-        lines = data.read().splitlines()
-
-    data_breakpoints = list(filter(lambda line: has_str(line, "data_"), lines))
-    nbr_structs = len(data_breakpoints)
-
-    if cut_nbr is not None and cut_nbr >= nbr_structs:
-        print(
-            f"Provided 'cut' arg ({cut_nbr}) is larger or equal "
-            f"to the total number of structures in '{args.filename}'.\n"
-            "Therefore, as it will not change anything, "
-            "the cut option will now be deactivated."
+        assert os.path.isfile(file) and file.endswith(".cif"), (
+        f"{file} is not a valid file or is not in CIF format."
         )
 
-    elif cut_nbr is not None:
-        write_cut_file(args.filename, lines, data_breakpoints, cut_nbr)
+        with open(file, mode="r", encoding="utf-8") as data:
+            lines = data.read().splitlines()
 
-    print(f"{nbr_structs} structures found in file '{args.filename}'.")
+        data_breakpoints = list(filter(lambda line: has_str(line, "data_"), lines))
+        nbr_structs = len(data_breakpoints)
+
+        if cut_nbr is not None and cut_nbr >= nbr_structs:
+            print(
+                f"Provided 'cut' arg ({cut_nbr}) is larger or equal "
+                f"to the total number of structures in '{file}'.\n"
+                "Therefore, as it will not change anything, "
+                "the cut option will now be deactivated."
+            )
+
+        elif cut_nbr is not None:
+            write_cut_file(file, lines, data_breakpoints, cut_nbr)
+
+        print(f"{nbr_structs} structures found in file '{file}'.")
 
 
 if __name__ == "__main__":
