@@ -244,7 +244,7 @@ def remove_equivalent(
     workers: int = 1,
     test_volume: bool = False,
     keep_equivalent: bool = False
-) -> Tuple[List[Structure], int]:
+) -> Tuple[List[Structure], int, int]:
     """
     Group structures by equivalence using multiple processes, then discards the duplicates.
 
@@ -287,7 +287,7 @@ def remove_equivalent(
 
     if keep_equivalent:
         sorted_structs = flatten(equivalent_structs, level_of_flattening=2)
-        return sorted_structs, nbr_discarded
+        return sorted_structs, nbr_discarded, nbr_unmatched
     
     sorted_structs = flatten(equivalent_structs, level_of_flattening=1)
     nbr_discarded  = sum([len(sublist) - 1 for sublist in sorted_structs])

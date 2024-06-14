@@ -113,7 +113,7 @@ def main() -> None:
         )
         print("Test set loaded.")
         # remove duplicate structures from the dataset
-        dataset, _ = remove_equivalent(
+        dataset, _, _ = remove_equivalent(
             structures=dataset, workers=args.workers, keep_equivalent=False
         )
 
