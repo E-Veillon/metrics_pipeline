@@ -264,7 +264,7 @@ def main() -> None:
 
     # Comparaison des structures pour éliminer les doublons
 
-    kept_structs, nbr_equivalent = remove_equivalent(
+    kept_structs, nbr_equivalent, nbr_unmatched = remove_equivalent(
             structures=symmetrized_structs,
             workers=args.workers,
             test_volume=args.test_min_vol,
@@ -276,6 +276,10 @@ def main() -> None:
     if not args.no_equiv_match:
         print(f"{nbr_unique_structs} unique structures detected")
         print(f"{nbr_equivalent} duplicates were discarded")
+
+    if args.test_min_vol:
+        print(f"--test-min-vol debug flag was passed:")
+        print(f"{nbr_unmatched} structures were assumed unique.")
 
     # Ecriture du fichier CIF symétrisé et épuré des structures indésirables
     write_cif(
@@ -294,19 +298,25 @@ def main() -> None:
     print("SUMMARY OF THE CALCULATION")
     print(" ")
     print(f"{nbr_total_structs} structures detected in total, including:")
-    print(f"- {nbr_unique_structs} unique structures")
+    print(f"- {nbr_unique_structs} unique structure(s)")
 
     if not args.no_rare_gas_check:
-        print(f"- {nbr_rare_gas_structs} structures containing rare gases")
+        print(f"- {nbr_rare_gas_structs} structure(s) containing rare gases")
 
     if not args.no_rare_earth_check:
-        print(f"- {nbr_rare_earth_structs} structures containing rare earths")
+        print(f"- {nbr_rare_earth_structs} structure(s) containing rare earths")
 
     if not args.no_dist_check:
-        print(f"- {nbr_not_valid} structures with too small interatomic distances")
+        print(f"- {nbr_not_valid} structure(s) with too small interatomic distances")
 
     if not args.no_equiv_match:
-        print(f"- {nbr_equivalent} structures that are duplicates")
+        print(f"- {nbr_equivalent} structure(s) that are duplicates")
+    
+    if args.test_min_vol:
+        print(
+            f"- {nbr_unmatched} structure(s) assumed unique "
+            f"because of {'its' if nbr_unmatched < 2 else 'their'} unphysical volume"
+        )
 
     print(" ")
     print(f"Output results written in '{args.output}'")
