@@ -185,7 +185,7 @@ def main() -> None:
 
     # MAIN BLOCK
 
-    from .perturb_utils import (
+    from perturb_utils import (
         get_perturbs_dict, simply_read_cif, write_cif, batch_generate_perturbed_structs
     )
 
