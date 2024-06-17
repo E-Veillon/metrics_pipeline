@@ -428,12 +428,12 @@ def _perturb_lattice_parameters(
                 "(i.e. volume > 1.2 Angstroms^3; a, b and c > 1.06 Angstroms):\n"
                 f"{structure}\n"
                 "---Given lattice perturbation parameters---\n"
-                f"on 'a' length: {perturbs_dict["a"]}\n"
-                f"on 'b' length: {perturbs_dict["b"]}\n"
-                f"on 'c' length: {perturbs_dict["c"]}\n"
-                f"on 'alpha' angle: {perturbs_dict["alpha"]}\n"
-                f"on 'beta' angle: {perturbs_dict["beta"]}\n"
-                f"on 'gamma' angle: {perturbs_dict["gamma"]}\n"
+                f"on 'a' length: {perturbs_dict['a']}\n"
+                f"on 'b' length: {perturbs_dict['b']}\n"
+                f"on 'c' length: {perturbs_dict['c']}\n"
+                f"on 'alpha' angle: {perturbs_dict['alpha']}\n"
+                f"on 'beta' angle: {perturbs_dict['beta']}\n"
+                f"on 'gamma' angle: {perturbs_dict['gamma']}\n"
             )
 
     perturbed_struct = structure.copy()
