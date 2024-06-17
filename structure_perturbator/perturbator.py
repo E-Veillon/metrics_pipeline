@@ -212,7 +212,7 @@ def main() -> None:
         perturbs_dict=perturbs_dict,
         sample_size=sample_size,
         modified_lattice=modified_lattice,
-        lattice_retries=args.lattice_retries
+        lattice_retries=args.retries
     )
 
     write_cif(filename=outfile, structures=perturbed_structs, workers=workers)
