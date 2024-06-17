@@ -417,6 +417,7 @@ def _perturb_lattice_parameters(
         or any([length < 1.06 for length in (new_lattice.a, new_lattice.b, new_lattice.c)])
     ): # minimum length of 1.06 = 2 * 0.53 (Bohr Radius)
         if retries > 0:
+            print(f"Unphysical lattice generated, retrying... (retries left: {retries})")
             retries -= 1
             return _perturb_lattice_parameters(structure, perturbs_dict, retries=retries)
         else:

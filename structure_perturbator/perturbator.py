@@ -142,6 +142,16 @@ def main() -> None:
         help="Number of randomly perturbed structures to generate for each input structure.\n"
     )
     parser.add_argument(
+        "-r", "--retries",
+        default=4,
+        help=(
+            "Number of times lattice perturbations can be retried "
+            "when resulting in an unphysical lattice generation "
+            "(i.e. a, b or c < 2*Bohr radius = ~1.06 angstroms, "
+            "or volume < (2 * Bohr radius)^3 = ~1.2 angstroms^3) before raising an error."
+        )
+    )
+    parser.add_argument(
         "-w", "--workers",
         type=int,
         default=1,
@@ -201,7 +211,8 @@ def main() -> None:
         workers=workers,
         perturbs_dict=perturbs_dict,
         sample_size=sample_size,
-        modified_lattice=modified_lattice
+        modified_lattice=modified_lattice,
+        lattice_retries=args.lattice_retries
     )
 
     write_cif(filename=outfile, structures=perturbed_structs, workers=workers)
