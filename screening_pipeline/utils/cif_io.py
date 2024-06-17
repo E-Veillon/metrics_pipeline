@@ -68,7 +68,7 @@ def cif_str_to_struct(cif_str: str) -> Structure:
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
         parsed_str  = CifParser.from_str(cif_string=cif_str)
-        struct_list = parsed_str.parse_structures()
+        struct_list = parsed_str.parse_structures(primitive=False)
         structure   = struct_list[0]
         return structure
 
