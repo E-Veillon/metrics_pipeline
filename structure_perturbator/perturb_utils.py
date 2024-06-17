@@ -416,8 +416,10 @@ def _perturb_lattice_parameters(structure: Structure, perturbs_dict: Dict) -> St
 
 
 def generate_perturbed_structs(
-        structure: Structure, perturbs_dict: Dict, 
-        sample_size: int = 1, modified_lattice: bool = False
+        structure: Structure,
+        perturbs_dict: Dict[str, Union[Dict[str, float], None]], 
+        sample_size: int = 1,
+        modified_lattice: bool = False
     ) -> List[Structure]:
     """
     Generate perturbed structures from a reference.
@@ -487,7 +489,11 @@ def generate_perturbed_structs(
 
 
 def batch_generate_perturbed_structs(
-        structures: Sequence[Structure], perturbs_dict: Dict, workers: int = 1, **kwargs
+        structures: Sequence[Structure],
+        perturbs_dict: Dict[str, Union[Dict[str, float], None]],
+        workers: int = 1,
+        sample_size: int = 1,
+        modified_lattice: bool = False
     ) -> List[Structure]:
     """
     Parallelized version of generate_perturbed_structs() designed for a batch of structures.
@@ -512,10 +518,7 @@ def batch_generate_perturbed_structs(
     )
     assert isinstance(perturbs_dict, Dict), "'perturbs_dict' argument value must be a dict."
     assert workers >= 1, "'workers' argument value must be strictly positive."
-    
-    sample_size = kwargs.pop("sample_size", 1)
-    modified_lattice = kwargs.pop("modified_lattice", False)
-    
+
     nbr_structs = len(structures)
     chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
     perturb_setup = partial(generate_perturbed_structs,
