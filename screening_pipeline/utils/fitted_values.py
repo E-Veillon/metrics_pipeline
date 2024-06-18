@@ -4,7 +4,7 @@ Global variables for storing experimental fits and values used in the pipeline.
 
 
 ########################################
-
+# NOTE: Unused for now.
 E_O2_FIT = -1,36 # eV per O2 in the formation reaction
 
 '''
@@ -300,7 +300,7 @@ EL_PER_XC_VOL = {
 
 '''
 Values of N* (the number of electrons per exchange-correlation volume) 
-used by M.K.Y. Chan and G. Ceder to determine n the number of electrons 
+used by M.K.Y. Chan and G. Ceder to determine the number 'n' of electrons 
 to add to or remove from the simulated structure in the Δ-Sol method.
 
 Reference:
