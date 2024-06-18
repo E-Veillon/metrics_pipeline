@@ -4,6 +4,15 @@
 # DFT+U corrections are the ones proposed in 2011 by Jain et al.:
 # A. Jain, G. Hautier, C.J. Moore, S.P. Ong, C.C. Fischer, T. Mueller, K.A. Persson, and G. Ceder, 
 # Computational Materials Science, 50, 2295-2310 (2011).
+#
+# The choices for the pseudopotentials to use are from Pymatgen's "PBE54Base.yaml" file.
+# Pymatgen official documentation: https://pymatgen.org/
+# Pymatgen's reference:
+# Shyue Ping Ong, William Davidson Richards, Anubhav Jain, Geoffroy Hautier,
+# Michael Kocher, Shreyas Cholia, Dan Gunter, Vincent Chevrier, Kristin A.
+# Persson, Gerbrand Ceder. *Python Materials Genomics (pymatgen) : A Robust,
+# Open-Source Python Library for Materials Analysis.* Computational Materials
+# Science, 2013, 68, 314–319. https://doi.org/10.1016/j.commatsci.2012.10.028
 
 
 INCAR:

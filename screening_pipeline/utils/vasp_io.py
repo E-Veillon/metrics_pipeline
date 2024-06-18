@@ -30,8 +30,6 @@ from pymatgen.core.structure import Structure, SiteCollection, Composition
 from pymatgen.core import SETTINGS
 from pymatgen.io.vasp.inputs import PotcarSingle
 from pymatgen.io.vasp import VaspInput, Vasprun
-#from pymatgen.io.vasp.inputs import Poscar
-#from pymatgen.io.vasp.outputs import Chgcar, Oszicar
 from pymatgen.io.vasp.sets import (
     DictSet, MITRelaxSet, MPRelaxSet#, _load_yaml_config, MPStaticSet, UserPotcarFunctional
 )
@@ -81,7 +79,7 @@ class DeltaSolStaticSet(MPRelaxSet):
                                 set is initialized without a Structure but one must be
                                 set separately before the inputs are generated.
 
-        nelect (float):         The number of electrons to put in the NELECT INCAR tag.
+        incar_nelect (float):   The number of electrons to put in the NELECT INCAR tag.
                                 In Δ-Sol, several computations with distinct number of 
                                 electrons are done, this is a convenient arg to set that.
                                 If not given, infers the Δ-Sol N0 electrons calculation 
@@ -108,7 +106,7 @@ class DeltaSolStaticSet(MPRelaxSet):
             try:
                 incar_nelect = get_all_valence_electrons(structure)
             except TypeError:
-                raise ValueError(f"Either structure or nelect must be set.")
+                raise ValueError(f"Either structure or incar_nelect must be given.")
 
         self.incar_nelect = incar_nelect
 
