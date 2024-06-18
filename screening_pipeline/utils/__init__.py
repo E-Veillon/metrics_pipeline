@@ -22,7 +22,7 @@ from .vasp_io import (
     vasp_static_settings,
     vasp_launcher,
     vasp_batch_launch,
-    converged_Vasprun,
+    converged_vasprun,
     batch_extract_vasp_data,
     batch_extract_vasp_structures,
     delta_sol_inputs_init,

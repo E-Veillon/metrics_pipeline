@@ -6,9 +6,9 @@ Functions to write VASP input files, launch VASP calculations and manage VASP ou
 # SYSTEM I/O MODULES
 
 import os
+import json
 import warnings
 from copy import deepcopy
-from monty.os.path import zpath
 from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal, Any
 from pathlib import Path
 from dataclasses import dataclass
@@ -26,12 +26,14 @@ from tqdm.contrib.concurrent import process_map
 ########################################
 # PYTHON MATERIAL GENOMICS PACKAGE
 
-from pymatgen.core.structure import Structure, SiteCollection, Composition
+from pymatgen.core.structure import Structure, SiteCollection
 from pymatgen.core import SETTINGS
+from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp.inputs import PotcarSingle
 from pymatgen.io.vasp import VaspInput, Vasprun
 from pymatgen.io.vasp.sets import (
-    DictSet, MITRelaxSet, MPRelaxSet#, _load_yaml_config, MPStaticSet, UserPotcarFunctional
+    DictSet, MITRelaxSet, MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet,
+    MPMetalRelaxSet, MVLRelax52Set, MVLScanRelaxSet
 )
 
 ########################################
@@ -91,7 +93,7 @@ class DeltaSolStaticSet(MPRelaxSet):
     """
     base_path = os.path.dirname(os.path.dirname(__file__))
     path = os.path.join(base_path, "config", "DeltaSolStaticSet.yaml")
-    CONFIG = _yaml_loader(path, on_error='raise')
+    CONFIG = _yaml_loader(path, on_error="raise")
 
     def __init__(
             self,
@@ -105,8 +107,8 @@ class DeltaSolStaticSet(MPRelaxSet):
         if incar_nelect is None:
             try:
                 incar_nelect = get_all_valence_electrons(structure)
-            except TypeError:
-                raise ValueError(f"Either structure or incar_nelect must be given.")
+            except TypeError as exc:
+                raise ValueError("Either structure or incar_nelect must be given.") from exc
 
         self.incar_nelect = incar_nelect
 
@@ -116,18 +118,18 @@ class DeltaSolStaticSet(MPRelaxSet):
         updates: Dict[str, Any] = {"MAGMOM": None, "NELECT": self.incar_nelect}
         return updates
 
-if __name__ == '__main__':
-    """
-    Test for the DeltaSolStaticSet class. You may have to change the given path
-    to one pointing at a valid CIF structure file for it to work properly.
-    You'll also need to set PMG_VASP_PSP_DIR for POTCAR files in .pmgrc.yaml.
-    """
-    from pymatgen.io.cif import CifParser
-    path = "/home/elohan/screening-pipeline/screening_pipeline/_benchmarks/TiO2.cif"
-    with open(path, "rt") as fp:
-        struct = CifParser(fp).parse_structures()[0]
+if __name__ == "__main__":
+    # Test for the DeltaSolStaticSet class. You may have to change the given path
+    # to one pointing at a valid CIF structure file for it to work properly.
+    # You'll also need to set PMG_VASP_PSP_DIR for POTCAR files in .pmgrc.yaml.
+    test_path = "/home/elohan/screening-pipeline/screening_pipeline/_benchmarks/TiO2.cif"
+    with open(test_path, "rt", encoding="utf-8") as test_file:
+        struct = CifParser(test_file).parse_structures()[0]
     dset = DeltaSolStaticSet(struct).get_input_set()
-    with open(os.path.join(DeltaSolStaticSet.base_path, "DeltaVaspInput.txt"), "wt") as out:
+    with open(
+        os.path.join(DeltaSolStaticSet.base_path, "DeltaVaspInput.txt"),
+        mode="wt", encoding="utf-8"
+    ) as out:
         out.write(str(dset))
     print(dset.incar_nelect)
     dset.incar_nelect = 58
@@ -137,7 +139,7 @@ if __name__ == '__main__':
 # LOCAL FUNCTIONS
 
 
-def _get_POTCAR_ENMAX_values(
+def _get_potcar_enmax_values(
     structure: SiteCollection,
     default_config: Dict,
     user_potcar_dict: Optional[Dict] = None,
@@ -146,7 +148,7 @@ def _get_POTCAR_ENMAX_values(
     """
     Reminder:
     When installing the pipeline repository in a new environment, after having initialised
-    POTCARs with pymatgen, assemble all ENMAX values in a file called 'ENMAX_<POTCAR_FUNCTIONAL>.txt
+    POTCARs with pymatgen, assemble all ENMAX values in a file called 'ENMAX_<POTCAR_FUNCTIONAL>.txt'
     in the POTCARs pymatgen directory before calling this function.
     """
 
@@ -154,7 +156,7 @@ def _get_POTCAR_ENMAX_values(
     functional = user_potcar_functional or default_config.get(
         "POTCAR_FUNCTIONAL", "PBE"
     )
-    ENMAX_list = []
+    enmax_list = []
 
     enmax_path = os.path.join(
         SETTINGS["PMG_VASP_PSP_DIR"],
@@ -164,22 +166,23 @@ def _get_POTCAR_ENMAX_values(
 
     if not Path(enmax_path).is_file():
         raise FileNotFoundError(
-            f"{enmax_path} not found. Use gzip and grep commands to assemble ENMAX values in this file."
+            f"{enmax_path} not found. Use gzip and grep commands "
+            "to assemble ENMAX values in this file."
         )
 
     for elt in structure.composition.element_composition.elements:
-
+        elt_symbol = str(elt)
         try:
             potcar_symbol = next(
-                filter(lambda symbol: symbol.find(str(elt)) != -1, potcar_dict.values())
+                filter(lambda symbol: symbol.find(elt_symbol) != -1, potcar_dict.values())
             )
-        except StopIteration:
+        except StopIteration as exc:
             raise ValueError(
-                f"No POTCAR symbol found for element '{elt}' in provided POTCAR settings."
+                f"No POTCAR symbol found for element '{elt_symbol}' in provided POTCAR settings."
                 "Please verify the .yaml file used for the calculation."
-            )
+            ) from exc
 
-        with open(enmax_path, "r") as enmax_file:
+        with open(enmax_path, "rt", encoding="utf-8") as enmax_file:
 
             try:
                 enmax_line = next(
@@ -189,18 +192,18 @@ def _get_POTCAR_ENMAX_values(
                         enmax_file.readlines(),
                     )
                 ).split()
-            except StopIteration:
+            except StopIteration as exc:
                 raise ValueError(
                     f"The POTCAR symbol '{potcar_symbol}' defined in the .yaml configuration file"
                     f"cannot be found in {enmax_path}."
                     "Make sure you are using the right POTCAR library or that the ENMAX file"
                     "compiles the right POTCARs."
-                )
+                ) from exc
 
         enmax_value = enmax_line[enmax_line.index("ENMAX") + 2].rstrip(";")
-        ENMAX_list.append(float(enmax_value))
+        enmax_list.append(float(enmax_value))
 
-    return ENMAX_list
+    return enmax_list
 
 
 ########################################
@@ -214,14 +217,16 @@ def _MITRelaxSet_INCAR_corrections(**kwargs) -> Dict:
     parameters:
         structure (SiteCollection):     Structure associated with the VASP run.
 
-        user_potcar_dict (dict):        If POTCAR corrections are overriding MITRelaxSet's defaults,
-                                        they must be provided here to initialize right ENCUT tag value.
-                                        If not provided, it will be initialized from original MITRelaxSet
-                                        POTCARs.
+        user_potcar_dict (dict):        If POTCAR corrections are overriding
+                                        MITRelaxSet's defaults, they must be
+                                        provided here to initialize right ENCUT tag value.
+                                        If not provided, it will be initialized from original
+                                        MITRelaxSet POTCARs.
 
-        user_potcar_functional (str):   If POTCAR_FUNCTIONAL correction is overriding MITRelaxSet's default,
-                                        it must be provided here to initialize right ENCUT tag value.
-                                        If not provided, it will be initialized from MITRelaxSet default.
+        user_potcar_functional (str):   If POTCAR_FUNCTIONAL correction is overriding
+                                        MITRelaxSet's default, it must be provided here
+                                        to initialize right ENCUT tag value. If not provided,
+                                        it will be initialized from MITRelaxSet default.
 
     Returns:
         A dictionnary containing the INCAR tags corrections for MITRelaxSet.
@@ -231,13 +236,13 @@ def _MITRelaxSet_INCAR_corrections(**kwargs) -> Dict:
     default_config = MITRelaxSet.CONFIG
     user_potcar_dict: Dict = kwargs.pop("user_potcar_dict", None)
     user_potcar_functional: str = kwargs.pop("user_potcar_functional", None)
-    ENMAX_list = _get_POTCAR_ENMAX_values(
+    enmax_list = _get_potcar_enmax_values(
         structure, default_config, user_potcar_dict, user_potcar_functional
     )
 
-    corrected_EDIFF = round(float(5e-5) * structure.num_sites, 6)
-    corrected_ENCUT = 1.3 * max(ENMAX_list)
-    corrected_LDAUL = {
+    corrected_ediff = round(float(5e-5) * structure.num_sites, 6)
+    corrected_encut = 1.3 * max(enmax_list)
+    corrected_ldaul = {
         "F": {
             "Ag": 2,
             "Co": 2,
@@ -270,24 +275,24 @@ def _MITRelaxSet_INCAR_corrections(**kwargs) -> Dict:
         },
         "S": {
             "Fe": 2,
-            "Mn": 2,  #'Mn': 2.5 -> 2 (quantum number l have to be an integer)
+            "Mn": 2,  #"Mn": 2.5 -> 2 (quantum number l have to be an integer)
         },
     }
-    corrected_LDAUU = U_VALUES
-    corrected_INCAR = {
-        "EDIFF": corrected_EDIFF,
-        "ENCUT": corrected_ENCUT,
-        "LDAUL": corrected_LDAUL,
-        "LDAUU": corrected_LDAUU,
+    corrected_ldauu = U_VALUES
+    corrected_incar = {
+        "EDIFF": corrected_ediff,
+        "ENCUT": corrected_encut,
+        "LDAUL": corrected_ldaul,
+        "LDAUU": corrected_ldauu,
         "LMAXMIX": 4,  # Necessary to get reliable results with GGA + U framework on d-type orbitals
     }
-    return corrected_INCAR
+    return corrected_incar
 
 
 ########################################
 
 def vasp_launcher(vasp_exe: PathLike, path: PathLike, vasp_input: VaspInput) -> None:
-    '''
+    """
     Function to run VASP from a VaspInput object.
 
     Parameters:
@@ -296,21 +301,22 @@ def vasp_launcher(vasp_exe: PathLike, path: PathLike, vasp_input: VaspInput) -> 
         path (str|Path):        Path to the directory where VASP files will be written and run.
 
         vasp_input (VaspInput): The VaspInput object containing all necessary data to run VASP.
-    '''
+    """
     assert isinstance(vasp_exe, (Path, str))
     assert isinstance(path, (Path, str))
     assert isinstance(vasp_input, VaspInput)
-    assert vasp_input.get('INCAR') is not None, (
-    f'vasp_launcher: There is no INCAR defined in the input !'
+    assert vasp_input.get("INCAR") is not None, (
+    "vasp_launcher: There is no INCAR defined in the input !"
     )
-    assert vasp_input.get('POSCAR') is not None, (
-    f'vasp_launcher: There is no POSCAR defined in the input !'
+    assert vasp_input.get("POSCAR") is not None, (
+    "vasp_launcher: There is no POSCAR defined in the input !"
     )
-    assert vasp_input.get('KPOINTS') is not None or vasp_input['INCAR'].get('KSPACING') is not None, (
-    f'vasp_launcher: There is no KPOINTS or KSPACING tag defined in the input !'
-    )
-    assert vasp_input.get('POTCAR') is not None, (
-    f'vasp_launcher: There is no POTCAR defined in the input !'
+    assert (
+        vasp_input.get("KPOINTS") is not None
+        or vasp_input["INCAR"].get("KSPACING") is not None
+    ), "vasp_launcher: There is no KPOINTS or KSPACING tag defined in the input !"
+    assert vasp_input.get("POTCAR") is not None, (
+    "vasp_launcher: There is no POTCAR defined in the input !"
     )
 
 
@@ -319,7 +325,7 @@ def vasp_launcher(vasp_exe: PathLike, path: PathLike, vasp_input: VaspInput) -> 
     calc_dir      = path
     out_file      = os.path.join(path, "vasp.out")
     err_file      = os.path.join(path, "vasp.err")
-    
+
     try:
         vasp_input.run_vasp(
             run_dir=calc_dir,
@@ -328,7 +334,7 @@ def vasp_launcher(vasp_exe: PathLike, path: PathLike, vasp_input: VaspInput) -> 
             err_file=err_file,
         )
     except FileExistsError: # Case of several processors trying to do the same calculation at once
-        print(f'WARNING: {str(path)}: This directory already exists, skipping...')
+        print(f"WARNING: {str(path)}: This directory already exists, skipping...")
 
 ########################################
 
@@ -343,9 +349,9 @@ def _vasp_launcher_batch_wrapper(args_tuple: Tuple[PathLike, VaspInput]):
 
 
 def vasp_batch_launch(
-        vasp_exe: PathLike, 
-        base_dir: PathLike, 
-        inputs_data: Dict[PathLike, VaspInput], 
+        vasp_exe: PathLike,
+        base_dir: PathLike,
+        inputs_data: Dict[PathLike, VaspInput],
         workers: int = 1
     ) -> None:
     """
@@ -357,7 +363,8 @@ def vasp_batch_launch(
     Parameters:
         vasp_exe (Path|str):        Path to the VASP executable.
 
-        inputs_data (dict):         Dict of structure data to run, of the form {subdir_name: VaspInput}.
+        inputs_data (dict):         Dict of structure data to run, of the form
+                                    {subdir_name: VaspInput}.
 
         base_dir (str|Path):        The directory where the subdirs should be created.
 
@@ -370,8 +377,8 @@ def vasp_batch_launch(
     ), f"vasp_exe: expected a str or Path, got {type(vasp_exe)} instead."
 
     assert all(isinstance(vasp_input, VaspInput) for vasp_input in inputs_data.values()), \
-    f'vasp_inputs: Expected VaspInput objects, got types listed below:\n \
-    {print(list((type(vasp_input) for vasp_input in inputs_data.values())))}'
+    f"vasp_inputs: Expected VaspInput objects, got types listed below:\n \
+    {print(list((type(vasp_input) for vasp_input in inputs_data.values())))}"
 
     base_dir = Path(base_dir)
 
@@ -397,21 +404,11 @@ def vasp_batch_launch(
 ########################################
 
 
-def _RelaxSet_init(
+def _relax_set_init(
     structure: SiteCollection,
     preset: str = "MPRelaxSet",
     corrections: Optional[Dict] = None,
 ) -> DictSet:
-
-    from pymatgen.io.vasp.sets import (
-        MITRelaxSet,
-        MPRelaxSet,
-        MPScanRelaxSet,
-        MPHSERelaxSet,
-        MPMetalRelaxSet,
-        MVLRelax52Set,
-        MVLScanRelaxSet,
-    )
 
     corrections = corrections or {}
     incar_corrections = {}
@@ -429,73 +426,74 @@ def _RelaxSet_init(
     potcar_functional_correction = corrections.get("POTCAR_FUNCTIONAL", {})
 
     if preset == "MITRelaxSet":
-            return MITRelaxSet(
-                structure=structure,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
+        return MITRelaxSet(
+            structure=structure,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
     if preset == "MPRelaxSet":
-            return MPRelaxSet(
-                structure=structure,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
+        return MPRelaxSet(
+            structure=structure,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
     if preset == "MPScanRelaxSet":
-            return MPScanRelaxSet(
-                structure=structure,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
+        return MPScanRelaxSet(
+            structure=structure,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
     if preset == "MPHSERelaxSet":
-            return MPHSERelaxSet(
-                structure=structure,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
+        return MPHSERelaxSet(
+            structure=structure,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
     if preset == "MPMetalRelaxSet":
-            return MPMetalRelaxSet(
-                structure=structure,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
+        return MPMetalRelaxSet(
+            structure=structure,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
     if preset == "MVLRelax52Set":
-            return MVLRelax52Set(
-                structure=structure,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
+        return MVLRelax52Set(
+            structure=structure,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
     if preset == "MVLScanRelaxSet":
-            return MVLScanRelaxSet(
-                structure=structure,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
-    elif isinstance(preset, str):
+        return MVLScanRelaxSet(
+            structure=structure,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
+    if isinstance(preset, str):
         raise ValueError(f"Provided string is not a valid preset name ({preset}).")
+    
     else:
         raise TypeError(
-            f'"preset" arg expected a str type, got {type(preset)} instead.'
+            f"'preset' arg expected a str type, got {type(preset)} instead."
         )
 
 
 ########################################
 
 
-def _StaticSet_init(
+def _static_set_init(
     struct_or_path: Union[SiteCollection, PathLike],
     from_prev_calc: bool = False,
     preset: str = "MPStaticSet",
@@ -552,7 +550,7 @@ def _StaticSet_init(
             )
         else:
             raise TypeError(
-                f'"preset" arg expected a str type, got {type(preset)} instead.'
+                f"'preset' arg expected a str type, got {type(preset)} instead."
             )
     if preset == "DeltaSolStaticSet":
         return DeltaSolStaticSet(
@@ -591,7 +589,7 @@ def _StaticSet_init(
         raise ValueError(f"Provided string is not a valid preset name ({preset}).")
     else:
         raise TypeError(
-            f'"preset" arg expected a str type, got {type(preset)} instead.'
+            f"'preset' arg expected a str type, got {type(preset)} instead."
         )
 
 
@@ -607,30 +605,32 @@ def vasp_relaxation_settings(
     Parameters:
         structure (SiteCollection):     The structure to write VASP inputs for.
 
-        preset (str):                   The pymatgen preset to use for VASP inputs initialization.
+        preset (str):                   The pymatgen preset to use for VASP inputs
+                                        initialization.
 
-        user_corrections (dict):        User defined settings. It allows to override some of the preset
-                                        INCAR, KPOINTS or POTCAR settings if necessary. Defaults to None.
+        user_corrections (dict):        User defined settings. It allows to override
+                                        some of the preset INCAR, KPOINTS or POTCAR
+                                        settings if necessary. Defaults to None.
     """
 
-    assert isinstance(
-        structure, SiteCollection
-    ), '"structure" argument format not supported. \
-    It must be an instance of the SiteCollection class or one of its subclasses.'
+    assert isinstance(structure, SiteCollection), (
+        "'structure' argument format not supported. "
+        "It must be an instance of the SiteCollection class or one of its subclasses."
+    )
 
-    assert (
-        preset in PMGRelaxSet
-    ), f'"preset" argument not recognized. \
-    It must be one of the allowed pymatgen relaxation presets:\n\
-    {PMGRelaxSet}.'
+    assert preset in PMGRelaxSet, (
+        "'preset' argument not recognized. "
+        "It must be one of the allowed pymatgen relaxation presets:\n"
+        f"{PMGRelaxSet}"
+    )
 
     assert (
         isinstance(user_corrections, dict) or user_corrections is None
     ), "user_incar_settings must be a dict or None"
 
-    vasp_input = _RelaxSet_init(
-        structure=structure, 
-        preset=preset, 
+    vasp_input = _relax_set_init(
+        structure=structure,
+        preset=preset,
         corrections=user_corrections
     ).get_input_set()
 
@@ -681,32 +681,34 @@ def vasp_static_settings(
                                         Defaults to None.
     """
 
-    assert (
-        isinstance(structure, SiteCollection) or structure is None
-    ), '"structure" argument format not supported. \
-    It must be an instance of the SiteCollection class or one of its subclasses.'
+    assert isinstance(structure, SiteCollection) or structure is None, (
+        "'structure' argument format not supported. "
+        "It must be an instance of the SiteCollection "
+        "class or one of its subclasses."
+    )
 
-    assert (
-        preset in PMGStaticSet
-    ), f'"preset" argument not recognized. \
-    It must be one of the allowed pymatgen static presets:\n\
-    {PMGStaticSet}.'
+    assert preset in PMGStaticSet, (
+        "'preset' argument not recognized. "
+        "It must be one of the allowed pymatgen static presets:\n"
+        f"{PMGStaticSet}."
+    )
 
     assert isinstance(user_corrections, dict) or user_corrections is None, (
         "user_corrections must be a dict or None"
     )
 
     if not from_prev_calc:
-        vasp_input = _StaticSet_init(
+        vasp_input = _static_set_init(
             struct_or_path=structure,
             preset=preset,
             nelect=nelect,
             corrections=user_corrections
         ).get_input_set()
-    
+
     else:
         assert isinstance(prev_calc_dir, (Path, str)), (
-            "'from_prev_calc' was set to True, prev_calc_dir must be provided as 'str' or 'Path' type."
+            "'from_prev_calc' was set to True, prev_calc_dir must be provided "
+            "as 'str' or 'Path' type."
         )
 
         prev_calc_dir = Path(prev_calc_dir)
@@ -715,10 +717,10 @@ def vasp_static_settings(
             prev_calc_dir.is_dir()
         ), f"Prev_calc_dir: {prev_calc_dir} is not a valid directory."
 
-        vasp_input = _StaticSet_init(
-            struct_or_path=prev_calc_dir, 
-            from_prev_calc=from_prev_calc, 
-            preset=preset, 
+        vasp_input = _static_set_init(
+            struct_or_path=prev_calc_dir,
+            from_prev_calc=from_prev_calc,
+            preset=preset,
             corrections=user_corrections
         ).get_input_set()
 
@@ -733,14 +735,13 @@ def _check_summary_data(struct_dir: PathLike, summary_file: PathLike) -> bool:
     Check if given structure directory is present in the summary file and if it
     was rejected in the previous step.
     """
-    import json
 
-    with open(summary_file, 'rt') as fp:
+    with open(summary_file, "rt", encoding="utf-8") as fp:
         summary = json.load(fp)
-    
+
     try:
         prev_struct_data = next(filter(
-            lambda data: os.path.samefile(data['path'], struct_dir), 
+            lambda data: os.path.samefile(data["path"], struct_dir),
             summary
         ))
     except StopIteration:
@@ -761,7 +762,7 @@ def _check_summary_data(struct_dir: PathLike, summary_file: PathLike) -> bool:
 
 ########################################
 
-def converged_Vasprun(run_path: PathLike, **kwargs) -> Vasprun|None:
+def converged_vasprun(run_path: PathLike, **kwargs) -> Vasprun|None:
     """
     Read and parse vasprun.xml file at given VASP run directory.
     Check whether the VASP run terminated and converged correctly.
@@ -817,7 +818,7 @@ def converged_Vasprun(run_path: PathLike, **kwargs) -> Vasprun|None:
 
     if not vasprun.converged:
         return None
-    
+
     return vasprun
 
 
@@ -851,16 +852,16 @@ def extract_vasp_data_for_convex_hull(
     assert os.path.isdir(str(struct_dir))
 
     struct_dir: str = str(struct_dir)
-    
+
     if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
         return {}
 
-    vasprun = converged_Vasprun(
+    vasprun = converged_vasprun(
         struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
     )
 
     if vasprun is None:
-         return {}
+        return {}
 
     # We want data of the generated structure for convex hulls, not the relaxed one
     struct_name  = os.path.basename(struct_dir)
@@ -881,7 +882,7 @@ def extract_vasp_data_for_convex_hull(
 
 
 def extract_vasp_data_for_delta_sol_init(
-    struct_dir: PathLike = ".", 
+    struct_dir: PathLike = ".",
     path_to_summary: Optional[PathLike] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
     """
@@ -904,7 +905,10 @@ def extract_vasp_data_for_delta_sol_init(
     """
 
     assert isinstance(struct_dir, (Path, str)), (
-        TypeError(f"'struct_dir' argument expected 'Path' or 'str' type, got '{type(struct_dir)}' instead.")
+        TypeError(
+            "'struct_dir' argument expected 'Path' or 'str' type, "
+            "got '{type(struct_dir)}' instead."
+        )
     )
     assert os.path.isdir(str(struct_dir)), (
         ValueError(f"{struct_dir}: No such directory found.")
@@ -915,7 +919,7 @@ def extract_vasp_data_for_delta_sol_init(
     if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
         return {}
 
-    vasprun = converged_Vasprun(
+    vasprun = converged_vasprun(
         struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
     )
     if vasprun is None:
@@ -923,11 +927,11 @@ def extract_vasp_data_for_delta_sol_init(
 
     struct_name = struct_dir.name
     structure = vasprun.final_structure
-    final_energy_eV = vasprun.final_energy
+    final_energy = vasprun.final_energy
 
     struct_dict = {
         "structure": structure,
-        "final_energy": final_energy_eV,
+        "final_energy": final_energy,
     }
     struct_data = (struct_name, struct_dict)
 
@@ -993,8 +997,8 @@ def extract_vasp_data_for_delta_sol_calc(
 
 
 def batch_extract_vasp_data(
-        method: Literal['convex_hull', 'delta_sol_init', "delta_sol_calc"], 
-        base_dir: PathLike = '.', 
+        method: Literal["convex_hull", "delta_sol_init", "delta_sol_calc"],
+        base_dir: PathLike = ".",
         structs_names: Optional[Sequence[str]] = None,
         path_to_summary: Optional[PathLike] = None,
         workers: int = 1
@@ -1123,7 +1127,7 @@ def vasp_output_structure(struct_dir: str) -> Tuple[Structure,Structure]|Tuple[N
             f"{struct_dir}: No such directory found."
         )
 
-    vasprun = converged_Vasprun(
+    vasprun = converged_vasprun(
         struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
     )
     if vasprun is None:
@@ -1200,32 +1204,37 @@ def delta_sol_inputs_init(
     def _inputs_init(name: str, data: Dict[str, Any]) -> List[Tuple[str, VaspInput]]:
 
         # Initialize input sets
-        structure = data['structure']
+        structure = data["structure"]
         N_val     = get_all_valence_electrons(structure)
-        run_set   = vasp_static_settings(structure, preset=preset, user_corrections=user_corrections)
+        run_set   = vasp_static_settings(
+            structure, preset=preset, user_corrections=user_corrections
+        )
 
         # Search for the right N* parameter to use
-        pot_func = run_set.get('POTCAR_FUNCTIONAL', 'PBE')
+        pot_func = run_set.get("POTCAR_FUNCTIONAL", "PBE")
 
-        if 'LDA' in pot_func: delta_sol_functional = 'LDA'
-        elif 'PBE' in pot_func: delta_sol_functional = 'PBE'
-        elif 'AM05' in pot_func: delta_sol_functional = 'AM05'
+        if "LDA" in pot_func:
+            delta_sol_functional = "LDA"
+        elif "PBE" in pot_func:
+            delta_sol_functional = "PBE"
+        elif "AM05" in pot_func:
+            delta_sol_functional = "AM05"
         else:
             raise NotImplementedError(
                 "Provided POTCAR functional is not implemented for Δ-Sol method.\n"
                 "Supported functionals are 'LDA', 'PBE' and 'AM05'."
             )
 
-        n_star_types = ('BEST', 'MIN', 'MAX') if with_uncertainties else ('BEST',)
-        
+        n_star_types = ("BEST", "MIN", "MAX") if with_uncertainties else ("BEST",)
+
         if preset != "DeltaSolStaticSet":
             run_N0_dict = run_set.as_dict()
-            run_N0_dict['INCAR'].update({'NELECT': N_val})
+            run_N0_dict["INCAR"].update({"NELECT": N_val})
             run_N0 = VaspInput.from_dict(run_N0_dict)
         else:
             run_N0 = deepcopy(run_set)
 
-        run_N0_path = '_'.join((name , 'neutral'))
+        run_N0_path = "_".join((name , "neutral"))
         struct_runs_list = [(run_N0_path, run_N0)]
 
 
@@ -1240,8 +1249,8 @@ def delta_sol_inputs_init(
             if preset != "DeltaSolStaticSet":
                 run_plus, run_minus = run_set.as_dict(), run_set.as_dict()
 
-                run_plus['INCAR'].update({'NELECT': N_val + n_ratio})
-                run_minus['INCAR'].update({'NELECT': N_val - n_ratio})
+                run_plus["INCAR"].update({"NELECT": N_val + n_ratio})
+                run_minus["INCAR"].update({"NELECT": N_val - n_ratio})
 
                 run_plus  = VaspInput.from_dict(run_plus)
                 run_minus = VaspInput.from_dict(run_minus)
@@ -1259,8 +1268,8 @@ def delta_sol_inputs_init(
                     user_corrections=user_corrections
                 )
 
-            run_plus_path    = '_'.join((name , n_star_type.lower(), 'plus'))
-            run_minus_path   = '_'.join((name , n_star_type.lower(), 'minus'))
+            run_plus_path    = "_".join((name , n_star_type.lower(), "plus"))
+            run_minus_path   = "_".join((name , n_star_type.lower(), "minus"))
 
             struct_runs_list += [(run_plus_path, run_plus), (run_minus_path, run_minus)]
 
@@ -1275,21 +1284,22 @@ def delta_sol_inputs_init(
 
 
 def _match_calc_index(calc_index: int) -> str|None:
-    if calc_index == 0:
-        return None
-    if 1 <= calc_index <= 2:
-        return "BEST"
-    if 3 <= calc_index <= 4:
-        return "MIN"
-    if 5 <= calc_index <= 6:
-        return "MAX"
-    if isinstance(calc_index, int):
-        raise ValueError("calc_index must be between 0 and 6 included.")
-    else:
-        raise TypeError(f"Expected 'int' type, got '{type(calc_index)}' type instead.")
+    match calc_index:
+        case 0:
+            return None
+        case 1|2:
+            return "BEST"
+        case 3|4:
+            return "MIN"
+        case 5|6:
+            return "MAX"
+        case int():
+            raise ValueError("calc_index must be between 0 and 6 included.")
+        case _:
+            raise TypeError(f"Expected 'int' type, got '{type(calc_index)}' type instead.")
 
-if __name__ == '__main__':
-    """Unit test for _match_calc_index()."""
+if __name__ == "__main__":
+    # Unit test for _match_calc_index().
     print("Wanted output:")
     print("None\nBEST BEST\nMIN MIN\nMAX MAX")
     print("Actual output:")
@@ -1302,10 +1312,10 @@ if __name__ == '__main__':
 
 
 def delta_sol_calculation_init(
-        structure: Structure, 
-        calc_index: int, 
-        preset: str = "DeltaSolStaticSet", 
-        user_corrections: Optional[Dict[str, Any]] = None, 
+        structure: Structure,
+        calc_index: int,
+        preset: str = "DeltaSolStaticSet",
+        user_corrections: Optional[Dict[str, Any]] = None,
     ) -> VaspInput:
     """
     Initializes one of the static calculations used for delta-sol method for one structure.
@@ -1318,10 +1328,11 @@ def delta_sol_calculation_init(
                                     3-4 = E(N0 + n), E(N0 - n) respectively, using N*_min, 
                                     5-6 = E(N0 + n), E(N0 - n) respectively, using N*_max.
 
-        preset (str):               A pymatgen VASP static preset, or the homemade DeltaSolStaticSet.
-                                    Defaults to DeltaSolStaticSet.
+        preset (str):               A pymatgen VASP static preset, or the homemade
+                                    DeltaSolStaticSet. Defaults to DeltaSolStaticSet.
 
-        user_corrections (dict):    Additional corrections provided by the user in a separate .yaml file.
+        user_corrections (dict):    Additional corrections provided by the user in a
+                                    separate .yaml file.
     
     Returns:
         The corresponding VaspInput object.
@@ -1336,11 +1347,14 @@ def delta_sol_calculation_init(
     run_set = vasp_static_settings(structure, preset, user_corrections=user_corrections)
 
     # Search for the right N* parameter to use with respect to the functional
-    pot_func = run_set.get('POTCAR_FUNCTIONAL', 'PBE')
+    pot_func = run_set.get("POTCAR_FUNCTIONAL", "PBE")
 
-    if 'LDA' in pot_func: delta_sol_functional = 'LDA'
-    elif 'PBE' in pot_func: delta_sol_functional = 'PBE'
-    elif 'AM05' in pot_func: delta_sol_functional = 'AM05'
+    if "LDA" in pot_func:
+        delta_sol_functional = "LDA"
+    elif "PBE" in pot_func:
+        delta_sol_functional = "PBE"
+    elif "AM05" in pot_func:
+        delta_sol_functional = "AM05"
     else:
         raise NotImplementedError(
             "Provided POTCAR functional is not implemented for Δ-Sol method.\n"
@@ -1359,14 +1373,14 @@ def delta_sol_calculation_init(
 
         if preset == "DeltaSolStaticSet":
             run_set = vasp_static_settings(
-                structure, preset, incar_nelect=nelect, user_corrections=user_corrections
+                structure, preset, nelect=nelect, user_corrections=user_corrections
             )
     else:
         nelect = N_val
 
     if preset != "DeltaSolStaticSet":
         run_dict = run_set.as_dict()
-        run_dict['INCAR'].update({'NELECT': nelect})
+        run_dict["INCAR"].update({"NELECT": nelect})
         run_set = VaspInput.from_dict(run_dict)
 
     return run_set
