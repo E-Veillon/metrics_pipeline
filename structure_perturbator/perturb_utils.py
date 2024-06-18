@@ -413,9 +413,10 @@ def _perturb_lattice_parameters(
     # if the generated lattice leads to such behavior, we retry the random generation
     # until it is not unphysical anymore. Bohr radius is approximated to 0.53 angstroms.
     if (
-        new_lattice.volume < 1.2 # Volume for a cubic cell with a = b = c = 2 * 0.53 (Bohr radius)
-        or any([length < 1.06 for length in (new_lattice.a, new_lattice.b, new_lattice.c)])
-    ): # minimum length of 1.06 = 2 * 0.53 (Bohr Radius)
+        new_lattice.volume < 1.2 # Volume of a cubic cell with a = b = c = 2 * 0.53 (Bohr radius)
+        or any([length < 1.06 for length in new_lattice.lengths])
+        or any([angle < 1.0 for angle in new_lattice.angles])
+    ): # minimum length of 1.06 = 2 * 0.53 (Bohr Radius), minimum angle of 1°
         if retries > 0:
             print(f"Unphysical lattice generated, retrying... (retries left: {retries})")
             retries -= 1
@@ -426,7 +427,8 @@ def _perturb_lattice_parameters(
                 "in a physically viable way, you should check if the original "
                 "structure is physical and/or if given lattice perturbation amplitudes "
                 "makes it possible to have a physical lattice "
-                "(i.e. volume > 1.2 Angstroms^3; a, b and c > 1.06 Angstroms):\n"
+                "(i.e. volume > 1.2 Angstroms^3; a, b and c > 1.06 Angstroms; "
+                "angles > 1.0 degree):\n"
                 f"{structure}\n"
                 "---Given lattice perturbation parameters---\n"
                 f"on 'a' length: {perturbs_dict['a']}\n"
