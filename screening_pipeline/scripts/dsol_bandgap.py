@@ -17,18 +17,8 @@ from pathlib import Path
 from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
-########################################
-# PYTHON MATERIALS GENOMICS PACKAGE
 
-
-########################################
-# LOCAL MODULES
-
-from screening_pipeline.utils.utils import _yaml_loader
-from screening_pipeline.utils.custom_types import PMGStaticSet
-from screening_pipeline.utils.vasp_io import vasp_batch_launch, vasp_launcher, batch_extract_vasp_data, \
-                                             delta_sol_inputs_init
-from screening_pipeline.utils.data_process import batch_calculate_delta_sol_band_gaps
+from screening_pipeline.utils import batch_extract_vasp_data, batch_calculate_delta_sol_band_gaps
 
 ########################################
 # LOCAL FUNCTIONS
@@ -157,8 +147,6 @@ def main():
     else:
         valid_interval = sorted(args.valid_interval)
 
-    accept_file    = args.accept or None
-    ignore_file    = args.ignore or None
     workers        = args.workers
     summary        = os.path.join(input_dir, args.summary)
 
