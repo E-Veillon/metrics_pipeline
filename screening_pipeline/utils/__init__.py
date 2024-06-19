@@ -31,11 +31,10 @@ from .periodic_table import (
     get_all_valence_electrons,
 )
 
-from .matcher import remove_equivalent, group_by_composition
+from .matcher import check_interatomic_distances, flatten, remove_equivalent, group_by_composition
 
 
-from .data_process import (
-    check_interatomic_distances,
+from .convex_hulls import (
     get_max_dim,
     init_entries_from_dict,
     filter_database_entries,
@@ -44,6 +43,9 @@ from .data_process import (
     get_sub_entries,
     get_lacking_elts_entries,
     batch_compute_e_above_hull,
+)
+from .delta_sol import (
+    get_delta_sol_n_ratio,
     calculate_delta_sol_band_gap,
     batch_calculate_delta_sol_band_gaps,
 )

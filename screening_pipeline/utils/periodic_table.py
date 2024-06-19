@@ -11,7 +11,6 @@ from typing import Union, Iterable, List, Tuple, Literal, Sequence
 ########################################
 # OPTIMIZATION MODULES
 
-import sys
 import re
 from itertools import filterfalse
 
@@ -332,41 +331,5 @@ def get_all_valence_electrons(structure: SiteCollection) -> int:
     
     return nbr_val_elec
 
-def get_delta_sol_el_ratio(
-        structure: SiteCollection, 
-        dft_functional: Literal['LDA','PBE','AM05'] = 'PBE', 
-        n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
-    ) -> float:
-    '''
-    Computes n = N0/N* the electron ratio to add or remove from 
-    the structure in the Δ-Sol method developped by Chan et al.
 
-    Reference:
-        M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-        (reference 32 in screening_pipeline/Bibliography)
-    '''
-    from screening_pipeline.utils import EL_PER_XC_VOL
-    
-    val_elec_type = 'sp'
-
-    for elt in structure.elements:
-        if elt.block == 's' or elt.block == 'p':
-            continue
-        elif elt.block == 'd': 
-            val_elec_type = 'spd'
-            break
-        elif elt.block == 'f':
-            raise NotImplementedError(
-                'f-block elements are not supported in Δ-Sol method.'
-            )
-        else:
-            raise ValueError(
-                'Something is wrong with this function or Element objects "block" property.'
-            )
-    
-    N_0        = get_all_valence_electrons(structure)
-    value_name = '_'.join((dft_functional, val_elec_type))
-    N_star     = EL_PER_XC_VOL[n_star_type][value_name]
-    n          = float(N_0) / float(N_star)
-
-    return n
+########################################
