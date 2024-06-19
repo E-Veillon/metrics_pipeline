@@ -1,22 +1,8 @@
-from .periodic_table import (
-    has_rare_gas,
-    discard_rare_gas_structures,
-    has_rare_earth,
-    discard_rare_earth_structures,
-    get_elements,
-    get_elemental_subsets,
-    get_all_elements_groups,
-    get_element_valence_electrons,
-    get_all_valence_electrons,
-)
-from .cif_io import read_cif, write_cif, extract_cif_from_file, cif_str_to_struct
-from .matcher import (
-    flatten,
-    remove_equivalent,
-    group_by_composition,
-    batch_group_by_equivalence,
-    batch_get_novel_structures
-)
+"""Screening pipeline utils module init."""
+
+# I/O modules
+from .cif_io import read_cif, write_cif
+from .paths_io import add_new_dir, batch_add_new_dirs
 from .vasp_io import (
     vasp_relaxation_settings,
     vasp_static_settings,
@@ -29,9 +15,25 @@ from .vasp_io import (
     extract_vasp_data_for_delta_sol_init,
     delta_sol_calculation_init,
 )
-from .spacegroup import structure_symmetrizer, batch_symmetrizer
+
+# Chemistry related modules
 from .fitted_values import E_O2_FIT, U_VALUES, DELTA_E_M, EXP_DELTA_H, EL_PER_XC_VOL
-from .paths import add_new_dir, batch_add_new_dirs
+from .spacegroup import structure_symmetrizer, batch_symmetrizer
+from .periodic_table import (
+    has_rare_gas,
+    discard_rare_gas_structures,
+    has_rare_earth,
+    discard_rare_earth_structures,
+    get_elements,
+    get_elemental_subsets,
+    get_all_elements_groups,
+    get_element_valence_electrons,
+    get_all_valence_electrons,
+)
+
+from .matcher import remove_equivalent, group_by_composition
+
+
 from .data_process import (
     check_interatomic_distances,
     get_max_dim,
@@ -39,7 +41,6 @@ from .data_process import (
     filter_database_entries,
     get_elements_from_entries,
     group_by_dim_and_comp,
-    #init_entries_and_group_by_dim_and_comp,
     get_sub_entries,
     get_lacking_elts_entries,
     batch_compute_e_above_hull,
@@ -64,16 +65,11 @@ from .crystalnn import to_crystalnn_fingerprint
 from .utils import _yaml_loader
 
 __all__ = [
-    "has_rare_gas",
-    "discard_rare_gas_structures",
-    "has_rare_earth",
-    "discard_rare_earth_structures",
-    "get_elements",
-    "get_elemental_subsets",
-    "get_all_elements_groups",
-    "get_all_valence_electrons",
-    "read_cif",
-    "write_cif",
+    "has_rare_gas", "discard_rare_gas_structures",
+    "has_rare_earth", "discard_rare_earth_structures",
+    "get_elements", "get_elemental_subsets", "get_all_elements_groups",
+    "get_element_valence_electrons", "get_all_valence_electrons",
+    "read_cif", "write_cif",
     "structure_symmetrizer",
     "batch_symmetrizer",
     "remove_equivalent",
@@ -82,7 +78,6 @@ __all__ = [
     "vasp_launcher",
     "vasp_batch_launch",
     "batch_extract_vasp_data",
-    "chgcar_density_switch",
     "delta_sol_inputs_init",
     "E_O2_FIT",
     "U_VALUES",
@@ -92,11 +87,7 @@ __all__ = [
     "add_new_dir",
     "batch_add_new_dirs",
     "get_elements_from_entries",
-    "init_entries_and_group_by_dim_and_comp",
     "get_sub_entries",
-    "phase_diagram_init",
-    "calculate_instability_energies",
-    "batch_calculate_instability_energies",
     "calculate_delta_sol_band_gap",
     "batch_calculate_delta_sol_band_gaps",
     "load_phase_diagram_entries",

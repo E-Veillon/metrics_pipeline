@@ -49,7 +49,7 @@ from screening_pipeline.utils.custom_types import (
 from screening_pipeline.utils.utils import _yaml_loader
 from screening_pipeline.utils.matcher import flatten
 from screening_pipeline.utils.fitted_values import U_VALUES
-from screening_pipeline.utils.paths import batch_add_new_dirs
+from screening_pipeline.utils.paths_io import batch_add_new_dirs
 from screening_pipeline.utils.periodic_table import (
     get_all_valence_electrons,
     get_delta_sol_el_ratio,
