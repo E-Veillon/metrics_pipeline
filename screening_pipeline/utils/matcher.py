@@ -26,7 +26,7 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 ########################################
 # LOCAL MODULES
 
-from screening_pipeline.utils.utils import flatten
+from screening_pipeline.utils.flattener import flatten
 
 ########################################
 # LOCAL FUNCTIONS
