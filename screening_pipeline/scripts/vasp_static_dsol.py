@@ -8,7 +8,6 @@ for structures not already rejected.
 # SYSTEM I/O MODULES
 
 import os
-import sys
 from datetime import datetime
 from typing import Tuple
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
@@ -22,8 +21,8 @@ from monty.os import cd
 # LOCAL MODULES
 
 from screening_pipeline.utils import (
-    _yaml_loader, PathLike, PMGStaticSet, extract_vasp_data_for_delta_sol_init,
-    delta_sol_calculation_init
+    yaml_loader, PathLike, PMGStaticSet, extract_vasp_data_for_delta_sol_init,
+    get_dsol_struct_dir, calc_idx_to_dir_name, dsol_calc_init
 )
 
 ########################################
@@ -35,9 +34,11 @@ def assert_args(args: Namespace) -> None:
     assert os.path.isdir(args.input_dir), (
         f"{args.input_dir}: No directory found."
     )
-    assert args.executable_path.startswith("vasp") or os.path.exists(args.executable_path), (
-        f"{args.executable_path}: Executable file not found."
-    )
+    assert (
+        args.executable_path.startswith("vasp")
+        or os.path.exists(args.executable_path)
+        ), f"{args.executable_path}: Executable file not found."
+
     assert args.task_id >= 0, (
         "task-id argument must be positive or zero."
     )
@@ -60,70 +61,6 @@ def assert_args(args: Namespace) -> None:
     assert args.user_settings.endswith(".yaml"), (
     "user settings file must be of .yaml format."
     )
-
-def get_struct_dir(
-        path: PathLike, task_id: int, with_uncertainties: bool = False
-        ) -> Tuple[str, int, int]:
-    """
-    Determines structure index and calculation ID from the task ID,
-    then finds corresponding structure directory.
-
-    Parameters:
-        path (Path|str):            Where to search for the structure directory.
-
-        task_id (int):              The ID of the task in the job array.
-
-        with_uncertainties (bool):  Whether to take into account uncertainty calculations.
-                                    Defaults to False.
-
-    Returns:
-        Tuple[str, int, int]:
-        path to the structure directory, structure index and calculation ID.
-    """
-
-    tasks_per_struct = 7 if with_uncertainties else 3
-    struct_idx = task_id // tasks_per_struct
-    calc_idx = task_id % tasks_per_struct
-
-    try:
-        struct_dir = next(
-            filter(
-            lambda dirname: os.path.isdir(dirname) and dirname.startswith(f"{struct_idx}_"),
-            os.listdir(path)
-            )
-        )
-    except StopIteration:
-        raise ValueError(
-            "No structure directory found with index corresponding to given 'task-id' argument.\n"
-            f"Searched directory: {path}\n"
-            f"Given task-id argument: {task_id}\n"
-            f"Corresponding structure index: {struct_idx}\n"
-            f"Corresponding calculation ID: {calc_idx}\n"
-            "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
-        )
-
-    struct_path = os.path.join(path, struct_dir)
-
-    return struct_path, struct_idx, calc_idx
-
-def calc_idx_to_dir_name(struct_dir_name: str, calc_index: int) -> str:
-    """Maps calculation index to corresponding calculation name."""
-    assert isinstance(calc_index, int), f"Expected 'int' type, got '{type(calc_index)}' instead."
-    if calc_index == 0:
-        return "_".join(struct_dir_name, "neutral")
-    if calc_index == 1:
-        return "_".join(struct_dir_name, "best_plus")
-    if calc_index == 2:
-        return "_".join(struct_dir_name, "best_minus")
-    if calc_index == 3:
-        return "_".join(struct_dir_name, "min_plus")
-    if calc_index == 4:
-        return "_".join(struct_dir_name, "min_minus")
-    if calc_index == 5:
-        return "_".join(struct_dir_name, "max_plus")
-    if calc_index == 6:
-        return "_".join(struct_dir_name, "max_minus")
-    raise ValueError(f"Only int from 0 to 6 supported, got {calc_index}")
 
 ########################################
 # MAIN FUNCTION
@@ -250,10 +187,10 @@ def main() -> None:
 
     prev_summary = args.prev_summary or None
     preset = args.preset
-    user_settings = _yaml_loader(args.user_settings)
+    user_settings = yaml_loader(args.user_settings)
 
     # Variables deduced from args
-    struct_path, struct_idx, calc_idx = get_struct_dir(
+    struct_path, struct_idx, calc_idx = get_dsol_struct_dir(
         input_dir, task_id, with_uncertainties=args.with_uncertainties
     )
 
@@ -277,7 +214,7 @@ def main() -> None:
     calc_name  = calc_idx_to_dir_name(dir_name, calc_idx)
     calc_dir   = os.path.join(outdir, dir_name, calc_name)
 
-    input_data = delta_sol_calculation_init(
+    input_data = dsol_calc_init(
         structure=struct_data[1]["structure"],
         calc_index=calc_idx,
         preset=preset,
@@ -286,7 +223,7 @@ def main() -> None:
 
     os.makedirs(calc_dir, exist_ok=True)
 
-    #vasp_launcher(vasp_exe=exe_path, path=calc_dir, vasp_input=input_data)
+    # vasp_launcher(vasp_exe=exe_path, path=calc_dir, vasp_input=input_data)
     input_data.write_input(output_dir=calc_dir)
     with cd(calc_dir):
         os.system(f"{exe_path}")

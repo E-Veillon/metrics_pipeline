@@ -23,7 +23,7 @@ from pymatgen.core.structure import SiteCollection
 # LOCAL MODULES
 
 from screening_pipeline.utils import (
-    _yaml_loader, PMGRelaxSet, read_cif, vasp_relaxation_settings
+    yaml_loader, PMGRelaxSet, read_cif, vasp_relaxation_settings
 )
 
 ########################################
@@ -154,7 +154,7 @@ def main():
 
     assert_args(args)
 
-    user_settings = _yaml_loader(args.user_settings)
+    user_settings = yaml_loader(args.user_settings)
     struct_idx    = args.task_index
 
 

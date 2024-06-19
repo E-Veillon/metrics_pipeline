@@ -2,7 +2,7 @@
 
 # I/O modules
 from .cif_io import read_cif, write_cif
-from .paths_io import add_new_dir, batch_add_new_dirs
+from .file_io import add_new_dir, batch_add_new_dirs, yaml_loader
 from .vasp_io import (
     vasp_relaxation_settings,
     vasp_static_settings,
@@ -13,7 +13,7 @@ from .vasp_io import (
     batch_extract_vasp_structures,
     delta_sol_inputs_init,
     extract_vasp_data_for_delta_sol_init,
-    delta_sol_calculation_init,
+    dsol_calc_init,
 )
 
 # Chemistry related modules
@@ -31,7 +31,7 @@ from .periodic_table import (
     get_all_valence_electrons,
 )
 
-from .matcher import check_interatomic_distances, flatten, remove_equivalent, group_by_composition
+from .matcher import check_interatomic_distances, remove_equivalent, group_by_composition
 
 
 from .convex_hulls import (
@@ -45,9 +45,14 @@ from .convex_hulls import (
     batch_compute_e_above_hull,
 )
 from .delta_sol import (
-    get_delta_sol_n_ratio,
-    calculate_delta_sol_band_gap,
-    batch_calculate_delta_sol_band_gaps,
+    DeltaSolStaticSet,
+    get_dsol_struct_dir,
+    calc_idx_to_dir_name,
+    get_dsol_n_ratio,
+    _match_calc_index,
+    dsol_calc_init,
+    get_dsol_band_gap,
+    batch_get_dsol_band_gaps,
 )
 from .custom_types import (
     PathLike, FormulaLike, PMGRelaxSetType, PMGStaticSetType,
@@ -64,7 +69,7 @@ from .distribution import (
 from .density import get_densities
 from .rmsd import rmsd_from_structures
 from .crystalnn import to_crystalnn_fingerprint
-from .utils import _yaml_loader
+from .flattener import flatten
 
 __all__ = [
     "has_rare_gas", "discard_rare_gas_structures",
@@ -90,7 +95,8 @@ __all__ = [
     "batch_add_new_dirs",
     "get_elements_from_entries",
     "get_sub_entries",
-    "calculate_delta_sol_band_gap",
-    "batch_calculate_delta_sol_band_gaps",
+    "get_dsol_band_gap",
+    "batch_get_dsol_band_gaps",
     "load_phase_diagram_entries",
+    "yaml_loader",
 ]

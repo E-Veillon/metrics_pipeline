@@ -18,7 +18,9 @@ from datetime import datetime
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
 
-from screening_pipeline.utils import batch_extract_vasp_data, batch_calculate_delta_sol_band_gaps
+from screening_pipeline.utils import (
+    batch_extract_vasp_data, batch_get_dsol_band_gaps
+)
 
 ########################################
 # LOCAL FUNCTIONS
@@ -160,7 +162,7 @@ def main():
         workers=workers
     )
 
-    E_band_gaps = batch_calculate_delta_sol_band_gaps(
+    E_band_gaps = batch_get_dsol_band_gaps(
         bg_data, dft_func, args.with_uncertainties, workers
     )
 
