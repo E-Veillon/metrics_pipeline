@@ -15,7 +15,7 @@ from pymatgen.io.vasp.sets import MPRelaxSet
 
 from screening_pipeline.utils import (
     get_all_valence_electrons, yaml_loader, vasp_static_settings,
-    PathLike, PMGStaticSetType, PMGStaticSet
+    PathLike, PMGStaticSetType, PMGStaticSet, EL_PER_XC_VOL
 )
 
 ########################################
@@ -114,7 +114,7 @@ def get_dsol_struct_dir(
             os.listdir(path)
             )
         )
-    except StopIteration:
+    except StopIteration as exc:
         raise ValueError(
             "No structure directory found with index corresponding to given 'task-id' argument.\n"
             f"Searched directory: {path}\n"
@@ -122,7 +122,7 @@ def get_dsol_struct_dir(
             f"Corresponding structure index: {struct_idx}\n"
             f"Corresponding calculation ID: {calc_idx}\n"
             "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
-        )
+        ) from exc
 
     struct_path = os.path.join(path, struct_dir)
 
@@ -154,19 +154,19 @@ def calc_idx_to_dir_name(struct_dir_name: str, calc_index: int) -> str:
                 f"Only int from 0 to 6 supported, got {calc_index}"
             )
         case _:
-            TypeError(
+            raise TypeError(
                 "'calc_index' expected a type 'int', "
                 f"got '{type(calc_index)}' instead."
             )
-    return "_".join(struct_dir_name, calc_type)
+    return "_".join((struct_dir_name, calc_type))
 
 
 ########################################
 
 
 def get_dsol_n_ratio(
-        structure: SiteCollection, 
-        dft_functional: Literal['LDA','PBE','AM05'] = 'PBE', 
+        structure: SiteCollection,
+        dft_functional: Literal['LDA','PBE','AM05'] = 'PBE',
         n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
     ) -> float:
     '''
@@ -177,29 +177,26 @@ def get_dsol_n_ratio(
         M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
         (reference 32 in screening_pipeline/Bibliography)
     '''
-    from screening_pipeline.utils import EL_PER_XC_VOL
-    
     val_elec_type = 'sp'
 
     for elt in structure.elements:
-        if elt.block == 's' or elt.block == 'p':
+        if elt.block in {'s', 'p'}:
             continue
-        elif elt.block == 'd': 
+        if elt.block == 'd':
             val_elec_type = 'spd'
             break
-        elif elt.block == 'f':
+        if elt.block == 'f':
             raise NotImplementedError(
                 'f-block elements are not supported in Δ-Sol method.'
             )
-        else:
-            raise ValueError(
-                'Something is wrong with this function or Element objects "block" property.'
-            )
-    
-    N_0        = get_all_valence_electrons(structure)
+        raise ValueError(
+            'Something is wrong with this function or Element objects "block" property.'
+        )
+
+    n_0        = get_all_valence_electrons(structure)
     value_name = '_'.join((dft_functional, val_elec_type))
-    N_star     = EL_PER_XC_VOL[n_star_type][value_name]
-    n          = float(N_0) / float(N_star)
+    n_star     = EL_PER_XC_VOL[n_star_type][value_name]
+    n          = float(n_0) / float(n_star)
 
     return n
 
@@ -217,15 +214,14 @@ def _match_dft_functional(
     """
     if "LDA" in functional:
         return "LDA"
-    elif "PBE" in functional:
+    if "PBE" in functional:
         return "PBE"
-    elif "AM05" in functional:
+    if "AM05" in functional:
         return "AM05"
-    else:
-        raise NotImplementedError(
-            "Provided POTCAR functional is not implemented for Δ-Sol method.\n"
-            "Recognized functionals are 'LDA', 'PBE', and 'AM05'."
-        )
+    raise NotImplementedError(
+        "Provided POTCAR functional is not implemented for Δ-Sol method.\n"
+        "Recognized functionals are 'LDA', 'PBE', and 'AM05'."
+    )
 
 
 ########################################
@@ -277,7 +273,7 @@ def dsol_calc_init(
 
         user_corrections (dict):    Additional corrections provided by the user in a
                                     separate .yaml file.
-    
+
     Returns:
         The corresponding VaspInput object.
     """
@@ -300,7 +296,7 @@ def dsol_calc_init(
         raise ValueError(
             "'preset' argument value is not a supported preset. "
             "Supported presets are:\n"
-            f"{PMGStaticSet + set(("DeltaSolStaticSet",))}\n"
+            f"{PMGStaticSet + set(('DeltaSolStaticSet',))}\n"
             f"'preset' got value '{preset}' instead."
         )
     if not isinstance(user_corrections, Dict) and user_corrections is not None:
@@ -373,53 +369,65 @@ def get_dsol_band_gap(data: dict) -> Union[Tuple[str, float], Tuple[str, float, 
     supp_keys = ("E_N0_plus_n_min","E_N0_minus_n_min","E_N0_plus_n_max","E_N0_minus_n_max")
 
     assert isinstance(data, dict)
-    assert all([has_str_key(data, key) for key in data_keys])
+    assert all(has_str_key(data, key) for key in data_keys)
 
-    n_ratio_best = get_dsol_n_ratio(data["structure"], dft_functional=data["functional"], n_star_type="BEST")
+    n_ratio_best = get_dsol_n_ratio(
+        data["structure"], dft_functional=data["functional"], n_star_type="BEST"
+    )
 
-    # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap 
+    # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap
     # (Ref 32 in screening_pipeline/Bibliography))
-    E_band_gap = (data["E_N0_plus_n_best"] + data["E_N0_minus_n_best"] - 2*data["E_N0"])/n_ratio_best
+    e_diff_best = data["E_N0_plus_n_best"] + data["E_N0_minus_n_best"] - 2*data["E_N0"]
+    e_bg_best = e_diff_best / n_ratio_best
 
-    if not all([has_str_key(data, key) for key in supp_keys]): # data do not have uncertainty keys
-        return (data["name"], E_band_gap)
+    if not all(has_str_key(data, key) for key in supp_keys):
+        # If data do not have uncertainty keys, return here
+        return (data["name"], e_bg_best)
 
-    n_ratio_min = get_dsol_n_ratio(data["structure"], dft_functional=data["functional"], n_star_type="MIN")
-    n_ratio_max = get_dsol_n_ratio(data["structure"], dft_functional=data["functional"], n_star_type="MAX")
+    n_ratio_min = get_dsol_n_ratio(
+        data["structure"], dft_functional=data["functional"], n_star_type="MIN"
+    )
+    n_ratio_max = get_dsol_n_ratio(
+        data["structure"], dft_functional=data["functional"], n_star_type="MAX"
+    )
+    e_diff_min = data["E_N0_plus_n_min"] + data["E_N0_minus_n_min"] - 2*data["E_N0"]
+    e_bg_min = e_diff_min / n_ratio_min
 
-    E_band_gap_min = (data["E_N0_plus_n_min"] + data["E_N0_minus_n_min"] - 2*data["E_N0"])/n_ratio_min
-    E_band_gap_max = (data["E_N0_plus_n_max"] + data["E_N0_minus_n_max"] - 2*data["E_N0"])/n_ratio_max
+    e_diff_max = data["E_N0_plus_n_max"] + data["E_N0_minus_n_max"] - 2*data["E_N0"]
+    e_bg_max = e_diff_max / n_ratio_max
 
-    return (data["name"], E_band_gap, E_band_gap_min, E_band_gap_max)
+    return (data["name"], e_bg_best, e_bg_min, e_bg_max)
 
 
 ########################################
 
 
 def batch_get_dsol_band_gaps(
-        bg_data: dict, 
-        dft_functional: Literal["LDA","PBE","AM05"] = "PBE", 
-        with_uncertainties: bool = False, 
-        workers: int = 1, 
-        /
+        bg_data: dict,
+        dft_functional: Literal["LDA","PBE","AM05"] = "PBE",
+        with_uncertainties: bool = False,
+        workers: int = 1
     ) -> Dict[str, float]:
     """
-    Calculate Δ-Sol band gap value for every structure in a batch from their data,
-    as provided by extract_vasp_data_for_delta_sol function applied on the 3 energy calculations.
+    Calculate Δ-Sol band gap value for every structure in a batch
+    from their data, as provided by extract_vasp_data_for_delta_sol
+    function applied on the 3 energy calculations.
 
     Parameters:
-        bg_data (dict):               Dict containing structures data extracted from previous VASP static calculations.
+        bg_data (dict):             Dict containing structures data extracted
+                                    from previous VASP static calculations.
 
-        dft_functional (str):         The type of functional used for static calculations. Supported functionals are
-                                      "LDA", "PBE", and "AM05". Defaults to "PBE".
+        dft_functional (str):       The type of functional used for static calculations.
+                                    Supported functionals are "LDA", "PBE", and "AM05".
+                                    Defaults to "PBE".
 
-        with_uncertainties (bool):    Whether to include uncertainty calculations data in the results.
-                                      Defaults to False.
+        with_uncertainties (bool):  Whether to include uncertainty calculations data
+                                    in the results. Defaults to False.
 
-        workers (int):                The number of parallel processes to spawn. Defaults to 1.
+        workers (int):              The number of parallel processes to spawn. Defaults to 1.
 
-    Returns:
-        Dict[str, float]: Dict of Band gap values associated with the original structure directory name.
+    Returns: Dict[str, float]:
+        Dict of Band gap values associated with the original structure directory name.
     """
 
     assert isinstance(bg_data, dict)
@@ -438,7 +446,7 @@ def batch_get_dsol_band_gaps(
                 "E_N0_minus_n_best": data[name + "_best_minus"],
             } for name, data in bg_data.items()
         }
-    
+
     else:
         final_energies = {
             name: {
@@ -459,30 +467,30 @@ def batch_get_dsol_band_gaps(
     chunksize = min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1
     data_list = list(final_energies.values())
 
-    E_band_gaps = list(process_map(
-        get_dsol_band_gap, 
-        data_list, 
-        max_workers=workers, 
+    e_band_gaps = list(process_map(
+        get_dsol_band_gap,
+        data_list,
+        max_workers=workers,
         chunksize=chunksize
     ))
 
     if not with_uncertainties:
-        E_band_gaps = {
+        e_band_gaps = {
             tup[0]: {
                 'E_band_gap': tup[1]
-            } for tup in E_band_gaps
+            } for tup in e_band_gaps
         }
 
     else:
-        E_band_gaps = {
+        e_band_gaps = {
             tup[0]: {
-                'E_band_gap': tup[1], 
-                'E_band_gap_min': tup[2], 
+                'E_band_gap': tup[1],
+                'E_band_gap_min': tup[2],
                 'E_band_gap_max': tup[3]
-            } for tup in E_band_gaps
+            } for tup in e_band_gaps
         }
 
-    return E_band_gaps
+    return e_band_gaps
 
 
 ########################################

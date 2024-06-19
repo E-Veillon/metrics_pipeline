@@ -27,17 +27,18 @@ from screening_pipeline.utils import (
 
 def get_max_dim(entries: Sequence[PDEntry]) -> int:
     """Search for the maximum number of distinct elements in given entries."""
-    return max([len(entry.elements) for entry in entries])
+    return max(len(entry.elements) for entry in entries)
 
 
 ########################################
 
 
 def init_entries_from_dict(
-        entries_dict: Dict[str, Dict], attribute: Optional[str] = None, workers: int = 1
+        entries_dict: Dict[str, Dict], attribute: Optional[str] = None
     ) -> List[PDEntry]:
     """
-    Convert structures data dict into a list of PDEntry objects compatible with phase diagrams.
+    Convert structures data dict into a list of PDEntry objects
+    that are compatible with phase diagrams.
 
     Parameters:
         entries_dict (dict):    Dict of dicts containing following structure data keys:
@@ -54,7 +55,7 @@ def init_entries_from_dict(
         raise TypeError(
             f"'entries_dict' arg expected a type 'dict', got '{type(entries_dict)}' instead."
         )
-    
+
     print(f"Convert {len(entries_dict)} '{attribute}' structures to entries...")
     entries_list = [
         PDEntry(
@@ -102,7 +103,7 @@ def filter_database_entries(
     print("Filtering reference dataset...")
 
     if isinstance(entries, Dict):
-        entries = init_entries_from_dict(entries, attribute="ref_struct", workers=workers)
+        entries = init_entries_from_dict(entries, attribute="ref_struct")
 
     if ref_elts is not None:
         entries = _get_relevant_entries(entries, ref_elts)
@@ -179,7 +180,7 @@ def group_by_dim_and_comp(
 
     if max_dim is None:
         max_dim = get_max_dim(entries)
-    
+
     grouper = partial(_group_one_dim, entries=entries)
 
     grouped_entries = process_map(
@@ -225,7 +226,7 @@ def get_sub_entries(
 
     sub_entries = list(
         filter(
-            lambda entry: all([elt in main_entry.elements for elt in entry.elements]),
+            lambda entry: all(elt in main_entry.elements for elt in entry.elements),
             entry_pool,
         )
     )
@@ -420,7 +421,7 @@ def _compute_e_above_hull(
         ref_entries: List[PDEntry],
         stable_limit: float = 0.1,
         from_mp_api: bool = False,
-        mp_api_key: str|None = None,
+        mp_api_key: Union[str, None] = None,
         verbose: bool = False
     ) -> List[Dict[str, str|float]]:
     """
