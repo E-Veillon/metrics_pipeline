@@ -2,7 +2,7 @@
 
 import os
 import json
-from typing import List, Dict, Any
+from typing import Dict, Any
 from mp_api.client import MPRester
 from emmet.core.thermo import ThermoType
 from pymatgen.core import SETTINGS
@@ -40,8 +40,9 @@ def _mp_api_key_check(api_key: str|None = None) -> str:
 
 def mp_api_download(path: str, api_key: str|None = None) -> None:
     """
-    Download GGA/GGA+U phase diagram relevant entries from MP API to a local JSON file.
-    Downloaded entries are dicts of the form {"entry_id": str, "composition": dict, "final_energy": float}
+    Download GGA/GGA+U phase diagram relevant entries from MP API
+    to a local JSON file. Downloaded entries are dicts of the form
+    {"entry_id": str, "composition": dict, "final_energy": float}.
     
     Parameters:
         path (str):     Where to build the output JSON file.
@@ -74,7 +75,7 @@ def mp_api_download(path: str, api_key: str|None = None) -> None:
                 }
             )
 
-    with open(path,"wt") as fp:
+    with open(path, "wt", encoding="utf-8") as fp:
         json.dump(final_data, fp)
 
 
@@ -118,11 +119,11 @@ def process_oqmd_json_file(path: str) -> None:
         f"Given filename '{os.path.basename(path)}' is not a valid JSON file."
     )
 
-    with open(path, "rt") as fp:
+    with open(path, "rt", encoding="utf-8") as fp:
         data = json.load(fp)
-    
+
     processed_data = {}
-    
+
     for name, struct in data.items():
         struct: Dict[str, Any]
 
@@ -138,12 +139,11 @@ def process_oqmd_json_file(path: str) -> None:
                     "Please verify that you are not processing the same data more than "
                     "once, as it may cause wrong total energy computations."
                 )
-            else:
-                raise ValueError(
-                    f"At least one of needed data keys is missing in structure '{name}'. "
-                    "Please verify that the following keys are present: "
-                    "'entry_id', 'composition', 'natoms', 'delta_e'."
-                )
+            raise ValueError(
+                f"At least one of needed data keys is missing in structure '{name}'. "
+                "Please verify that the following keys are present: "
+                "'entry_id', 'composition', 'natoms', 'delta_e'."
+            )
 
         entry_id: str = str(struct.get("entry_id"))
 
@@ -177,7 +177,7 @@ def process_oqmd_json_file(path: str) -> None:
     new_filename = os.path.basename(path).replace(".json", "_proc.json")
     new_path = os.path.join(os.path.dirname(path), new_filename)
 
-    with open(new_path, "wt") as fp:
+    with open(new_path, "wt", encoding="utf-8") as fp:
         json.dump(processed_data, fp)
 
 
@@ -187,7 +187,7 @@ def process_oqmd_json_file(path: str) -> None:
 def load_phase_diagram_entries(filename: str) -> dict:
     """Load entries data from a JSON file."""
     print(f"Loading {filename}...")
-    with open(filename, "r") as fp:
+    with open(filename, "rt", encoding="utf-8") as fp:
         entries = json.load(fp)
 
     for entry in entries.values():
@@ -197,4 +197,3 @@ def load_phase_diagram_entries(filename: str) -> dict:
 
 
 ########################################
-

@@ -1,3 +1,5 @@
+"""Functions to compute structures fingerprints using CrystalNN."""
+
 from typing import List
 from pymatgen.core import Structure
 from matminer.featurizers.site.fingerprint import CrystalNNFingerprint
@@ -13,7 +15,7 @@ def _structure_to_fingerprint(struct: Structure):
         atom_fingerprints = [
             CrystalNNFP.featurize(struct, i) for i, _ in enumerate(struct)
         ]
-    except:
+    except Exception:
         return None
     return np.mean(atom_fingerprints, axis=0)
 

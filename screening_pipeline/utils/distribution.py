@@ -1,3 +1,5 @@
+"""Functions related to distance computations between distributions."""
+
 import torch
 import numpy as np
 from torch_cluster import knn
@@ -5,6 +7,7 @@ from scipy.stats import wasserstein_distance
 
 
 def get_distance_closest(source: np.ndarray, target: np.ndarray) -> np.ndarray:
+    """Computes the smallest distance between two structures as coordinate arrays."""
     source = torch.from_numpy(source)
     target = torch.from_numpy(target)
 
@@ -16,7 +19,8 @@ def get_distance_closest(source: np.ndarray, target: np.ndarray) -> np.ndarray:
 
 
 def recall(source: np.ndarray, target: np.ndarray, threshold: float) -> float:
-    distance = get_distance_closest(target, source)
+    """Get Recall metric value."""
+    distance = get_distance_closest(source=target, target=source)
 
     mask = distance < threshold
 
@@ -24,18 +28,21 @@ def recall(source: np.ndarray, target: np.ndarray, threshold: float) -> float:
 
 
 def precision(source: np.ndarray, target: np.ndarray, threshold: float) -> float:
-    distance = get_distance_closest(source, target)
+    """Get Precision metric value."""
+    distance = get_distance_closest(source=source, target=target)
 
     mask = distance < threshold
 
     return mask.astype(np.float32).mean().item()
 
 
-def sqrt_tr(X: np.ndarray) -> float:
-    return np.sum(np.sqrt(np.linalg.eigvals(X).real))
+def sqrt_tr(x: np.ndarray) -> float:
+    """Trace of the square root eigenvalues of a matrix."""
+    return np.sum(np.sqrt(np.linalg.eigvals(x).real))
 
 
 def frechet_distance(x: np.ndarray, y: np.ndarray) -> float:
+    """Frechet Distance between two matrices x and y."""
     mu_x = np.mean(x, axis=0)
     mu_y = np.mean(y, axis=0)
 
