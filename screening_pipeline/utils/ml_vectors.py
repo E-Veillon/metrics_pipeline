@@ -1,3 +1,8 @@
+"""Functions to compute vectors using a pretrained ALIGNN model."""
+
+
+from typing import List,Literal
+
 from pymatgen.core import Structure, Element
 import numpy as np
 import torch
@@ -6,14 +11,17 @@ from materials_toolkit.data import StructureData, StructureLoader, collate
 from materials_toolkit.models.alignn import get_pretrained_alignn
 import tqdm
 
-from typing import List,Literal
-
 
 def _species_to_tensor(elements: List[Element]):
+    """Convert Element objects to a Tensor containing their atomic numbers."""
     return torch.tensor([e.Z for e in elements], dtype=torch.long)
 
 
 class StructuresDataset(Dataset):
+    """
+    A class to store several structures data
+    and extract them into StructureData objects.
+    """
     data_class = StructureData
 
     def __init__(self, structures: List[Structure]):
@@ -32,9 +40,11 @@ class StructuresDataset(Dataset):
         self.cell = [cell for _, _, cell in data]
 
     def len(self) -> int:
+        """Number of structures in the instance."""
         return len(self.cell)
 
     def get(self, idx: int | torch.LongTensor) -> StructureData:
+        """Extract structures data from indices."""
         if isinstance(idx, torch.LongTensor):
             return collate(
                 [
@@ -51,9 +61,13 @@ def vectors_from_alignn(
     batch_size: int = 128,
     device: torch.device = None,
     model_name: str = "mp/e_form",
-    output: Literal["latent","energy"]="latent"
+    output: Literal["latent","energy"] = "latent"
 ) -> np.ndarray:
-    assert output in ("latent","energy")
+    """
+    Computes vector representation of structures with ALIGNN
+    (latent or energy representation).
+    """
+    assert output in ("latent", "energy")
 
     if device is None:
         if torch.cuda.is_available():
@@ -66,10 +80,15 @@ def vectors_from_alignn(
     dataset = StructuresDataset(structures)
     loader = StructureLoader(dataset, batch_size=batch_size)
     latent = []
+
+    def is_latent(output: str) -> bool:
+        """True if 'output' == "latent"."""
+        return output == "latent"
+
     for batch in tqdm.tqdm(loader):
         batch = batch.to(device)
         batch.build_graph(knn=12)
         batch.build_tripets()
-        latent.append(alignn(batch, latent=(output=="latent")).detach())
+        latent.append(alignn(batch, latent=is_latent(output)).detach())
 
     return torch.cat(latent).numpy()

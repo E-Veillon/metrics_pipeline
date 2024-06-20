@@ -49,24 +49,27 @@ def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
     return re.search(r"(He|Ne|Ar|Kr|Xe|Rn|Og)", structure) is not None
 
 def discard_rare_gas_structures(
-        structures: Iterable[Union[SiteCollection, str]]
+        structures: Sequence[Union[SiteCollection, str]]
     ) -> Tuple[List[Union[SiteCollection, str]], int]:
     '''
     Eliminates structures containing rare gases and counts the number eliminated.
 
     Parameters:
-        structures (Iterable[SiteCollection | str]]): the structure data to scan.
+        structures ([SiteCollection | str]): the structure data to scan.
     
     Returns:
         List[Union[SiteCollection, str]]: The list of data not containing rare gases.
         Int: The number of structures discarded.
     '''
 
-    assert isinstance(structures, Iterable), \
-    f"Provided 'structures' argument is not iterable (got {type(structures)} instead)."
+    assert isinstance(structures, Sequence), (
+    "'structures' argument expected a sequence (list, tuple), "
+    f"got {type(structures)} instead."
+    )
 
     structures = list(structures)
-    if not len(structures): return [], 0
+    if not structures:
+        return [], 0
 
     nbr_discarded = len(list(filter(has_rare_gas, structures)))
     kept_structs  = list(filterfalse(has_rare_gas, structures))
@@ -88,7 +91,7 @@ def has_rare_earth(structure: Union[SiteCollection, str]) -> bool:
 
     if isinstance(structure, SiteCollection):
         return structure.composition.contains_element_type("f-block")
-    
+
     elts_grps_list = get_all_elements_groups(structure)
     has_lanthanoid = 'L' in elts_grps_list
     has_actinoid   = 'A' in elts_grps_list
@@ -113,11 +116,12 @@ def discard_rare_earth_structures(
     f"Provided 'structures' argument is not iterable (got {type(structures)} instead)."
 
     structures = list(structures)
-    if not len(structures): return [], 0
+    if not structures:
+        return [], 0
 
     nbr_discarded = len(list(filter(has_rare_earth, structures)))
     kept_structs  = list(filterfalse(has_rare_earth, structures))
-    
+
     return kept_structs, nbr_discarded
 
 def get_elements(
@@ -150,15 +154,15 @@ def get_elements(
 
     if isinstance(elts_data, str):
         elts_list = Composition(''.join(elts_data.split(sep='-')), strict=True).elements
-    
+
     else:
-        assert all([isinstance(elt, (str, int, Element)) for elt in elts_data])
+        assert all(isinstance(elt, (str, int, Element)) for elt in elts_data)
         elts_list = Composition([(elt, 1) for elt in elts_data], strict=True).elements
 
     return elts_list
 
 def get_elemental_subsets(
-        main_elts_set: FormulaLike, 
+        main_elts_set: FormulaLike,
         elts_subsets: Sequence[FormulaLike]
     ) -> List[str]:
     '''
@@ -177,18 +181,18 @@ def get_elemental_subsets(
     Returns:
         List of the formulas fully included in the main one.
     '''
-    
+
     ref_elts = get_elements(main_elts_set)
 
     sub_pd_list = list(filter(
-        lambda pd_elts: all([elt in ref_elts for elt in get_elements(pd_elts)]), 
+        lambda pd_elts: all(elt in ref_elts for elt in get_elements(pd_elts)),
         elts_subsets
     ))
 
     return sub_pd_list
 
 def get_element_group(
-        atom: Union[Element, str], 
+        atom: Union[Element, str],
         return_type: Literal['int', 'str'] = 'str'
     ) -> Union[int, str]:
     '''
@@ -215,39 +219,44 @@ def get_element_group(
                     periodic table the best classification should be group 3 for both.
     '''
 
-    assert return_type == 'str' or return_type == 'int'
+    assert return_type in {'str', 'int'}
 
-    try: atom = Element(atom)
-    except TypeError:
+    try:
+        atom = Element(atom)
+    except TypeError as exc:
         raise TypeError(
             f"'atom' arg expected a 'str' or 'Element' type, got {type(atom)} instead."
-        )
-    except ValueError:
+        ) from exc
+    except ValueError as exc:
         raise ValueError(
             f"'atom' arg value '{atom}' is not recognized as an element."
-        )
+        ) from exc
 
-    if atom.block == 's':
-        return (
-            (atom.block.upper() + str(atom.group)) 
-            if return_type == 'str' else atom.group
-        )
-    elif atom.block == 'p':
-        return (
-            (atom.block.upper() + str(atom.group - 12)) 
-            if return_type == 'str' else atom.group
-        )
-    elif atom.block == 'd':
-        return (
-            (atom.block.upper() + str(atom.group - 2)) 
-            if return_type == 'str' else atom.group
-        )
-    elif atom.block == 'f':
-        return (
-            ('L' if return_type == 'str' else 19) 
-            if atom.row == 6 else ('A' if return_type == 'str' else 20)
-        )
-    else: raise NotImplementedError(f"{atom.block}: Unrecognized Periodic Table block.")
+    match atom.block:
+        case 's':
+            return (
+                (atom.block.upper() + str(atom.group))
+                if return_type == 'str' else atom.group
+            )
+        case 'p':
+            return (
+                (atom.block.upper() + str(atom.group - 12))
+                if return_type == 'str' else atom.group
+            )
+        case 'd':
+            return (
+                (atom.block.upper() + str(atom.group - 2))
+                if return_type == 'str' else atom.group
+            )
+        case 'f':
+            return (
+                ('L' if return_type == 'str' else 19)
+                if atom.row == 6 else ('A' if return_type == 'str' else 20)
+            )
+        case _:
+            raise NotImplementedError(
+                f"{atom.block}: Unrecognized Periodic Table block."
+            )
 
 def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
     '''
@@ -270,7 +279,7 @@ def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
 
     if isinstance(structure, SiteCollection):
         elts_list = list(structure.composition.keys())
-    
+
     elif isinstance(structure, str):
         formula   = CifBlock.from_str(structure).data["_chemical_formula_structural"]
         comp      = Composition(formula)
@@ -296,9 +305,9 @@ def get_element_valence_electrons(atom: Union[str,Element]) -> int:
 
     elif group.startswith("D") or group.startswith("P"):
         nb_val_elec = int(group[1]) + 2
-        # Δ-Sol method counts all outermost s and d electrons in transition metals, 
+        # Δ-Sol method counts all outermost s and d electrons in transition metals,
         # even for d10 ones.
-    elif group == 'L' or group == 'A':
+    elif group in {'L', 'A'}:
         raise NotImplementedError(
             'f-block elements are not yet supported.'
         )
@@ -326,9 +335,9 @@ def get_all_valence_electrons(structure: SiteCollection) -> int:
 
     for elt, number in elts_dict.items():
         nbr_val_elec += get_element_valence_electrons(elt) * int(number)
-    
+
     nbr_val_elec -= structure.charge #e.g. a charge of +1 means there is 1 less electron
-    
+
     return nbr_val_elec
 
 

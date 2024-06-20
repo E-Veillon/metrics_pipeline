@@ -43,7 +43,7 @@ def add_new_dir(base_dir: PathLike, new_dir_name: PathLike) -> Path:
 ########################################
 
 def batch_add_new_dirs(
-        base_dir: PathLike, 
+        base_dir: PathLike,
         new_subdirs: Sequence[PathLike]
     ) -> List[Path]:
     """
@@ -63,12 +63,12 @@ def batch_add_new_dirs(
     assert isinstance(base_dir, PathLike)
 
     base_dir = Path(base_dir)
-    
+
     assert base_dir.is_dir()
     assert all(isinstance(subdir, PathLike) for subdir in new_subdirs)
 
     new_dirs = list(map(add_new_dir, repeat(base_dir), new_subdirs))
-    
+
     return new_dirs
 
 
@@ -86,7 +86,7 @@ def yaml_loader(file_path: PathLike, on_error: Literal["raise", "warn", "ignore"
     """Load a YAML file and casts it explicitly to a dict"""
     if not isinstance(file_path, (Path, str)):
         raise TypeError(f"Expected a Path object or str, got {type(file_path)} instead.")
-    
+
     assert str(file_path).endswith(".yaml"), \
     f"{str(file_path)} is not a .yaml file format."
 
@@ -102,7 +102,7 @@ def yaml_loader(file_path: PathLike, on_error: Literal["raise", "warn", "ignore"
         except Exception as exc:
             if on_error == "raise":
                 raise exc
-            elif on_error == "warn":
+            if on_error == "warn":
                 warnings.warn(
                     f"An exception was thrown during yaml loading of file {str(file_path)}.\n"
                     f"Data written in this file is ignored to proceed.\n"

@@ -7,35 +7,32 @@ import os
 import re
 import json
 import warnings
-from itertools import starmap, repeat
+from itertools import repeat
 from functools import partial
-from copy import deepcopy
 from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal, Any
 from pathlib import Path
-from dataclasses import dataclass
 import xml.etree.ElementTree as ET
 from tqdm.contrib.concurrent import process_map
 
 # PYTHON MATERIAL GENOMICS
-from pymatgen.core import SETTINGS, Structure, SiteCollection
-from pymatgen.io.cif import CifParser
-from pymatgen.io.vasp import VaspInput, Vasprun, PotcarSingle
+from pymatgen.core import Structure, SiteCollection
+from pymatgen.io.vasp import VaspInput, Vasprun
 from pymatgen.io.vasp.sets import (
     DictSet, MITRelaxSet, MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet,
-    MPMetalRelaxSet, MVLRelax52Set, MVLScanRelaxSet
+    MPMetalRelaxSet, MVLRelax52Set, MVLScanRelaxSet,
+    MPStaticSet, MatPESStaticSet, MPScanStaticSet
 )
 
 from screening_pipeline.utils import (
     PathLike, PMGRelaxSetType, PMGStaticSetType, PMGRelaxSet, PMGStaticSet,
-    DeltaSolStaticSet, flatten, batch_add_new_dirs, U_VALUES,
-    get_all_valence_electrons, get_dsol_n_ratio
+    DeltaSolStaticSet, flatten, batch_add_new_dirs, U_VALUES
 )
 
 
 ########################################
 
 
-def _MITRelaxSet_INCAR_corrections(n_sites: int|None = None) -> Dict:
+def _mitrelaxset_incar_corrections(n_sites: int|None = None) -> Dict:
     """
     Systematic correction for MITRelaxSet INCAR tags that do not match with 
     parameters given in the original work of Jain et al.
@@ -224,16 +221,12 @@ def _relax_set_init(
     preset: str = "MPRelaxSet",
     corrections: Optional[Dict] = None,
 ) -> DictSet:
-
+    """Init a relaxation set of VASP input files."""
     corrections = corrections or {}
     incar_corrections = {}
 
     if preset == "MITRelaxSet":
-        incar_corrections = _MITRelaxSet_INCAR_corrections(
-            structure=structure,
-            user_potcar_dict=corrections.get("POTCAR") or None,
-            user_potcar_functional=corrections.get("POTCAR_FUNCTIONAL") or None,
-        )
+        incar_corrections = _mitrelaxset_incar_corrections(structure.num_sites)
 
     incar_corrections.update(corrections.get("INCAR", {}))
     kpoints_corrections = corrections.get("KPOINTS", {})
@@ -242,7 +235,7 @@ def _relax_set_init(
 
     match preset:
         case "MITRelaxSet":
-            return MITRelaxSet(
+            preset_obj = MITRelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -250,7 +243,7 @@ def _relax_set_init(
                 user_potcar_functional=potcar_functional_correction,
             )
         case "MPRelaxSet":
-            return MPRelaxSet(
+            preset_obj = MPRelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -258,7 +251,7 @@ def _relax_set_init(
                 user_potcar_functional=potcar_functional_correction,
             )
         case "MPScanRelaxSet":
-            return MPScanRelaxSet(
+            preset_obj = MPScanRelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -266,7 +259,7 @@ def _relax_set_init(
                 user_potcar_functional=potcar_functional_correction,
             )
         case "MPHSERelaxSet":
-            return MPHSERelaxSet(
+            preset_obj = MPHSERelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -274,7 +267,7 @@ def _relax_set_init(
                 user_potcar_functional=potcar_functional_correction,
             )
         case "MPMetalRelaxSet":
-            return MPMetalRelaxSet(
+            preset_obj = MPMetalRelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -282,7 +275,7 @@ def _relax_set_init(
                 user_potcar_functional=potcar_functional_correction,
             )
         case "MVLRelax52Set":
-            return MVLRelax52Set(
+            preset_obj = MVLRelax52Set(
                 structure=structure,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -290,7 +283,7 @@ def _relax_set_init(
                 user_potcar_functional=potcar_functional_correction,
             )
         case "MVLScanRelaxSet":
-            return MVLScanRelaxSet(
+            preset_obj = MVLScanRelaxSet(
                 structure=structure,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -303,7 +296,7 @@ def _relax_set_init(
             raise TypeError(
                 f"'preset' arg expected a type 'str', got {type(preset)} instead."
             )
-
+    return preset_obj
 
 ########################################
 
@@ -315,8 +308,7 @@ def _static_set_init(
     nelect: float|None = None,
     corrections: Optional[Dict] = None,
 ) -> DictSet:
-    """"""
-    from pymatgen.io.vasp.sets import MPStaticSet, MatPESStaticSet, MPScanStaticSet
+    """Init a static calculation set of VASP input files."""
 
     corrections = corrections or {}
     incar_corrections = corrections.get("INCAR", {})
@@ -330,7 +322,7 @@ def _static_set_init(
 
         match preset:
             case "DeltaSolStaticSet":
-                return DeltaSolStaticSet.from_prev_calc(
+                preset_obj = DeltaSolStaticSet.from_prev_calc(
                     prev_calc_dir=dir_path,
                     user_incar_settings=incar_corrections,
                     user_kpoints_settings=kpoints_corrections,
@@ -338,7 +330,7 @@ def _static_set_init(
                     user_potcar_functional=potcar_functional_correction,
                 )
             case "MPStaticSet":
-                return MPStaticSet.from_prev_calc(
+                preset_obj = MPStaticSet.from_prev_calc(
                     prev_calc_dir=dir_path,
                     user_incar_settings=incar_corrections,
                     user_kpoints_settings=kpoints_corrections,
@@ -346,7 +338,7 @@ def _static_set_init(
                     user_potcar_functional=potcar_functional_correction,
                 )
             case "MatPESStaticSet":
-                return MatPESStaticSet.from_prev_calc(
+                preset_obj = MatPESStaticSet.from_prev_calc(
                     prev_calc_dir=dir_path,
                     user_incar_settings=incar_corrections,
                     user_kpoints_settings=kpoints_corrections,
@@ -354,7 +346,7 @@ def _static_set_init(
                     user_potcar_functional=potcar_functional_correction,
                 )
             case "MPScanStaticSet":
-                return MPScanStaticSet.from_prev_calc(
+                preset_obj = MPScanStaticSet.from_prev_calc(
                     prev_calc_dir=dir_path,
                     user_incar_settings=incar_corrections,
                     user_kpoints_settings=kpoints_corrections,
@@ -369,9 +361,11 @@ def _static_set_init(
                 raise TypeError(
                     f"'preset' arg expected a str type, got {type(preset)} instead."
                 )
+        return preset_obj
+
     match preset:
         case "DeltaSolStaticSet":
-            return DeltaSolStaticSet(
+            preset_obj = DeltaSolStaticSet(
                 structure=struct_or_path,
                 incar_nelect=nelect,
                 user_incar_settings=incar_corrections,
@@ -380,7 +374,7 @@ def _static_set_init(
                 user_potcar_functional=potcar_functional_correction,
             )
         case "MPStaticSet":
-            return MPStaticSet(
+            preset_obj = MPStaticSet(
                 structure=struct_or_path,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -388,7 +382,7 @@ def _static_set_init(
                 user_potcar_functional=potcar_functional_correction,
             )
         case "MatPESStaticSet":
-            return MatPESStaticSet(
+            preset_obj = MatPESStaticSet(
                 structure=struct_or_path,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -396,7 +390,7 @@ def _static_set_init(
                 user_potcar_functional=potcar_functional_correction,
             )
         case "MPScanStaticSet":
-            return MPScanStaticSet(
+            preset_obj = MPScanStaticSet(
                 structure=struct_or_path,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -409,7 +403,7 @@ def _static_set_init(
             raise TypeError(
                 f"'preset' arg expected a str type, got {type(preset)} instead."
             )
-
+    return preset_obj
 
 ########################################
 
@@ -432,20 +426,19 @@ def vasp_relaxation_settings(
                                         some of the preset INCAR, KPOINTS or POTCAR
                                         settings if necessary. Defaults to None.
     """
-
     assert isinstance(structure, SiteCollection), (
-        "'structure' argument format not supported. "
-        "It must be an instance of the SiteCollection class or one of its subclasses."
+        "'structure' argument expected a type "
+        "'pymatgen.core.structure.SiteCollection', "
+        f"got '{type(structure)}' instead."
     )
-
     assert preset in PMGRelaxSet, (
         "'preset' argument not recognized. "
         "It must be one of the allowed pymatgen relaxation presets:\n"
         f"{PMGRelaxSet}"
     )
-
     assert (
-        isinstance(user_corrections, dict) or user_corrections is None
+        isinstance(user_corrections, dict)
+        or user_corrections is None
     ), "user_incar_settings must be a dict or None"
 
     vasp_input = _relax_set_init(

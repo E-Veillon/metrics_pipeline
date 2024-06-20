@@ -1,7 +1,10 @@
+"""Redirect unnecessary warnings output."""
+
 from contextlib import contextmanager
 import ctypes
 import io
-import os, sys
+import os
+import sys
 import tempfile
 from typing import TextIO
 

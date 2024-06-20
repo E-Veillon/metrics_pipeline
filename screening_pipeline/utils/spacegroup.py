@@ -12,6 +12,7 @@ from typing import List, Union
 # OPTIMIZATION MODULES
 
 import warnings
+from functools import partial
 from tqdm.contrib.concurrent import process_map
 
 ########################################
@@ -44,8 +45,9 @@ def _retry_get_symmetrized_structure(
     Parameters:
         structure (Structure):      Pymatgen Structure object to symmetrize.
 
-        symprec (float):            Initial position tolerance for symmetry detection in fractional coordinate.
-                                    Defaults to 0.01, which works nicely in most cases.
+        symprec (float):            Initial position tolerance for symmetry detection
+                                    in fractional coordinate. Defaults to 0.01, which
+                                    works nicely in most cases.
         
         angle_tolerance (float):    Initial angles tolerance for symmetry detection in degrees.
                                     Defaults to 5.0 degrees, which works nicely in most cases.
@@ -57,8 +59,8 @@ def _retry_get_symmetrized_structure(
     for precision_factor in [2, 3, 5, 10]:
 
         symmetrizer = SpacegroupAnalyzer(
-            structure=structure, 
-            symprec=precision_factor*symprec, 
+            structure=structure,
+            symprec=precision_factor*symprec,
             angle_tolerance=precision_factor*angle_tolerance
         )
 
@@ -69,17 +71,17 @@ def _retry_get_symmetrized_structure(
 
             if symmetrizer.get_symmetry_dataset() is not None:
                 return structure
-            
+
         else:
             return sym_struct
-    
+
     return structure
 
 ########################################
 
 def structure_symmetrizer(
-        structure: Structure,  
-        symprec: float = 0.01, 
+        structure: Structure,
+        symprec: float = 0.01,
         angle_tolerance: float = 5.0
     ) -> Union[Structure, SymmetrizedStructure, None]:
     '''
@@ -89,13 +91,15 @@ def structure_symmetrizer(
     Parameters:
         structure (Structure):      Pymatgen Structure object to symmetrize.
 
-        valid_tol (float):          Tolerance in relative atomic positions checking in Angstroms.
-                                    If the structure contains atoms that are closer than valid_tol, 
-                                    the function returns None. If valid_tol = 0.0, distance checking
-                                    is disabled. Defaults to 0.0.
+        valid_tol (float):          Tolerance in relative atomic positions checking
+                                    in Angstroms. If the structure contains atoms that
+                                    are closer than valid_tol, the function returns None.
+                                    If valid_tol = 0.0, distance checking is disabled.
+                                    Defaults to 0.0.
 
-        symprec (float):            Initial position tolerance for symmetry detection in fractional coordinate.
-                                    Defaults to 0.01, which works nicely in most cases.
+        symprec (float):            Initial position tolerance for symmetry detection
+                                    in fractional coordinate. Defaults to 0.01, which
+                                    works nicely in most cases.
         
         angle_tolerance (float):    Initial angles tolerance for symmetry detection in degrees.
                                     Defaults to 5.0 degrees, which works nicely in most cases.
@@ -112,8 +116,8 @@ def structure_symmetrizer(
     with redirect_c_stdout(None), redirect_c_stderr(None):
 
         struct_analyzer = SpacegroupAnalyzer(
-            structure=structure, 
-            symprec=symprec, 
+            structure=structure,
+            symprec=symprec,
             angle_tolerance=angle_tolerance
         )
         try:
@@ -129,11 +133,6 @@ def structure_symmetrizer(
                         SymmNotFoundWarning
                 )
                 return structure
-                    #_retry_get_symmetrized_structure(
-                    #structure=structure, 
-                    #symprec=symprec, 
-                    #angle_tolerance=angle_tolerance
-                    #)
 
             raise exc
 
@@ -142,30 +141,31 @@ def structure_symmetrizer(
 ########################################
 
 def batch_symmetrizer(
-        structures: List[Structure], 
-        symprec: float = 0.01, 
-        angle_tolerance: float = 5.0, 
+        structures: List[Structure],
+        symprec: float = 0.01,
+        angle_tolerance: float = 5.0,
         workers: int = 1
     ):
     '''
     Use multiprocess to find symmetry spacegroups for a list of pymatgen Structure objects.
 
     Parameters:
-        structures (List[Structure]):   A list of all structures that need a symmetry analysis.
+        structures ([Structure]):   A list of all structures that need a symmetry analysis.
 
-        symprec (float):                Initial position tolerance for symmetry detection in fractional coordinate.
-                                        Defaults to 0.01, which works nicely in most cases.
+        symprec (float):            Initial position tolerance for symmetry detection
+                                    in fractional coordinate. Defaults to 0.01, which
+                                    works nicely in most cases.
         
-        angle_tolerance (float):        Initial angles tolerance for symmetry detection in degrees.
-                                        Defaults to 5.0 degrees, which works nicely in most cases.
+        angle_tolerance (float):    Initial angles tolerance for symmetry detection in degrees.
+                                    Defaults to 5.0 degrees, which works nicely in most cases.
         
-        workers (int):                  Number of parallel processes to create.
+        workers (int):              Number of parallel processes to create.
 
     Returns:
-        A list containing either pymatgen SymmetrizedStructure objects when symmetry detection worked properly,
-        or Structure objects with default P1 spacegroup if detection could not detect any symmetry.
+        A list of either pymatgen SymmetrizedStructure objects
+        when symmetry detection worked properly, or the unchanged
+        Structure object if symmetry detection failed.
     '''
-    from functools import partial
 
     #def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
     #    return [(struct, symprec, angle_tolerance) for struct in structures]
@@ -173,18 +173,18 @@ def batch_symmetrizer(
     nbr_structs = len(structures)
     chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
     set_structure_symmetrizer = partial(
-        structure_symmetrizer, 
-        symprec=symprec, 
+        structure_symmetrizer,
+        symprec=symprec,
         angle_tolerance=angle_tolerance
     )
-    
+
     return list(filter(
-        None, 
+        None,
         process_map(
-            set_structure_symmetrizer, 
-            structures, 
-            max_workers=workers, 
-            chunksize=chunksize, 
+            set_structure_symmetrizer,
+            structures,
+            max_workers=workers,
+            chunksize=chunksize,
             desc='Symmetrize structures'
         )
     ))

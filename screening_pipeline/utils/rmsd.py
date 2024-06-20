@@ -1,10 +1,14 @@
+"""Functions to compute Root Mean Square Displacement between Structures."""
+
+
+from typing import Tuple, List
+
 import torch
-import torch.nn.functional as F
+#import torch.nn.functional as F
 from torch_scatter import scatter_mean
 from pymatgen.core import Structure
 import numpy as np
 
-from typing import Tuple, List
 
 offset_range = torch.arange(-5, 6, dtype=torch.float32)
 offsets = torch.stack(
@@ -18,7 +22,7 @@ def _get_shortest_paths(
     x_dst: torch.FloatTensor,
     num_atoms: torch.LongTensor,
 ) -> Tuple[torch.LongTensor, torch.FloatTensor]:
-    """"""
+
     idx = torch.arange(num_atoms.shape[0], dtype=torch.long, device=num_atoms.device)
     batch = idx.repeat_interleave(num_atoms)
 
@@ -37,22 +41,18 @@ def _get_shortest_paths(
 
 
 def _to_euc(x: torch.FloatTensor, cell: torch.FloatTensor, batch: torch.LongTensor):
-    """"""
     return torch.einsum("ij,ijk->ik", x, cell[batch])
 
 
 def _to_inner(x: torch.FloatTensor, cell: torch.FloatTensor, batch: torch.LongTensor):
-    """"""
     return torch.einsum("ij,ijk->ik", x, cell[batch].inverse())
 
 
 def _center_around_zero(x: torch.FloatTensor) -> torch.FloatTensor:
-    """"""
     return (x + 0.5) % 1.0 + 0.5
 
 
 def polar(a: torch.FloatTensor) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
-    """"""
     w, s, vh = torch.linalg.svd(a)
     u = w @ vh
     return u, (vh.mT.conj() * s[:, None, :]) @ vh
@@ -65,7 +65,7 @@ def rmsd(
     x_dst: torch.FloatTensor,
     num_atoms: torch.LongTensor,
 ) -> torch.FloatTensor:
-    """"""
+    """Compute RMSD between two structures."""
     batch_atoms = torch.arange(cell_src.shape[0], dtype=torch.long).repeat_interleave(
         num_atoms
     )
@@ -92,7 +92,10 @@ def rmsd(
 def rmsd_from_structures(
     struct1: List[Structure], struct2: List[Structure]
 ) -> np.ndarray:
-    """"""
+    """
+    Computes RMSD of each given pair of structure (pairing by index matching),
+    and returns all results in a single array.
+    """
     num_atoms = torch.tensor([len(s) for s in struct1], dtype=torch.long)
 
     assert (

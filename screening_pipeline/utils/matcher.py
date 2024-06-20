@@ -32,7 +32,7 @@ from screening_pipeline.utils.flattener import flatten
 # LOCAL FUNCTIONS
 
 def check_interatomic_distances(
-        structures: Sequence[SiteCollection], 
+        structures: Sequence[SiteCollection],
         valid_tol: float = 0.5
     ) -> Tuple[List[SiteCollection], int]:
     '''
@@ -52,7 +52,7 @@ def check_interatomic_distances(
     '''
     def _is_valid(structure: SiteCollection):
         return structure.is_valid(tol=valid_tol)
-    
+
     assert isinstance(structures, Sequence)
     assert all(isinstance(structure, SiteCollection) for structure in structures)
     assert isinstance(valid_tol, float)
@@ -82,10 +82,10 @@ def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
 
     assert isinstance(comp, (Composition, Entry, SiteCollection)), \
     f"Given object type is not supported ({type(comp)})."
-    
+
     if isinstance(comp, Composition):
         return hash(comp.fractional_composition)
-    
+
     return hash(comp.composition.fractional_composition)
 
 ########################################
@@ -136,10 +136,10 @@ def hash_composition(comp: Union[Composition, Entry, SiteCollection]) -> int:
 
     assert isinstance(comp, (Composition, Entry, SiteCollection)), \
     f"Given object type is not supported ({type(comp)})."
-    
+
     if isinstance(comp, Composition):
         return hash(comp)
-    
+
     return hash(comp.composition)
 
 ########################################
@@ -201,12 +201,12 @@ def _group_by_equivalence(
 
     if test_volume:
         unmatchables = list(filter(lambda t: t[1].volume < 1, enumerate(structures)))
-        
+
         for idx, _ in reversed(unmatchables):
             structures.pop(idx)
 
         unmatchables = [[t[1]] for t in unmatchables] # Assumed to be uniques
-        
+
         if unmatchables:
             unmatch_count += len(unmatchables)
 
@@ -265,7 +265,7 @@ def batch_group_by_equivalence(
         desc=comment
     )
     equivalent_structs = [t[0] for t in match_results] #type: List[List[List[Structure]]]
-    total_unmatch_count = sum([t[1] for t in match_results])
+    total_unmatch_count = sum(t[1] for t in match_results)
 
     return (equivalent_structs, total_unmatch_count)
 
@@ -322,9 +322,9 @@ def remove_equivalent(
     if keep_equivalent:
         sorted_structs = flatten(equivalent_structs, level_of_flattening=2)
         return sorted_structs, nbr_discarded, nbr_unmatched
-    
+
     sorted_structs = flatten(equivalent_structs, level_of_flattening=1)
-    nbr_discarded  = sum([len(sublist) - 1 for sublist in sorted_structs])
+    nbr_discarded  = sum(len(sublist) - 1 for sublist in sorted_structs)
     unique_structs = [sublist[0] for sublist in sorted_structs]
     return unique_structs, nbr_discarded, nbr_unmatched
 
@@ -382,11 +382,11 @@ def batch_get_novel_structures(
         raise TypeError(
             f"'workers arg expected a type 'int', got {type(workers)} instead."
         )
-    if not workers > 0:
+    if workers < 1:
         raise ValueError(
             f"'workers' arg must be strictly positive (got {workers})."
         )
-    
+
     get_novel_structs = partial(_get_novel_structures, dataset=dataset)
 
     novel_structs = process_map(
