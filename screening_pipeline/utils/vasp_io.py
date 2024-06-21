@@ -500,6 +500,7 @@ def _check_summary_data(
     Check whether given structure directory is present in the summary file and
     whether it was rejected in the previous step.
     """
+    struct_dir = str(struct_dir)
 
     with open(summary_file, "rt", encoding="utf-8") as fp:
         summary = json.load(fp)
@@ -564,6 +565,39 @@ def converged_vasprun(run_path: PathLike, **kwargs) -> Union[Vasprun, None]:
 ########################################
 
 
+def _check_vasp_data(
+    struct_dir: PathLike, path_to_summary: Optional[PathLike] = None
+) -> Vasprun|None:
+    """
+    Check whether given path leads to a previously accepted structure,
+    its vasprun.xml file exists and is a normally terminated and converged run.
+
+    Parameters:
+        struct_dir (str|Path):  Directory containing a finished VASP calculation on a structure.
+        
+        path_to_summary (str):  Path to a JSON summary file containing results from previous step.
+                                Used to not consider structures that failed before.
+                                If not provided, all structure subdirs will be extracted.
+
+    Returns: Vasprun object if it is eligible and normally converged, None otherwise.
+    """
+    check_file_or_dir(struct_dir, "dir")
+    struct_dir: str = str(struct_dir)
+
+    if (
+        path_to_summary is not None
+        and not _check_summary_data(struct_dir, path_to_summary)
+    ):
+        return None
+
+    return converged_vasprun(
+        struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
+    )
+
+
+########################################
+
+
 def extract_vasp_data_for_convex_hull(
     struct_dir: PathLike = ".",
     path_to_summary: Optional[PathLike] = None
@@ -586,24 +620,16 @@ def extract_vasp_data_for_convex_hull(
                                     - structure chemical composition as Composition object,
                                     - generated structure energy (in eV),
     """
-
-    check_file_or_dir(struct_dir, "dir")
-    struct_dir: str = str(struct_dir)
-
-    if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
-        return {}
-
-    vasprun = converged_vasprun(
-        struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
-    )
+    vasprun = _check_vasp_data(struct_dir, path_to_summary)
 
     if vasprun is None:
         return {}
 
     # We want data of the generated structure for convex hulls, not the relaxed one
     struct_name  = os.path.basename(struct_dir)
-    generated_energy: float = vasprun.ionic_steps[0]["e_0_energy"]
     composition = vasprun.initial_structure.composition
+    generated_energy: float = vasprun.ionic_steps[0]["e_0_energy"]
+
 
     struct_dict = {
         "entry_id": struct_name,
@@ -640,15 +666,8 @@ def extract_vasp_data_for_delta_sol_init(
                                     - structure itself,
                                     - its final energy (in eV).
     """
-    check_file_or_dir(struct_dir, "dir")
-    struct_dir: Path = Path(struct_dir)
+    vasprun = _check_vasp_data(struct_dir, path_to_summary)
 
-    if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
-        return {}
-
-    vasprun = converged_vasprun(
-        struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
-    )
     if vasprun is None:
         return {}
 
@@ -847,11 +866,8 @@ def vasp_output_structure(struct_dir: str) -> Tuple[Structure,Structure]|Tuple[N
     Returns: (Structure, Structure)
         The initial and final structures if the calculation converged.
     """
-    check_file_or_dir(struct_dir, "dir")
+    vasprun = _check_vasp_data(struct_dir)
 
-    vasprun = converged_vasprun(
-        struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
-    )
     if vasprun is None:
         return (None, None)
 
