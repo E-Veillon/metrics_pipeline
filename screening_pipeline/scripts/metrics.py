@@ -97,7 +97,7 @@ def main() -> None:
         recall,
         precision,
         frechet_distance,
-        wasserstein_distance,
+        emd_wrapper,
         get_densities,
         rmsd_from_structures,
         to_crystalnn_fingerprint
@@ -286,11 +286,11 @@ def main() -> None:
         print("Computing properties EMD metrics...")
         energy_dataset = vectors_from_alignn(dataset, output="energy")
         energy_gen = vectors_from_alignn(full_generated, output="energy")
-        ml_metrics["EMD_energy"] = wasserstein_distance(energy_dataset, energy_gen)
+        ml_metrics["EMD_energy"] = emd_wrapper(energy_dataset, energy_gen)
 
         densities_dataset = get_densities(dataset)
         densities_generated = get_densities(full_generated)
-        ml_metrics["EMD_density"] = wasserstein_distance(
+        ml_metrics["EMD_density"] = emd_wrapper(
             densities_dataset, densities_generated
         )
         print("Properties EMD metrics computed.")

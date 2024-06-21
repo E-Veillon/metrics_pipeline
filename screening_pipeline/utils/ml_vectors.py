@@ -68,7 +68,7 @@ def vectors_from_alignn(
     Computes vector representation of structures with ALIGNN
     (latent or energy representation).
     """
-    assert output in ("latent", "energy")
+    assert output in {"latent", "energy"}
 
     if device is None:
         if torch.cuda.is_available():

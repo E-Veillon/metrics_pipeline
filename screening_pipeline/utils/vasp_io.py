@@ -31,6 +31,7 @@ from custom_types import (
 )
 from delta_sol import DSolStaticSet
 from fitted_values import U_VALUES
+from file_io import check_file_or_dir
 
 
 ########################################
@@ -492,7 +493,9 @@ def vasp_static_settings(
 ########################################
 
 
-def _check_summary_data(struct_dir: PathLike, summary_file: PathLike) -> bool:
+def _check_summary_data(
+    struct_dir: PathLike, summary_file: PathLike, key_to_check: str
+) -> bool:
     """
     Check whether given structure directory is present in the summary file and
     whether it was rejected in the previous step.
@@ -515,11 +518,7 @@ def _check_summary_data(struct_dir: PathLike, summary_file: PathLike) -> bool:
         )
         return False
 
-    is_good_struct = (
-        "True" in prev_struct_data.values() or
-        "true" in prev_struct_data.values()
-    )
-    return is_good_struct
+    return prev_struct_data[key_to_check]
 
 
 ########################################
@@ -539,34 +538,21 @@ def converged_vasprun(run_path: PathLike, **kwargs) -> Union[Vasprun, None]:
         Vasprun object if the run terminated and converged normally,
         None otherwise.
     """
-    if not isinstance(run_path, (Path,str)):
-        raise TypeError(
-            "Given 'struct-dir' argument value expected 'Path' or 'str', "
-            f"got '{type(run_path)}' instead."
-        )
-    if not os.path.isdir(run_path):
-        raise ValueError(f"{run_path}: No such directory found.")
-
+    check_file_or_dir(run_path, "dir")
     vasprun_path = os.path.join(run_path, "vasprun.xml")
-
-    if not os.path.isfile(vasprun_path):
-        raise ValueError(
-            f"{run_path}: No vasprun.xml file found at this location. "
-            "Make sure this file is present in its run directory."
-        )
+    check_file_or_dir(vasprun_path, "file", format="xml")
 
     try:
         vasprun = Vasprun(filename=vasprun_path, **kwargs)
     except ET.ParseError:
         return None
     except UnicodeDecodeError:
-        warn_msg = (
+        warnings.warn(
             f"WARNING: vasprun.xml file at {run_path} contains "
             "unreadable characters for 'utf-8' codec.\n"
             "Associated data is therefore considered erroneous "
             "and is not parsed further."
         )
-        warnings.warn(warn_msg)
         return None
 
     if not vasprun.converged:
@@ -601,9 +587,7 @@ def extract_vasp_data_for_convex_hull(
                                     - generated structure energy (in eV),
     """
 
-    assert isinstance(struct_dir, (Path, str))
-    assert os.path.isdir(str(struct_dir))
-
+    check_file_or_dir(struct_dir, "dir")
     struct_dir: str = str(struct_dir)
 
     if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
@@ -656,17 +640,7 @@ def extract_vasp_data_for_delta_sol_init(
                                     - structure itself,
                                     - its final energy (in eV).
     """
-
-    assert isinstance(struct_dir, (Path, str)), (
-        TypeError(
-            "'struct_dir' argument expected 'Path' or 'str' type, "
-            "got '{type(struct_dir)}' instead."
-        )
-    )
-    assert os.path.isdir(str(struct_dir)), (
-        ValueError(f"{struct_dir}: No such directory found.")
-    )
-
+    check_file_or_dir(struct_dir, "dir")
     struct_dir: Path = Path(struct_dir)
 
     if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
@@ -715,8 +689,7 @@ def extract_vasp_data_for_delta_sol_calc(
                                     - structure itself,
                                     - its final energy (in eV).
     """
-    assert isinstance(struct_dir, (Path, str))
-    assert os.path.isdir(str(struct_dir))
+    check_file_or_dir(struct_dir, "dir")
 
     calc_dirs   = list(filter(lambda path: os.path.isdir(path), os.listdir(struct_dir)))
     struct_dict = {}
@@ -791,9 +764,7 @@ def batch_extract_vasp_data(
                                     - structure itself,
                                     - final energy of the relaxation in eV.
     """
-
-    assert isinstance(base_dir, (Path, str))
-    assert os.path.isdir(str(base_dir))
+    check_file_or_dir(base_dir, "dir")
     assert os.listdir(str(base_dir))
     assert isinstance(path_to_summary, (Path, str)) or path_to_summary is None
     assert isinstance(workers, int) and workers >= 1
@@ -876,15 +847,7 @@ def vasp_output_structure(struct_dir: str) -> Tuple[Structure,Structure]|Tuple[N
     Returns: (Structure, Structure)
         The initial and final structures if the calculation converged.
     """
-
-    if not isinstance(struct_dir, str):
-        raise TypeError(
-            f"'struct_dir' arg expected a 'str', got '{type(struct_dir)}' instead."
-        )
-    if not os.path.isdir(struct_dir):
-        raise ValueError(
-            f"{struct_dir}: No such directory found."
-        )
+    check_file_or_dir(struct_dir, "dir")
 
     vasprun = converged_vasprun(
         struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
@@ -914,7 +877,6 @@ def batch_extract_vasp_structures(
     Returns: (List[Tuple[Structure, Structure]])
         List of loaded structures.
     """
-
     return list(filter(
         lambda tup: tup != (None, None),
         process_map(

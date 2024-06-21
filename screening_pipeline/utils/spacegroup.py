@@ -22,50 +22,6 @@ class SymmNotFoundWarning(UserWarning):
     """Warning for symmetry searching returning None."""
 
 
-def _retry_get_symmetrized_structure(
-        structure: Structure,
-        symprec: float = 0.01,
-        angle_tolerance: float = 5.0,
-    ) -> Structure:
-    '''
-    Retry function for symmetry detection with several sets of loosened tolerances,
-    called in case it did not work with initial given tolerances.
-
-    Parameters:
-        structure (Structure):      Pymatgen Structure object to symmetrize.
-
-        symprec (float):            Initial position tolerance for symmetry detection
-                                    in fractional coordinate. Defaults to 0.01, which
-                                    works nicely in most cases.
-        
-        angle_tolerance (float):    Initial angles tolerance for symmetry detection in degrees.
-                                    Defaults to 5.0 degrees, which works nicely in most cases.
-
-    Returns:
-        A Pymatgen SymmetrizedStructure object if symmetry detection worked properly,
-        or the original Structure object if it could not detect any symmetry.
-    '''
-    for precision_factor in [2, 3, 5, 10]:
-
-        symmetrizer = SpacegroupAnalyzer(
-            structure=structure,
-            symprec=precision_factor*symprec,
-            angle_tolerance=precision_factor*angle_tolerance
-        )
-
-        try:
-            sym_struct = symmetrizer.get_symmetrized_structure()
-
-        except TypeError:
-
-            if symmetrizer.get_symmetry_dataset() is not None:
-                return structure
-
-        else:
-            return sym_struct
-
-    return structure
-
 ########################################
 
 def structure_symmetrizer(

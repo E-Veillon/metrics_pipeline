@@ -1,5 +1,6 @@
 """Functions related to distance computations between distributions."""
 
+from typing import Any
 import torch
 import numpy as np
 from torch_cluster import knn
@@ -57,3 +58,8 @@ def frechet_distance(x: np.ndarray, y: np.ndarray) -> float:
     )
 
     return fid.item()
+
+
+def emd_wrapper(*args, **kwargs) -> Any:
+    """Simple wrapper for scipy.stats.wasserstein_distance."""
+    return wasserstein_distance(*args, **kwargs)

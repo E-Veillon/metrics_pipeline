@@ -9,6 +9,9 @@ from emmet.core.thermo import ThermoType
 # PYTHON MATERIALS GENOMICS
 from pymatgen.core import SETTINGS, Composition
 
+# LOCAL IMPORTS
+from file_io import check_file_or_dir
+
 
 ########################################
 
@@ -92,7 +95,7 @@ def mp_api_print_avail_fields(endpoint: str, api_key: str|None = None) -> None:
 
     api_key = _mp_api_key_check(api_key)
 
-    with MPRester("ZIQWsd2I9w337cKTrEKbJA0XKcveFIk3") as mpr:
+    with MPRester(api_key) as mpr:
         if endpoint == "materials":
             print(mpr.materials.thermo.available_fields)
         elif endpoint == "thermo":
@@ -115,10 +118,7 @@ def process_oqmd_json_file(path: str) -> None:
     Parameters:
         path (str): Path to the OQMD JSON file to process.
     """
-    assert os.path.isfile(path), f"{path}: No such file found."
-    assert path.endswith(".json"), (
-        f"Given filename '{os.path.basename(path)}' is not a valid JSON file."
-    )
+    check_file_or_dir(path, "file", format="json")
 
     with open(path, "rt", encoding="utf-8") as fp:
         data = json.load(fp)

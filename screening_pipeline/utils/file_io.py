@@ -47,7 +47,11 @@ def check_file_or_dir(
                             extension, provide here wanted extension without the dot
                             separator (e.g. "txt" and not ".txt").
     """
-    assert isinstance(path, (str, Path))
+    if not isinstance(path, (str, Path)):
+        raise TypeError(
+            "'path' argument expected a type 'str' or 'pathlib.Path', "
+            f"got {type(path)} instead."
+        )
     assert file_or_dir in {"file", "dir"}
     assert isinstance(format, str) or format is None
 
@@ -92,9 +96,7 @@ def add_new_dir(base_dir: PathLike, *new_dirs: str) -> str:
     Returns:
         str: path pointing to the new subdirectory.
     """
-
-    assert isinstance(base_dir, (str, Path))
-    assert os.path.isdir(str(base_dir))
+    check_file_or_dir(base_dir, "dir")
     assert all(isinstance(dir, str) for dir in new_dirs)
 
     new_path = os.path.join(str(base_dir), *new_dirs)
@@ -124,16 +126,7 @@ class BadYamlWarning(UserWarning):
 
 def yaml_loader(file_path: PathLike, on_error: Literal["raise", "warn", "ignore"] = "warn"):
     """Load a YAML file and casts it explicitly to a dict"""
-    if not isinstance(file_path, (Path, str)):
-        raise TypeError(f"Expected a Path object or str, got {type(file_path)} instead.")
-
-    assert str(file_path).endswith(".yaml"), \
-    f"{str(file_path)} is not a .yaml file format."
-
-    file_path = Path(file_path)
-
-    assert file_path.is_file(), \
-    f"{str(file_path)}: no such file found."
+    check_file_or_dir(file_path, "file",  format="yaml")
 
     yaml = YAML()
     with open(file_path, encoding="utf-8") as yaml_file:

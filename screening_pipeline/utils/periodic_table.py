@@ -87,22 +87,22 @@ def has_rare_earth(structure: Union[SiteCollection, str]) -> bool:
     return has_lanthanoid or has_actinoid
 
 def discard_rare_earth_structures(
-        structures: Iterable[Union[SiteCollection, str]]
+        structures: Sequence[Union[SiteCollection, str]]
     ) -> Tuple[List[Union[SiteCollection, str]], int]:
     '''
     Eliminates structures containing rare earth elements and counts the number eliminated.
 
     Parameters:
-        structures (Iterable[SiteCollection | str]]): the structure data to scan.
+        structures ([SiteCollection | str]): the structure data to scan.
     
     Returns:
         List[Union[SiteCollection, str]]: The list of data not containing rare earth elements.
         Int: The number of structures discarded.
     '''
 
-    assert isinstance(structures, Iterable), \
-    f"Provided 'structures' argument is not iterable (got {type(structures)} instead)."
-
+    assert isinstance(structures, Sequence), (
+        f"'structures' argument is not a sequence, got {type(structures)} instead."
+    )
     structures = list(structures)
     if not structures:
         return [], 0
@@ -137,8 +137,9 @@ def get_elements(
         A list of parsed Element objects.
     '''
 
-    assert isinstance(elts_data, Iterable), \
-    f"Provided 'elts_data' argument is not iterable (got {type(elts_data)} instead)."
+    assert isinstance(elts_data, Sequence), (
+        f"'elts_data' argument is not a sequence, got {type(elts_data)} instead."
+    )
 
     if isinstance(elts_data, str):
         elts_list = Composition(''.join(elts_data.split(sep='-')), strict=True).elements

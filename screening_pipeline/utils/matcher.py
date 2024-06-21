@@ -296,7 +296,10 @@ def remove_equivalent(
         Int: The number of unmatched structures (zero if test_volume = False).
     """
 
-    process_description = ("removing duplicates" if not keep_equivalent else "sorting structures")
+    process_description = (
+        "removing duplicates" if not keep_equivalent
+        else "sorting structures"
+    )
 
     equivalent_structs, nbr_unmatched = batch_group_by_equivalence(
         structures=structures,
