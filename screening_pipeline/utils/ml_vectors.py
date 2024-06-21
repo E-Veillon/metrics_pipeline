@@ -2,14 +2,15 @@
 
 
 from typing import List,Literal
-
-from pymatgen.core import Structure, Element
 import numpy as np
 import torch
 from torch_geometric.data import Dataset
 from materials_toolkit.data import StructureData, StructureLoader, collate
 from materials_toolkit.models.alignn import get_pretrained_alignn
 import tqdm
+
+# PYTHON MATERIALS GENOMICS
+from pymatgen.core import Structure, Element
 
 
 def _species_to_tensor(elements: List[Element]):

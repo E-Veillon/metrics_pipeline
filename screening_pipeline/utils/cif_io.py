@@ -5,21 +5,19 @@ Functions to load and write CIF formatted data with multiple processes.
 
 import re
 from typing import Tuple, List, Union
-
 from tqdm.contrib.concurrent import process_map
 
-########################################
-# PYTHON MATERIALS GENOMICS PACKAGE
-
+# PYTHON MATERIALS GENOMICS
 from pymatgen.core import Structure, PeriodicSite
 from pymatgen.io.cif import CifParser, CifWriter
 from pymatgen.symmetry.analyzer import SymmetrizedStructure
 
-
-from screening_pipeline.utils import (
-    discard_rare_gas_structures, discard_rare_earth_structures,
-    redirect_c_stdout, redirect_c_stderr
+# LOCAL IMPORTS
+from periodic_table import (
+    discard_rare_gas_structures, discard_rare_earth_structures
 )
+from redirect import redirect_c_stdout, redirect_c_stderr
+
 
 ##################################################
 

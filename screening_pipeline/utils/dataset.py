@@ -5,8 +5,9 @@ import json
 from typing import Dict, Any
 from mp_api.client import MPRester
 from emmet.core.thermo import ThermoType
-from pymatgen.core import SETTINGS
-from pymatgen.core.structure import Composition
+
+# PYTHON MATERIALS GENOMICS
+from pymatgen.core import SETTINGS, Composition
 
 
 ########################################

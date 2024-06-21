@@ -3,32 +3,20 @@ Functions relative to Periodic Table's (PT) elements properties.
 '''
 
 
-########################################
-# TYPE HINTING
-
-from typing import Union, Iterable, List, Tuple, Literal, Sequence
-
-########################################
-# OPTIMIZATION MODULES
-
 import re
 from itertools import filterfalse
+from typing import Union, Iterable, List, Tuple, Literal, Sequence
 
-########################################
-# PYTHON MATERIAL GENOMICS PACKAGE
-
-from pymatgen.core.structure import SiteCollection, Composition
-from pymatgen.core.periodic_table import Element
+# PYTHON MATERIAL GENOMICS
+from pymatgen.core import SiteCollection, Composition, Element
 from pymatgen.io.cif import CifBlock
 
-########################################
-# LOCAL MODULES
+# LOCAL IMPORTS
+from custom_types import FormulaLike
 
-#from screening_pipeline.utils.fitted_values import EL_PER_XC_VOL
-from screening_pipeline.utils.custom_types import FormulaLike
 
 ########################################
-# LOCAL FUNCTIONS
+
 
 def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
     """

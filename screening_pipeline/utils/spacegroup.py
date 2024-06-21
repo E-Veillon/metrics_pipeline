@@ -3,28 +3,17 @@ Functions to find spacegroup symmetry on pymatgen Structure objects.
 '''
 
 
-########################################
-# TYPE HINTING
-
-from typing import List, Union
-
-########################################
-# OPTIMIZATION MODULES
-
 import warnings
+from typing import List, Union
 from functools import partial
 from tqdm.contrib.concurrent import process_map
 
-########################################
-# PYTHON MATERIAL GENOMICS PACKAGE
-
-from pymatgen.core.structure import Structure
+# PYTHON MATERIAL GENOMICS
+from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmetrizedStructure
 
-########################################
-# LOCAL MODULES
-
-from screening_pipeline.utils.redirect import redirect_c_stdout, redirect_c_stderr
+# LOCAL IMPORTS
+from redirect import redirect_c_stdout, redirect_c_stderr
 
 ########################################
 # LOCAL FUNCTIONS

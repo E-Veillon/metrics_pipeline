@@ -16,10 +16,11 @@ from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 from mp_api.client import MPRester
 from emmet.core.thermo import ThermoType
 
-
-from screening_pipeline.utils import (
-    flatten, FormulaLike, group_by_composition, get_elements
-)
+# LOCAL IMPORTS
+from flattener import flatten
+from custom_types import FormulaLike
+from matcher import group_by_composition
+from periodic_table import get_elements
 
 
 ########################################

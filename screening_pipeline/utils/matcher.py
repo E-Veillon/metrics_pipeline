@@ -2,34 +2,22 @@
 Functions to check structures validity, compare them, and discard duplicates.
 """
 
-
-########################################
-# TYPE HINTING
-
-from typing import Tuple, List, Union, Sequence
-
-########################################
-# OPTIMIZATION MODULES
-
 import itertools
 from functools import partial
+from typing import Tuple, List, Union, Sequence
 from tqdm.contrib.concurrent import process_map
 
-########################################
-# PYTHON MATERIAL GENOMICS PACKAGE
-
-from pymatgen.core.structure import Structure, SiteCollection
-from pymatgen.core.composition import Composition
+# PYTHON MATERIAL GENOMICS
+from pymatgen.core import Structure, SiteCollection, Composition
 from pymatgen.analysis.phase_diagram import Entry
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
-########################################
-# LOCAL MODULES
+# LOCAL IMPORTS
+from flattener import flatten
 
-from screening_pipeline.utils.flattener import flatten
 
 ########################################
-# LOCAL FUNCTIONS
+
 
 def check_interatomic_distances(
         structures: Sequence[SiteCollection],

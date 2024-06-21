@@ -1,12 +1,14 @@
 """Redirect unnecessary warnings output."""
 
-from contextlib import contextmanager
-import ctypes
+
 import io
 import os
 import sys
+import ctypes
 import tempfile
 from typing import TextIO
+from contextlib import contextmanager
+
 
 libc = ctypes.CDLL(None)
 c_stdout = ctypes.c_void_p.in_dll(libc, "stdout")

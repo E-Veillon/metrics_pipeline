@@ -4,7 +4,9 @@ All specific type aliases used in this library are stored here.
 
 from typing import Union, Sequence, Literal
 from pathlib import Path
-from pymatgen.core.structure import Element
+
+# PYTHON MATERIALS GENOMICS
+from pymatgen.core import Element
 
 
 PathLike = Union[Path, str]

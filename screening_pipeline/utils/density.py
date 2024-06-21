@@ -2,9 +2,10 @@
 
 
 from typing import List
-from pymatgen.core import Structure
 import numpy as np
 
+# PYTHON MATERIALS GENOMICS
+from pymatgen.core import Structure
 
 def _volume_cm3(s: Structure) -> float:
     """Get the structure volume in cm^3."""

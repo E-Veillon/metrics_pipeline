@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """
 Implements functions to manage and operate on paths.
 """
@@ -5,71 +6,51 @@ Implements functions to manage and operate on paths.
 
 import os
 import warnings
-from itertools import repeat
-from typing import Sequence, List, Literal
+from typing import Tuple, Literal
 from pathlib import Path
 from ruamel.yaml import YAML
 
-
-from screening_pipeline.utils import PathLike
+# LOCAL IMPORTS
+from custom_types import PathLike
 
 
 ########################################
 
 
-def add_new_dir(base_dir: PathLike, new_dir_name: PathLike) -> Path:
+def add_new_dir(base_dir: PathLike, *new_dirs: str) -> str:
     """
-    Creates a new directory inside given base directory. If the subdirectory already exists, 
-    it is untouched but its path is still returned.
+    Creates a new path of sub-directories inside given base directory.
+    If part of the path already exists, only lacking subdirs are created.
+    The behaviour is like os.makedirs, but the complete path is returned
+    as a string once created.
     
     Parameters:
-        base_dir (str|Path): The base directory inside which the new one will be created.
+        base_dir (str|Path):    The base directory inside which
+                                the new one will be created.
 
-        new_dire_name (str): The name of the new subdirectory to create.
+        *dirs (str):            The name of the new subdirectory to create.
 
     Returns:
-        Path: The Path object pointing to the new subdirectory.
+        str: path pointing to the new subdirectory.
     """
 
-    assert isinstance(base_dir, PathLike)
+    assert isinstance(base_dir, (str, Path))
     assert os.path.isdir(str(base_dir))
-    assert isinstance(new_dir_name, PathLike)
+    assert all(isinstance(dir, str) for dir in new_dirs)
 
-    new_dir = os.path.join(str(base_dir), str(new_dir_name))
-    os.makedirs(new_dir, exist_ok=True)
+    new_path = os.path.join(str(base_dir), *new_dirs)
+    os.makedirs(new_path, exist_ok=True)
 
-    return new_dir
-
-########################################
-
-def batch_add_new_dirs(
-        base_dir: PathLike,
-        new_subdirs: Sequence[PathLike]
-    ) -> List[Path]:
-    """
-    Iterates through new_subdirs to create a bunch of subdirectories in base_dir.
-    Returns the list of created paths. If the subdirectory already exists, it is 
-    untouched but its path is still returned.
-
-    Parameters:
-        base_dir (str|Path):    An existing directory where subdirectories should be created.
-
-        new_subdirs (str|Path): Names or subpaths relative to base_dir to create directories at.
-    
-    Returns:
-        List[Path]: A list of all newly created paths starting from base_dir.
-    """
-
-    assert isinstance(base_dir, PathLike)
-
-    base_dir = Path(base_dir)
-
-    assert base_dir.is_dir()
-    assert all(isinstance(subdir, PathLike) for subdir in new_subdirs)
-
-    new_dirs = list(map(add_new_dir, repeat(base_dir), new_subdirs))
-
-    return new_dirs
+    return new_path
+#---------------------------------------
+def _test_add_new_dir() -> bool:
+    dirs = ("testdir1", "testdir2", "testdir3")
+    home = os.path.expanduser("~")
+    try:
+        new_path = add_new_dir(home, *dirs)
+        return os.path.isdir(new_path)
+    finally:
+        os.system("rm -r ~/testdir1")
 
 
 ########################################
@@ -114,3 +95,7 @@ def yaml_loader(file_path: PathLike, on_error: Literal["raise", "warn", "ignore"
 
 
 ########################################
+
+if __name__ == "__main__":
+    if _test_add_new_dir():
+        print("add_new_dir test passed !")

@@ -1,10 +1,13 @@
 """Functions to compute structures fingerprints using CrystalNN."""
 
 from typing import List
-from pymatgen.core import Structure
 from matminer.featurizers.site.fingerprint import CrystalNNFingerprint
 import numpy as np
 from tqdm.contrib.concurrent import process_map
+
+# PYTHON MATERIALS GENOMICS
+from pymatgen.core import Structure
+
 
 CrystalNNFP = CrystalNNFingerprint.from_preset("ops")
 

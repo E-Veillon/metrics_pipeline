@@ -2,12 +2,13 @@
 
 
 from typing import Tuple, List
-
 import torch
 #import torch.nn.functional as F
 from torch_scatter import scatter_mean
-from pymatgen.core import Structure
 import numpy as np
+
+# PYHTON MATERIALS GENOMICS
+from pymatgen.core import Structure
 
 
 offset_range = torch.arange(-5, 6, dtype=torch.float32)

@@ -11,6 +11,7 @@ from itertools import repeat
 from functools import partial
 from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal, Any
 from pathlib import Path
+from monty.os import cd
 import xml.etree.ElementTree as ET
 from tqdm.contrib.concurrent import process_map
 
@@ -23,10 +24,13 @@ from pymatgen.io.vasp.sets import (
     MPStaticSet, MatPESStaticSet, MPScanStaticSet
 )
 
-from screening_pipeline.utils import (
-    PathLike, PMGRelaxSetType, PMGStaticSetType, PMGRelaxSet, PMGStaticSet,
-    DeltaSolStaticSet, flatten, batch_add_new_dirs, U_VALUES
+# LOCAL IMPORTS
+from custom_types import (
+    PathLike, PMGRelaxSetType, PMGStaticSetType,
+    PMGRelaxSet, PMGStaticSet,
 )
+from delta_sol import DeltaSolStaticSet
+from fitted_values import U_VALUES
 
 
 ########################################
@@ -90,127 +94,73 @@ def _mitrelaxset_incar_corrections(n_sites: int|None = None) -> Dict:
 
 ########################################
 
-def vasp_launcher(vasp_exe: PathLike, path: PathLike, vasp_input: VaspInput) -> None:
-    """
-    Function to run VASP from a VaspInput object.
 
-    Parameters:
-        vasp_exe (str|Path):    Absolute path to the VASP executable.
+def _check_vasp_input(vasp_input: VaspInput) -> None:
+    """Perform several tests to verify VaspInput correctness."""
 
-        path (str|Path):        Path to the directory where VASP files
-                                will be written and run.
-
-        vasp_input (VaspInput): The VaspInput object containing all necessary
-                                data to write VASP input files.
-    """
-    if not isinstance(vasp_exe, (Path, str)):
-        raise TypeError(
-            "'vasp_exe' argument expected a type 'str' or 'pathlib.Path', "
-            f"got '{type(vasp_exe)}' instead."
-        )
-    if not isinstance(path, (Path, str)):
-        raise TypeError(
-            "'path' argument expected a type 'str' or 'pathlib.Path', "
-            f"got '{type(path)}' instead."
-        )
     if not isinstance(vasp_input, VaspInput):
         raise TypeError(
             "'vasp_input' argument expected a type 'pymatgen.io.vasp.VaspInput', "
             f"got '{type(vasp_input)}' instead."
         )
-    assert vasp_input.get("INCAR") is not None, (
-    "vasp_launcher: There is no INCAR defined in the input !"
-    )
-    assert vasp_input.get("POSCAR") is not None, (
-    "vasp_launcher: There is no POSCAR defined in the input !"
-    )
-    assert (
-        vasp_input.get("KPOINTS") is not None
-        or vasp_input["INCAR"].get("KSPACING") is not None
-    ), "vasp_launcher: There is no KPOINTS or KSPACING tag defined in the input !"
-    assert vasp_input.get("POTCAR") is not None, (
-    "vasp_launcher: There is no POTCAR defined in the input !"
-    )
-    # put executable into a list to keep it as a full command
-    vasp_exe_list = list((vasp_exe,))
-
-    calc_dir = str(path)
-    out_file = os.path.join(calc_dir, "vasp.out")
-    err_file = os.path.join(calc_dir, "vasp.err")
-
-    vasp_input.run_vasp(
-        run_dir=calc_dir,
-        vasp_cmd=vasp_exe_list,
-        output_file=out_file,
-        err_file=err_file,
-    )
-
-
-########################################
-
-def _vasp_launcher_batch_wrapper(args_tuple: Tuple[PathLike, VaspInput]):
-    vasp_exe   = args_tuple[0]
-    path       = args_tuple[1]
-    vasp_input = args_tuple[2]
-    vasp_launcher(vasp_exe, path, vasp_input)
+    if vasp_input.get("INCAR") is None:
+        raise ValueError(
+            "check_vasp_input: There is no INCAR defined in the input !"
+        )
+    if vasp_input.get("POSCAR") is None:
+        raise ValueError(
+            "check_vasp_input: There is no POSCAR defined in the input !"
+        )
+    if (
+        vasp_input.get("KPOINTS") is None
+        and vasp_input["INCAR"].get("KSPACING") is None
+    ):
+        raise ValueError(
+            "check_vasp_input: There is no KPOINTS or KSPACING tag defined in the input !"
+        )
+    if vasp_input.get("POTCAR") is None:
+        raise ValueError(
+            "check_vasp_input: There is no POTCAR defined in the input !"
+        )
 
 
 ########################################
 
 
-def vasp_batch_launch(
-        vasp_exe: PathLike,
-        base_dir: PathLike,
-        inputs_data: Dict[PathLike, VaspInput],
-        workers: int = 1
-    ) -> None:
+def write_and_run_vasp(
+    vasp_input: VaspInput, run_path: PathLike, vasp_exe: PathLike = "vasp"
+) -> None:
     """
-    Creates a subdirectory with given names for each provided VaspInput object, 
-    writes VASP input files in those subdirectories, then runs VASP inside each one.
-    As this process can be very expensive as it actually does the VASP computations,
-    it is recommended to parallelize it by setting workers > 1.
+    Function to run VASP from a VaspInput object.
 
     Parameters:
-        vasp_exe (Path|str):        Path to the VASP executable.
+        vasp_input (VaspInput): The VaspInput object containing all necessary
+                                data to write VASP input files.
 
-        inputs_data (dict):         Dict of structure data to run, of the form
-                                    {subdir_name: VaspInput}.
+        run_path (str|Path):    Path to the directory where VASP files
+                                will be written and run.
 
-        base_dir (str|Path):        The directory where the subdirs should be created.
-
-        workers (int):              The number of parallel processes to spawn.
-                                    Defaults to 1.
+        vasp_exe (str|Path):    Absolute path to the VASP executable.
+                                If not given, attempt the usual shortcut
+                                "vasp" launch command at given path.
     """
+    _check_vasp_input(vasp_input)
+
+    if not isinstance(run_path, (Path, str)):
+        raise TypeError(
+            "'path' argument expected a type 'str' or 'pathlib.Path', "
+            f"got '{type(run_path)}' instead."
+        )
     if not isinstance(vasp_exe, (Path, str)):
         raise TypeError(
             "'vasp_exe' argument expected a type 'str' or 'pathlib.Path', "
-            f"got {type(vasp_exe)} instead."
+            f"got '{type(vasp_exe)}' instead."
         )
 
-    if not all(isinstance(vasp_input, VaspInput) for vasp_input in inputs_data.values()):
-        raise TypeError(
-            "'inputs_data' dict expected containing only values of type "
-            "'pymatgen.io.vasp.VaspInput', but following types were found:\n"
-            f"{set((type(vasp_input) for vasp_input in inputs_data.values()))}"
-        )
-    base_dir = str(base_dir)
-    assert os.path.isdir(base_dir), f"{base_dir}: No such directory found."
-    assert all(isinstance(subdir_name, (Path, str)) for subdir_name in inputs_data.keys())
-    assert isinstance(workers, int) and workers >= 1, (
-        f"'workers' expected a strictly positive integer, got {workers}."
-    )
-    subpaths_list = batch_add_new_dirs(base_dir=base_dir, new_subdirs=list(inputs_data.keys()))
-    inputs_data   = {subpath: inputs_data.get(subpath.name) for subpath in subpaths_list}
-    inputs_list   = list(zip(repeat(vasp_exe), inputs_data.items()))
-    inputs_list   = list(tuple(flatten(input)) for input in inputs_list)
+    vasp_input.write_input(output_dir=run_path)
 
-    process_map(
-        _vasp_launcher_batch_wrapper,
-        inputs_list,
-        max_workers=workers,
-        chunksize=1,
-        desc="VASP computations",
-    )
+    with cd(run_path):
+        os.system(f"{vasp_exe}")
 
 
 ########################################
