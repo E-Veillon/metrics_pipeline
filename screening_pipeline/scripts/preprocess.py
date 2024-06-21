@@ -208,10 +208,9 @@ def main() -> None:
 
     # MAIN BLOCK
 
-    from screening_pipeline.utils import (read_cif, write_cif,
-                                          check_interatomic_distances,
-                                          batch_symmetrizer,
-                                          remove_equivalent
+    from screening_pipeline.utils import (
+        read_cif, write_cif, check_interatomic_distances,
+        batch_symmetrizer, remove_equivalent
     )
 
     # Extraction des données CIF et conversion en structures

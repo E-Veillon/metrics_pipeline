@@ -5,25 +5,18 @@ using pymatgen as a setting interface between raw data and VASP.
 The relaxation results then may be used in other scripts for material properties analysis.
 """
 
-########################################
-# SYSTEM I/O MODULES
 
 import os
 from datetime import datetime
-from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
+from argparse import ArgumentParser, Namespace
 from monty.os import cd
 
-
-########################################
-# PYTHON MATERIAL GENOMICS PACKAGE
-
+# PYTHON MATERIAL GENOMICS
 from pymatgen.core.structure import SiteCollection
 
-########################################
-# LOCAL MODULES
-
 from screening_pipeline.utils import (
-    yaml_loader, PMGRelaxSet, read_cif, vasp_relaxation_settings
+    yaml_loader, PMGRelaxSet, read_cif, add_new_dir,
+    vasp_relaxation_settings, write_and_run_vasp
 )
 
 ########################################
@@ -84,12 +77,9 @@ def main():
     The relaxation results then may be used in other scripts for material properties analysis.
     """
 
-    helper_format = RawTextHelpFormatter
-
     parser = ArgumentParser(
         prog=prog_name,
-        description=prog_description,
-        formatter_class=helper_format
+        description=prog_description
     )
 
     parser.add_argument(
@@ -175,17 +165,9 @@ def main():
         preset=args.preset,
         user_corrections=user_settings
     )
+    run_dir = add_new_dir(args.output, dir_name)
 
-    #vasp_launcher(
-    #   vasp_exe=exe_path,
-    #   vasp_input=vasp_input,
-    #   path=os.path.join(outdir, dir_name)
-    #)
-    run_dir = os.path.join(args.output, dir_name)
-    os.makedirs(run_dir, exist_ok=True)
-    vasp_input.write_input(output_dir=run_dir)
-    with cd(run_dir):
-        os.system(f"{args.executable_path}")
+    write_and_run_vasp(vasp_input, run_dir, args.executable_path)
 
     stop = datetime.now()
     print(f"Elapsed time: {stop-start}")

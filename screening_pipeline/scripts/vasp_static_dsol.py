@@ -21,8 +21,9 @@ from monty.os import cd
 # LOCAL MODULES
 
 from screening_pipeline.utils import (
-    yaml_loader, PathLike, PMGStaticSet, extract_vasp_data_for_delta_sol_init,
-    get_dsol_struct_dir, calc_idx_to_dir_name, dsol_calc_init
+    yaml_loader, PMGStaticSet, extract_vasp_data_for_delta_sol_init,
+    get_dsol_struct_dir, calc_idx_to_dir_name, dsol_calc_init,
+    add_new_dir, write_and_run_vasp
 )
 
 ########################################
@@ -210,10 +211,6 @@ def main() -> None:
             "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
         )
 
-    dir_name   = f"{struct_idx}_{struct_data[1]['structure'].composition.reduced_formula}"
-    calc_name  = calc_idx_to_dir_name(dir_name, calc_idx)
-    calc_dir   = os.path.join(outdir, dir_name, calc_name)
-
     input_data = dsol_calc_init(
         structure=struct_data[1]["structure"],
         calc_index=calc_idx,
@@ -221,12 +218,11 @@ def main() -> None:
         user_corrections=user_settings
     )
 
-    os.makedirs(calc_dir, exist_ok=True)
+    dir_name   = f"{struct_idx}_{struct_data[1]['structure'].composition.reduced_formula}"
+    calc_name  = calc_idx_to_dir_name(dir_name, calc_idx)
+    calc_dir   = add_new_dir(outdir, dir_name, calc_name)
 
-    # vasp_launcher(vasp_exe=exe_path, path=calc_dir, vasp_input=input_data)
-    input_data.write_input(output_dir=calc_dir)
-    with cd(calc_dir):
-        os.system(f"{exe_path}")
+    write_and_run_vasp(input_data, calc_dir, args.executable_path)
 
     stop = datetime.now()
     print(f"elapsed time: {stop-start}")
