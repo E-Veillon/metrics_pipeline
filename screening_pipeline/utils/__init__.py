@@ -34,7 +34,7 @@ from .phase_diagrams import (
     batch_compute_e_above_hull,
 )
 from .delta_sol import (
-    DeltaSolStaticSet,
+    DSolStaticSet,
     get_dsol_struct_dir,
     calc_idx_to_dir_name,
     get_dsol_n_ratio,
@@ -92,7 +92,7 @@ __all__ = [
     "get_sub_entries",              #
     "get_lacking_elts_entries",     #
     "batch_compute_e_above_hull",   #
-    "DeltaSolStaticSet",        # delta_sol
+    "DSolStaticSet",            # delta_sol
     "get_dsol_struct_dir",      #
     "calc_idx_to_dir_name",     #
     "get_dsol_n_ratio",         #

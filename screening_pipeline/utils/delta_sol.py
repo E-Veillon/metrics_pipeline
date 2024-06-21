@@ -24,7 +24,7 @@ from fitted_values import EL_PER_XC_VOL
 
 
 @dataclass
-class DeltaSolStaticSet(MPRelaxSet):
+class DSolStaticSet(MPRelaxSet):
     """
     Initialize VASP input files for Δ-Sol method computations using
     PBE_54_W_HASH pymatgen set of POTCAR files. Parameters are as 
@@ -251,7 +251,7 @@ def _match_calc_index(calc_index: int) -> str|None:
 def dsol_calc_init(
         structure: Structure,
         calc_index: int,
-        preset: PMGStaticSetType|"DeltaSolStaticSet" = "DeltaSolStaticSet",
+        preset: PMGStaticSetType|"DSolStaticSet" = "DeltaSolStaticSet",
         user_corrections: Optional[Dict[str, Any]] = None,
     ) -> VaspInput:
     """
@@ -505,9 +505,9 @@ if __name__ == "__main__":
     test_path = "/home/elohan/screening-pipeline/screening_pipeline/_benchmarks/TiO2.cif"
     with open(test_path, "rt", encoding="utf-8") as test_file:
         struct = CifParser(test_file).parse_structures()[0]
-    dset = DeltaSolStaticSet(struct).get_input_set()
+    dset = DSolStaticSet(struct).get_input_set()
     with open(
-        os.path.join(DeltaSolStaticSet.base_path, "DeltaVaspInput.txt"),
+        os.path.join(DSolStaticSet.base_path, "DeltaVaspInput.txt"),
         mode="wt", encoding="utf-8"
     ) as out:
         out.write(str(dset))

@@ -29,7 +29,7 @@ from custom_types import (
     PathLike, PMGRelaxSetType, PMGStaticSetType,
     PMGRelaxSet, PMGStaticSet,
 )
-from delta_sol import DeltaSolStaticSet
+from delta_sol import DSolStaticSet
 from fitted_values import U_VALUES
 
 
@@ -271,8 +271,8 @@ def _static_set_init(
         assert os.path.isdir(dir_path)
 
         match preset:
-            case "DeltaSolStaticSet":
-                preset_obj = DeltaSolStaticSet.from_prev_calc(
+            case "DSolStaticSet":
+                preset_obj = DSolStaticSet.from_prev_calc(
                     prev_calc_dir=dir_path,
                     user_incar_settings=incar_corrections,
                     user_kpoints_settings=kpoints_corrections,
@@ -314,8 +314,8 @@ def _static_set_init(
         return preset_obj
 
     match preset:
-        case "DeltaSolStaticSet":
-            preset_obj = DeltaSolStaticSet(
+        case "DSolStaticSet":
+            preset_obj = DSolStaticSet(
                 structure=struct_or_path,
                 incar_nelect=nelect,
                 user_incar_settings=incar_corrections,
@@ -405,7 +405,7 @@ def vasp_relaxation_settings(
 
 def vasp_static_settings(
     structure: Optional[SiteCollection] = None,
-    preset: PMGStaticSetType|"DeltaSolStaticSet" = "DeltaSolStaticSet",
+    preset: PMGStaticSetType|"DSolStaticSet" = "MPStaticSet",
     from_prev_calc: bool = False,
     prev_calc_dir: Optional[PathLike] = None,
     nelect: float|None = None,
@@ -418,7 +418,7 @@ def vasp_static_settings(
         structure (SiteCollection):     The structure to write VASP inputs for.
 
         preset (str):                   The pymatgen preset to use for VASP inputs initialization.
-                                        Can also be the homemade "DeltaSolStaticSet" if Δ-Sol
+                                        Can also be the homemade "DSolStaticSet" if Δ-Sol
                                         method by Chan et al. (2010) is used.
 
         from_prev_calc (bool):          Whether to get final structure, INCAR and KPOINTS settings
@@ -435,7 +435,7 @@ def vasp_static_settings(
                                         from_prev_calc is True. Otherwise, this argument is
                                         ignored.
 
-        nelect (float):                 Only useful if DeltaSolStaticSet is used.
+        nelect (float):                 Only useful if DSolStaticSet is used.
                                         Sets the NELECT tag in INCAR file.
                                         Ignored if from_prev_calc is True.
 
