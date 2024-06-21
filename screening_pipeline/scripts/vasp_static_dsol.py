@@ -21,9 +21,10 @@ from monty.os import cd
 # LOCAL MODULES
 
 from screening_pipeline.utils import (
-    yaml_loader, PMGStaticSet, extract_vasp_data_for_delta_sol_init,
+    CONFIGPATH, check_file_or_dir, add_new_dir, yaml_loader,
+    PMGStaticSet, extract_vasp_data_for_delta_sol_init,
     get_dsol_struct_dir, calc_idx_to_dir_name, dsol_calc_init,
-    add_new_dir, write_and_run_vasp
+    write_and_run_vasp
 )
 
 ########################################
@@ -32,36 +33,31 @@ from screening_pipeline.utils import (
 def assert_args(args: Namespace) -> None:
     """Asserting input arguments validity."""
 
-    assert os.path.isdir(args.input_dir), (
-        f"{args.input_dir}: No directory found."
-    )
+    check_file_or_dir(args.input_dir, "dir")
+
     assert (
         args.executable_path.startswith("vasp")
         or os.path.exists(args.executable_path)
-        ), f"{args.executable_path}: Executable file not found."
+    ), f"{args.executable_path}: Executable file not found."
 
     assert args.task_id >= 0, (
         "task-id argument must be positive or zero."
     )
-    assert os.path.isdir(args.output), (
-        f"{args.output}: No directory found."
-    )
+
+    check_file_or_dir(args.output, "dir")
+
     if args.prev_summary is not None:
-        assert os.path.isfile(args.prev_summary), (
-            f"{args.previous_results}: No such file found."
-        )
+        check_file_or_dir(args.prev_summary, "file", format="json")
 
     assert args.preset in PMGStaticSet, (
     "Provided static preset must be one of the following:\n"
     f"{PMGStaticSet}"
     )
-    assert os.path.isfile(args.user_settings) or args.user_settings is None, (
-    f"{args.user_settings}: file not found."
-    )
 
-    assert args.user_settings.endswith(".yaml"), (
-    "user settings file must be of .yaml format."
-    )
+    if args.user_settings is not None:
+        settings_path = os.path.join(CONFIGPATH, args.user_settings)
+        check_file_or_dir(settings_path, "file", format="yaml")
+
 
 ########################################
 # MAIN FUNCTION

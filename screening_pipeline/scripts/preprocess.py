@@ -12,6 +12,11 @@ import os
 from datetime import datetime
 from argparse import ArgumentParser, RawTextHelpFormatter, Namespace
 
+from screening_pipeline.utils import (
+    check_file_or_dir, read_cif, write_cif, check_interatomic_distances,
+    batch_symmetrizer, remove_equivalent
+)
+
 ########################################
 # LOCAL FUNCTIONS
 
@@ -27,9 +32,7 @@ def assert_args(args: Namespace):
     print(f"INPUT FILE: {args.input_file}")
     print(f"OUTPUT FILE: {args.output}")
 
-    assert os.path.isfile(args.input_file) and args.input_file.endswith(".cif"), (
-    f"{args.input_file} is not an existing CIF file."
-    )
+    check_file_or_dir(args.input_file, "file", format="cif")
 
     assert args.output.endswith(".cif"), "Output file must be of CIF format."
 
@@ -47,7 +50,7 @@ def assert_args(args: Namespace):
 
     if not args.no_dist_check:
         assert args.dist_tolerance > 0.0, \
-        "Interatomic distance tolerance must be positive."
+        "Interatomic distance tolerance must be strictly positive."
 
     print(f"SYMMETRIZATION: {not args.no_symmetrization}")
     print(
@@ -207,11 +210,6 @@ def main() -> None:
 
 
     # MAIN BLOCK
-
-    from screening_pipeline.utils import (
-        read_cif, write_cif, check_interatomic_distances,
-        batch_symmetrizer, remove_equivalent
-    )
 
     # Extraction des données CIF et conversion en structures
 

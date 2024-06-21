@@ -2,7 +2,11 @@
 
 # I/O modules
 from .cif_io import read_cif, write_cif
-from .file_io import add_new_dir, yaml_loader
+from .file_io import (
+    MAINDIRPATH, SCRIPTSPATH, UTILSPATH, CONFIGPATH,
+    check_file_or_dir, add_new_dir, yaml_loader
+
+)
 from .vasp_io import (
     vasp_relaxation_settings, vasp_static_settings,
     write_and_run_vasp,
@@ -71,7 +75,8 @@ from .redirect import redirect_c_stdout, redirect_c_stderr
 __all__ = [
     # I/O
     "read_cif", "write_cif",    # cif_io
-    "add_new_dir", "yaml_loader",   # file_io
+    "MAINDIRPATH", "SCRIPTSPATH", "UTILSPATH", "CONFIGPATH",    # file_io
+    "check_file_or_dir", "add_new_dir", "yaml_loader",          #
     "vasp_relaxation_settings", "vasp_static_settings",                 # vasp_io
     "write_and_run_vasp", "converged_vasprun",                          #                      #
     "extract_vasp_data_for_delta_sol_init", "batch_extract_vasp_data",  #

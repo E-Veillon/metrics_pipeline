@@ -4,29 +4,15 @@ A script using previous VASP relaxations to compute the relative stability of gi
 
 Algorithm:
 
-    1/  Group structures by dimension and composition. - OK
+    1 - Group structures by dimension and composition.
         
-    2/  Get reference structures from a dataset and add them to the pool
-        with a specific attribute. - Not done yet
+    2 - For each group, search in the dataset all corresponding structures.
 
-    3/  Build one convex hull per structure group 
-        (initialize ref elements from group composition) - OK
-        
-    4/  Inside each convex hull, compute ΔH for each generated entry. - OK
-
-    5/  Reject structures that have a ΔH above given threshold value. - OK
-
-Possible alternatives:
-
-    Comparing to known references:
-        1 - For each group, search in the dataset all corresponding structures.
-        2 - Build the phase diagram corresponding to dataset structures.
-        3 - Compute ΔH for all generated structures of the group.
-        4 - Reject structures too much above reference convex hull.
-
-    Opti:   Store some common phase spaces in a local util file.
-
-    Opti:   Match and ignore structures equivalents to references with StructureMatcher.
+    3 - Build the phase diagram corresponding to dataset structures.
+     
+    4 - Compute ΔH for all generated structures of the group.
+    
+    5 - Reject structures too much above reference convex hull.
 """
 
 
@@ -37,6 +23,7 @@ from datetime import datetime
 
 
 from screening_pipeline.utils import (
+    check_file_or_dir,
     get_max_dim,
     init_entries_from_dict,
     filter_database_entries,
@@ -55,22 +42,18 @@ from screening_pipeline.utils import (
 
 def assert_args(args: argparse.Namespace) -> None:
     """Asserting input arguments validity."""
-    import os
 
-    assert os.path.isdir(args.run_dir), f"{args.run_dir}: No such directory found."
+    check_file_or_dir(args.run_dir, "dir")
 
     if args.reference is not None:
-        assert os.path.isfile(args.reference), (
-            f"{args.reference}: No such file found."
-        )
-    if args.prev_summary is not None:
-        assert os.path.isfile(args.prev_summary), (
-            f"{args.prev_summary}: No such file found."
-        )
+        check_file_or_dir(args.reference, "file", format="json")
 
-    assert args.limit >= 1e-8, (
+    if args.prev_summary is not None:
+        check_file_or_dir(args.prev_summary, "file", format="json")
+
+    assert args.limit >= 1e-6, (
         "Instability energy elimination criterion must be strictly positive.\n"
-        "Moreover, any value below 1.10-8 eV/atom is too low and not supported."
+        "Moreover, any value below 1.10-6 eV/atom is too low and not supported."
     )
 
     assert args.workers >= 1, "The number of workers must be stricly positive."

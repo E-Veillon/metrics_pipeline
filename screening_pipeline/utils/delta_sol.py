@@ -14,7 +14,7 @@ from pymatgen.io.vasp.sets import MPRelaxSet
 
 # LOCAL IMPORTS
 from periodic_table import get_all_valence_electrons
-from file_io import yaml_loader
+from file_io import yaml_loader, CONFIGPATH
 from vasp_io import vasp_static_settings
 from custom_types import PathLike, PMGStaticSetType, PMGStaticSet
 from fitted_values import EL_PER_XC_VOL
@@ -54,9 +54,7 @@ class DSolStaticSet(MPRelaxSet):
     
     Raises: ValueError if neither structure nor nelect are given at instanciation time.
     """
-    base_path = os.path.dirname(os.path.dirname(__file__))
-    path = os.path.join(base_path, "config", "DeltaSolStaticSet.yaml")
-    CONFIG = yaml_loader(path, on_error="raise")
+    CONFIG = yaml_loader(CONFIGPATH, on_error="raise")
 
     def __init__(
             self,

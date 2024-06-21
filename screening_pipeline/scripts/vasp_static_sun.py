@@ -15,8 +15,8 @@ from monty.os import cd
 from pymatgen.core.structure import SiteCollection
 
 from screening_pipeline.utils import (
-    yaml_loader, PMGStaticSet, read_cif, add_new_dir,
-    vasp_static_settings, write_and_run_vasp
+    CONFIGPATH, check_file_or_dir, add_new_dir, yaml_loader,
+    PMGStaticSet, read_cif, vasp_static_settings, write_and_run_vasp
 )
 
 ########################################
@@ -25,41 +25,31 @@ from screening_pipeline.utils import (
 def assert_args(args: Namespace) -> None:
     """Asserting input arguments validity."""
 
-    assert os.path.exists(args.input_file), (
-    f"{args.input_file}: path to input file not found."
-    )
-    assert os.path.isfile(args.input_file), (
-    f"{args.input_file} found but it is not a file."
-    )
-    assert args.input_file.endswith(".cif"), (
-    "Input structure data must be in CIF format."
-    )
-    assert args.executable_path.startswith("vasp") or os.path.exists(args.executable_path), (
-    f"{args.executable_path}: executable file not found."
-    )
-    assert os.path.exists(args.output), (
-    f"{args.output}: path to output directory not found."
-    )
-    assert os.path.isdir(args.output), (
-    f"{args.output} found but it is not a directory."
-    )
+    check_file_or_dir(args.input_file, "file", format="cif")
+
+    assert (
+        args.executable_path.startswith("vasp")
+        or os.path.exists(args.executable_path)
+    ), f"{args.executable_path}: executable file not found."
+
+    check_file_or_dir(args.output, "dir")
+
     assert args.preset in PMGStaticSet, (
     "Provided relaxation preset must be one of the following:\n"
     f"{PMGStaticSet}"
     )
-    assert os.path.isfile(args.user_settings), (
-    f"{args.user_settings}: file not found."
-    )
-    assert args.user_settings.endswith(".yaml"), (
-    "user settings file must be of .yaml format."
-    )
+
+    settings_path = os.path.join(CONFIGPATH, args.user_settings)
+    check_file_or_dir(settings_path, "file", format="yaml")
+
     assert args.workers >= 1, (
     "'workers' argument value must be strictly positive."
     )
 
-    assert args.task_index >= 0 or args.task_index is None, (
-    "'task_index' argument value must be positive or zero."
-    )
+    if args.task_index is not None:
+        assert args.task_index >= 0, (
+        "'task_index' argument value must be positive or zero."
+        )
 
 ########################################
 # MAIN FUNCTION
@@ -123,9 +113,12 @@ def main():
         "-u",
         "--user-settings",
         type=str,
-        default="user_settings.yaml",
-        help="Path to the .yaml file containing tags overrides to put over the PMG preset.",
-        metavar="file.yaml",
+        default="default_settings.yaml",
+        help=(
+            "Name of the .yaml file containing tags overrides to put over the PMG preset.\n"
+            "The file must be at location screening_pipeline/config to be found."
+        ),
+        metavar="FILENAME",
         dest="user_settings"
     )
     parser.add_argument(
@@ -145,7 +138,8 @@ def main():
 
     assert_args(args)
 
-    user_settings = yaml_loader(args.user_settings)
+    settings = os.path.join(CONFIGPATH, args.user_settings)
+    user_settings = yaml_loader(settings)
     struct_idx    = args.task_index
 
 

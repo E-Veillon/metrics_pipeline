@@ -6,12 +6,71 @@ Implements functions to manage and operate on paths.
 
 import os
 import warnings
-from typing import Tuple, Literal
+from typing import Literal
 from pathlib import Path
 from ruamel.yaml import YAML
 
 # LOCAL IMPORTS
 from custom_types import PathLike
+
+# Main paths inside pipeline file tree
+MAINDIRPATH = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+"""Absolute path to the main pipeline directory."""
+SCRIPTSPATH = os.path.join(MAINDIRPATH, "scripts")
+"""Absolute path to the pipeline scripts directory containing executable scripts."""
+UTILSPATH   = os.path.join(MAINDIRPATH, "utils")
+"""Absolute path to the pipeline utils directory containing importable features."""
+CONFIGPATH  = os.path.join(MAINDIRPATH, "config")
+"""Absolute path to the pipeline config directory containing all VASP config YAML files."""
+
+
+########################################
+
+
+def check_file_or_dir(
+    path: PathLike,
+    file_or_dir: Literal["file", "dir"] = "file",
+    *,
+    format: str|None = None
+) -> None:
+    """
+    Verify existence and optionally extension format of given path.
+    
+    Parameters:
+        path (str|Path):    Path to verify.
+
+        file_or_dir (str):  Whether the path should lead to a file or a directory.
+                            If the path exists but is not the right data type,
+                            an error will still be raised for not finding it.
+
+        format (str):       If the path should lead to a file with a specific format
+                            extension, provide here wanted extension without the dot
+                            separator (e.g. "txt" and not ".txt").
+    """
+    assert isinstance(path, (str, Path))
+    assert file_or_dir in {"file", "dir"}
+    assert isinstance(format, str) or format is None
+
+    path = str(path)
+
+    if file_or_dir == "dir" and not os.path.isdir(path):
+        raise FileNotFoundError(
+            f"{path}: No such directory found."
+        )
+    if file_or_dir == "file" and not os.path.isfile(path):
+        raise FileNotFoundError(
+            f"{path}: No such file found."
+        )
+    if (
+        file_or_dir == "file"
+        and format is not None
+        and not path.endswith("." + format)
+    ):
+        file_ext = path.split(sep=".")[-1]
+        raise ValueError(
+            f"{path}: expected file format is '{format}', "
+            f"got '{file_ext}' format instead."
+        )
 
 
 ########################################

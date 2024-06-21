@@ -19,7 +19,7 @@ from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 
 
 from screening_pipeline.utils import (
-    batch_extract_vasp_data, batch_get_dsol_band_gaps
+    check_file_or_dir, batch_extract_vasp_data, batch_get_dsol_band_gaps
 )
 
 ########################################
@@ -27,7 +27,7 @@ from screening_pipeline.utils import (
 
 def assert_args(args: Namespace) -> None:
 
-    assert os.path.isdir(args.input_dir), f"{args.input_dir}: No such directory found."
+    check_file_or_dir(args.input_dir, "dir")
 
     assert args.functional in {"LDA", "PBE", "AM05"}, (
         f"{args.functional} is not supported by delta-Sol. "
@@ -43,22 +43,13 @@ def assert_args(args: Namespace) -> None:
         f"Acceptable band gap values cannot have the same value."
         )
 
-    if args.accept is not None:
-        assert args.accept.endswith(".txt"), (
-        "Structure acceptance file must be a plain text file type (.txt)."
-        )
-
-    if args.ignore is not None:
-        assert args.ignore.endswith(".txt"), (
-        "Structure ignoring file must be a plain text file type (.txt)."
-        )
-
     assert args.summary.endswith(".json"), (
         "'summary' argument value must be a JSON format file name (.json)."
     )
 
-    assert args.workers >= 1, \
-    "The number of workers cannot be negative or zero."
+    assert args.workers >= 1, (
+        "The number of workers cannot be negative or zero."
+    )
 
 ########################################
 # MAIN FUNCTION
@@ -76,9 +67,7 @@ def main():
             M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
             (reference 32 in screening_pipeline/Bibliography)
         """
-    prog_missing_steps = """
-        Missing steps to complete this script: None
-        """
+
     helper_format = RawTextHelpFormatter
 
     parser = ArgumentParser(
@@ -149,8 +138,8 @@ def main():
     else:
         valid_interval = sorted(args.valid_interval)
 
-    workers        = args.workers
-    summary        = os.path.join(input_dir, args.summary)
+    workers = args.workers
+    summary = os.path.join(input_dir, args.summary)
 
 
     # MAIN BLOCK
