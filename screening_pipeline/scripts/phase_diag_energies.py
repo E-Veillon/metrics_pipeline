@@ -5,13 +5,13 @@ A script using previous VASP relaxations to compute the relative stability of gi
 Algorithm:
 
     1 - Group structures by dimension and composition.
-        
+
     2 - For each group, search in the dataset all corresponding structures.
 
     3 - Build the phase diagram corresponding to dataset structures.
-     
+
     4 - Compute ΔH for all generated structures of the group.
-    
+
     5 - Reject structures too much above reference convex hull.
 """
 
@@ -21,26 +21,20 @@ import json
 import argparse
 from datetime import datetime
 
-
+# LOCAL IMPORTS
 from screening_pipeline.utils import (
-    check_file_or_dir,
-    get_max_dim,
-    init_entries_from_dict,
-    filter_database_entries,
-    get_elements_from_entries,
-    get_lacking_elts_entries,
-    group_by_composition,
-    batch_compute_e_above_hull,
-    batch_extract_vasp_data,
-    load_phase_diagram_entries,
+    check_file_format, check_file_or_dir,
+    get_max_dim, init_entries_from_dict, filter_database_entries,
+    get_elements_from_entries, get_lacking_elts_entries,
+    group_by_composition, batch_compute_e_above_hull,
+    batch_extract_vasp_data, load_phase_diagram_entries,
 )
 
 
 ########################################
-# LOCAL FUNCTIONS
 
 
-def assert_args(args: argparse.Namespace) -> None:
+def _assert_args(args: argparse.Namespace) -> None:
     """Asserting input arguments validity."""
 
     check_file_or_dir(args.run_dir, "dir")
@@ -51,6 +45,8 @@ def assert_args(args: argparse.Namespace) -> None:
     if args.prev_summary is not None:
         check_file_or_dir(args.prev_summary, "file", format="json")
 
+    check_file_format(args.summary, format="json")
+
     assert args.limit >= 1e-6, (
         "Instability energy elimination criterion must be strictly positive.\n"
         "Moreover, any value below 1.10-6 eV/atom is too low and not supported."
@@ -58,13 +54,8 @@ def assert_args(args: argparse.Namespace) -> None:
 
     assert args.workers >= 1, "The number of workers must be stricly positive."
 
-    assert args.summary.endswith(".json"), (
-        f"'{args.summary}' is not a valid JSON file, verify the .json extension."
-    )
-
 
 ########################################
-# MAIN FUNCTION
 
 
 def main():
@@ -172,7 +163,7 @@ def main():
 
     args: argparse.Namespace = parser.parse_args()
 
-    assert_args(args)
+    _assert_args(args)
 
     prev_summary = args.prev_summary or None
     delta_H_limit = round(args.limit, 8)

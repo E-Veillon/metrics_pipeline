@@ -5,14 +5,13 @@ It filters out too bad and / or duplicated data, finds symmetry space group
 and format the valid data in a way that will be more readable for further calculations.
 """
 
-
-import os
 from datetime import datetime
-from argparse import ArgumentParser, RawTextHelpFormatter, Namespace
+import argparse
 
 # LOCAL IMPORTS
 from screening_pipeline.utils import (
-    check_file_or_dir, read_cif, write_cif, check_interatomic_distances,
+    check_file_format, check_file_or_dir,
+    read_cif, write_cif, check_interatomic_distances,
     batch_symmetrizer, remove_equivalent
 )
 
@@ -20,21 +19,15 @@ from screening_pipeline.utils import (
 ########################################
 
 
-def assert_args(args: Namespace):
-    """
-    Apply viability assertions on input arguments and prints a summary of them.
-
-    Parameters:
-        args (Namespace): namespace of the parsed arguments.
-    """
+def _assert_args(args: argparse.Namespace):
+    """Asserting input arguments validity."""
 
     print(" - I/O ARGUMENTS - ")
     print(f"INPUT FILE: {args.input_file}")
     print(f"OUTPUT FILE: {args.output}")
 
     check_file_or_dir(args.input_file, "file", format="cif")
-
-    assert args.output.endswith(".cif"), "Output file must be of CIF format."
+    check_file_format(args.output, format="cif")
 
     print(" ")
     print("------------------------------")
@@ -82,8 +75,9 @@ def assert_args(args: Namespace):
     print("------------------------------")
     print(" ")
 
+
 ########################################
-# MAIN FUNCTION
+
 
 def main() -> None:
     """Main function."""
@@ -99,7 +93,7 @@ def main() -> None:
         "for further calculations."
     )
 
-    parser = ArgumentParser(
+    parser = argparse.ArgumentParser(
         prog=prog_name,
         description=prog_description
     )
@@ -198,12 +192,12 @@ def main() -> None:
         metavar="int",
     )
 
-    args: Namespace = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
 
     if args.output is None:
         args.output = args.input_file.replace(".cif", "_out.cif")
 
-    assert_args(args)
+    _assert_args(args)
 
 
     # MAIN BLOCK

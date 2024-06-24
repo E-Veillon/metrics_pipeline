@@ -5,24 +5,24 @@ using pymatgen as a setting interface between raw data and VASP.
 The relaxation results then may be used in other scripts for material properties analysis.
 """
 
-
 import os
 from datetime import datetime
 from argparse import ArgumentParser, Namespace
-from monty.os import cd
 
 # PYTHON MATERIAL GENOMICS
 from pymatgen.core.structure import SiteCollection
 
+# LOCAL IMPORTS
 from screening_pipeline.utils import (
     CONFIGPATH, check_file_or_dir, add_new_dir, yaml_loader,
     PMGRelaxSet, read_cif, vasp_relaxation_settings, write_and_run_vasp
 )
 
-########################################
-# LOCAL FUNCTIONS
 
-def assert_args(args: Namespace) -> None:
+########################################
+
+
+def _assert_args(args: Namespace) -> None:
     """Asserting input arguments validity."""
 
     check_file_or_dir(args.input_file, "file", format="cif")
@@ -132,7 +132,7 @@ def main():
 
     args: Namespace = parser.parse_args()
 
-    assert_args(args)
+    _assert_args(args)
 
     user_settings = yaml_loader(os.path.join(CONFIGPATH, args.user_settings))
     struct_idx    = args.task_index

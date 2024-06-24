@@ -1,6 +1,16 @@
 #!/usr/bin/python
+"""Get MP and/or process OQMD database entries for the pipeline."""
 
 import argparse
+import os
+
+# LOCAL IMPORTS
+from screening_pipeline.utils import (
+    check_file_or_dir, mp_api_download, process_oqmd_json_file
+)
+
+
+########################################
 
 
 def main() -> None:
@@ -44,25 +54,16 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    import os
-    from screening_pipeline.utils import mp_api_download, process_oqmd_json_file
-
 
     # MAIN BLOCK
 
     if args.from_mp_api is not None:
         dir_path = os.path.dirname(args.from_mp_api)
-        assert os.path.isdir(dir_path), (
-            f"{dir_path}: No such directory found, please check your "
-            "--from-mp-api argument."
-        )
+        check_file_or_dir(dir_path, "dir")
         mp_api_download(args.from_mp_api, api_key=args.mp_api_key)
     
     if args.process_oqmd is not None:
-        assert os.path.isfile(args.process_oqmd), (
-            f"{args.process_oqmd}: No such file found, please check your "
-            "--process-oqmd argument."
-        )
+        check_file_or_dir(args.process_oqmd, "file", format="json")
         process_oqmd_json_file(path=args.process_oqmd)
     
 

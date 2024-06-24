@@ -7,25 +7,23 @@ Reference for Δ-Sol method:
     (reference 32 in screening_pipeline/Bibliography)
 """
 
-########################################
-# SYSTEM I/O MODULES
-
 import os
 import json
 from typing import Dict
-from pathlib import Path
 from datetime import datetime
-from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
+from argparse import ArgumentParser, Namespace
 
-
+# LOCAL IMPORTS
 from screening_pipeline.utils import (
-    check_file_or_dir, batch_extract_vasp_data, batch_get_dsol_band_gaps
+    check_file_format, check_file_or_dir,
+    batch_extract_vasp_data, batch_get_dsol_band_gaps
 )
 
-########################################
-# LOCAL FUNCTIONS
 
-def assert_args(args: Namespace) -> None:
+########################################
+
+
+def _assert_args(args: Namespace) -> None:
 
     check_file_or_dir(args.input_dir, "dir")
 
@@ -43,23 +41,22 @@ def assert_args(args: Namespace) -> None:
         f"Acceptable band gap values cannot have the same value."
         )
 
-    assert args.summary.endswith(".json"), (
-        "'summary' argument value must be a JSON format file name (.json)."
-    )
+    check_file_format(args.summary, format="json")
 
     assert args.workers >= 1, (
         "The number of workers cannot be negative or zero."
     )
 
+
 ########################################
-# MAIN FUNCTION
+
 
 def main():
     start = datetime.now()
 
     # ARGUMENTS PARSING BLOCK
     
-    prog_name = "band_gap_screening"
+    prog_name = "dsol_bandgap"
     prog_desc = """
         A script to determine material fundamental band gap from VASP energies and Δ-Sol method.
 
@@ -68,26 +65,29 @@ def main():
             (reference 32 in screening_pipeline/Bibliography)
         """
 
-    helper_format = RawTextHelpFormatter
-
     parser = ArgumentParser(
         prog=prog_name, 
         description=prog_desc, 
-        #epilog=prog_missing_steps, 
-        formatter_class=helper_format
     )
 
     parser.add_argument(
         "input_dir",
         type=str,
         default=None,
-        help="Base directory containing structures directories, themself containing static calculations directories.",
+        help=(
+            "Base directory containing structures directories, "
+            "themself containing static calculations directories."
+        ),
     )
     parser.add_argument(
         "-f", "--functional",
         type=str,
         default="PBE",
-        help="DFT functional used for static calculations. Can be chosen between 'LDA', 'PBE', and 'AM05' (default: '%(default)s')."
+        help=(
+            "DFT functional used for static calculations. "
+            "Can be chosen between 'LDA', 'PBE', and 'AM05' "
+            "(default: '%(default)s')."
+        ),
     )
     parser.add_argument(
         "-v", "--valid-interval",
@@ -96,8 +96,8 @@ def main():
         default=None,
         help=(
             "Valid band gaps interval in eV (default: [1.3 ; 3.6] eV).\n"
-            "If another interval is given, the min AND max values must be given, even if one "
-            "of them matches the default values."
+            "If another interval is given, the min AND max values must be given, "
+            "even if one of them matches the default values."
         ), 
         metavar="float"
     )
@@ -114,21 +114,25 @@ def main():
         default="summary.json",
         help=(
             "Output file indicating calculation results for this step (json format).\n"
-            "Also usable by further steps to filter out structures that were rejected in this step.\n"
-            "This arg only changes the file name, its path is automatically set in the step directory."
+            "Also usable by further steps to filter out structures "
+            "that were rejected in this step.\n"
+            "This arg only changes the file name, "
+            "its path is automatically set in the step directory."
         ),
         metavar="summary.json"
     )
     parser.add_argument(
         "--with-uncertainties", 
         action="store_true", 
-        help="Pass this flag to enable computation of minimal and maximal Δ-Sol band gaps.\n\
-              If enabled, it will search for uncertainty calculations results."
+        help=(
+            "Enables computation of minimal and maximal Δ-Sol band gaps.\n"
+            "If enabled, it will search for uncertainty calculations results."
+        )
     )
 
     args: Namespace = parser.parse_args()
 
-    assert_args(args)
+    _assert_args(args)
 
     input_dir = args.input_dir
     dft_func  = args.functional

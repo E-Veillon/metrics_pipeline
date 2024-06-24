@@ -27,6 +27,29 @@ CONFIGPATH  = os.path.join(MAINDIRPATH, "config")
 ########################################
 
 
+def check_file_format(filename: PathLike, *, format: str) -> None:
+    """
+    Verify that extension format of given file and wanted file format match,
+    no matter if given file exists or not.
+
+    Parameters:
+        filename (str|Path):    Name or path of the file to check.
+
+        format (str):           Wanted extension format for the checked file,
+                                without the dot separator (e.g. "txt" and not ".txt").
+    """
+    filename = str(filename)
+    file_format = filename.split(sep=".")[-1]
+    if file_format != format:
+        raise ValueError(
+            f"{filename}: expected file format is '{format}', "
+            f"got '{file_format}' format instead."
+        )
+
+
+########################################
+
+
 def check_file_or_dir(
     path: PathLike,
     file_or_dir: Literal["file", "dir"] = "file",
@@ -68,13 +91,8 @@ def check_file_or_dir(
     if (
         file_or_dir == "file"
         and format is not None
-        and not path.endswith("." + format)
     ):
-        file_ext = path.split(sep=".")[-1]
-        raise ValueError(
-            f"{path}: expected file format is '{format}', "
-            f"got '{file_ext}' format instead."
-        )
+        check_file_format(path, format=format)
 
 
 ########################################

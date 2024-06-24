@@ -5,24 +5,24 @@ using pymatgen as a setting interface between raw data and VASP.
 Energy results may be used for phase diagrams computations.
 """
 
-
 import os
 from datetime import datetime
-from argparse import ArgumentParser, Namespace
-from monty.os import cd
+import argparse
 
 # PYTHON MATERIAL GENOMICS
 from pymatgen.core.structure import SiteCollection
 
+# LOCAL IMPORTS
 from screening_pipeline.utils import (
     CONFIGPATH, check_file_or_dir, add_new_dir, yaml_loader,
     PMGStaticSet, read_cif, vasp_static_settings, write_and_run_vasp
 )
 
-########################################
-# LOCAL FUNCTIONS
 
-def assert_args(args: Namespace) -> None:
+########################################
+
+
+def _assert_args(args: argparse.Namespace) -> None:
     """Asserting input arguments validity."""
 
     check_file_or_dir(args.input_file, "file", format="cif")
@@ -51,8 +51,9 @@ def assert_args(args: Namespace) -> None:
         "'task_index' argument value must be positive or zero."
         )
 
+
 ########################################
-# MAIN FUNCTION
+
 
 def main():
     """Main function."""
@@ -68,7 +69,7 @@ def main():
         "Energy results may be used for phase diagrams computations."
     )
 
-    parser = ArgumentParser(
+    parser = argparse.ArgumentParser(
         prog=prog_name,
         description=prog_description
     )
@@ -134,9 +135,9 @@ def main():
         ),
     )
 
-    args: Namespace = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
 
-    assert_args(args)
+    _assert_args(args)
 
     settings = os.path.join(CONFIGPATH, args.user_settings)
     user_settings = yaml_loader(settings)

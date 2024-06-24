@@ -1,6 +1,49 @@
 #!/usr/bin/python
 
 import argparse
+import json
+import numpy as np
+
+# LOCAL IMPORTS
+from screening_pipeline.utils import (
+    check_file_format, check_file_or_dir,
+    batch_extract_vasp_structures, read_cif,
+    remove_equivalent, vectors_from_alignn,
+    recall, precision, frechet_distance,
+    emd_wrapper, get_densities,
+    rmsd_from_structures, to_crystalnn_fingerprint
+)
+
+
+########################################
+
+
+def _assert_args(args: argparse.Namespace) -> None:
+    """Check arguments values validity."""
+    if args.dataset is not None:
+        check_file_or_dir(args.dataset, "file", format="cif")
+    if args.generated is not None:
+        check_file_or_dir(args.generated, "file", format="cif")
+    if args.uniques is not None:
+        check_file_or_dir(args.uniques, "file", format="cif")
+    if args.valid is not None:
+        check_file_or_dir(args.valid, "file", format="cif")
+    if args.summary is not None:
+        check_file_or_dir(args.summary, "file", format="json")
+
+    check_file_format(args.output, format="json")
+
+    if args.workers < 1:
+        raise ValueError(
+            f"'workers' argument must be strictly positive (got {args.workers})."
+        )
+    if args.threshold <= 0.0:
+        raise ValueError(
+            f"'threshold' argument must be strictly positive (got {args.threshold})."
+        )
+
+
+########################################
 
 
 def main() -> None:
@@ -86,22 +129,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    import json
-    import numpy as np
-
-    from screening_pipeline.utils import (
-        batch_extract_vasp_structures,
-        read_cif,
-        remove_equivalent,
-        vectors_from_alignn,
-        recall,
-        precision,
-        frechet_distance,
-        emd_wrapper,
-        get_densities,
-        rmsd_from_structures,
-        to_crystalnn_fingerprint
-    )
+    _assert_args(args)
 
     if args.dataset is not None:
         print("Loading test set...")
@@ -188,7 +216,8 @@ def main() -> None:
 
     if args.valid is not None:
         dft_metrics["num_valid"] = len(valids)
-        dft_metrics["percent_valid"] = len(valids) / len(full_generated)
+        prop_valid = len(valids) / len(full_generated)
+        dft_metrics["percent_valid"] = round(prop_valid * 100, 6)
 
     if (
         args.dataset is not None
@@ -226,17 +255,20 @@ def main() -> None:
             keep_equivalent=False
         )
         dft_metrics["num_unique_novel"] = len(concat_novel_unique) - len(dataset)
-        dft_metrics["percent_unique_novel"] = dft_metrics["num_unique_novel"] / len(full_generated)
+        prop_unique_novel = dft_metrics["num_unique_novel"] / len(full_generated)
+        dft_metrics["percent_unique_novel"] = round(prop_unique_novel * 100, 6)
 
         if nbr_unmatched != 0:
             dft_metrics["unmatched_novel_unique"] = nbr_unmatched
 
         # stable count
         dft_metrics["num_stable"] = sum(map(lambda x: x["stable"], summary))
-        dft_metrics["percent_stable"] = dft_metrics["num_stable"] / 64 # nb DFT structures per batch
+        prop_stable = dft_metrics["num_stable"] / len(full_generated)
+        dft_metrics["percent_stable"] = round(prop_stable * 100, 6)
 
         # S.U.N. percentage
-        dft_metrics["SUN"] = dft_metrics["percent_stable"] * dft_metrics["percent_unique_novel"]
+        prop_sun = prop_stable * prop_unique_novel
+        dft_metrics["S.U.N."] = round(prop_sun * 100, 6)
 
         print("S.U.N. metrics computed.")
         for key, val in dft_metrics.items():

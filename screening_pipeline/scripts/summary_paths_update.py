@@ -1,7 +1,30 @@
 #!/usr/bin/python
+"""
+Update paths keys in a summary json file when the corresponding structure directories are moved.
+"""
 
-
+import os
+import json
+from typing import List, Dict
 import argparse
+
+# LOCAL IMPORTS
+from screening_pipeline.utils import check_file_or_dir
+
+
+########################################
+
+
+def _assert_args(args: argparse.Namespace) -> None:
+    """Asserting input arguments validity."""
+    check_file_or_dir(args.input_file, "file", format="json")
+    check_file_or_dir(args.new_path, "dir")
+    assert args.workers >= 1, (
+        f"'workers' arg must be strictly positive."
+    )
+
+
+########################################
 
 
 def main() -> None:
@@ -32,19 +55,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    import os
-    import json
-    from typing import List, Dict
-
-    assert args.input_file.endswith(".json"), (
-        f"'input_file' must be a JSON file."
-    )
-    assert os.path.isdir(args.new_path), (
-        f"'{args.new_path}': No such directory found."
-    )
-    assert args.workers >= 1, (
-        f"'workers' arg must be strictly positive."
-    )
+    _assert_args(args)
 
 
     # MAIN BLOCK
@@ -71,6 +82,7 @@ def main() -> None:
         json.dump(data, fp, indent=4)
     
     print(f"the file '{os.path.basename(args.input_file)}' was successfully modified.")
+
 
 if __name__ == "__main__":
     main()

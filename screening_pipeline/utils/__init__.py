@@ -4,7 +4,7 @@
 from .cif_io import read_cif, write_cif
 from .file_io import (
     MAINDIRPATH, SCRIPTSPATH, UTILSPATH, CONFIGPATH,
-    check_file_or_dir, add_new_dir, yaml_loader
+    check_file_format, check_file_or_dir, add_new_dir, yaml_loader
 
 )
 from .vasp_io import (

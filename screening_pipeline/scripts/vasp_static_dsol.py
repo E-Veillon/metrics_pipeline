@@ -4,22 +4,11 @@ Parses previous VASP data and launches Δ-Sol static calculations
 for structures not already rejected.
 """
 
-########################################
-# SYSTEM I/O MODULES
-
 import os
 from datetime import datetime
-from typing import Tuple
-from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
-from monty.os import cd
+import argparse
 
-########################################
-# PYTHON MATERIALS GENOMICS PACKAGE
-
-
-########################################
-# LOCAL MODULES
-
+# LOCAL IMPORTS
 from screening_pipeline.utils import (
     CONFIGPATH, check_file_or_dir, add_new_dir, yaml_loader,
     PMGStaticSet, extract_vasp_data_for_delta_sol_init,
@@ -27,10 +16,11 @@ from screening_pipeline.utils import (
     write_and_run_vasp
 )
 
-########################################
-# LOCAL FUNCTIONS
 
-def assert_args(args: Namespace) -> None:
+########################################
+
+
+def _assert_args(args: argparse.Namespace) -> None:
     """Asserting input arguments validity."""
 
     check_file_or_dir(args.input_dir, "dir")
@@ -60,7 +50,7 @@ def assert_args(args: Namespace) -> None:
 
 
 ########################################
-# MAIN FUNCTION
+
 
 def main() -> None:
     """Main function."""
@@ -84,13 +74,11 @@ def main() -> None:
             - If rejected, stop the sub-job with a simple message in output about it
             - Else, extract the structure, prepare corresponding calculation and launch it
         """
-    helper_format = RawTextHelpFormatter
 
-    parser = ArgumentParser(
+    parser = argparse.ArgumentParser(
         prog=prog_name,
         description=prog_desc,
-        epilog=prog_missing_steps,
-        formatter_class=helper_format
+        epilog=prog_missing_steps
     )
 
     parser.add_argument(
@@ -167,9 +155,9 @@ def main() -> None:
         )
     )
 
-    args: Namespace = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
 
-    assert_args(args)
+    _assert_args(args)
 
     # Positional args
     input_dir = args.input_dir
@@ -218,7 +206,7 @@ def main() -> None:
     calc_name  = calc_idx_to_dir_name(dir_name, calc_idx)
     calc_dir   = add_new_dir(outdir, dir_name, calc_name)
 
-    write_and_run_vasp(input_data, calc_dir, args.executable_path)
+    write_and_run_vasp(input_data, calc_dir, exe_path)
 
     stop = datetime.now()
     print(f"elapsed time: {stop-start}")
