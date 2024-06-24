@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "screening-pipeline"
 version = "0.1.0"
-description = "Screening pipeline for materials discovery"
+description = "Screening pipeline for metrics evaluation in Generative AI for materials"
 authors = [
     "Elohan Veillon <elohan.veillon@univ-artois.fr>",
     "Astrid Klipfel <astridklipfel@gmail.com>",
@@ -22,14 +22,15 @@ mp-api = "^0.41.2"
 
 [tool.poetry.scripts]
 cif_counter = 'screening_pipeline.scripts.cif_counter:main'
+dataset_loader = 'screening_pipeline.scripts.dataset_loader:main'
 preprocess = 'screening_pipeline.scripts.preprocess:main'
-vasp_relaxation = 'screening_pipeline.scripts.vasp_relaxation:main'
-stability_screening = 'screening_pipeline.scripts.stability_screening:main'
-metrics = 'screening_pipeline.scripts.metrics:main'
-vasp_delta_sol_statics = 'screening_pipeline.scripts.vasp_delta_sol_statics:main'
-delta_sol_calculator = 'screening_pipeline.scripts.delta_sol_calculator:main'
+vasp_static_sun = 'screening_pipeline.scripts.vasp_static_sun:main'
+phase_diag_energies = "screening_pipeline.scripts.phase_diag_energies:main'
 summary_paths_update = 'screening_pipeline.scripts.summary_paths_update:main'
-process_dataset = 'screening_pipeline.scripts.process_dataset:main'
+vasp_relax = 'screening_pipeline.scripts.vasp_relax:main'
+metrics = 'screening_pipeline.scripts.metrics:main'
+vasp_static_dsol = 'screening_pipeline.scripts.vasp_static_dsol:main'
+dsol_bandgap = 'screening_pipeline.scripts.dsol_bandgap:main'
 
 [[tool.poetry.source]]
 name = "pytorch-geometric"

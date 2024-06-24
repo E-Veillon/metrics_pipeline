@@ -5,20 +5,20 @@ It filters out too bad and / or duplicated data, finds symmetry space group
 and format the valid data in a way that will be more readable for further calculations.
 """
 
-########################################
-# SYSTEM I/O MODULES
 
 import os
 from datetime import datetime
 from argparse import ArgumentParser, RawTextHelpFormatter, Namespace
 
+# LOCAL IMPORTS
 from screening_pipeline.utils import (
     check_file_or_dir, read_cif, write_cif, check_interatomic_distances,
     batch_symmetrizer, remove_equivalent
 )
 
+
 ########################################
-# LOCAL FUNCTIONS
+
 
 def assert_args(args: Namespace):
     """
@@ -49,9 +49,9 @@ def assert_args(args: Namespace):
     )
 
     if not args.no_dist_check:
-        assert args.dist_tolerance > 0.0, \
-        "Interatomic distance tolerance must be strictly positive."
-
+        assert args.dist_tolerance > 0.0, (
+            "Interatomic distance tolerance must be strictly positive."
+        )
     print(f"SYMMETRIZATION: {not args.no_symmetrization}")
     print(
         f"* Fractional coordinates tolerance: {args.symprec} "
@@ -70,9 +70,9 @@ def assert_args(args: Namespace):
     )
 
     if not args.no_symmetrization:
-        assert (0.0 <= args.angleprec <= 30.0), \
-        "Angles tolerance must be between 0.0 and 20.0 degrees to retain some reliability."
-
+        assert (0.0 <= args.angleprec <= 30.0), (
+            "Angles tolerance must be between 0.0 and 20.0 degrees to retain some reliability."
+        )
     print(f"STRUCTURE MATCHING: {not args.no_equiv_match}")
     print(f"NUMBER OF WORKERS: {args.workers}")
 
@@ -99,12 +99,9 @@ def main() -> None:
         "for further calculations."
     )
 
-    helper_format = RawTextHelpFormatter
-
     parser = ArgumentParser(
         prog=prog_name,
-        description=prog_description,
-        formatter_class=helper_format
+        description=prog_description
     )
 
     parser.add_argument(
