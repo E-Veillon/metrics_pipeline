@@ -379,6 +379,23 @@ def _perturb_site_positions(structure: Structure, min: float, max: float) -> Str
 ########################################
 
 
+def is_valid_lattice(lattice: Lattice) -> bool:
+    """Check whether given lattice has physically valid parameters values."""
+    a0 = 0.53 # a0 = Bohr radius, approximately equal to 0.53 angstroms.
+    min_vol = (2 * a0)**3 # Minimal cell volume of (2 * a0)^3 angstroms^3.
+    min_len = 2 * a0 # a, b, c must be superior than 2 * a0 angstroms.
+    min_angle = 5.0 # alpha, beta, gamma must be superior than 5.0 degrees.
+
+    return (
+        lattice.volume >= min_vol
+        and all([length >= min_len for length in lattice.lengths]) 
+        and all([angle >= min_angle for angle in lattice.angles])
+    )
+
+
+########################################
+
+
 def _perturb_lattice_parameters(
         structure: Structure, perturbs_dict: Dict, retries: int = 4) -> Structure:
     """
@@ -407,16 +424,10 @@ def _perturb_lattice_parameters(
         beta=new_lattice_params["beta"],
         gamma=new_lattice_params["gamma"]
     )
-    # We are using conventional unit cells, if we consider an atom at the origin,
-    # its equivalent positions should not be at a distance of less than 2 times the
-    # Bohr radius, as it would mean an unphysical overlap of atomic radii. Therefore,
-    # if the generated lattice leads to such behavior, we retry the random generation
-    # until it is not unphysical anymore. Bohr radius is approximated to 0.53 angstroms.
-    if (
-        new_lattice.volume < 1.2 # Volume of a cubic cell with a = b = c = 2 * 0.53 (Bohr radius)
-        or any([length < 1.06 for length in new_lattice.lengths])
-        or any([angle < 1.0 for angle in new_lattice.angles])
-    ): # minimum length of 1.06 = 2 * 0.53 (Bohr Radius), minimum angle of 1°
+    # As the process is random, it might sometimes return an unphysical lattice.
+    # If it is the case, try to get another random perturbation which leads to
+    # physically valid values.
+    if not is_valid_lattice(new_lattice):
         if retries > 0:
             print(f"Unphysical lattice generated, retrying... (retries left: {retries})")
             retries -= 1
