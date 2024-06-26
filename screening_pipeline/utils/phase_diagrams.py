@@ -4,17 +4,13 @@ process phase diagram entries, and compute energy above hull of entries.
 """
 
 
-from typing import Dict, Union, Sequence, Any, List, Optional, Set
+from typing import Dict, Union, Sequence, Any, List, Optional, Set, Tuple
 from functools import partial
 from tqdm.contrib.concurrent import process_map
 
 # PYTHON MATERIAL GENOMICS
-from pymatgen.core import SETTINGS, Element, Composition
+from pymatgen.core import Element, Composition
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
-
-# THE MATERIALS PROJECT REST API
-from mp_api.client import MPRester
-from emmet.core.thermo import ThermoType
 
 # LOCAL IMPORTS
 from common_asserts import check_type, check_num_value
@@ -41,8 +37,9 @@ def get_max_dim(entries: Sequence[PDEntry]) -> int:
 
 
 def init_entries_from_dict(
-        entries_dict: Dict[str, Dict], attribute: Optional[str] = None
-    ) -> List[PDEntry]:
+    entries_dict: Dict[str, Dict],
+    attribute: Optional[str] = None
+) -> List[PDEntry]:
     """
     Convert structures data dict into a list of PDEntry objects
     that are compatible with phase diagrams.
@@ -87,11 +84,11 @@ def init_entries_from_dict(
 
 
 def filter_database_entries(
-        entries: Dict[str, Any]|List[PDEntry],
-        ref_elts: Optional[List[Element]] = None,
-        max_dim: Optional[int] = None,
-        workers: int = 1
-    ) -> List[PDEntry]:
+    entries: Dict[str, Any]|List[PDEntry],
+    ref_elts: Optional[List[Element]] = None,
+    max_dim: Optional[int] = None,
+    workers: int = 1
+) -> List[PDEntry]:
     """
     Filter out entries in database file that are useless for generated data.
     Data format conversion can be parallelized.
@@ -165,8 +162,10 @@ def get_elements_from_entries(entries: Sequence[PDEntry]) -> List[Element]:
 
 
 def group_by_dim_and_comp(
-        entries: Sequence[PDEntry], max_dim: Optional[int] = None, workers: int = 1
-    ) -> List[List[List[PDEntry]]]:
+    entries: Sequence[PDEntry],
+    max_dim: Optional[int] = None,
+    workers: int = 1
+) -> List[List[List[PDEntry]]]:
     """
     Group entries in sublists according to the number of elements,
     then group entries in each sublist in subsublists according to
@@ -266,7 +265,8 @@ def get_sub_entries(
 
 
 def _get_relevant_entries(
-    entries: Sequence[PDEntry], ref_elts: Union[Sequence[Element], set[Element]]
+    entries: Sequence[PDEntry],
+    ref_elts: Union[Sequence[Element], set[Element]]
 ) -> List[PDEntry]:
     """
     Extract entries that are only composed of given reference Elements.
@@ -293,7 +293,8 @@ def _get_relevant_entries(
 
 
 def get_lacking_elts_entries(
-    entries: Sequence[PDEntry], ref_elts: Union[Sequence[Element], set[Element]]
+    entries: Sequence[PDEntry],
+    ref_elts: Union[Sequence[Element], set[Element]]
 ) -> List[PDEntry]:
     """
     Check elemental entries with respect to given reference elements,
@@ -347,43 +348,99 @@ def get_lacking_elts_entries(
 ########################################
 
 
+def _process_pd_data(
+    entries: Optional[Sequence[PDEntry]] = None,
+    ref_elts: Optional[FormulaLike] = None
+) -> Tuple[List[PDEntry], List[Element]]:
+    """
+    Process entries and reference elements necessary to build a phase diagram.
+
+    Parameters:
+        entries ([PDEntry]):                The entries that will be put into the PhaseDiagram.
+                                            If there is no unary entries for some given ref_elts,
+                                            default unary entries with energy = 0.0 eV are created.
+                                            Entries containing elements that are not referenced in
+                                            ref_elts are ignored. This behaviour is particularly
+                                            useful if one needs to initialize several diagrams
+                                            from different parts of the same entry dataset.
+
+        ref_elts (str|[str|int|Element]):   The reference elements of the phase diagram.
+                                            Can be given as a single formula string
+                                            (e.g. 'FePO4') or a composition string (eg. 'Fe-P-O'),
+                                            or as a sequence containing valid element symbols,
+                                            atomic numbers and/or Element objects.
+                                            If not given, they are inferred from given entries.
+                                            In that case, returned ref_elts contains needed
+                                            Element objects to make the minimal phase diagram
+                                            containing all given entries.
+
+    Returns:
+        Processed entries and elements to build a PhaseDiagram.
+    """
+    match (bool(entries), bool(ref_elts)):
+        case (False, False): # Both 'entries' and 'ref_elts' are empty or None
+            raise ValueError(
+                "At least one of either 'entries' or 'ref_elts' arguments "
+                "have to be given and not empty."
+            )
+
+        case (True, False): # 'entries' is given, 'ref_elts' is empty or None
+            # Infer reference elements from entries
+            # => data for a diagram containing all entries.
+            check_type(entries, "entries", (Sequence,))
+            (
+                check_type(entry, f"entries[{idx}]", (PDEntry,))
+                for idx, entry in enumerate(entries)
+            )
+            ref_elts = get_elements_from_entries(entries)
+
+        case (False, True): # 'ref_elts' is given, 'entries' is empty or None
+            # Init default unary entries for each element
+            # => data for a 'blank' diagram with only 0.0 eV entries.
+            check_type(ref_elts, "ref_elts", (str, Sequence))
+            if not isinstance(ref_elts, str):
+                (
+                    check_type(elt, f"ref_elts[{idx}]", (str, int, Element))
+                    for idx, elt in enumerate(ref_elts)
+                )
+            ref_elts = get_elements(ref_elts)
+            entries = get_lacking_elts_entries(entries=[], ref_elts=ref_elts)
+
+        case (True, True): # Both 'entries' and 'ref_elts' are given
+            # Filter out entries with unmatching elements
+            # Add default unary entries for elements that
+            # do not have matching unary entries.
+            check_type(entries, "entries", (Sequence,))
+            (
+                check_type(entry, f"entries[{idx}]", (PDEntry,))
+                for idx, entry in enumerate(entries)
+            )
+            check_type(ref_elts, "ref_elts", (str, Sequence))
+            if not isinstance(ref_elts, str):
+                (
+                    check_type(elt, f"ref_elts[{idx}]", (str, int, Element))
+                    for idx, elt in enumerate(ref_elts)
+                )
+            ref_elts = get_elements(ref_elts)
+            entries  = _get_relevant_entries(entries, ref_elts)
+
+    return entries, ref_elts
+
+
+########################################
+
+
 def _phase_diagram_init(
     entries: Sequence[PDEntry],
-    ref_elts: Optional[FormulaLike] = None,
-    from_mp_api: bool = False,
-    mp_api_key: Optional[str] = None,
+    ref_elts: Sequence[Element],
     verbose: bool = False
 ):
-    """Compute a new PhaseDiagram object from given elements and entries."""
-    pd_name = "-".join(list(map(str, ref_elts)))
-    print(f"Initializing phase diagram '{pd_name}'")
-
-    if from_mp_api:
-        mp_api_key = mp_api_key or SETTINGS.get("PMG_MAPI_KEY", None)
-        if not mp_api_key:
-            raise ValueError(
-                "'from-mp-api' was set to True but no 'mp-api-key' was defined. "
-                "You can define it either by entering the key manually or "
-                "add PMG_MAPI_KEY to .pmgrc.yaml."
-            )
-        try:
-            with MPRester(mp_api_key) as mpr:
-                new_pd = mpr.materials.thermo.get_phase_diagram_from_chemsys(
-                    chemsys=pd_name, thermo_type=ThermoType.GGA_GGA_U
-                )
-        except Exception:
-            # Building a default phase diagram after all
-            new_pd = PhaseDiagram(entries=entries, elements=ref_elts)
-            return new_pd
-
-        if not new_pd.all_entries: # No explicit exception but no entry in the diagram
-            new_pd = PhaseDiagram(entries=entries, elements=ref_elts)
-            return new_pd
-
-    else:
-        new_pd = PhaseDiagram(entries=entries, elements=ref_elts)
+    """Compute a new PhaseDiagram object from given entries and elements."""
+    new_pd = PhaseDiagram(entries=entries, elements=ref_elts)
 
     if verbose:
+        pd_name = "-".join(list(map(str, ref_elts)))
+        print(f"Initializing phase diagram '{pd_name}'")
         print(f"{pd_name} diagram contains following entries:")
         for entry in new_pd.qhull_entries:
             entry = PDEntry(entry.composition, entry.energy)
@@ -391,93 +448,16 @@ def _phase_diagram_init(
 
     return new_pd
 
-def phase_diagram_init(
-    entries: Sequence[PDEntry],
-    ref_elts: Optional[FormulaLike] = None,
-    from_mp_api: bool = False,
-    mp_api_key: Optional[str] = None,
-    verbose: bool = False
-) -> PhaseDiagram:
-    """
-    Compute a new PhaseDiagram object from given elements and entries.
-
-    Parameters:
-        entries ([PDEntry]):        The entries that will be put into the PhaseDiagram.
-                                    If some elemental entries are provided, they will be
-                                    used with their energy. If some elemental entries are
-                                    lacking with respect to ref_elts, they will be
-                                    initialized with energy = 0.0 eV. If some entries have
-                                    elements not referenced in provided ref_elts, they
-                                    will be ignored. This behaviour is particularly
-                                    useful if one needs to initialize several diagrams from
-                                    different parts of the same entry dataset.
-
-        ref_elts (str|Sequence):    The  elemental references of the new phase diagram.
-                                    If a single string is provided, it can either
-                                    be a raw formula (eg. 'FePO4') or a composition
-                                    string containing element symbols separated by
-                                    '-' (eg. 'Fe-P-O'). If a sequence is given, it can 
-                                    contain valid element symbols, atomic numbers and/or 
-                                    Element objects. If not provided, they are computed from 
-                                    given entries. In that case, all provided entries are 
-                                    checked, so the phase diagram will be of the minimal 
-                                    chemical space that contains all entries.
-
-        from_mp_api (bool):         Whether to get the phase diagram from the Materials 
-                                    Project REST API. If set to True, a MP API key must be
-                                    given in mp_api_key arg. In that case, ref_elts arg is
-                                    used to get the chemical space to query. If no valid
-                                    phase diagram could be fetched from MP, reverts back to
-                                    normal initialization. Defaults to False.
-
-        mp_api_key (str):           The MP API key to use to query phase diagrams from the
-                                    Materials Project REST API. If from_mp_api is set to
-                                    False, this argument is ignored.
-
-        verbose (bool):             Whether to print each reference entry used when
-                                    building a phase diagram.
-
-    Returns:
-        The constructed PhaseDiagram object.
-    """
-    check_type(entries, "entries", (Sequence,))
-    if not entries:
-        raise ValueError(
-            f"'entries' argument does not contain any entry."
-        )
-    (
-        check_type(entry, f"entries[{idx}]", (PDEntry,))
-        for idx, entry in enumerate(entries)
-    )
-    check_type(from_mp_api, "from_mp_api", (bool,))
-    check_type(verbose, "verbose", (bool,))
-
-    if not ref_elts:
-        ref_elts = get_elements_from_entries(entries)
-
-    else:
-        check_type(ref_elts, "ref_elts", (str, Sequence))
-        ref_elts = get_elements(ref_elts)
-        entries = _get_relevant_entries(entries, ref_elts)
-
-    entry_list = get_lacking_elts_entries(entries, ref_elts) + list(entries)
-
-    return _phase_diagram_init(
-        entry_list, ref_elts, from_mp_api, mp_api_key, verbose
-    )
-
 
 ########################################
 
 
 def _compute_e_above_hull(
-        entries_to_compute: List[PDEntry],
-        ref_entries: List[PDEntry],
-        stable_limit: float = 0.1,
-        from_mp_api: bool = False,
-        mp_api_key: Union[str, None] = None,
-        verbose: bool = False
-    ) -> List[Dict[str, str|float]]:
+    entries_to_compute: List[PDEntry],
+    ref_entries: List[PDEntry],
+    stable_limit: float = 0.1,
+    verbose: bool = False
+) -> List[Dict[str, str|float]]:
     """
     Initialize a phase diagram and compute above hull energies of given entries.
     """
@@ -485,12 +465,8 @@ def _compute_e_above_hull(
     # entries_to_compute is one composition group here,
     # all structures contain the same elements
     comp_refs = get_sub_entries(main_entry=entries_to_compute[0], entry_pool=ref_entries)
-    pd = phase_diagram_init(
-        entries=comp_refs,
-        from_mp_api=from_mp_api,
-        mp_api_key=mp_api_key,
-        verbose=verbose
-    )
+    pd_entries, pd_elts = _process_pd_data(entries=comp_refs)
+    pd = _phase_diagram_init(pd_entries, pd_elts, verbose=verbose)
 
     # Compute energy above hull for each generated entry
     for entry in entries_to_compute:
@@ -511,14 +487,12 @@ def _compute_e_above_hull(
     return results
 #---------------------------------------
 def batch_compute_e_above_hull(
-        entries: List[List[PDEntry]],
-        ref_entries: List[PDEntry],
-        stable_limit: float = 0.1,
-        from_mp_api: bool = False,
-        mp_api_key: str|None = None,
-        workers: int = 1,
-        verbose: bool = False
-    ) -> List[Dict[str, Union[str, float]]]:
+    entries: List[List[PDEntry]],
+    ref_entries: List[PDEntry],
+    stable_limit: float = 0.1,
+    workers: int = 1,
+    verbose: bool = False
+) -> List[Dict[str, Union[str, float]]]:
     """
     For each sublist, build the minimal phase diagram using the reference entries,
     then computes the energy above hull of all entries in the sublist.
@@ -535,18 +509,6 @@ def batch_compute_e_above_hull(
         stable_limit (float):       Threshold of the energy above hull above which
                                     the entry is considered unstable, in eV/atom.
                                     Defaults to 0.1 eV/atom.
-
-        from_mp_api (bool):         Whether to get the phase diagram from the Materials 
-                                    Project REST API. If set to True, a MP API key must
-                                    be given in mp_api_key arg. In that case, ref_elts
-                                    arg is used to get the chemical space to query.
-                                    If no valid phase diagram could be fetched from MP,
-                                    reverts back to normal initialization.
-                                    Defaults to False.
-
-        mp_api_key (str):           The MP API key to use to query phase diagrams from
-                                    the Materials Project REST API. If from_mp_api is
-                                    set to False, this argument is ignored.
 
         workers (int):              Number of parallel processes to spawn.
 
@@ -567,16 +529,8 @@ def batch_compute_e_above_hull(
         check_type(entry, f"entries ({idx}-th entry)", (PDEntry,))
         for idx, entry in enumerate(flatten(entries))     
     )
-    check_type(ref_entries, "ref_entries", (Sequence,))
-    (
-        check_type(entry, f"ref_entries[{idx}]", (PDEntry,))
-        for idx, entry in ref_entries
-    )
     check_type(stable_limit, "stable_limit", (float,))
     check_num_value(stable_limit, "stable_limit", ">=", 0.0)
-    check_type(from_mp_api, "from_mp_api", (bool,))
-    if mp_api_key is not None:
-        check_type(mp_api_key, "mp_api_key", (str,))
     check_type(workers, "workers", (int,))
     check_num_value(workers, "workers", ">", 0)
     check_type(verbose, "verbose", (bool,))
@@ -585,8 +539,6 @@ def batch_compute_e_above_hull(
         _compute_e_above_hull,
         ref_entries=ref_entries,
         stable_limit=stable_limit,
-        from_mp_api=from_mp_api,
-        mp_api_key=mp_api_key,
         verbose=verbose
     )
 

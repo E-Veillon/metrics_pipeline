@@ -1,6 +1,8 @@
 #!/usr/bin/python
 """
-A script using previous VASP relaxations to compute the relative stability of given structures.
+A script using previous VASP relaxations to compute the phase stability
+of given structures by comparing their energy with a convex hull of
+energies of refererence structures.
 
 Algorithm:
 
@@ -23,7 +25,7 @@ from datetime import datetime
 
 # LOCAL IMPORTS
 from screening_pipeline.utils import (
-    check_file_format, check_file_or_dir,
+    check_file_format, check_file_or_dir, check_num_value,
     get_max_dim, init_entries_from_dict, filter_database_entries,
     get_elements_from_entries, get_lacking_elts_entries,
     group_by_composition, batch_compute_e_above_hull,
@@ -36,7 +38,6 @@ from screening_pipeline.utils import (
 
 def _assert_args(args: argparse.Namespace) -> None:
     """Asserting input arguments validity."""
-
     check_file_or_dir(args.run_dir, "dir")
 
     if args.reference is not None:
@@ -46,13 +47,8 @@ def _assert_args(args: argparse.Namespace) -> None:
         check_file_or_dir(args.prev_summary, "file", format="json")
 
     check_file_format(args.summary, format="json")
-
-    assert args.limit >= 1e-6, (
-        "Instability energy elimination criterion must be strictly positive.\n"
-        "Moreover, any value below 1.10-6 eV/atom is too low and not supported."
-    )
-
-    assert args.workers >= 1, "The number of workers must be stricly positive."
+    check_num_value(args.limit, "--limit", ">=", float(1e-6))
+    check_num_value(args.workers, "--workers", ">", 0)
 
 
 ########################################
@@ -65,8 +61,11 @@ def main():
     # ARGUMENTS PARSING BLOCK
 
     prog_name = "stability_screening.py"
-    prog_description = "A script using previous VASP relaxations to compute the relative \
-                          stability of given structures."
+    prog_description = (
+        "A script using previous VASP relaxations to compute the phase "
+        "stability of given structures by comparing their energy with "
+        "a convex hull of energies of refererence structures."
+    )
 
     parser = argparse.ArgumentParser(
         prog=prog_name,
@@ -79,13 +78,12 @@ def main():
         help="Base directory containing structure directories.",
     )
     parser.add_argument(
-        "-r",
-        "--reference",
+        "-r", "--reference",
         help=(
             "dataset of already known structure to construct a reference convex hull "
             "and compare generated structure against it (json format).\n"
-            "If not given, the default reference hull will be defined only with elemental "
-            "entries of energy 0.0 eV/atom."
+            "If not given, the default reference hull will be defined only with "
+            "elemental entries of energy 0.0 eV/atom."
         ),
     )
     parser.add_argument(
@@ -94,14 +92,14 @@ def main():
         default=None,
         help=(
             "Path to a JSON summary file produced by a previous screening step.\n"
-            "If given, the file will be checked to filter structures that are already rejected."
+            "If given, the file will be checked to filter out structures that are "
+            "already rejected."
         ),
         metavar="/path/to/summary.json",
         dest="prev_summary"
     )
     parser.add_argument(
-        "-s",
-        "--summary",
+        "-s", "--summary",
         default="summary.json",
         help=(
             "Output file indicating calculation results for this step (json format).\n"
@@ -111,8 +109,7 @@ def main():
         ),
     )
     parser.add_argument(
-        "-l",
-        "--limit",
+        "-l", "--limit",
         type=float,
         default=0.1,
         help=(
@@ -123,28 +120,7 @@ def main():
         metavar="float",
     )
     parser.add_argument(
-        "--from-mp-api",
-        action="store_true",
-        help=(
-            "Phase diagrams will be fetched from the Materials Project API "
-            "instead of being initialized internally. In that case you must provide "
-            "a valid MP API key in the --mp-api-key argument for the program to be able "
-            "to retrieve data. If there is no MP phase diagram correponding to some "
-            "needed chemical spaces, the phase diagram will still be initialized "
-            "internally using entries in --reference as usual."
-        )
-    )
-    parser.add_argument(
-        "-k", "--mp-api-key",
-        help=(
-            "If the --from-mp-api flag is passed, you can either enter manually a valid MP "
-            "API key here or set 'PMG_MAPI_KEY' in .pmgrc.yaml for the program to be able "
-            "to fetch the phase diagrams from the Materials Project API."
-        )
-    )
-    parser.add_argument(
-        "-w",
-        "--workers",
+        "-w", "--workers",
         type=int,
         default=1,
         help="Number of parallel processes to spawn for parallelized steps.",
