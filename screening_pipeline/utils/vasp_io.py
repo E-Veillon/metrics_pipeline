@@ -25,6 +25,7 @@ from pymatgen.io.vasp.sets import (
 )
 
 # LOCAL IMPORTS
+from common_asserts import check_type, check_num_value
 from custom_types import (
     PathLike, PMGRelaxSetType, PMGStaticSetType,
     PMGRelaxSet, PMGStaticSet,
@@ -98,12 +99,7 @@ def _mitrelaxset_incar_corrections(n_sites: int|None = None) -> Dict:
 
 def _check_vasp_input(vasp_input: VaspInput) -> None:
     """Perform several tests to verify VaspInput correctness."""
-
-    if not isinstance(vasp_input, VaspInput):
-        raise TypeError(
-            "'vasp_input' argument expected a type 'pymatgen.io.vasp.VaspInput', "
-            f"got '{type(vasp_input)}' instead."
-        )
+    check_type(vasp_input, "vasp_input", (VaspInput,))
     if vasp_input.get("INCAR") is None:
         raise ValueError(
             "check_vasp_input: There is no INCAR defined in the input !"
@@ -146,17 +142,8 @@ def write_and_run_vasp(
                                 "vasp" launch command at given path.
     """
     _check_vasp_input(vasp_input)
-
-    if not isinstance(run_path, (Path, str)):
-        raise TypeError(
-            "'path' argument expected a type 'str' or 'pathlib.Path', "
-            f"got '{type(run_path)}' instead."
-        )
-    if not isinstance(vasp_exe, (Path, str)):
-        raise TypeError(
-            "'vasp_exe' argument expected a type 'str' or 'pathlib.Path', "
-            f"got '{type(vasp_exe)}' instead."
-        )
+    check_file_or_dir(run_path, "dir")
+    check_file_or_dir(vasp_exe, "file")
 
     vasp_input.write_input(output_dir=run_path)
 
@@ -244,10 +231,10 @@ def _relax_set_init(
         case str():
             raise ValueError(f"Provided string is not a valid preset name ({preset}).")
         case _:
-            raise TypeError(
-                f"'preset' arg expected a type 'str', got {type(preset)} instead."
-            )
+            check_type(preset, "preset", (str,))
+
     return preset_obj
+
 
 ########################################
 
@@ -351,10 +338,10 @@ def _static_set_init(
         case str():
             raise ValueError(f"Provided string is not a valid preset name ({preset}).")
         case _:
-            raise TypeError(
-                f"'preset' arg expected a str type, got {type(preset)} instead."
-            )
+            check_type(preset, "preset", (str,))
+
     return preset_obj
+
 
 ########################################
 
@@ -377,20 +364,14 @@ def vasp_relaxation_settings(
                                         some of the preset INCAR, KPOINTS or POTCAR
                                         settings if necessary. Defaults to None.
     """
-    assert isinstance(structure, SiteCollection), (
-        "'structure' argument expected a type "
-        "'pymatgen.core.structure.SiteCollection', "
-        f"got '{type(structure)}' instead."
-    )
+    check_type(structure, "structure", (SiteCollection,))
     assert preset in PMGRelaxSet, (
         "'preset' argument not recognized. "
         "It must be one of the allowed pymatgen relaxation presets:\n"
         f"{PMGRelaxSet}"
     )
-    assert (
-        isinstance(user_corrections, dict)
-        or user_corrections is None
-    ), "user_incar_settings must be a dict or None"
+    if user_corrections is not None:
+        check_type(user_corrections, "user_corrections", (Dict,))
 
     vasp_input = _relax_set_init(
         structure=structure,
@@ -444,21 +425,15 @@ def vasp_static_settings(
                                         the preset INCAR, KPOINTS or POTCAR settings if necessary.
                                         Defaults to None.
     """
-    assert isinstance(structure, SiteCollection) or structure is None, (
-        "'structure' argument format not supported. "
-        "It must be an instance of the SiteCollection "
-        "class or one of its subclasses."
-    )
-
+    if structure is not None:
+        check_type(structure, "structure", (SiteCollection,))
     assert preset in PMGStaticSet, (
         "'preset' argument not recognized. "
         "It must be one of the allowed pymatgen static presets:\n"
         f"{PMGStaticSet}."
     )
-
-    assert isinstance(user_corrections, dict) or user_corrections is None, (
-        "user_corrections must be a dict or None"
-    )
+    if user_corrections is not None:
+        check_type(user_corrections, "user_corrections", (Dict,))
 
     if not from_prev_calc:
         vasp_input = _static_set_init(
@@ -469,16 +444,7 @@ def vasp_static_settings(
         ).get_input_set()
 
     else:
-        assert isinstance(prev_calc_dir, (Path, str)), (
-            "'from_prev_calc' was set to True, prev_calc_dir must be provided "
-            "as 'str' or 'Path' type."
-        )
-
-        prev_calc_dir = Path(prev_calc_dir)
-
-        assert (
-            prev_calc_dir.is_dir()
-        ), f"Prev_calc_dir: {prev_calc_dir} is not a valid directory."
+        check_file_or_dir(prev_calc_dir, "dir")
 
         vasp_input = _static_set_init(
             struct_or_path=prev_calc_dir,
@@ -710,11 +676,14 @@ def extract_vasp_data_for_delta_sol_calc(
     """
     check_file_or_dir(struct_dir, "dir")
 
-    calc_dirs   = list(filter(lambda path: os.path.isdir(path), os.listdir(struct_dir)))
+    calc_dirs   = list(filter(os.path.isdir, os.listdir(struct_dir)))
     struct_dict = {}
 
     for calc_dir in calc_dirs:
-        if path_to_summary is not None and not _check_summary_data(struct_dir, path_to_summary):
+        if (
+            path_to_summary is not None
+            and not _check_summary_data(struct_dir, path_to_summary)
+        ):
             return {}
 
         calc_data = extract_vasp_data_for_delta_sol_init(
@@ -784,15 +753,20 @@ def batch_extract_vasp_data(
                                     - final energy of the relaxation in eV.
     """
     check_file_or_dir(base_dir, "dir")
-    assert os.listdir(str(base_dir))
-    assert isinstance(path_to_summary, (Path, str)) or path_to_summary is None
-    assert isinstance(workers, int) and workers >= 1
+    assert os.listdir(str(base_dir)), (
+        f"{str(base_dir)}: Directory exists but is empty."
+    )
+    if path_to_summary is not None:
+        check_type(path_to_summary, "path_to_summary", (Path, str))
+    check_type(workers, "workers", (int,))
+    check_num_value(workers, "workers", ">", 0)
 
     def is_struct_dir(path: Path) -> bool:
         #NOTE: Do not change type hint to str here, os.listdir() is not appropriate.
-        return os.path.isdir(path) and re.match(
-            r"\A[0-9]+_[A-Za-z0-9\(\)]+\Z", os.path.basename(path)
-        ) is not None
+        return (
+            path.is_dir()
+            and re.match(r"\A[0-9]+_[A-Za-z0-9\(\)]+\Z", path.name) is not None
+        )
 
     match method:
         case "convex_hull":
@@ -817,9 +791,7 @@ def batch_extract_vasp_data(
                 "'convex_hull', 'delta_sol_init', 'delta_sol_calc'."
             )
         case _:
-            raise TypeError(
-                f"'method' expected a type 'str', got '{type(method)}' instead."
-            )
+            check_type(method, "method", (str,))
 
     #NOTE: Do not change the Path object here, os.listdir() is not appropriate
     structs_dir_list = list(filter(is_struct_dir, Path(base_dir).iterdir()))
@@ -893,6 +865,9 @@ def batch_extract_vasp_structures(
     Returns: (List[Tuple[Structure, Structure]])
         List of loaded structures.
     """
+    check_type(workers, "workers", (int,))
+    check_num_value(workers, "workers", ">", 0)
+
     return list(filter(
         lambda tup: tup != (None, None),
         process_map(

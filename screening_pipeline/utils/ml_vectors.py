@@ -12,10 +12,19 @@ import tqdm
 # PYTHON MATERIALS GENOMICS
 from pymatgen.core import Structure, Element
 
+# LOCAL IMPORTS
+from common_asserts import check_type
+
+
+########################################
+
 
 def _species_to_tensor(elements: List[Element]):
     """Convert Element objects to a Tensor containing their atomic numbers."""
     return torch.tensor([e.Z for e in elements], dtype=torch.long)
+
+
+########################################
 
 
 class StructuresDataset(Dataset):
@@ -56,6 +65,9 @@ class StructuresDataset(Dataset):
         return StructureData(z=self.z[idx], pos=self.x[idx], cell=self.cell[idx])
 
 
+########################################
+
+
 @torch.no_grad
 def vectors_from_alignn(
     structures: List[Structure],
@@ -68,6 +80,15 @@ def vectors_from_alignn(
     Computes vector representation of structures with ALIGNN
     (latent or energy representation).
     """
+    check_type(structures, "structures", (List,))
+    (
+        check_type(struct, f"structures[{idx}]", (Structure,))
+        for idx, struct in enumerate(structures)
+    )
+    check_type(batch_size, "batch_size", (int,))
+    if device is not None:
+        check_type(device, "device", (torch.device,))
+    check_type(model_name, "model_name", (str,))
     assert output in {"latent", "energy"}
 
     if device is None:
@@ -93,3 +114,6 @@ def vectors_from_alignn(
         latent.append(alignn(batch, latent=is_latent(output)).detach())
 
     return torch.cat(latent).numpy()
+
+
+########################################

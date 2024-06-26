@@ -13,6 +13,7 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmetrizedStructure
 
 # LOCAL IMPORTS
+from common_asserts import check_type, check_num_value
 from redirect import redirect_c_stdout, redirect_c_stderr
 
 ########################################
@@ -53,10 +54,11 @@ def structure_symmetrizer(
         A Pymatgen SymmetrizedStructure object if symmetry detection worked properly,
         or the original Structure object if it could not detect any symmetry.
     '''
-
-    assert isinstance(structure, Structure)
-    assert isinstance(symprec, float)
-    assert isinstance(angle_tolerance, float)
+    check_type(structure, "structure", (Structure,))
+    check_type(symprec, "symprec", (float,))
+    check_num_value(symprec, "symprec", ">=", 0.0)
+    check_type(angle_tolerance, "angle_tolerance", (float,))
+    check_num_value(angle_tolerance, "angle_tolerance", ">=", 0.0)
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
 
@@ -111,9 +113,15 @@ def batch_symmetrizer(
         when symmetry detection worked properly, or the unchanged
         Structure object if symmetry detection failed.
     '''
-
-    #def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
-    #    return [(struct, symprec, angle_tolerance) for struct in structures]
+    check_type(structures, "structures", (List,))
+    (
+        check_type(struct, f"structures[{idx}]", (Structure,))
+        for idx, struct in enumerate(structures)
+    )
+    check_type(symprec, "symprec", (float,))
+    check_num_value(symprec, "symprec", ">=", 0.0)
+    check_type(angle_tolerance, "angle_tolerance", (float,))
+    check_num_value(angle_tolerance, "angle_tolerance", ">=", 0.0)
 
     nbr_structs = len(structures)
     chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
@@ -133,5 +141,6 @@ def batch_symmetrizer(
             desc='Symmetrize structures'
         )
     ))
+
 
 ########################################

@@ -64,6 +64,7 @@ from .ml_vectors import vectors_from_alignn
 from .rmsd import rmsd_from_structures
 
 # Other modules
+from .common_asserts import check_type, check_num_value
 from .custom_types import (
     PathLike, FormulaLike,
     PMGRelaxSetType, PMGStaticSetType,
@@ -75,10 +76,10 @@ from .redirect import redirect_c_stdout, redirect_c_stderr
 __all__ = [
     # I/O
     "read_cif", "write_cif",    # cif_io
-    "MAINDIRPATH", "SCRIPTSPATH", "UTILSPATH", "CONFIGPATH",    # file_io
-    "check_file_or_dir", "add_new_dir", "yaml_loader",          #
+    "MAINDIRPATH", "SCRIPTSPATH", "UTILSPATH", "CONFIGPATH",                # file_io
+    "check_file_format", "check_file_or_dir", "add_new_dir", "yaml_loader", #
     "vasp_relaxation_settings", "vasp_static_settings",                 # vasp_io
-    "write_and_run_vasp", "converged_vasprun",                          #                      #
+    "write_and_run_vasp", "converged_vasprun",                          #
     "extract_vasp_data_for_delta_sol_init", "batch_extract_vasp_data",  #
     "batch_extract_vasp_structures",                                    #
     # Chemistry
@@ -114,6 +115,7 @@ __all__ = [
     "vectors_from_alignn",  # ml_vectors
     "rmsd_from_structures", # rmsd
     # Other
+    "check_type", "check_num_value",    # common_asserts
     "PathLike", "FormulaLike",              # custom_types
     "PMGRelaxSetType", "PMGStaticSetType",  #
     "PMGRelaxSet", "PMGStaticSet",          #

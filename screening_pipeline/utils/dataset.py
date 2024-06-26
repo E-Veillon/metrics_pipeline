@@ -10,7 +10,8 @@ from emmet.core.thermo import ThermoType
 from pymatgen.core import SETTINGS, Composition
 
 # LOCAL IMPORTS
-from file_io import check_file_or_dir
+from common_asserts import check_type
+from file_io import check_file_format, check_file_or_dir
 
 
 ########################################
@@ -55,6 +56,9 @@ def mp_api_download(path: str, api_key: str|None = None) -> None:
                         If not given directly, it is searched in .pmgrc.yaml with
                         the "PMG_MAPI_KEY" variable.
     """
+    check_file_format(path, format="json")
+    if api_key is not None:
+        check_type(api_key, "api_key", (str,))
     api_key = _mp_api_key_check(api_key)
 
     with MPRester(
@@ -88,11 +92,9 @@ def mp_api_download(path: str, api_key: str|None = None) -> None:
 
 def mp_api_print_avail_fields(endpoint: str, api_key: str|None = None) -> None:
     """Print the list of available fields corresponding to given MPRester endpoint."""
-    if not isinstance(endpoint, str):
-        raise TypeError(
-            f"'endpoint' arg expected a type 'str', got '{type(endpoint)}' instead."
-        )
-
+    check_type(endpoint, "endpoint", (str,))
+    if api_key is not None:
+        check_type(api_key, "api_key", (str,))
     api_key = _mp_api_key_check(api_key)
 
     with MPRester(api_key) as mpr:
@@ -187,6 +189,8 @@ def process_oqmd_json_file(path: str) -> None:
 
 def load_phase_diagram_entries(filename: str) -> dict:
     """Load entries data from a JSON file."""
+    check_file_or_dir(filename, "file", format="json")
+
     print(f"Loading {filename}...")
     with open(filename, "rt", encoding="utf-8") as fp:
         entries = json.load(fp)

@@ -13,6 +13,7 @@ from pymatgen.analysis.phase_diagram import Entry
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 # LOCAL IMPORTS
+from common_asserts import check_type, check_num_value
 from flattener import flatten
 
 
@@ -38,12 +39,15 @@ def check_interatomic_distances(
         List[SiteCollection]: list of valid structures.
         int: Number of invalid structures discarded.
     '''
-    def _is_valid(structure: SiteCollection):
-        return structure.is_valid(tol=valid_tol)
+    check_type(structures, "structures", (Sequence,))
+    (
+        check_type(struct, f"structures[{idx}]", (SiteCollection,))
+        for idx, struct in enumerate(structures)
+    )
+    check_type(valid_tol, "valid_tol", (float,))
 
-    assert isinstance(structures, Sequence)
-    assert all(isinstance(structure, SiteCollection) for structure in structures)
-    assert isinstance(valid_tol, float)
+    def _is_valid(structure: SiteCollection) -> bool:
+        return structure.is_valid(tol=valid_tol)
 
     valid_structs = list(filter(_is_valid, structures))
     nbr_discarded = len(structures) - len(valid_structs)
@@ -67,9 +71,7 @@ def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
     Returns:
         int: The hash.
     """
-
-    assert isinstance(comp, (Composition, Entry, SiteCollection)), \
-    f"Given object type is not supported ({type(comp)})."
+    check_type(comp, "comp", (Composition, Entry, SiteCollection))
 
     if isinstance(comp, Composition):
         return hash(comp.fractional_composition)
@@ -95,10 +97,13 @@ def group_by_stoichiometry(
         A list containing lists of objects with the same fractionnal composition.
     """
 
-    assert isinstance(comps, Sequence)
+    check_type(comps, "comps", (Sequence,))
     if not comps:
         return []
-
+    (
+        check_type(comp, f"comps[{idx}]", (Composition, Entry, SiteCollection))
+        for idx, comp in enumerate(comps)
+    )
     sorted_comps = sorted(comps, key=hash_stoichiometry)
 
     return [
@@ -122,8 +127,7 @@ def hash_composition(comp: Union[Composition, Entry, SiteCollection]) -> int:
         int: The hash.
     """
 
-    assert isinstance(comp, (Composition, Entry, SiteCollection)), \
-    f"Given object type is not supported ({type(comp)})."
+    check_type(comp, "comp", (Composition, Entry, SiteCollection))
 
     if isinstance(comp, Composition):
         return hash(comp)
@@ -149,9 +153,13 @@ def group_by_composition(
         A list of lists of objects containing the same elements.
     """
 
-    assert isinstance(comps, Sequence)
+    check_type(comps, "comps", (Sequence,))
     if not comps:
         return []
+    (
+        check_type(comp, f"comps[{idx}]", (Composition, Entry, SiteCollection))
+        for idx, comp in enumerate(comps)
+    )
 
     sorted_comps = sorted(comps, key=hash_composition)
 
@@ -238,6 +246,15 @@ def batch_group_by_equivalence(
     A list containing lists of same composition containing lists of equivalent structures,
     and total count of unmatched structures (equal to zero if test_volume is set to False).
     """
+    check_type(structures, "structures", (Sequence,))
+    (
+        check_type(struct, f"structures[{idx}]", (Structure,))
+        for idx, struct in enumerate(structures)
+    )
+    check_type(test_volume, "test_volume", (bool,))
+    check_type(workers, "workers", (int,))
+    check_num_value(workers, "workers", ">", 0)
+    check_type(comment, "comment", (str,))
 
     nbr_struct    = len(structures)
     chunksize     = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
@@ -295,6 +312,15 @@ def remove_equivalent(
         Int: The number of discarded structures.
         Int: The number of unmatched structures (zero if test_volume = False).
     """
+    check_type(structures, "structures", (Sequence,))
+    (
+        check_type(struct, f"structures[{idx}]", (Structure,))
+        for idx, struct in enumerate(structures)
+    )
+    check_type(test_volume, "test_volume", (bool,))
+    check_type(workers, "workers", (int,))
+    check_num_value(workers, "workers", ">", 0)
+    check_type(keep_equivalent, "keep_equivalent", (bool,))
 
     process_description = (
         "removing duplicates" if not keep_equivalent
@@ -369,14 +395,8 @@ def batch_get_novel_structures(
     Returns: List[Structure]
     The list of novel structures not seen in the dataset.
     """
-    if not isinstance(workers, int):
-        raise TypeError(
-            f"'workers arg expected a type 'int', got {type(workers)} instead."
-        )
-    if workers < 1:
-        raise ValueError(
-            f"'workers' arg must be strictly positive (got {workers})."
-        )
+    check_type(workers, "workers", (int,))
+    check_num_value(workers, "workers", ">", 0)
 
     get_novel_structs = partial(_get_novel_structures, dataset=dataset)
 
@@ -388,3 +408,6 @@ def batch_get_novel_structures(
     )
     novel_structs = flatten(novel_structs)
     return novel_structs
+
+
+########################################

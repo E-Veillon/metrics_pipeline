@@ -67,9 +67,13 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         prog="perturbator.py",
-        description="A script to generate randomly perturbated structures from given structures in a CIF file.",
+        description=(
+            "A script to generate randomly perturbated structures "
+            "from given structures in a CIF file."
+        ),
         epilog=(
-            "Usage example: python perturbator.py structs.cif -p sites a b angles -b 0.05 0.1 0.1 2.0\n"
+            "Usage example:\n"
+            "python perturbator.py structs.cif -p sites a b angles -b 0.05 0.1 0.1 2.0\n"
             "This set will perturb randomly:\n"
             "- sites positions from 0 to 0.05 angstroms from their original positions,\n"
             "- length of lattice vector 'a' from 0 to 0.1 angstroms from its original value,\n"
@@ -90,7 +94,8 @@ def main() -> None:
         default=None,
         help=(
             "Path to the output CIF file to write perturbed structures.\n"
-            "By default, it is written at the same path as the input file with a '_perturb' suffix in name.\n"
+            "By default, it is written at the same path as the input file "
+            "with a '_perturb' suffix in name.\n"
         )
     )
     parser.add_argument(
@@ -101,12 +106,16 @@ def main() -> None:
         help=(
             "Defines which parameters will be perturbed. Supported args are listed below:\n"
             "- 'sites': perturbs sites positions in lattice (in angstroms).\n"
-            "- 'lengths': perturbs all lattice vectors lengths in angstroms (a, b, c) with same limit amplitudes.\n"
-            "- 'angles': perturbs all lattice angles in degrees (alpha, beta, gamma) with same limit amplitudes.\n"
+            "- 'lengths': perturbs all lattice vectors lengths in angstroms "
+            "(a, b, c) with same limit amplitudes.\n"
+            "- 'angles': perturbs all lattice angles in degrees (alpha, beta, gamma) "
+            "with same limit amplitudes.\n"
             "- 'a', 'b', 'c': perturbs corresponding lattice vector length in angstroms.\n"
             "- 'alpha', 'beta', 'gamma': perturbs corresponding lattice angle in degrees.\n"
-            "Several args can be given at once in any order, they will be combined to perturb specific sets of parameters\n"
-            "(e.g. '-p sites a b alpha' will perturb sites positions, a, b and alpha lattice parameters).\n"
+            "Several args can be given at once in any order, they will be combined to perturb "
+            "specific sets of parameters\n"
+            "(e.g. '-p sites a b alpha' will perturb sites positions, a, b and alpha "
+            "lattice parameters).\n"
             "If some parameters are overlapping, an error is raised.\n"
             "By default, only sites will be perturbed and lattice will remain untouched.\n"
         )

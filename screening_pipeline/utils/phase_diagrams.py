@@ -4,7 +4,7 @@ process phase diagram entries, and compute energy above hull of entries.
 """
 
 
-from typing import Dict, Union, Sequence, Any, List, Optional
+from typing import Dict, Union, Sequence, Any, List, Optional, Set
 from functools import partial
 from tqdm.contrib.concurrent import process_map
 
@@ -17,8 +17,9 @@ from mp_api.client import MPRester
 from emmet.core.thermo import ThermoType
 
 # LOCAL IMPORTS
-from flattener import flatten
+from common_asserts import check_type, check_num_value
 from custom_types import FormulaLike
+from flattener import flatten
 from matcher import group_by_composition
 from periodic_table import get_elements
 
@@ -28,6 +29,11 @@ from periodic_table import get_elements
 
 def get_max_dim(entries: Sequence[PDEntry]) -> int:
     """Search for the maximum number of distinct elements in given entries."""
+    check_type(entries, "entries", (Sequence,))
+    (
+        check_type(entry, f"entries[{idx}]", (PDEntry,))
+        for idx, entry in enumerate(entries)
+    )
     return max(len(entry.elements) for entry in entries)
 
 
@@ -52,10 +58,17 @@ def init_entries_from_dict(
     Returns:
         List[PDEntry]: The list of phase diagram entries.
     """
-    if not isinstance(entries_dict, Dict):
-        raise TypeError(
-            f"'entries_dict' arg expected a type 'dict', got '{type(entries_dict)}' instead."
-        )
+    check_type(entries_dict, "entries_dict", (Dict,))
+    (
+        check_type(key, f"entries_dict.keys()[{idx}]", (str,))
+        for idx, key in enumerate(entries_dict.keys())
+    )
+    (
+        check_type(val, f"entries_dict.values()[{idx}]", (Dict,))
+        for idx, val in enumerate(entries_dict.values())
+    )
+    if attribute is not None:
+        check_type(attribute, "attribute", (str,))
 
     print(f"Convert {len(entries_dict)} '{attribute}' structures to entries...")
     entries_list = [
@@ -97,9 +110,11 @@ def filter_database_entries(
         List[PDEntry]: List of useful entries.
     """
 
-    assert isinstance(entries, (Dict, List))
-    assert isinstance(max_dim, int) or max_dim is None
-    assert isinstance(ref_elts, List) or ref_elts is None
+    check_type(entries, "entries", (Dict, List))
+    if max_dim is not None:
+        check_type(max_dim, "max_dim", (int,))
+    if ref_elts is not None:
+        check_type(ref_elts, "ref_elts", (List,))
 
     print("Filtering reference dataset...")
 
@@ -133,11 +148,13 @@ def get_elements_from_entries(entries: Sequence[PDEntry]) -> List[Element]:
     Returns:
         The list of found Element objects.
     """
-
-    assert isinstance(entries, Sequence)
+    check_type(entries, "entries", (Sequence,))
     if not entries:
         return []
-    assert all(isinstance(entry, PDEntry) for entry in entries)
+    (
+        check_type(entry, f"entries[{idx}]", (PDEntry,))
+        for idx, entry in enumerate(entries)
+    )
     if len(entries) == 1:
         return entries[0].elements
 
@@ -171,13 +188,24 @@ def group_by_dim_and_comp(
         List[List[List[PDEntry]]]: List of lists of entries of same dimension sorted
         in sublists according to their composition.
     """
+    check_type(entries, "entries", (Sequence,))
+    if not entries:
+        return []
+    (
+        check_type(entry, f"entries[{idx}]", (PDEntry,))
+        for idx, entry in enumerate(entries)
+    )
+    if max_dim is not None:
+        check_type(max_dim, "max_dim", (int,))
+    check_type(workers, "workers", (int,))
 
     def _group_one_dim(entries: Sequence[PDEntry], dim: int):
+        """Group all entries of a specific dimension by composition."""
         dim_group = list(filter(lambda entry: len(entry.elements) == dim, entries))
         grouped_entries = group_by_composition(dim_group)
         return grouped_entries
 
-    initial_group = [[]]  # fill the index 0 to match indexes and entries dimensionality
+    initial_group = [[]]  # fill the index 0 to match indexes and entries dimension
 
     if max_dim is None:
         max_dim = get_max_dim(entries)
@@ -215,14 +243,13 @@ def get_sub_entries(
         The list of all found sub-entries relative to the main entry.
     """
 
-    assert isinstance(main_entry, PDEntry)
-    assert isinstance(entry_pool, Sequence)
+    check_type(main_entry, "main_entry", (PDEntry,))
+    check_type(entry_pool, "entry_pool", (Sequence,))
     if not entry_pool:
         return []
-    assert all(isinstance(entry, PDEntry) for entry in entry_pool), (
-        "Some of given entries in 'entry_pool' arguments are not instances of PDEntry class.\n"
-        "See below the set of types found in the argument:\n"
-        f"{set([type(entry) for entry in entry_pool])}"
+    (
+        check_type(entry, f"entry_pool[{idx}]", (PDEntry,))
+        for idx, entry in enumerate(entry_pool)
     )
 
     sub_entries = list(
@@ -280,10 +307,16 @@ def get_lacking_elts_entries(
     Returns:
         A list of auto-defined elemental entries.
     """
+    check_type(entries, "entries", (Sequence,))
+    check_type(ref_elts, "ref_elts", (Sequence, Set))
 
     if not entries:
         user_elt_entries = []
     else:
+        (
+            check_type(entry, f"entries[{idx}]", (PDEntry,))
+            for idx, entry in enumerate(entries)
+        )
         user_elt_entries = list(
             filter(
                 lambda entry: entry.is_element and entry.elements[0] in ref_elts,
@@ -314,11 +347,55 @@ def get_lacking_elts_entries(
 ########################################
 
 
+def _phase_diagram_init(
+    entries: Sequence[PDEntry],
+    ref_elts: Optional[FormulaLike] = None,
+    from_mp_api: bool = False,
+    mp_api_key: Optional[str] = None,
+    verbose: bool = False
+):
+    """Compute a new PhaseDiagram object from given elements and entries."""
+    pd_name = "-".join(list(map(str, ref_elts)))
+    print(f"Initializing phase diagram '{pd_name}'")
+
+    if from_mp_api:
+        mp_api_key = mp_api_key or SETTINGS.get("PMG_MAPI_KEY", None)
+        if not mp_api_key:
+            raise ValueError(
+                "'from-mp-api' was set to True but no 'mp-api-key' was defined. "
+                "You can define it either by entering the key manually or "
+                "add PMG_MAPI_KEY to .pmgrc.yaml."
+            )
+        try:
+            with MPRester(mp_api_key) as mpr:
+                new_pd = mpr.materials.thermo.get_phase_diagram_from_chemsys(
+                    chemsys=pd_name, thermo_type=ThermoType.GGA_GGA_U
+                )
+        except Exception:
+            # Building a default phase diagram after all
+            new_pd = PhaseDiagram(entries=entries, elements=ref_elts)
+            return new_pd
+
+        if not new_pd.all_entries: # No explicit exception but no entry in the diagram
+            new_pd = PhaseDiagram(entries=entries, elements=ref_elts)
+            return new_pd
+
+    else:
+        new_pd = PhaseDiagram(entries=entries, elements=ref_elts)
+
+    if verbose:
+        print(f"{pd_name} diagram contains following entries:")
+        for entry in new_pd.qhull_entries:
+            entry = PDEntry(entry.composition, entry.energy)
+            print(f"{entry}, energy_per_atom = {entry.energy_per_atom}")
+
+    return new_pd
+
 def phase_diagram_init(
     entries: Sequence[PDEntry],
     ref_elts: Optional[FormulaLike] = None,
     from_mp_api: bool = False,
-    mp_api_key: str|None = None,
+    mp_api_key: Optional[str] = None,
     verbose: bool = False
 ) -> PhaseDiagram:
     """
@@ -363,55 +440,31 @@ def phase_diagram_init(
     Returns:
         The constructed PhaseDiagram object.
     """
-
-    assert entries and isinstance(entries, Sequence)
-    assert all(isinstance(entry, PDEntry) for entry in entries)
+    check_type(entries, "entries", (Sequence,))
+    if not entries:
+        raise ValueError(
+            f"'entries' argument does not contain any entry."
+        )
+    (
+        check_type(entry, f"entries[{idx}]", (PDEntry,))
+        for idx, entry in enumerate(entries)
+    )
+    check_type(from_mp_api, "from_mp_api", (bool,))
+    check_type(verbose, "verbose", (bool,))
 
     if not ref_elts:
         ref_elts = get_elements_from_entries(entries)
 
     else:
-        assert isinstance(ref_elts, Sequence)
+        check_type(ref_elts, "ref_elts", (str, Sequence))
         ref_elts = get_elements(ref_elts)
         entries = _get_relevant_entries(entries, ref_elts)
 
     entry_list = get_lacking_elts_entries(entries, ref_elts) + list(entries)
 
-    pd_name = "-".join(list(map(str, ref_elts)))
-    print(f"Initializing phase diagram '{pd_name}'")
-
-    if from_mp_api:
-        mp_api_key = mp_api_key or SETTINGS.get("PMG_MAPI_KEY", None)
-        if not mp_api_key:
-            raise ValueError(
-                "'from-mp-api' was set to True but no 'mp-api-key' was defined. "
-                "You can define it either by entering the key manually or "
-                "add PMG_MAPI_KEY to .pmgrc.yaml."
-            )
-        try:
-            with MPRester(mp_api_key) as mpr:
-                new_pd = mpr.materials.thermo.get_phase_diagram_from_chemsys(
-                    chemsys=pd_name, thermo_type=ThermoType.GGA_GGA_U
-                )
-        except Exception:
-            # Building a default phase diagram after all
-            new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
-            return new_pd
-
-        if not new_pd.all_entries: # No explicit exception but 0 entry in the diagram
-            new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
-            return new_pd
-
-    else:
-        new_pd = PhaseDiagram(entries=entry_list, elements=ref_elts)
-
-    if verbose:
-        print(f"{pd_name} diagram contains following entries:")
-        for entry in new_pd.qhull_entries:
-            entry = PDEntry(entry.composition, entry.energy)
-            print(f"{entry}, energy_per_atom = {entry.energy_per_atom}")
-
-    return new_pd
+    return _phase_diagram_init(
+        entry_list, ref_elts, from_mp_api, mp_api_key, verbose
+    )
 
 
 ########################################
@@ -443,10 +496,11 @@ def _compute_e_above_hull(
     for entry in entries_to_compute:
         e_above_hull = pd.get_e_above_hull(entry, allow_negative=True)
         is_stable = e_above_hull <= stable_limit
-        print(f"Entry '{entry.name}':")
-        print(f"- energy_per_atom: {entry.energy_per_atom}")
-        print(f"- e_above_hull: {e_above_hull}")
-        print(f"- is_stable: {is_stable}")
+        if verbose:
+            print(f"Entry '{entry.name}':")
+            print(f"- energy_per_atom: {entry.energy_per_atom}")
+            print(f"- e_above_hull: {e_above_hull}")
+            print(f"- is_stable: {is_stable}")
         results.append(
             {
                 "name": entry.name,
@@ -457,7 +511,7 @@ def _compute_e_above_hull(
     return results
 #---------------------------------------
 def batch_compute_e_above_hull(
-        entries_to_compute: List[List[PDEntry]],
+        entries: List[List[PDEntry]],
         ref_entries: List[PDEntry],
         stable_limit: float = 0.1,
         from_mp_api: bool = False,
@@ -504,6 +558,28 @@ def batch_compute_e_above_hull(
         and stringified (for JSON serailization) stability test boolean for one entry
         structure each.
     """
+    check_type(entries, "entries", (Sequence,))
+    (
+        check_type(entry_group, f"entries[{idx}]", (Sequence,))
+        for idx, entry_group in entries
+    )
+    (
+        check_type(entry, f"entries ({idx}-th entry)", (PDEntry,))
+        for idx, entry in enumerate(flatten(entries))     
+    )
+    check_type(ref_entries, "ref_entries", (Sequence,))
+    (
+        check_type(entry, f"ref_entries[{idx}]", (PDEntry,))
+        for idx, entry in ref_entries
+    )
+    check_type(stable_limit, "stable_limit", (float,))
+    check_num_value(stable_limit, "stable_limit", ">=", 0.0)
+    check_type(from_mp_api, "from_mp_api", (bool,))
+    if mp_api_key is not None:
+        check_type(mp_api_key, "mp_api_key", (str,))
+    check_type(workers, "workers", (int,))
+    check_num_value(workers, "workers", ">", 0)
+    check_type(verbose, "verbose", (bool,))
 
     energy_computer = partial(
         _compute_e_above_hull,
@@ -516,7 +592,7 @@ def batch_compute_e_above_hull(
 
     computed_energies = process_map(
         energy_computer,
-        entries_to_compute,
+        entries,
         max_workers=workers,
         chunksize=1,
         desc="Compute above hull energies"

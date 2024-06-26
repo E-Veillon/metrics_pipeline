@@ -7,6 +7,13 @@ import numpy as np
 # PYTHON MATERIALS GENOMICS
 from pymatgen.core import Structure
 
+# LOCAL IMPORTS
+from common_asserts import check_type
+
+
+########################################
+
+
 def _volume_cm3(s: Structure) -> float:
     """Get the structure volume in cm^3."""
     return s.volume*1e-24
@@ -17,4 +24,11 @@ def _mass_g(s: Structure) -> float:
 
 def get_densities(structures: List[Structure]) -> np.ndarray:
     """Computes structure volumic mass in g / cm^3."""
+    (
+        check_type(struct, "structures[{idx}]", (Structure,))
+        for idx, struct in enumerate(structures)
+    )
     return np.array([_mass_g(s)/_volume_cm3(s) for s in structures])
+
+
+########################################

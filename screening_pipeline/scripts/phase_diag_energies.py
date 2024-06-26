@@ -211,7 +211,7 @@ def main():
 
     # Compute energy above hulls in each group
     screening_results = batch_compute_e_above_hull(
-        entries_to_compute=grouped_entries,
+        entries=grouped_entries,
         ref_entries=ref_entries,
         stable_limit=delta_H_limit,
         from_mp_api=args.from_mp_api,

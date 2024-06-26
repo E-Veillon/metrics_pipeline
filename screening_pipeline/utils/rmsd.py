@@ -53,7 +53,7 @@ def _center_around_zero(x: torch.FloatTensor) -> torch.FloatTensor:
     return (x + 0.5) % 1.0 + 0.5
 
 
-def polar(a: torch.FloatTensor) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
+def _polar(a: torch.FloatTensor) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
     w, s, vh = torch.linalg.svd(a)
     u = w @ vh
     return u, (vh.mT.conj() * s[:, None, :]) @ vh
@@ -71,8 +71,8 @@ def rmsd(
         num_atoms
     )
 
-    _, cell_src = polar(cell_src)
-    _, cell_dst = polar(cell_dst)
+    _, cell_src = _polar(cell_src)
+    _, cell_dst = _polar(cell_dst)
     x_src = _center_around_zero(x_src)
     x_dst = _center_around_zero(x_dst)
 

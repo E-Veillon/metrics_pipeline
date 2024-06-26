@@ -23,7 +23,6 @@ def flatten(sequence: Sequence[Any], level_of_flattening: int = 1) -> List:
     Returns:
         A list flattened the specified number of times.
     """
-
     for _ in range(1, level_of_flattening + 1):
         sequence = list(itertools.chain.from_iterable(sequence))
     return sequence

@@ -13,11 +13,14 @@ from pymatgen.io.vasp import VaspInput
 from pymatgen.io.vasp.sets import MPRelaxSet
 
 # LOCAL IMPORTS
-from periodic_table import get_all_valence_electrons
-from file_io import CONFIGPATH, yaml_loader
-from vasp_io import vasp_static_settings
+from common_asserts import check_type, check_num_value
 from custom_types import PathLike, PMGStaticSetType, PMGStaticSet
+from file_io import CONFIGPATH, check_file_or_dir, yaml_loader
 from fitted_values import EL_PER_XC_VOL
+from periodic_table import get_all_valence_electrons
+from vasp_io import vasp_static_settings
+
+
 
 
 ########################################
@@ -62,7 +65,7 @@ class DSolStaticSet(MPRelaxSet):
             incar_nelect: float|None = None,
             **kwargs
         ) -> None:
-        """DeltaSolStaticSet init."""
+        """DSolStaticSet init."""
         super().__init__(structure, **kwargs)
 
         if incar_nelect is None:
@@ -102,6 +105,10 @@ def get_dsol_struct_dir(
         Tuple[str, int, int]:
         path to the structure directory, structure index and calculation ID.
     """
+    check_file_or_dir(path, "dir")
+    check_type(task_id, "task_id", (int,))
+    check_num_value(task_id, "task_id", ">=", 0)
+    check_type(with_uncertainties, "with_uncertainties", (bool,))
 
     tasks_per_struct = 7 if with_uncertainties else 3
     struct_idx = task_id // tasks_per_struct
@@ -134,6 +141,8 @@ def get_dsol_struct_dir(
 
 def calc_idx_to_dir_name(struct_dir_name: str, calc_index: int) -> str:
     """Maps calculation index to corresponding calculation name."""
+    check_type(struct_dir_name, "struct_dir_name", (str,))
+
     match calc_index:
         case 0:
             calc_type = "neutral"
@@ -150,14 +159,10 @@ def calc_idx_to_dir_name(struct_dir_name: str, calc_index: int) -> str:
         case 6:
             calc_type = "max_minus"
         case int():
-            raise ValueError(
-                f"Only int from 0 to 6 supported, got {calc_index}"
-            )
+            check_num_value(calc_index, "calc_index", ">=", 0)
+            check_num_value(calc_index, "calc_index", "<=", 6)
         case _:
-            raise TypeError(
-                "'calc_index' expected a type 'int', "
-                f"got '{type(calc_index)}' instead."
-            )
+            check_type(calc_index, "calc_index", (int,))
     return "_".join((struct_dir_name, calc_type))
 
 
@@ -177,6 +182,8 @@ def get_dsol_n_ratio(
         M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
         (reference 32 in screening_pipeline/Bibliography)
     '''
+    check_type(structure, "structure", (SiteCollection,))
+
     val_elec_type = 'sp'
 
     for elt in structure.elements:
@@ -249,7 +256,7 @@ def _match_calc_index(calc_index: int) -> str|None:
 def dsol_calc_init(
         structure: Structure,
         calc_index: int,
-        preset: PMGStaticSetType|"DSolStaticSet" = "DeltaSolStaticSet",
+        preset: PMGStaticSetType|"DSolStaticSet" = "DSolStaticSet",
         user_corrections: Optional[Dict[str, Any]] = None,
     ) -> VaspInput:
     """
@@ -269,7 +276,7 @@ def dsol_calc_init(
                                     5-6 = E(N0 + n), E(N0 - n) respectively, using N*_max.
 
         preset (str):               A pymatgen VASP static preset, or the homemade
-                                    DeltaSolStaticSet. Defaults to DeltaSolStaticSet.
+                                    DSolStaticSet. Defaults to DSolStaticSet.
 
         user_corrections (dict):    Additional corrections provided by the user in a
                                     separate .yaml file.
@@ -277,33 +284,19 @@ def dsol_calc_init(
     Returns:
         The corresponding VaspInput object.
     """
-    if not isinstance(structure, Structure):
-        raise TypeError(
-            "'structure' argument expected a type 'pymatgen.core.structure.Structure', "
-            f"got '{type(structure)}' instead."
-        )
-    if not isinstance(calc_index, int):
-        raise TypeError(
-            "'calc_index' argument expected a type 'int', "
-            f"got '{type(calc_index)}' instead."
-        )
-    if not 0 <= calc_index <= 6:
-        raise ValueError(
-            "'calc_index' argument value must be between 0 and 6 included, "
-            f"got {calc_index}."
-        )
-    if not preset in PMGStaticSet or preset == "DeltaSolStaticSet":
+    check_type(structure, "structure", (Structure,))
+    check_type(calc_index, "calc_index", (int,))
+    check_num_value(calc_index, "calc_index", ">=", 0)
+    check_num_value(calc_index, "calc_index", "<=", 6)
+    if not preset in PMGStaticSet and not preset == "DSolStaticSet":
         raise ValueError(
             "'preset' argument value is not a supported preset. "
             "Supported presets are:\n"
-            f"{PMGStaticSet + set(('DeltaSolStaticSet',))}\n"
+            f"{PMGStaticSet + set(('DSolStaticSet',))}\n"
             f"'preset' got value '{preset}' instead."
         )
-    if not isinstance(user_corrections, Dict) and user_corrections is not None:
-        raise TypeError(
-            "'user_corrections' expected a type 'dict', "
-            f"got '{type(user_corrections)}' instead."
-        )
+    if user_corrections is not None:
+        check_type(user_corrections, "user_corrections", (Dict,))
 
     nb_val_elec = get_all_valence_electrons(structure)
     run_set = vasp_static_settings(structure, preset, user_corrections=user_corrections)
@@ -321,14 +314,14 @@ def dsol_calc_init(
         )
         nelect = nb_val_elec + n_ratio if calc_index % 2 == 1 else nb_val_elec - n_ratio
 
-        if preset == "DeltaSolStaticSet":
+        if preset == "DSolStaticSet":
             run_set = vasp_static_settings(
                 structure, preset, nelect=nelect, user_corrections=user_corrections
             )
     else:
         nelect = nb_val_elec
 
-    if preset != "DeltaSolStaticSet":
+    if preset != "DSolStaticSet":
         run_dict = run_set.as_dict()
         run_dict["INCAR"].update({"NELECT": nelect})
         run_set = VaspInput.from_dict(run_dict)
@@ -361,6 +354,7 @@ def get_dsol_band_gap(data: dict) -> Union[Tuple[str, float], Tuple[str, float, 
     Returns:
         The name of the structure and its band gap value(s).
     """
+    check_type(data, "data", (Dict,))
 
     def has_str_key(dct: Dict, key: str) -> bool:
         return dct.get(key) is not None
@@ -368,7 +362,6 @@ def get_dsol_band_gap(data: dict) -> Union[Tuple[str, float], Tuple[str, float, 
     data_keys = ("name","functional","structure","E_N0","E_N0_plus_n_best","E_N0_minus_n_best")
     supp_keys = ("E_N0_plus_n_min","E_N0_minus_n_min","E_N0_plus_n_max","E_N0_minus_n_max")
 
-    assert isinstance(data, dict)
     assert all(has_str_key(data, key) for key in data_keys)
 
     n_ratio_best = get_dsol_n_ratio(
@@ -429,11 +422,11 @@ def batch_get_dsol_band_gaps(
     Returns: Dict[str, float]:
         Dict of Band gap values associated with the original structure directory name.
     """
-
-    assert isinstance(bg_data, dict)
+    check_type(bg_data, "bg_data", (Dict,))
     assert dft_functional in {"LDA", "PBE", "AM05"}
-    assert isinstance(with_uncertainties, bool)
-    assert isinstance(workers, int) and workers >= 1
+    check_type(with_uncertainties, "with_uncertainties", (bool,))
+    check_type(workers, "workers", (int,))
+    check_num_value(workers, "workers", ">", 0)
 
     if not with_uncertainties:
         final_energies = {
@@ -497,7 +490,7 @@ def batch_get_dsol_band_gaps(
 
 
 if __name__ == "__main__":
-    # Test for the DeltaSolStaticSet class. You may have to change the given path
+    # Test for the DSolStaticSet class. You may have to change the given path
     # to one pointing at a valid CIF structure file for it to work properly.
     # You'll also need to set PMG_VASP_PSP_DIR for POTCAR files in .pmgrc.yaml.
     test_path = "/home/elohan/screening-pipeline/screening_pipeline/_benchmarks/TiO2.cif"

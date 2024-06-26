@@ -13,6 +13,8 @@ from pymatgen.io.cif import CifParser, CifWriter
 from pymatgen.symmetry.analyzer import SymmetrizedStructure
 
 # LOCAL IMPORTS
+from common_asserts import check_type, check_num_value
+from file_io import check_file_format, check_file_or_dir
 from periodic_table import (
     discard_rare_gas_structures, discard_rare_earth_structures
 )
@@ -35,6 +37,7 @@ def extract_cif_from_file(filename: str) -> List[str]:
     Returns:
         List[str]: List of CIF strings, each one representing a single structure.
     """
+    check_file_or_dir(filename, "file", format="cif")
 
     # load file
     with open(filename, "rt", encoding="utf-8") as input_file:
@@ -47,6 +50,9 @@ def extract_cif_from_file(filename: str) -> List[str]:
     return cif_str_structs
 
 
+########################################
+
+
 def cif_str_to_struct(cif_str: str) -> Structure:
     """
     Parses data from a cif formatted string and converts it to a pymatgen Structure object.
@@ -57,6 +63,7 @@ def cif_str_to_struct(cif_str: str) -> Structure:
     Returns:
         A Pymatgen Structure object.
     """
+    check_type(cif_str, "cif_str", (str,))
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
         parsed_str  = CifParser.from_str(cif_string=cif_str)
@@ -65,8 +72,11 @@ def cif_str_to_struct(cif_str: str) -> Structure:
         return structure
 
 
+########################################
+
+
 def struct_to_cif_str(
-        structure: Union[Structure, SymmetrizedStructure],
+        structure: Structure,
         significant_figures: int = 8
     ) -> str:
     """
@@ -74,13 +84,15 @@ def struct_to_cif_str(
 
     Parameters:
         structure (Structure): Structure object to convert.
+
+        significant_figures (int): Number of decimal places to keep.
     
     Returns:
         str: CIF formatted string.
     """
-
-    if not isinstance(structure, Structure):
-        raise TypeError("Cannot write CIF data for a non-structure object.")
+    check_type(structure, "structure", (Structure,))
+    check_type(significant_figures, "significant_figures", (int,))
+    check_num_value(significant_figures, "significant_figures", ">=", 0)
 
     cif_writer = CifWriter(
         struct=structure,
@@ -167,6 +179,10 @@ def struct_to_cif_str(
 
     return cif_str
 
+
+########################################
+
+
 def read_cif(
     filename: str,
     workers: int = 1,
@@ -192,6 +208,11 @@ def read_cif(
         Int: Number of structures containing rare gases discarded.
         Int: Number of structures containing rare earth elements discarded.
     """
+    check_file_or_dir(filename, "file", format="cif")
+    check_type(workers, "workers", (int,))
+    check_num_value(workers, "workers", ">", 0)
+    check_type(keep_rare_gases, "keep_rare_gases", (bool,))
+    check_type(keep_rare_earths, "keep_rare_earths", (bool,))
 
     struct_strings = extract_cif_from_file(filename)
     nbr_rare_gas_structs, nbr_rare_earth_structs = 0, 0
@@ -220,6 +241,10 @@ def read_cif(
 
     return structs_list, nbr_rare_gas_structs, nbr_rare_earth_structs
 
+
+########################################
+
+
 def write_cif(
     filename: str,
     structures: List[Structure],
@@ -235,6 +260,13 @@ def write_cif(
 
         workers (int):                Number of parallel processes to use.
     """
+    check_file_format(filename, format="cif")
+    (
+        check_type(struct, f"structures[{idx}]", (Structure,))
+        for idx, struct in enumerate(structures)
+    )
+    check_type(workers, "workers", (int,))
+    check_num_value(workers, "workers", ">", 0)
 
     nbr_struct = len(structures)
     chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
@@ -254,3 +286,6 @@ def write_cif(
 
     with open(filename, "wt", encoding="utf-8") as out_file:
         out_file.write("\n".join(encoded_cif))
+
+
+########################################

@@ -11,6 +11,7 @@ from pathlib import Path
 from ruamel.yaml import YAML
 
 # LOCAL IMPORTS
+from common_asserts import check_type
 from custom_types import PathLike
 
 # Main paths inside pipeline file tree
@@ -38,6 +39,9 @@ def check_file_format(filename: PathLike, *, format: str) -> None:
         format (str):           Wanted extension format for the checked file,
                                 without the dot separator (e.g. "txt" and not ".txt").
     """
+    check_type(filename, "filename", (str, Path))
+    check_type(format, "format", (str,))
+
     filename = str(filename)
     file_format = filename.split(sep=".")[-1]
     if file_format != format:
@@ -70,13 +74,10 @@ def check_file_or_dir(
                             extension, provide here wanted extension without the dot
                             separator (e.g. "txt" and not ".txt").
     """
-    if not isinstance(path, (str, Path)):
-        raise TypeError(
-            "'path' argument expected a type 'str' or 'pathlib.Path', "
-            f"got {type(path)} instead."
-        )
+    check_type(path, "path", (str, Path))
     assert file_or_dir in {"file", "dir"}
-    assert isinstance(format, str) or format is None
+    if format is not None:
+        check_type(format, "format", (str,))
 
     path = str(path)
 
@@ -115,7 +116,10 @@ def add_new_dir(base_dir: PathLike, *new_dirs: str) -> str:
         str: path pointing to the new subdirectory.
     """
     check_file_or_dir(base_dir, "dir")
-    assert all(isinstance(dir, str) for dir in new_dirs)
+    (
+        check_type(new_dir, f"new_dirs[{idx}]", (str,))
+        for idx, new_dir in enumerate(new_dirs)
+    )
 
     new_path = os.path.join(str(base_dir), *new_dirs)
     os.makedirs(new_path, exist_ok=True)
