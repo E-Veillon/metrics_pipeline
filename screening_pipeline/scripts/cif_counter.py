@@ -1,11 +1,9 @@
 #!/usr/bin/python
 """Counts the number of structures in given CIF files."""
 
+import os
 from argparse import ArgumentParser
 from typing import List
-
-# LOCAL IMPORTS
-from screening_pipeline.utils import check_file_or_dir
 
 
 ########################################
@@ -131,7 +129,10 @@ def main() -> None:
 
     for file in args.filenames:
 
-        check_file_or_dir(file, "file", format="cif")
+        if not os.path.isfile(file):
+            raise FileNotFoundError(f"{file}: No such file found.")
+        if not file.endswith(".cif"):
+            raise ValueError(f"{file} is not a valid CIF file.")
 
         with open(file, mode="r", encoding="utf-8") as data:
             lines = data.read().splitlines()
