@@ -1,3 +1,4 @@
+#!/usr/bin/python
 '''
 Global variables for storing experimental fits and values used in the pipeline.
 '''

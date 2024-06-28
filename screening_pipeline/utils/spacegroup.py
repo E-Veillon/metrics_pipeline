@@ -1,6 +1,7 @@
-'''
+#!/usr/bin/python
+"""
 Functions to find spacegroup symmetry on pymatgen Structure objects.
-'''
+"""
 
 
 import warnings
@@ -30,7 +31,7 @@ def structure_symmetrizer(
         symprec: float = 0.01,
         angle_tolerance: float = 5.0
     ) -> Union[Structure, SymmetrizedStructure, None]:
-    '''
+    """
     Try to find spacegroup symmetry of a structure using spglib via pymatgen.
     If the first try does not work, it will retry several times with loosened tolerances.
 
@@ -53,7 +54,7 @@ def structure_symmetrizer(
     Returns:
         A Pymatgen SymmetrizedStructure object if symmetry detection worked properly,
         or the original Structure object if it could not detect any symmetry.
-    '''
+    """
     check_type(structure, "structure", (Structure,))
     check_type(symprec, "symprec", (float,))
     check_num_value(symprec, "symprec", ">=", 0.0)
@@ -93,7 +94,7 @@ def batch_symmetrizer(
         angle_tolerance: float = 5.0,
         workers: int = 1
     ):
-    '''
+    """
     Use multiprocess to find symmetry spacegroups for a list of pymatgen Structure objects.
 
     Parameters:
@@ -112,7 +113,7 @@ def batch_symmetrizer(
         A list of either pymatgen SymmetrizedStructure objects
         when symmetry detection worked properly, or the unchanged
         Structure object if symmetry detection failed.
-    '''
+    """
     check_type(structures, "structures", (List,))
     (
         check_type(struct, f"structures[{idx}]", (Structure,))
@@ -138,7 +139,7 @@ def batch_symmetrizer(
             structures,
             max_workers=workers,
             chunksize=chunksize,
-            desc='Symmetrize structures'
+            desc="Symmetrize structures"
         )
     ))
 

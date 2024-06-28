@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """Functions related to distance computations between distributions."""
 
 from typing import Any

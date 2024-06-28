@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """
 Functions to manage, read, and write VASP files and launch VASP computations.
 """

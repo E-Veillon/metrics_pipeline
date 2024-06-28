@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """Functions to compute the density of Structure objects."""
 
 

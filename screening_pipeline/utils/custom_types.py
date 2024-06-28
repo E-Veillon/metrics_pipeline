@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """
 All specific type aliases used in this library are stored here.
 """

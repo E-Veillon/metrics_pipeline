@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """
 Functions relative to Periodic Table's (PT) elements properties.
 """

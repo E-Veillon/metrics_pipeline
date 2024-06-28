@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """This module defines common guard clauses used throughout the pipeline."""
 
 import typing as typ

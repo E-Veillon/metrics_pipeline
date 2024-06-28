@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """Functions to compute structures fingerprints using CrystalNN."""
 
 from typing import List

@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """Redirect unnecessary warnings output."""
 
 

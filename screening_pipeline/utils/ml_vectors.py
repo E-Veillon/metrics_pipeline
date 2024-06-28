@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """Functions to compute vectors using a pretrained ALIGNN model."""
 
 

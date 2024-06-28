@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """Downloads and manages remote databases API and data."""
 
 import os

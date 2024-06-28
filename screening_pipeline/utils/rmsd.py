@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """Functions to compute Root Mean Square Displacement between Structures."""
 
 

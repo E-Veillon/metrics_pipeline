@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """
 Functions to check structures validity, compare them, and discard duplicates.
 """

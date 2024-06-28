@@ -1,10 +1,11 @@
+#!/usr/bin/python
 """
 Functions to load and write CIF formatted data with multiple processes.
 """
 
 
 import re
-from typing import Tuple, List, Union
+from typing import Tuple, List
 from tqdm.contrib.concurrent import process_map
 
 # PYTHON MATERIALS GENOMICS

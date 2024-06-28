@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """
 Functions to initialize phase diagrams with energy convex hull,
 process phase diagram entries, and compute energy above hull of entries.

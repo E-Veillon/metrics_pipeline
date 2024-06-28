@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """
 Module implementing general utilitary functions.
 """
