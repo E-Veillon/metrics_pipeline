@@ -14,8 +14,8 @@ from pymatgen.analysis.phase_diagram import Entry
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 # LOCAL IMPORTS
-from common_asserts import check_type, check_num_value
-from flattener import flatten
+from .common_asserts import check_type, check_num_value
+from .flattener import flatten
 
 
 ########################################

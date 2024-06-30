@@ -11,8 +11,8 @@ from emmet.core.thermo import ThermoType
 from pymatgen.core import SETTINGS, Composition
 
 # LOCAL IMPORTS
-from common_asserts import check_type
-from file_io import check_file_format, check_file_or_dir
+from .common_asserts import check_type
+from .file_io import check_file_format, check_file_or_dir
 
 
 ########################################

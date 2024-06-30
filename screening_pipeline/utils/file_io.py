@@ -11,8 +11,8 @@ from pathlib import Path
 from ruamel.yaml import YAML
 
 # LOCAL IMPORTS
-from common_asserts import check_type
-from custom_types import PathLike
+from .common_asserts import check_type
+from .custom_types import PathLike
 
 # Main paths inside pipeline file tree
 MAINDIRPATH = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))

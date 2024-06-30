@@ -14,8 +14,8 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmetrizedStructure
 
 # LOCAL IMPORTS
-from common_asserts import check_type, check_num_value
-from redirect import redirect_c_stdout, redirect_c_stderr
+from .common_asserts import check_type, check_num_value
+from .redirect import redirect_c_stdout, redirect_c_stderr
 
 ########################################
 # LOCAL FUNCTIONS

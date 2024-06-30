@@ -14,7 +14,7 @@ import tqdm
 from pymatgen.core import Structure, Element
 
 # LOCAL IMPORTS
-from common_asserts import check_type
+from .common_asserts import check_type
 
 
 ########################################

@@ -14,11 +14,11 @@ from pymatgen.core import Element, Composition
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 # LOCAL IMPORTS
-from common_asserts import check_type, check_num_value
-from custom_types import FormulaLike
-from flattener import flatten
-from matcher import group_by_composition
-from periodic_table import get_elements
+from .common_asserts import check_type, check_num_value
+from .custom_types import FormulaLike
+from .flattener import flatten
+from .matcher import group_by_composition
+from .periodic_table import get_elements
 
 
 ########################################

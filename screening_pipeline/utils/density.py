@@ -9,7 +9,7 @@ import numpy as np
 from pymatgen.core import Structure
 
 # LOCAL IMPORTS
-from common_asserts import check_type
+from .common_asserts import check_type
 
 
 ########################################

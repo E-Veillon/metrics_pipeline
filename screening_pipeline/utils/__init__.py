@@ -12,6 +12,7 @@ from .vasp_io import (
     write_and_run_vasp,
     converged_vasprun,
     extract_vasp_data_for_delta_sol_init, batch_extract_vasp_data,
+    dsol_calc_init,
     batch_extract_vasp_structures,
 )
 
@@ -42,7 +43,6 @@ from .delta_sol import (
     get_dsol_struct_dir,
     calc_idx_to_dir_name,
     get_dsol_n_ratio,
-    dsol_calc_init,
     get_dsol_band_gap,
     batch_get_dsol_band_gaps,
 )

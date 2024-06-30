@@ -14,12 +14,12 @@ from pymatgen.io.cif import CifParser, CifWriter
 from pymatgen.symmetry.analyzer import SymmetrizedStructure
 
 # LOCAL IMPORTS
-from common_asserts import check_type, check_num_value
-from file_io import check_file_format, check_file_or_dir
-from periodic_table import (
+from .common_asserts import check_type, check_num_value
+from .file_io import check_file_format, check_file_or_dir
+from .periodic_table import (
     discard_rare_gas_structures, discard_rare_earth_structures
 )
-from redirect import redirect_c_stdout, redirect_c_stderr
+from .redirect import redirect_c_stdout, redirect_c_stderr
 
 
 ##################################################

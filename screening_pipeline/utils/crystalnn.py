@@ -10,7 +10,7 @@ from tqdm.contrib.concurrent import process_map
 from pymatgen.core import Structure
 
 # LOCAL IMPORTS
-from common_asserts import check_type, check_num_value
+from .common_asserts import check_type, check_num_value
 
 
 ########################################

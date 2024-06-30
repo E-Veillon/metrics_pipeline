@@ -13,8 +13,8 @@ from pymatgen.core import SiteCollection, Composition, Element
 from pymatgen.io.cif import CifBlock
 
 # LOCAL IMPORTS
-from common_asserts import check_type
-from custom_types import FormulaLike
+from .common_asserts import check_type
+from .custom_types import FormulaLike
 
 
 ########################################

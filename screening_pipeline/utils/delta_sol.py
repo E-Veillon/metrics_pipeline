@@ -14,14 +14,11 @@ from pymatgen.io.vasp import VaspInput
 from pymatgen.io.vasp.sets import MPRelaxSet
 
 # LOCAL IMPORTS
-from common_asserts import check_type, check_num_value
-from custom_types import PathLike, PMGStaticSetType, PMGStaticSet
-from file_io import CONFIGPATH, check_file_or_dir, yaml_loader
-from fitted_values import EL_PER_XC_VOL
-from periodic_table import get_all_valence_electrons
-from vasp_io import vasp_static_settings
-
-
+from .common_asserts import check_type, check_num_value
+from .custom_types import PathLike, PMGStaticSetType, PMGStaticSet
+from .file_io import CONFIGPATH, check_file_or_dir, yaml_loader
+from .fitted_values import EL_PER_XC_VOL
+from .periodic_table import get_all_valence_electrons
 
 
 ########################################
@@ -58,7 +55,7 @@ class DSolStaticSet(MPRelaxSet):
     
     Raises: ValueError if neither structure nor nelect are given at instanciation time.
     """
-    CONFIG = yaml_loader(CONFIGPATH, on_error="raise")
+    CONFIG = yaml_loader(os.path.join(CONFIGPATH, "DSolStaticSet.yaml"), on_error="raise")
 
     def __init__(
             self,
@@ -249,85 +246,6 @@ def _match_calc_index(calc_index: int) -> str|None:
             raise ValueError("calc_index must be between 0 and 6 included.")
         case _:
             raise TypeError(f"Expected 'int' type, got '{type(calc_index)}' type instead.")
-
-
-########################################
-
-
-def dsol_calc_init(
-        structure: Structure,
-        calc_index: int,
-        preset: PMGStaticSetType|"DSolStaticSet" = "DSolStaticSet",
-        user_corrections: Optional[Dict[str, Any]] = None,
-    ) -> VaspInput:
-    """
-    Initializes one of the static calculations used for Δ-Sol method for one structure.
-
-    Reference of the Δ-Sol method:
-        M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-        (reference 32 in screening_pipeline/Bibliography, values in Table I)
-
-    Parameters:
-        structure (Structure):      The input structure.
-
-        calc_index (int):           An integer corresponding to a delta-sol static calculation:
-                                    0 = E(N0), 
-                                    1-2 = E(N0 + n), E(N0 - n) respectively, using N*_best, 
-                                    3-4 = E(N0 + n), E(N0 - n) respectively, using N*_min, 
-                                    5-6 = E(N0 + n), E(N0 - n) respectively, using N*_max.
-
-        preset (str):               A pymatgen VASP static preset, or the homemade
-                                    DSolStaticSet. Defaults to DSolStaticSet.
-
-        user_corrections (dict):    Additional corrections provided by the user in a
-                                    separate .yaml file.
-
-    Returns:
-        The corresponding VaspInput object.
-    """
-    check_type(structure, "structure", (Structure,))
-    check_type(calc_index, "calc_index", (int,))
-    check_num_value(calc_index, "calc_index", ">=", 0)
-    check_num_value(calc_index, "calc_index", "<=", 6)
-    if not preset in PMGStaticSet and not preset == "DSolStaticSet":
-        raise ValueError(
-            "'preset' argument value is not a supported preset. "
-            "Supported presets are:\n"
-            f"{PMGStaticSet + set(('DSolStaticSet',))}\n"
-            f"'preset' got value '{preset}' instead."
-        )
-    if user_corrections is not None:
-        check_type(user_corrections, "user_corrections", (Dict,))
-
-    nb_val_elec = get_all_valence_electrons(structure)
-    run_set = vasp_static_settings(structure, preset, user_corrections=user_corrections)
-
-    # Search for the right N* parameter to use with respect to the functional
-    pot_func = run_set.get("POTCAR_FUNCTIONAL", "PBE")
-    dsol_functional = _match_dft_functional(pot_func)
-    n_star_type = _match_calc_index(calc_index)
-
-    if n_star_type is not None:
-        n_ratio = get_dsol_n_ratio(
-            structure=structure,
-            dft_functional=dsol_functional,
-            n_star_type=n_star_type
-        )
-        nelect = nb_val_elec + n_ratio if calc_index % 2 == 1 else nb_val_elec - n_ratio
-
-        if preset == "DSolStaticSet":
-            run_set = vasp_static_settings(
-                structure, preset, nelect=nelect, user_corrections=user_corrections
-            )
-    else:
-        nelect = nb_val_elec
-
-    if preset != "DSolStaticSet":
-        run_dict = run_set.as_dict()
-        run_dict["INCAR"].update({"NELECT": nelect})
-        run_set = VaspInput.from_dict(run_dict)
-
-    return run_set
 
 
 ########################################
