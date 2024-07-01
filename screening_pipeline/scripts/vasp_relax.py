@@ -118,6 +118,12 @@ def main():
         dest="user_settings"
     )
     parser.add_argument(
+        "-w", "--workers",
+        type=int,
+        default=1,
+        help="Number of parallel processes to spawn for parallelized steps."
+    )
+    parser.add_argument(
         "-t",
         "--task_index",
         type=int,
@@ -143,6 +149,7 @@ def main():
     # Convert CIF data into Structure objects
     structures, *_ = read_cif(
         filename=args.input_file,
+        workers=args.workers,
         keep_rare_gases=True, # Avoid calling rare gaz screening function
         keep_rare_earths=True # Avoid calling rare earth screening function
     )
