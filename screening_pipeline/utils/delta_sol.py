@@ -167,48 +167,6 @@ def calc_idx_to_dir_name(struct_dir_name: str, calc_index: int) -> str:
 ########################################
 
 
-def get_dsol_n_ratio(
-        structure: SiteCollection,
-        dft_functional: Literal['LDA','PBE','AM05'] = 'PBE',
-        n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
-    ) -> float:
-    '''
-    Computes n = N0/N* the electron ratio to add or remove from 
-    the structure in the Δ-Sol method developped by Chan et al.
-
-    Reference:
-        M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-        (reference 32 in screening_pipeline/Bibliography)
-    '''
-    check_type(structure, "structure", (SiteCollection,))
-
-    val_elec_type = 'sp'
-
-    for elt in structure.elements:
-        if elt.block in {'s', 'p'}:
-            continue
-        if elt.block == 'd':
-            val_elec_type = 'spd'
-            break
-        if elt.block == 'f':
-            raise NotImplementedError(
-                'f-block elements are not supported in Δ-Sol method.'
-            )
-        raise ValueError(
-            'Something is wrong with this function or Element objects "block" property.'
-        )
-
-    n_0        = get_all_valence_electrons(structure)
-    value_name = '_'.join((dft_functional, val_elec_type))
-    n_star     = EL_PER_XC_VOL[n_star_type][value_name]
-    n          = float(n_0) / float(n_star)
-
-    return n
-
-
-########################################
-
-
 def _match_dft_functional(
     functional: str
 ) -> Union[Literal["LDA"], Literal["PBE"], Literal["AM05"]]:
@@ -246,6 +204,56 @@ def _match_calc_index(calc_index: int) -> str|None:
             raise ValueError("calc_index must be between 0 and 6 included.")
         case _:
             raise TypeError(f"Expected 'int' type, got '{type(calc_index)}' type instead.")
+
+
+########################################
+
+
+def get_dsol_n_ratio(
+        structure: SiteCollection,
+        dft_functional: str = 'PBE',
+        n_star_type: Union[Literal['MIN', 'BEST', 'MAX'], int, None] = 'BEST'
+    ) -> float:
+    '''
+    Computes n = N0/N* the electron ratio to add or remove from 
+    the structure in the Δ-Sol method developped by Chan et al.
+
+    Reference:
+        M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
+        (reference 32 in screening_pipeline/Bibliography)
+    '''
+    check_type(structure, "structure", (SiteCollection,))
+
+    if n_star_type is not None and isinstance(n_star_type, int):
+        n_star_type = _match_calc_index(n_star_type)
+
+    if n_star_type is None:
+        return 0.0
+
+    dft_func = _match_dft_functional(dft_functional)
+
+    val_elec_type = 'sp'
+
+    for elt in structure.elements:
+        if elt.block in {'s', 'p'}:
+            continue
+        if elt.block == 'd':
+            val_elec_type = 'spd'
+            break
+        if elt.block == 'f':
+            raise NotImplementedError(
+                'f-block elements are not supported in Δ-Sol method.'
+            )
+        raise ValueError(
+            'Something is wrong with this function or Element objects "block" property.'
+        )
+
+    n_0        = get_all_valence_electrons(structure)
+    value_name = '_'.join((dft_func, val_elec_type))
+    n_star     = EL_PER_XC_VOL[n_star_type][value_name]
+    n          = float(n_0) / float(n_star)
+
+    return n
 
 
 ########################################

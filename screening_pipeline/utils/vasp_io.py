@@ -22,7 +22,7 @@ from pymatgen.io.vasp import VaspInput, Vasprun
 from pymatgen.io.vasp.sets import (
     DictSet, MITRelaxSet, MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet,
     MPMetalRelaxSet, MVLRelax52Set, MVLScanRelaxSet,
-    MPStaticSet, MatPESStaticSet, MPScanStaticSet
+    MPStaticSet, MatPESStaticSet, MPScanStaticSet, MPSOCSet
 )
 
 # LOCAL IMPORTS
@@ -31,7 +31,7 @@ from .custom_types import (
     PathLike, PMGRelaxSetType, PMGStaticSetType,
     PMGRelaxSet, PMGStaticSet,
 )
-from .delta_sol import DSolStaticSet
+from .delta_sol import DSolStaticSet, get_all_valence_electrons, get_dsol_n_ratio
 from .fitted_values import U_VALUES
 from .file_io import check_file_or_dir
 
@@ -292,6 +292,14 @@ def _static_set_init(
                     user_potcar_settings=potcar_corrections,
                     user_potcar_functional=potcar_functional_correction,
                 )
+            case "MPSOCSet":
+                preset_obj = MPSOCSet.from_prev_calc(
+                    prev_calc_dir=dir_path,
+                    user_incar_settings=incar_corrections,
+                    user_kpoints_settings=kpoints_corrections,
+                    user_potcar_settings=potcar_corrections,
+                    user_potcar_functional=potcar_functional_correction,
+                )
             case str():
                 raise ValueError(
                     f"Provided string is not a valid preset name ({preset})."
@@ -330,6 +338,14 @@ def _static_set_init(
             )
         case "MPScanStaticSet":
             preset_obj = MPScanStaticSet(
+                structure=struct_or_path,
+                user_incar_settings=incar_corrections,
+                user_kpoints_settings=kpoints_corrections,
+                user_potcar_settings=potcar_corrections,
+                user_potcar_functional=potcar_functional_correction,
+            )
+        case "MPSOCSet":
+            preset_obj = MPSOCSet(
                 structure=struct_or_path,
                 user_incar_settings=incar_corrections,
                 user_kpoints_settings=kpoints_corrections,
@@ -933,24 +949,20 @@ def dsol_calc_init(
 
     # Search for the right N* parameter to use with respect to the functional
     pot_func = run_set.get("POTCAR_FUNCTIONAL", "PBE")
-    dsol_functional = _match_dft_functional(pot_func)
-    n_star_type = _match_calc_index(calc_index)
 
-    if n_star_type is not None:
-        n_ratio = get_dsol_n_ratio(
-            structure=structure,
-            dft_functional=dsol_functional,
-            n_star_type=n_star_type
+    n_ratio = get_dsol_n_ratio(
+        structure=structure,
+        dft_functional=pot_func,
+        n_star_type=calc_index
+    )
+
+    nelect = nb_val_elec + n_ratio if calc_index % 2 == 1 else nb_val_elec - n_ratio
+
+    if preset == "DSolStaticSet":
+        run_set = vasp_static_settings(
+            structure, preset, nelect=nelect, user_corrections=user_corrections
         )
-        nelect = nb_val_elec + n_ratio if calc_index % 2 == 1 else nb_val_elec - n_ratio
-
-        if preset == "DSolStaticSet":
-            run_set = vasp_static_settings(
-                structure, preset, nelect=nelect, user_corrections=user_corrections
-            )
-    else:
-        nelect = nb_val_elec
-
+    
     if preset != "DSolStaticSet":
         run_dict = run_set.as_dict()
         run_dict["INCAR"].update({"NELECT": nelect})

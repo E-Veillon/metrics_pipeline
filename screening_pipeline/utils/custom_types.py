@@ -37,11 +37,13 @@ PMGRelaxSet = {
 PMGStaticSetType = Literal[
     "MPStaticSet", 
     "MatPESStaticSet", 
-    "MPScanStaticSet"
+    "MPScanStaticSet",
+    "MPSOCSet"
 ]
 
 PMGStaticSet = {
     "MPStaticSet", 
     "MatPESStaticSet", 
-    "MPScanStaticSet"
+    "MPScanStaticSet",
+    "MPSOCSet"
 }
