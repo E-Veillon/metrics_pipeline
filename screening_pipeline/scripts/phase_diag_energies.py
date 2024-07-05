@@ -165,7 +165,7 @@ def main():
     if args.reference is not None:
         ref_data = load_phase_diagram_entries(args.reference)
         ref_entries = init_entries_from_dict(
-            entries_dict=ref_data, attribute="ref_structs", workers=args.workers
+            entries_dict=ref_data, attribute="ref_structs"
         )
         ref_entries = filter_database_entries(
             entries=ref_entries,
@@ -190,8 +190,6 @@ def main():
         entries=grouped_entries,
         ref_entries=ref_entries,
         stable_limit=delta_H_limit,
-        from_mp_api=args.from_mp_api,
-        mp_api_key=args.mp_api_key,
         workers=args.workers,
         verbose=args.verbose
     )
