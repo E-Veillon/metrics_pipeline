@@ -156,7 +156,7 @@ def main():
         workers=args.workers,
     )
     generated_entries = init_entries_from_dict(
-        entries_dict=structs_data, attribute="generated", workers=args.workers
+        entries_dict=structs_data, attribute="generated"
     )
     max_dim_generated = get_max_dim(generated_entries)
     used_elts = get_elements_from_entries(generated_entries)
