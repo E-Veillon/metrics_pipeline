@@ -3,8 +3,9 @@
 All specific type aliases used in this library are stored here.
 """
 
-from typing import Union, Sequence, Literal
+from typing import Union, Sequence, List
 from pathlib import Path
+from enum import Enum
 
 # PYTHON MATERIALS GENOMICS
 from pymatgen.core import Element
@@ -14,36 +15,72 @@ PathLike = Union[Path, str]
 
 FormulaLike = Union[str, Sequence[Union[str, int, Element]]]
 
-PMGRelaxSetType = Literal[
-    "MITRelaxSet", 
-    "MPRelaxSet", 
-    "MPScanRelaxSet", 
-    "MPHSERelaxSet", 
-    "MPMetalRelaxSet", 
-    "MVLRelax52Set", 
-    "MVLScanRelaxSet"
-]
+class PMGRelaxSet(Enum):
+    """Enum class of known to date VASP relaxation presets implemented in pymatgen."""
+    MITRELAXSET = "MITRelaxSet"
+    MPRELAXSET = "MPRelaxSet"
+    MPSCANRELAXSET = "MPScanRelaxSet"
+    MPMETALRELAXSET = "MPMetalRelaxSet"
+    MVLRELAX52SET = "MVLRelax52Set"
+    MVLSCANRELAXSET = "MVLScanRelaxSet"
 
-PMGRelaxSet = {
-    "MITRelaxSet", 
-    "MPRelaxSet", 
-    "MPScanRelaxSet", 
-    "MPHSERelaxSet", 
-    "MPMetalRelaxSet", 
-    "MVLRelax52Set", 
-    "MVLScanRelaxSet"
-}
+    @property
+    def names(self) -> List[str]:
+        """Get the list of all Enum members names."""
+        return list(member.name for member in self)
 
-PMGStaticSetType = Literal[
-    "MPStaticSet", 
-    "MatPESStaticSet", 
-    "MPScanStaticSet",
-    "MPSOCSet"
-]
+    @property
+    def values(self) -> List[str]:
+        """Get the list of all Enum members values."""
+        return list(member.value for member in self)
 
-PMGStaticSet = {
-    "MPStaticSet", 
-    "MatPESStaticSet", 
-    "MPScanStaticSet",
-    "MPSOCSet"
-}
+class PMGStaticSet(Enum):
+    """Enum class of known to date VASP static presets implemented in pymatgen."""
+    MPSTATICSET = "MPStaticSet" 
+    MATPESSTATICSET = "MatPESStaticSet"
+    MPSCANSTATICSET = "MPScanStaticSet"
+    MPSOCSET = "MPSOCSet"
+
+    @property
+    def names(self) -> List[str]:
+        """Get the list of all Enum members names."""
+        return list(member.name for member in self)
+
+    @property
+    def values(self) -> List[str]:
+        """Get the list of all Enum members values."""
+        return list(member.value for member in self)
+
+#PMGRelaxSetType = Literal[
+#    "MITRelaxSet", 
+#    "MPRelaxSet", 
+#    "MPScanRelaxSet", 
+#    "MPHSERelaxSet", 
+#    "MPMetalRelaxSet", 
+#    "MVLRelax52Set", 
+#    "MVLScanRelaxSet"
+#]
+
+#PMGRelaxSet = {
+#    "MITRelaxSet", 
+#    "MPRelaxSet", 
+#    "MPScanRelaxSet", 
+#    "MPHSERelaxSet", 
+#    "MPMetalRelaxSet", 
+#    "MVLRelax52Set", 
+#    "MVLScanRelaxSet"
+#}
+
+#PMGStaticSetType = Literal[
+#    "MPStaticSet", 
+#    "MatPESStaticSet", 
+#    "MPScanStaticSet",
+#    "MPSOCSet"
+#]
+
+#PMGStaticSet = {
+#    "MPStaticSet", 
+#    "MatPESStaticSet", 
+#    "MPScanStaticSet",
+#    "MPSOCSet"
+#}

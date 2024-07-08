@@ -39,9 +39,9 @@ def _assert_args(args: argparse.Namespace) -> None:
     if args.prev_summary is not None:
         check_file_or_dir(args.prev_summary, "file", format="json")
 
-    assert args.preset in PMGStaticSet, (
+    assert args.preset in PMGStaticSet.values or args.preset == "DsolStaticSet", (
     "Provided static preset must be one of the following:\n"
-    f"{PMGStaticSet}"
+    f"{PMGStaticSet.values} or 'DsolStaticSet'."
     )
 
     if args.user_settings is not None:
@@ -163,6 +163,9 @@ def main() -> None:
     input_dir = args.input_dir
     exe_path  = args.executable_path
     task_id   = args.task_id
+
+    if preset != "DsolStaticSet":
+        preset = PMGStaticSet(preset)
 
     # Optional args
     if args.output is None:

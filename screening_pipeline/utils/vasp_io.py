@@ -8,7 +8,6 @@ import os
 import re
 import json
 import warnings
-from itertools import repeat
 from functools import partial
 from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal, Any
 from pathlib import Path
@@ -27,10 +26,7 @@ from pymatgen.io.vasp.sets import (
 
 # LOCAL IMPORTS
 from .common_asserts import check_type, check_num_value
-from .custom_types import (
-    PathLike, PMGRelaxSetType, PMGStaticSetType,
-    PMGRelaxSet, PMGStaticSet,
-)
+from .custom_types import PathLike, PMGRelaxSet, PMGStaticSet
 from .delta_sol import DSolStaticSet, get_all_valence_electrons, get_dsol_n_ratio
 from .fitted_values import U_VALUES
 from .file_io import check_file_or_dir
@@ -157,14 +153,14 @@ def write_and_run_vasp(
 
 def _relax_set_init(
     structure: SiteCollection,
-    preset: str = "MPRelaxSet",
+    preset: PMGRelaxSet = PMGRelaxSet.MPRELAXSET,
     corrections: Optional[Dict] = None,
 ) -> DictSet:
     """Init a relaxation set of VASP input files."""
     corrections = corrections or {}
     incar_corrections = {}
 
-    if preset == "MITRelaxSet":
+    if preset == PMGRelaxSet.MITRELAXSET:
         incar_corrections = _mitrelaxset_incar_corrections(structure.num_sites)
 
     incar_corrections.update(corrections.get("INCAR", {}))
@@ -172,7 +168,7 @@ def _relax_set_init(
     potcar_corrections = corrections.get("POTCAR", {})
     potcar_functional_correction = corrections.get("POTCAR_FUNCTIONAL", {})
 
-    match preset:
+    match preset.value:
         case "MITRelaxSet":
             preset_obj = MITRelaxSet(
                 structure=structure,
@@ -229,10 +225,6 @@ def _relax_set_init(
                 user_potcar_settings=potcar_corrections,
                 user_potcar_functional=potcar_functional_correction,
             )
-        case str():
-            raise ValueError(f"Provided string is not a valid preset name ({preset}).")
-        case _:
-            check_type(preset, "preset", (str,))
 
     return preset_obj
 
@@ -241,9 +233,8 @@ def _relax_set_init(
 
 
 def _static_set_init(
-    struct_or_path: Union[SiteCollection, PathLike],
-    from_prev_calc: bool = False,
-    preset: str = "MPStaticSet",
+    structure: SiteCollection,
+    preset: PMGStaticSet|"DSolStaticSet" = PMGStaticSet.MPSTATICSET,
     nelect: float|None = None,
     corrections: Optional[Dict] = None,
 ) -> DictSet:
@@ -255,107 +246,49 @@ def _static_set_init(
     potcar_corrections = corrections.get("POTCAR", {})
     potcar_functional_correction = corrections.get("POTCAR_FUNCTIONAL", {})
 
-    if from_prev_calc:
-        dir_path = str(struct_or_path)
-        assert os.path.isdir(dir_path)
-
-        match preset:
-            case "DSolStaticSet":
-                preset_obj = DSolStaticSet.from_prev_calc(
-                    prev_calc_dir=dir_path,
-                    user_incar_settings=incar_corrections,
-                    user_kpoints_settings=kpoints_corrections,
-                    user_potcar_settings=potcar_corrections,
-                    user_potcar_functional=potcar_functional_correction,
-                )
+    if preset == "DSolStaticSet":
+        preset_obj = DSolStaticSet(
+            structure=structure,
+            incar_nelect=nelect,
+            user_incar_settings=incar_corrections,
+            user_kpoints_settings=kpoints_corrections,
+            user_potcar_settings=potcar_corrections,
+            user_potcar_functional=potcar_functional_correction,
+        )
+    else:
+        match preset.value:
             case "MPStaticSet":
-                preset_obj = MPStaticSet.from_prev_calc(
-                    prev_calc_dir=dir_path,
+                preset_obj = MPStaticSet(
+                    structure=structure,
                     user_incar_settings=incar_corrections,
                     user_kpoints_settings=kpoints_corrections,
                     user_potcar_settings=potcar_corrections,
                     user_potcar_functional=potcar_functional_correction,
                 )
             case "MatPESStaticSet":
-                preset_obj = MatPESStaticSet.from_prev_calc(
-                    prev_calc_dir=dir_path,
+                preset_obj = MatPESStaticSet(
+                    structure=structure,
                     user_incar_settings=incar_corrections,
                     user_kpoints_settings=kpoints_corrections,
                     user_potcar_settings=potcar_corrections,
                     user_potcar_functional=potcar_functional_correction,
                 )
             case "MPScanStaticSet":
-                preset_obj = MPScanStaticSet.from_prev_calc(
-                    prev_calc_dir=dir_path,
+                preset_obj = MPScanStaticSet(
+                    structure=structure,
                     user_incar_settings=incar_corrections,
                     user_kpoints_settings=kpoints_corrections,
                     user_potcar_settings=potcar_corrections,
                     user_potcar_functional=potcar_functional_correction,
                 )
             case "MPSOCSet":
-                preset_obj = MPSOCSet.from_prev_calc(
-                    prev_calc_dir=dir_path,
+                preset_obj = MPSOCSet(
+                    structure=structure,
                     user_incar_settings=incar_corrections,
                     user_kpoints_settings=kpoints_corrections,
                     user_potcar_settings=potcar_corrections,
                     user_potcar_functional=potcar_functional_correction,
                 )
-            case str():
-                raise ValueError(
-                    f"Provided string is not a valid preset name ({preset})."
-                )
-            case _:
-                raise TypeError(
-                    f"'preset' arg expected a str type, got {type(preset)} instead."
-                )
-        return preset_obj
-
-    match preset:
-        case "DSolStaticSet":
-            preset_obj = DSolStaticSet(
-                structure=struct_or_path,
-                incar_nelect=nelect,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
-        case "MPStaticSet":
-            preset_obj = MPStaticSet(
-                structure=struct_or_path,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
-        case "MatPESStaticSet":
-            preset_obj = MatPESStaticSet(
-                structure=struct_or_path,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
-        case "MPScanStaticSet":
-            preset_obj = MPScanStaticSet(
-                structure=struct_or_path,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
-        case "MPSOCSet":
-            preset_obj = MPSOCSet(
-                structure=struct_or_path,
-                user_incar_settings=incar_corrections,
-                user_kpoints_settings=kpoints_corrections,
-                user_potcar_settings=potcar_corrections,
-                user_potcar_functional=potcar_functional_correction,
-            )
-        case str():
-            raise ValueError(f"Provided string is not a valid preset name ({preset}).")
-        case _:
-            check_type(preset, "preset", (str,))
 
     return preset_obj
 
@@ -365,7 +298,7 @@ def _static_set_init(
 
 def vasp_relaxation_settings(
     structure: SiteCollection,
-    preset: PMGRelaxSetType = "MPRelaxSet",
+    preset: PMGRelaxSet = PMGRelaxSet.MPRELAXSET,
     user_corrections: Optional[Dict] = None,
 ) -> VaspInput:
     """
@@ -385,15 +318,13 @@ def vasp_relaxation_settings(
     assert preset in PMGRelaxSet, (
         "'preset' argument not recognized. "
         "It must be one of the allowed pymatgen relaxation presets:\n"
-        f"{PMGRelaxSet}"
+        f"{PMGRelaxSet.values}"
     )
     if user_corrections is not None:
         check_type(user_corrections, "user_corrections", (Dict,))
 
     vasp_input = _relax_set_init(
-        structure=structure,
-        preset=preset,
-        corrections=user_corrections
+        structure, preset, user_corrections
     ).get_input_set()
 
     return vasp_input
@@ -404,9 +335,7 @@ def vasp_relaxation_settings(
 
 def vasp_static_settings(
     structure: Optional[SiteCollection] = None,
-    preset: PMGStaticSetType|"DSolStaticSet" = "MPStaticSet",
-    from_prev_calc: bool = False,
-    prev_calc_dir: Optional[PathLike] = None,
+    preset: PMGStaticSet|"DSolStaticSet" = PMGStaticSet.MPSTATICSET,
     nelect: float|None = None,
     user_corrections: Optional[dict] = None,
 ) -> VaspInput:
@@ -419,20 +348,6 @@ def vasp_static_settings(
         preset (str):                   The pymatgen preset to use for VASP inputs initialization.
                                         Can also be the homemade "DSolStaticSet" if Δ-Sol
                                         method by Chan et al. (2010) is used.
-
-        from_prev_calc (bool):          Whether to get final structure, INCAR and KPOINTS settings
-                                        from a previous VASP run. INCAR tags will still be managed
-                                        to fit a static calculation if previous run is a relaxation.
-                                        For the sake of consistency, it is recommended to use the
-                                        static preset corresponding to previous relaxation preset
-                                        in this case (e.g. MPStaticSet for a relaxation with
-                                        MPRelaxSet). If set to True, a directory to extract data
-                                        from must be provided and structure argument is ignored.
-                                        Defaults to False.
-
-        prev_calc_dir (str|Path):       Directory to extract previous VASP run data from when 
-                                        from_prev_calc is True. Otherwise, this argument is
-                                        ignored.
 
         nelect (float):                 Only useful if DSolStaticSet is used.
                                         Sets the NELECT tag in INCAR file.
@@ -447,28 +362,14 @@ def vasp_static_settings(
     assert preset in PMGStaticSet, (
         "'preset' argument not recognized. "
         "It must be one of the allowed pymatgen static presets:\n"
-        f"{PMGStaticSet}."
+        f"{PMGStaticSet.values}."
     )
     if user_corrections is not None:
         check_type(user_corrections, "user_corrections", (Dict,))
 
-    if not from_prev_calc:
-        vasp_input = _static_set_init(
-            struct_or_path=structure,
-            preset=preset,
-            nelect=nelect,
-            corrections=user_corrections
-        ).get_input_set()
-
-    else:
-        check_file_or_dir(prev_calc_dir, "dir")
-
-        vasp_input = _static_set_init(
-            struct_or_path=prev_calc_dir,
-            from_prev_calc=from_prev_calc,
-            preset=preset,
-            corrections=user_corrections
-        ).get_input_set()
+    vasp_input = _static_set_init(
+        structure, preset, nelect, user_corrections
+    ).get_input_set()
 
     return vasp_input
 
@@ -902,7 +803,7 @@ def batch_extract_vasp_structures(
 def dsol_calc_init(
         structure: Structure,
         calc_index: int,
-        preset: PMGStaticSetType|"DSolStaticSet" = "DSolStaticSet",
+        preset: PMGStaticSet|"DSolStaticSet" = "DSolStaticSet",
         user_corrections: Optional[Dict[str, Any]] = None,
     ) -> VaspInput:
     """
@@ -945,7 +846,7 @@ def dsol_calc_init(
         check_type(user_corrections, "user_corrections", (Dict,))
 
     nb_val_elec = get_all_valence_electrons(structure)
-    run_set = vasp_static_settings(structure, preset, user_corrections=user_corrections)
+    run_set = vasp_static_settings(structure, preset, user_corrections)
 
     # Search for the right N* parameter to use with respect to the functional
     pot_func = run_set.get("POTCAR_FUNCTIONAL", "PBE")

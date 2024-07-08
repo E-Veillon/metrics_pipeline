@@ -36,7 +36,7 @@ def _assert_args(args: argparse.Namespace) -> None:
 
     assert args.preset in PMGStaticSet, (
     "Provided relaxation preset must be one of the following:\n"
-    f"{PMGStaticSet}"
+    f"{PMGStaticSet.values}"
     )
 
     settings_path = os.path.join(CONFIGPATH, args.user_settings)
@@ -87,8 +87,7 @@ def main():
         metavar="PATH"
     )
     parser.add_argument(
-        "-o",
-        "--output",
+        "-o", "--output",
         type=str,
         default="./",
         help=(
@@ -99,10 +98,9 @@ def main():
         metavar="outdir"
     )
     parser.add_argument(
-        "-p",
-        "--preset",
-        type=str,
-        default="MPStaticSet",
+        "-p", "--preset",
+        type=PMGStaticSet,
+        default=PMGStaticSet.MPSTATICSET,
         help=(
             "The pymatgen preset to use for VASP static run. "
             "More info on possible presets in pymatgen documentation:\n"

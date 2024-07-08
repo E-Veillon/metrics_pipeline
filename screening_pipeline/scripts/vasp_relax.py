@@ -36,7 +36,7 @@ def _assert_args(args: Namespace) -> None:
 
     assert args.preset in PMGRelaxSet, (
     "Provided relaxation preset must be one of the following:\n"
-    f"{PMGRelaxSet}"
+    f"{PMGRelaxSet.values}"
     )
 
     settings_path = os.path.join(CONFIGPATH, args.user_settings)
@@ -99,8 +99,8 @@ def main():
     parser.add_argument(
         "-p",
         "--preset",
-        type=str,
-        default="MPRelaxSet",
+        type=PMGRelaxSet,
+        default=PMGRelaxSet.MPRELAXSET,
         help=(
             "The pymatgen preset to use for VASP relaxation. "
             "More info on possible presets in pymatgen documentation:\n"
