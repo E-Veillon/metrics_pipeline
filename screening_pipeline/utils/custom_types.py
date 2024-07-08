@@ -51,36 +51,3 @@ class PMGStaticSet(Enum):
         """Get the list of all Enum members values."""
         return list(member.value for member in self)
 
-#PMGRelaxSetType = Literal[
-#    "MITRelaxSet", 
-#    "MPRelaxSet", 
-#    "MPScanRelaxSet", 
-#    "MPHSERelaxSet", 
-#    "MPMetalRelaxSet", 
-#    "MVLRelax52Set", 
-#    "MVLScanRelaxSet"
-#]
-
-#PMGRelaxSet = {
-#    "MITRelaxSet", 
-#    "MPRelaxSet", 
-#    "MPScanRelaxSet", 
-#    "MPHSERelaxSet", 
-#    "MPMetalRelaxSet", 
-#    "MVLRelax52Set", 
-#    "MVLScanRelaxSet"
-#}
-
-#PMGStaticSetType = Literal[
-#    "MPStaticSet", 
-#    "MatPESStaticSet", 
-#    "MPScanStaticSet",
-#    "MPSOCSet"
-#]
-
-#PMGStaticSet = {
-#    "MPStaticSet", 
-#    "MatPESStaticSet", 
-#    "MPScanStaticSet",
-#    "MPSOCSet"
-#}
