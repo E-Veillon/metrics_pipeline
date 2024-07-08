@@ -3,22 +3,29 @@
 
 
 import os
-from typing import Tuple, Dict, Union, Literal, Any, Optional
+from typing import Tuple, Dict, Union, Literal, Any
 from dataclasses import dataclass
 from tqdm.contrib.concurrent import process_map
+from enum import Enum
 
 # PYTHON MATERIALS GENOMICS
 from pymatgen.core import SiteCollection, Structure
 from pymatgen.io.cif import CifParser
-from pymatgen.io.vasp import VaspInput
 from pymatgen.io.vasp.sets import MPRelaxSet
 
 # LOCAL IMPORTS
-from .common_asserts import check_type, check_num_value
-from .custom_types import PathLike, PMGStaticSetType, PMGStaticSet
-from .file_io import CONFIGPATH, check_file_or_dir, yaml_loader
-from .fitted_values import EL_PER_XC_VOL
-from .periodic_table import get_all_valence_electrons
+try:
+    from .common_asserts import check_type, check_num_value
+    from .custom_types import PathLike
+    from .file_io import CONFIGPATH, check_file_or_dir, yaml_loader
+    from .fitted_values import EL_PER_XC_VOL
+    from .periodic_table import get_all_valence_electrons
+except ImportError as exc:
+    from common_asserts import check_type, check_num_value
+    from custom_types import PathLike
+    from file_io import CONFIGPATH, check_file_or_dir, yaml_loader
+    from fitted_values import EL_PER_XC_VOL
+    from periodic_table import get_all_valence_electrons
 
 
 ########################################
@@ -84,6 +91,19 @@ class DSolStaticSet(MPRelaxSet):
 ########################################
 
 
+class DSolCalc(Enum):
+    NEUTRAL = 0
+    BEST_PLUS = 1
+    BEST_MINUS = 2
+    MIN_PLUS = 3
+    MIN_MINUS = 4
+    MAX_PLUS = 5
+    MAX_MINUS = 6
+
+
+########################################
+
+
 def get_dsol_struct_dir(
         path: PathLike, task_id: int, with_uncertainties: bool = False
         ) -> Tuple[str, int, int]:
@@ -137,31 +157,37 @@ def get_dsol_struct_dir(
 ########################################
 
 
+def _get_dsol_calc(calc_idx: int) -> str|None:
+    for calc in DSolCalc:
+        if calc_idx == calc.value:
+            return calc.name
+    return None
+
+
+########################################
+
+
 def calc_idx_to_dir_name(struct_dir_name: str, calc_index: int) -> str:
     """Maps calculation index to corresponding calculation name."""
     check_type(struct_dir_name, "struct_dir_name", (str,))
+    check_type(calc_index, "calc_index", (int,))
 
-    match calc_index:
-        case 0:
-            calc_type = "neutral"
-        case 1:
-            calc_type = "best_plus"
-        case 2:
-            calc_type = "best_minus"
-        case 3:
-            calc_type = "min_plus"
-        case 4:
-            calc_type = "min_minus"
-        case 5:
-            calc_type = "max_plus"
-        case 6:
-            calc_type = "max_minus"
-        case int():
-            check_num_value(calc_index, "calc_index", ">=", 0)
-            check_num_value(calc_index, "calc_index", "<=", 6)
-        case _:
-            check_type(calc_index, "calc_index", (int,))
-    return "_".join((struct_dir_name, calc_type))
+    calc_type = _get_dsol_calc(calc_index)
+
+    if calc_type is None:
+        check_num_value(calc_index, "calc_index", ">=", 0)
+        check_num_value(calc_index, "calc_index", "<=", 6)
+
+    return "_".join((struct_dir_name, calc_type.lower()))
+
+
+########################################
+
+
+def _match_n_star_idx(n_star_idx: int) -> str|None:
+    """Get delta-sol N* type name (e.g. "BEST")."""
+    n_star_type = _get_dsol_calc(n_star_idx)
+    return n_star_type if n_star_type is None else n_star_type.split(sep="_")[0]
 
 
 ########################################
@@ -190,20 +216,19 @@ def _match_dft_functional(
 ########################################
 
 
-def _match_calc_index(calc_index: int) -> str|None:
-    match calc_index:
-        case 0:
-            return None
-        case 1|2:
-            return "BEST"
-        case 3|4:
-            return "MIN"
-        case 5|6:
-            return "MAX"
-        case int():
-            raise ValueError("calc_index must be between 0 and 6 included.")
-        case _:
-            raise TypeError(f"Expected 'int' type, got '{type(calc_index)}' type instead.")
+def _match_orbital_types(structure: SiteCollection) -> Union[Literal["sp"], Literal["spd"]]:
+    """Get valence orbital types in the structure for delta-Sol."""
+    for elt in structure.elements:
+        match elt.block:
+            case "s"|"p":
+                continue
+            case "d":
+                return "spd"
+            case "f":
+                raise NotImplementedError(
+                    "f-block elements are not supported in Δ-Sol method."
+                )
+    return "sp"
 
 
 ########################################
@@ -211,47 +236,36 @@ def _match_calc_index(calc_index: int) -> str|None:
 
 def get_dsol_n_ratio(
         structure: SiteCollection,
-        dft_functional: str = 'PBE',
-        n_star_type: Union[Literal['MIN', 'BEST', 'MAX'], int, None] = 'BEST'
+        dft_functional: str = "PBE",
+        n_star_idx: int = 0
     ) -> float:
-    '''
+    """
     Computes n = N0/N* the electron ratio to add or remove from 
     the structure in the Δ-Sol method developped by Chan et al.
 
     Reference:
         M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
         (reference 32 in screening_pipeline/Bibliography)
-    '''
+    """
     check_type(structure, "structure", (SiteCollection,))
+    check_type(n_star_idx, "n_star_idx", (int,))
+    if not (0 <= n_star_idx <= 6):
+        check_num_value(n_star_idx, "n_star_idx", ">=", 0)
+        check_num_value(n_star_idx, "n_star_idx", "<=", 6)
 
-    if n_star_type is not None and isinstance(n_star_type, int):
-        n_star_type = _match_calc_index(n_star_type)
-
-    if n_star_type is None:
+    # n_star_idx = 0 => n_star_type = "NEUTRAL" => n = 0.0 electron
+    if n_star_idx == 0:
         return 0.0
 
-    dft_func = _match_dft_functional(dft_functional)
-
-    val_elec_type = 'sp'
-
-    for elt in structure.elements:
-        if elt.block in {'s', 'p'}:
-            continue
-        if elt.block == 'd':
-            val_elec_type = 'spd'
-            break
-        if elt.block == 'f':
-            raise NotImplementedError(
-                'f-block elements are not supported in Δ-Sol method.'
-            )
-        raise ValueError(
-            'Something is wrong with this function or Element objects "block" property.'
+    value_name = "_".join(
+        (
+            _match_dft_functional(dft_functional),
+            _match_orbital_types(structure)
         )
-
-    n_0        = get_all_valence_electrons(structure)
-    value_name = '_'.join((dft_func, val_elec_type))
-    n_star     = EL_PER_XC_VOL[n_star_type][value_name]
-    n          = float(n_0) / float(n_star)
+    )
+    n_0    = get_all_valence_electrons(structure)
+    n_star = EL_PER_XC_VOL[_match_n_star_idx(n_star_idx)][value_name]
+    n      = float(n_0) / float(n_star)
 
     return n
 
@@ -292,7 +306,7 @@ def get_dsol_band_gap(data: dict) -> Union[Tuple[str, float], Tuple[str, float, 
     assert all(has_str_key(data, key) for key in data_keys)
 
     n_ratio_best = get_dsol_n_ratio(
-        data["structure"], dft_functional=data["functional"], n_star_type="BEST"
+        data["structure"], dft_functional=data["functional"], n_star_idx="BEST"
     )
 
     # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap
@@ -305,10 +319,10 @@ def get_dsol_band_gap(data: dict) -> Union[Tuple[str, float], Tuple[str, float, 
         return (data["name"], e_bg_best)
 
     n_ratio_min = get_dsol_n_ratio(
-        data["structure"], dft_functional=data["functional"], n_star_type="MIN"
+        data["structure"], dft_functional=data["functional"], n_star_idx="MIN"
     )
     n_ratio_max = get_dsol_n_ratio(
-        data["structure"], dft_functional=data["functional"], n_star_type="MAX"
+        data["structure"], dft_functional=data["functional"], n_star_idx="MAX"
     )
     e_diff_min = data["E_N0_plus_n_min"] + data["E_N0_minus_n_min"] - 2*data["E_N0"]
     e_bg_min = e_diff_min / n_ratio_min
@@ -397,16 +411,16 @@ def batch_get_dsol_band_gaps(
     if not with_uncertainties:
         e_band_gaps = {
             tup[0]: {
-                'E_band_gap': tup[1]
+                "E_band_gap": tup[1]
             } for tup in e_band_gaps
         }
 
     else:
         e_band_gaps = {
             tup[0]: {
-                'E_band_gap': tup[1],
-                'E_band_gap_min': tup[2],
-                'E_band_gap_max': tup[3]
+                "E_band_gap": tup[1],
+                "E_band_gap_min": tup[2],
+                "E_band_gap_max": tup[3]
             } for tup in e_band_gaps
         }
 
@@ -437,7 +451,7 @@ if __name__ == "__main__":
     print("Wanted output:")
     print("None\nBEST BEST\nMIN MIN\nMAX MAX")
     print("Actual output:")
-    print(_match_calc_index(0))
-    print(_match_calc_index(1), _match_calc_index(2))
-    print(_match_calc_index(3), _match_calc_index(4))
-    print(_match_calc_index(5), _match_calc_index(6))
+    print(_match_n_star_idx(0))
+    print(_match_n_star_idx(1), _match_n_star_idx(2))
+    print(_match_n_star_idx(3), _match_n_star_idx(4))
+    print(_match_n_star_idx(5), _match_n_star_idx(6))

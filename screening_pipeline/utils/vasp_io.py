@@ -953,7 +953,7 @@ def dsol_calc_init(
     n_ratio = get_dsol_n_ratio(
         structure=structure,
         dft_functional=pot_func,
-        n_star_type=calc_index
+        n_star_idx=calc_index
     )
 
     nelect = nb_val_elec + n_ratio if calc_index % 2 == 1 else nb_val_elec - n_ratio
@@ -963,7 +963,7 @@ def dsol_calc_init(
             structure, preset, nelect=nelect, user_corrections=user_corrections
         )
     
-    if preset != "DSolStaticSet":
+    else:
         run_dict = run_set.as_dict()
         run_dict["INCAR"].update({"NELECT": nelect})
         run_set = VaspInput.from_dict(run_dict)
