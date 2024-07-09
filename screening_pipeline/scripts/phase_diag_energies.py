@@ -74,7 +74,6 @@ def main():
 
     parser.add_argument(
         "run_dir",
-        type=str,
         help="Base directory containing structure directories.",
     )
     parser.add_argument(
@@ -88,8 +87,6 @@ def main():
     )
     parser.add_argument(
         "-R", "--read-previous-summary",
-        type=str,
-        default=None,
         help=(
             "Path to a JSON summary file produced by a previous screening step.\n"
             "If given, the file will be checked to filter out structures that are "
@@ -97,6 +94,14 @@ def main():
         ),
         metavar="/path/to/summary.json",
         dest="prev_summary"
+    )
+    parser.add_argument(
+        "-k", "--key-to-check",
+        help=(
+            "The dict key associated to the bool used to verify eligibility "
+            "in the previous summary file.\n"
+            "If --read-previous-summary is given, it must be given too."
+        )
     )
     parser.add_argument(
         "-s", "--summary",
@@ -142,6 +147,7 @@ def main():
     _assert_args(args)
 
     prev_summary = args.prev_summary or None
+    key_to_check = args.key_to_check or None
     delta_H_limit = round(args.limit, 8)
     summary = os.path.join(args.run_dir, args.summary)
 
@@ -153,6 +159,7 @@ def main():
         method="convex_hull",
         base_dir=args.run_dir,
         path_to_summary=prev_summary,
+        key_to_check=key_to_check,
         workers=args.workers,
     )
     generated_entries = init_entries_from_dict(

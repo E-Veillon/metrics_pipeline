@@ -83,12 +83,10 @@ def main() -> None:
 
     parser.add_argument(
         "input_dir",
-        type=str,
         help="Base directory containing structure directories.",
     )
     parser.add_argument(
         "executable_path",
-        type=str,
         help="Path to the VASP executable.",
     )
     parser.add_argument(
@@ -105,7 +103,6 @@ def main() -> None:
     parser.add_argument(
         "-o", "--output",
         type=str,
-        default=None,
         help=(
             "Path to the output directory where VASP files will be written.\n"
             "A subdirectory will be created in this directory for each Δ-Sol calculation.\n"
@@ -116,8 +113,6 @@ def main() -> None:
     )
     parser.add_argument(
         "-R", "--read-previous-summary",
-        type=str,
-        default=None,
         help=(
             "Path to a JSON summary file produced by a previous screening step.\n"
             "If given, the file will be checked to filter structures that are already rejected."
@@ -126,8 +121,15 @@ def main() -> None:
         dest="prev_summary"
     )
     parser.add_argument(
+        "-k", "--key-to-check",
+        help=(
+            "The dict key associated to the bool used to verify eligibility "
+            "in the previous summary file.\n"
+            "If --read-previous-summary is given, it must be given too."
+        )
+    )
+    parser.add_argument(
         "-p", "--preset",
-        type=str,
         default="MPStaticSet",
         help=(
             "The pymatgen preset to use for VASP static calculations.\n"
@@ -138,8 +140,6 @@ def main() -> None:
     )
     parser.add_argument(
         "-u", "--user-settings",
-        type=str,
-        default=None,
         help=(
             "Path to the .yaml file containing user defined VASP tags "
             "that will override those of the preset."

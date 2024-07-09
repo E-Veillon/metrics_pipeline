@@ -450,7 +450,9 @@ def converged_vasprun(run_path: PathLike, **kwargs) -> Union[Vasprun, None]:
 
 
 def _check_vasp_data(
-    struct_dir: PathLike, path_to_summary: Optional[PathLike] = None
+    struct_dir: PathLike,
+    path_to_summary: Optional[PathLike] = None,
+    key_to_check: Optional[str] = None
 ) -> Vasprun|None:
     """
     Check whether given path leads to a previously accepted structure,
@@ -463,6 +465,9 @@ def _check_vasp_data(
                                 Used to not consider structures that failed before.
                                 If not provided, all structure subdirs will be extracted.
 
+        key_to_check (str):     The dict key associated to the bool used to verify eligibility.
+                                If path_to_summary is given, it must be given too.
+
     Returns: Vasprun object if it is eligible and normally converged, None otherwise.
     """
     check_file_or_dir(struct_dir, "dir")
@@ -470,7 +475,7 @@ def _check_vasp_data(
 
     if (
         path_to_summary is not None
-        and not _check_summary_data(struct_dir, path_to_summary)
+        and not _check_summary_data(struct_dir, path_to_summary, key_to_check)
     ):
         return None
 
@@ -484,7 +489,8 @@ def _check_vasp_data(
 
 def extract_vasp_data_for_convex_hull(
     struct_dir: PathLike = ".",
-    path_to_summary: Optional[PathLike] = None
+    path_to_summary: Optional[PathLike] = None,
+    key_to_check: Optional[str] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
     """
     Extracts VASP data from a previous run for one structure.
@@ -497,6 +503,9 @@ def extract_vasp_data_for_convex_hull(
                                 Used to not consider structures that failed before.
                                 If not provided, all structure subdirs will be extracted.
 
+        key_to_check (str):     The dict key associated to the bool used to verify eligibility.
+                                If path_to_summary is given, it must be given too.
+
     Returns:
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
                                 containing following data, used in stability calculation:
@@ -504,7 +513,7 @@ def extract_vasp_data_for_convex_hull(
                                     - structure chemical composition as Composition object,
                                     - generated structure energy (in eV),
     """
-    vasprun = _check_vasp_data(struct_dir, path_to_summary)
+    vasprun = _check_vasp_data(struct_dir, path_to_summary, key_to_check)
 
     if vasprun is None:
         return {}
@@ -530,7 +539,8 @@ def extract_vasp_data_for_convex_hull(
 
 def extract_vasp_data_for_delta_sol_init(
     struct_dir: PathLike = ".",
-    path_to_summary: Optional[PathLike] = None
+    path_to_summary: Optional[PathLike] = None,
+    key_to_check: Optional[str] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
     """
     Extracts VASP data from a previous run for one structure.
@@ -543,6 +553,8 @@ def extract_vasp_data_for_delta_sol_init(
                                 Used to not consider structures that failed before.
                                 If not provided, all structure subdirs will be extracted.
 
+        key_to_check (str):     The dict key associated to the bool used to verify eligibility.
+                                If path_to_summary is given, it must be given too.
 
     Returns:
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
@@ -550,7 +562,7 @@ def extract_vasp_data_for_delta_sol_init(
                                     - structure itself,
                                     - its final energy (in eV).
     """
-    vasprun = _check_vasp_data(struct_dir, path_to_summary)
+    vasprun = _check_vasp_data(struct_dir, path_to_summary, key_to_check)
 
     if vasprun is None:
         return {}
@@ -573,7 +585,8 @@ def extract_vasp_data_for_delta_sol_init(
 
 def extract_vasp_data_for_delta_sol_calc(
     struct_dir: PathLike = ".",
-    path_to_summary: Optional[PathLike] = None
+    path_to_summary: Optional[PathLike] = None,
+    key_to_check: Optional[str] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
     """
     Extract the results of Δ-Sol computations.
@@ -585,6 +598,8 @@ def extract_vasp_data_for_delta_sol_calc(
                                 Used to not consider structures that failed before.
                                 If not provided, all structure subdirs will be extracted.
 
+        key_to_check (str):     The dict key associated to the bool used to verify eligibility.
+                                If path_to_summary is given, it must be given too.
 
     Returns:
         Tuple[str, Dict]:       Tuple containing the name of the struct_dir and corresponding dict,
@@ -600,12 +615,12 @@ def extract_vasp_data_for_delta_sol_calc(
     for calc_dir in calc_dirs:
         if (
             path_to_summary is not None
-            and not _check_summary_data(struct_dir, path_to_summary)
+            and not _check_summary_data(struct_dir, path_to_summary, key_to_check)
         ):
             return {}
 
         calc_data = extract_vasp_data_for_delta_sol_init(
-            struct_dir=calc_dir, path_to_summary=path_to_summary
+            calc_dir, path_to_summary, key_to_check
         )
         if not calc_data:
             msg = f"WARNING: {calc_dir} could not be parsed, either because the "
@@ -633,6 +648,7 @@ def batch_extract_vasp_data(
         base_dir: PathLike = ".",
         structs_names: Optional[Sequence[str]] = None,
         path_to_summary: Optional[PathLike] = None,
+        key_to_check: Optional[str] = None,
         workers: int = 1
 ) -> Dict[str, Dict[str, Any]]:
     """
@@ -654,6 +670,9 @@ def batch_extract_vasp_data(
         path_to_summary (str):  Path to a JSON summary file containing results from previous steps.
                                 Used to not consider structures that failed before.
                                 If not provided, all structure subdirs will be extracted.
+
+        key_to_check (str):     The dict key associated to the bool used to verify eligibility.
+                                If path_to_summary is given, it must be given too.
 
         workers (int):          Number of parallel processes to spawn.
 
@@ -690,17 +709,20 @@ def batch_extract_vasp_data(
         case "convex_hull":
             set_vasp_extractor = partial(
                 extract_vasp_data_for_convex_hull,
-                path_to_summary=path_to_summary
+                path_to_summary=path_to_summary,
+                key_to_check=key_to_check
             )
         case "delta_sol_init":
             set_vasp_extractor = partial(
                 extract_vasp_data_for_delta_sol_init,
-                path_to_summary=path_to_summary
+                path_to_summary=path_to_summary,
+                key_to_check=key_to_check
             )
         case "delta_sol_calc":
             set_vasp_extractor = partial(
                 extract_vasp_data_for_delta_sol_calc,
-                path_to_summary=path_to_summary
+                path_to_summary=path_to_summary,
+                key_to_check=key_to_check
             )
         case str():
             raise NotImplementedError(
