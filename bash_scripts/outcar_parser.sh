@@ -1,4 +1,11 @@
 #!/bin/bash
+# Extract basic informations from a VASP OUTCAR file.
+# Several OUTCAR files can be given at once to get all results concatenated and separated by lines of dashes.
+# Collected informations in each OUTCAR file:
+# - index of last commenced ionic and electronic iterations,
+# - the last written total energies (TOTEN, without entropy and sigma->0),
+# - the number of issued warnings and a categorization of the most common ones,
+# - Whether the run finished on a VASP error, printing it if it is the case.
 
 WarningCounter () {
 	warn_count=$(grep -c "$2" $3)
@@ -38,15 +45,15 @@ for file in "$@"; do
 	total_warn_count=$(grep -c "WW  WW" $file)
 	echo "Number of Warnings: $total_warn_count"
 	if [ $total_warn_count -gt 0 ]; then
-		WarningCounter "Interatomic distances" "distance between some ions" $file
+		WarningCounter "Small interatomic distances" "distance between some ions" $file
 		cumul_warn_count=$(($cumul_warn_count + $warn_count))
 		WarningCounter "Electronic not converged" "electronic self-consistency" $file
 		cumul_warn_count=$(($cumul_warn_count + $warn_count))
-		WarningCounter "Lattice symmetry class" "reciprocal lattice and k-lattice" $file
+		WarningCounter "Lattice symmetry not consistent" "reciprocal lattice and k-lattice" $file
 		cumul_warn_count=$(($cumul_warn_count + $warn_count))
-		WarningCounter "Fermi occu variations" "Tetrahedron method does not include" $file
+		WarningCounter "Fermi occu variations with Tetrahedron" "Tetrahedron method does not include" $file
 		cumul_warn_count=$(($cumul_warn_count + $warn_count))
-		WarningCounter "Lattice len over 50" "lattice vectors is very long (>50 A)" $file
+		WarningCounter "Lattice length over 50A" "lattice vectors is very long (>50 A)" $file
 		cumul_warn_count=$(($cumul_warn_count + $warn_count))
 		warns_left=$(($total_warn_count - $cumul_warn_count))
 		if [ $warns_left -gt 0 ]; then
