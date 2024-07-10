@@ -5,7 +5,6 @@ Functions to manage, read, and write VASP files and launch VASP computations.
 
 
 import os
-import re
 import json
 import warnings
 from functools import partial

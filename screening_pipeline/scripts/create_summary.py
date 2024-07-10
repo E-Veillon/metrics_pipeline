@@ -3,7 +3,6 @@
 
 import os
 import json
-import itertools
 import argparse
 
 # LOCAL IMPORTS

@@ -4,7 +4,6 @@ Functions to check structures validity, compare them, and discard duplicates.
 """
 
 import re
-import os
 import itertools
 from functools import partial
 from typing import Tuple, List, Union, Sequence, Optional
