@@ -3,9 +3,12 @@
 Functions to check structures validity, compare them, and discard duplicates.
 """
 
+import re
+import os
 import itertools
 from functools import partial
-from typing import Tuple, List, Union, Sequence
+from typing import Tuple, List, Union, Sequence, Optional
+from pathlib import Path
 from tqdm.contrib.concurrent import process_map
 
 # PYTHON MATERIAL GENOMICS
@@ -15,6 +18,7 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 
 # LOCAL IMPORTS
 from .common_asserts import check_type, check_num_value
+from .custom_types import PathLike
 from .flattener import flatten
 
 
@@ -409,6 +413,95 @@ def batch_get_novel_structures(
     )
     novel_structs = flatten(novel_structs)
     return novel_structs
+
+
+########################################
+
+
+def is_struct_dir(path: PathLike) -> bool:
+    #NOTE: Here 'path' must be a Path object, do not change for os.path.
+    path = Path(path)
+    return (
+        path.is_dir()
+        and re.match(r"\A[0-9]+_[A-Za-z0-9\(\)]+\Z", path.name) is not None
+    )
+
+
+########################################
+
+
+def match_struct_dirs(
+    path: PathLike,
+    indices: Optional[List[int]] = None,
+    match_all: bool = True,
+    unique: bool = True,
+    no_return: bool = False
+) -> List[str]:
+    """
+    Match structure directories at given path.
+    
+    Parameters:
+        path (str|Path):    Where to search for structure directories.
+
+        indices ([int]):    Indices of wanted structure directories to match.
+                            If not given, matches all directories conforming to structure
+                            directory format. In this default behavior, match_all, unique
+                            and no_return are ignored.
+
+        match_all (bool):   Whether each given index should match at least one directory.
+                            If True, raise an error when an index does not match any directory.
+                            Defaults to True.
+
+        unique (bool):      Whether each given index should match at most one directory.
+                            If True, raise an error when an index matches several directories.
+                            Defaults to True.
+
+        no_return (bool):   Whether to only match structure directories without
+                            returning the matching paths list for memory saving.
+                            If True, an empty list is always returned.
+                            Defaults to False.
+
+    Raises:
+        ValueError if match_all is True and an index does not match any structure directory.
+        ValueError if unique is True and an index does match with several structure directories.
+
+    Returns:
+        [str]: List of paths of matching structure directories.
+    """
+    subtree = list(Path(path).iterdir())
+    print(f"{subtree=}")
+    print(f"{indices=}")
+    if indices is None:
+        return sorted(list(map(str, filter(is_struct_dir, subtree))))
+
+    all_matching_dirs = []
+
+    for idx in sorted(indices):
+        print(f"{idx=}")
+        matching_dirs = list(
+            filter(
+                lambda f: f.name.startswith(f"{idx}_") and is_struct_dir(f),
+                subtree        
+            )
+        )
+        print(f"{matching_dirs=}")
+        if match_all and not matching_dirs:
+            raise ValueError(
+                f"Index '{idx}' do not match with any structure "
+                f"directory in {path}."
+            )
+        if unique and len(matching_dirs) > 1:
+            raise ValueError(
+                f"Index '{idx}' matches with more than one structure directory, "
+                "which should not be possible as structure indexation is unique "
+                "inside a same batch. Please make sure that there are no parasite "
+                f"directories in {path}, i.e. non-structure directories starting with "
+                f"'{idx}_' or structure directories moved from other batches."
+            )
+        if not no_return:
+            all_matching_dirs += sorted(matching_dirs)
+
+    return list(map(str, all_matching_dirs))
 
 
 ########################################

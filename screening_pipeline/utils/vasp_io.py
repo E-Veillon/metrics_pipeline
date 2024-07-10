@@ -30,6 +30,7 @@ from .custom_types import PathLike, PMGRelaxSet, PMGStaticSet
 from .delta_sol import DSolStaticSet, get_all_valence_electrons, get_dsol_n_ratio
 from .fitted_values import U_VALUES
 from .file_io import check_file_or_dir
+from .matcher import match_struct_dirs
 
 
 ########################################
@@ -488,7 +489,7 @@ def _check_vasp_data(
 
 
 def extract_vasp_data_for_convex_hull(
-    struct_dir: PathLike = ".",
+    struct_dir: PathLike,
     path_to_summary: Optional[PathLike] = None,
     key_to_check: Optional[str] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
@@ -519,7 +520,7 @@ def extract_vasp_data_for_convex_hull(
         return {}
 
     # We want data of the generated structure for convex hulls, not the relaxed one
-    struct_name  = os.path.basename(struct_dir)
+    struct_name  = os.path.basename(str(struct_dir))
     composition = vasprun.initial_structure.composition
     generated_energy: float = vasprun.ionic_steps[0]["e_0_energy"]
 
@@ -538,7 +539,7 @@ def extract_vasp_data_for_convex_hull(
 
 
 def extract_vasp_data_for_delta_sol_init(
-    struct_dir: PathLike = ".",
+    struct_dir: PathLike,
     path_to_summary: Optional[PathLike] = None,
     key_to_check: Optional[str] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
@@ -567,7 +568,7 @@ def extract_vasp_data_for_delta_sol_init(
     if vasprun is None:
         return {}
 
-    struct_name = struct_dir.name
+    struct_name = os.path.basename(str(struct_dir))
     structure = vasprun.final_structure
     final_energy = vasprun.final_energy
 
@@ -584,7 +585,7 @@ def extract_vasp_data_for_delta_sol_init(
 
 
 def extract_vasp_data_for_delta_sol_calc(
-    struct_dir: PathLike = ".",
+    struct_dir: PathLike,
     path_to_summary: Optional[PathLike] = None,
     key_to_check: Optional[str] = None
 ) -> Tuple[str, Dict[str, Union[Structure, float]]]:
@@ -645,7 +646,7 @@ def extract_vasp_data_for_delta_sol_calc(
 
 def batch_extract_vasp_data(
         method: Literal["convex_hull", "delta_sol_init", "delta_sol_calc"],
-        base_dir: PathLike = ".",
+        base_dir: PathLike,
         structs_names: Optional[Sequence[str]] = None,
         path_to_summary: Optional[PathLike] = None,
         key_to_check: Optional[str] = None,
@@ -698,13 +699,6 @@ def batch_extract_vasp_data(
     check_type(workers, "workers", (int,))
     check_num_value(workers, "workers", ">", 0)
 
-    def is_struct_dir(path: Path) -> bool:
-        #NOTE: Do not change type hint to str here, os.listdir() is not appropriate.
-        return (
-            path.is_dir()
-            and re.match(r"\A[0-9]+_[A-Za-z0-9\(\)]+\Z", path.name) is not None
-        )
-
     match method:
         case "convex_hull":
             set_vasp_extractor = partial(
@@ -733,8 +727,7 @@ def batch_extract_vasp_data(
         case _:
             check_type(method, "method", (str,))
 
-    #NOTE: Do not change the Path object here, os.listdir() is not appropriate
-    structs_dir_list = list(filter(is_struct_dir, Path(base_dir).iterdir()))
+    structs_dir_list = match_struct_dirs(base_dir)
 
     if structs_names:
         structs_dir_list = list(filter(

@@ -58,7 +58,8 @@ from .distribution import (
     recall, precision, frechet_distance, emd_wrapper
 )
 from .matcher import (
-    check_interatomic_distances, remove_equivalent, group_by_composition
+    check_interatomic_distances, remove_equivalent,
+    group_by_composition, is_struct_dir, match_struct_dirs
 )
 from .ml_vectors import vectors_from_alignn
 from .rmsd import rmsd_from_structures
@@ -111,6 +112,7 @@ __all__ = [
     "get_densities",    # density
     "recall", "precision", "frechet_distance", "emd_wrapper",  # distribution
     "check_interatomic_distances", "remove_equivalent", "group_by_composition", # matcher
+    "is_struct_dir", "match_struct_dirs",                                         #
     "vectors_from_alignn",  # ml_vectors
     "rmsd_from_structures", # rmsd
     # Other
