@@ -92,7 +92,7 @@ def main() -> None:
         )
     
     with open(outfile, "wt", encoding="utf-8") as fp:
-        json.dump(summary_result, fp)
+        json.dump(summary_result, fp, indent=4)
 
 
 if __name__ == "__main__":
