@@ -234,7 +234,7 @@ def _relax_set_init(
 
 def _static_set_init(
     structure: SiteCollection,
-    preset: PMGStaticSet|"DSolStaticSet" = PMGStaticSet.MPSTATICSET,
+    preset: Union[PMGStaticSet, Literal["DsolStaticSet"]] = PMGStaticSet.MPSTATICSET,
     nelect: float|None = None,
     corrections: Optional[Dict] = None,
 ) -> DictSet:
@@ -335,7 +335,7 @@ def vasp_relaxation_settings(
 
 def vasp_static_settings(
     structure: Optional[SiteCollection] = None,
-    preset: PMGStaticSet|"DSolStaticSet" = PMGStaticSet.MPSTATICSET,
+    preset: Union[PMGStaticSet, Literal["DsolStaticSet"]] = PMGStaticSet.MPSTATICSET,
     nelect: float|None = None,
     user_corrections: Optional[dict] = None,
 ) -> VaspInput:
@@ -825,7 +825,7 @@ def batch_extract_vasp_structures(
 def dsol_calc_init(
         structure: Structure,
         calc_index: int,
-        preset: PMGStaticSet|"DSolStaticSet" = "DSolStaticSet",
+        preset: Union[PMGStaticSet, Literal["DsolStaticSet"]] = "DSolStaticSet",
         user_corrections: Optional[Dict[str, Any]] = None,
     ) -> VaspInput:
     """
