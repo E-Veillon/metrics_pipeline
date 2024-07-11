@@ -87,12 +87,10 @@ def init_entries_from_dict(
 def filter_database_entries(
     entries: Dict[str, Any]|List[PDEntry],
     ref_elts: Optional[List[Element]] = None,
-    max_dim: Optional[int] = None,
-    workers: int = 1
+    max_dim: Optional[int] = None
 ) -> List[PDEntry]:
     """
     Filter out entries in database file that are useless for generated data.
-    Data format conversion can be parallelized.
 
     Parameters:
         entries (dict):         Entries to filter.
@@ -101,8 +99,6 @@ def filter_database_entries(
                                 All structures containing other elements are discarded.
 
         max_dim (int):          Max dimension of entries to keep.
-
-        workers (int):          Number of parallel processes to spawn.
 
     Returns:
         List[PDEntry]: List of useful entries.
@@ -325,13 +321,15 @@ def get_lacking_elts_entries(
                 entries
             )
         )
-
+    user_defined_elts = get_elements_from_entries(user_elt_entries)
     lacking_elts = list(
         filter(
-            lambda elt: elt not in get_elements_from_entries(user_elt_entries),
+            lambda elt: elt not in user_defined_elts,
             ref_elts
         )
     )
+    if not lacking_elts: # No lacking entry
+        return []
 
     auto_defined_elts_entries = [
         PDEntry(
@@ -339,8 +337,7 @@ def get_lacking_elts_entries(
             energy=0.0,
             name=elt.symbol,
             attribute="element_ref",
-        )
-        for elt in lacking_elts
+        ) for elt in lacking_elts
     ]
 
     return auto_defined_elts_entries
@@ -424,6 +421,8 @@ def _process_pd_data(
                 )
             ref_elts = get_elements(ref_elts)
             entries  = _get_relevant_entries(entries, ref_elts)
+            auto_unaries = get_lacking_elts_entries(entries, ref_elts)
+            entries += auto_unaries
 
     return entries, ref_elts
 
@@ -524,7 +523,7 @@ def batch_compute_e_above_hull(
     check_type(entries, "entries", (Sequence,))
     (
         check_type(entry_group, f"entries[{idx}]", (Sequence,))
-        for idx, entry_group in entries
+        for idx, entry_group in enumerate(entries)
     )
     (
         check_type(entry, f"entries ({idx}-th entry)", (PDEntry,))

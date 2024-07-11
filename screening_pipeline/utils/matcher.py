@@ -130,7 +130,6 @@ def hash_composition(comp: Union[Composition, Entry, SiteCollection]) -> int:
     Returns:
         int: The hash.
     """
-
     check_type(comp, "comp", (Composition, Entry, SiteCollection))
 
     if isinstance(comp, Composition):
@@ -138,7 +137,9 @@ def hash_composition(comp: Union[Composition, Entry, SiteCollection]) -> int:
 
     return hash(comp.composition)
 
+
 ########################################
+
 
 def group_by_composition(
         comps: Sequence[Union[Composition, Entry, SiteCollection]]
@@ -156,7 +157,6 @@ def group_by_composition(
     Returns:
         A list of lists of objects containing the same elements.
     """
-
     check_type(comps, "comps", (Sequence,))
     if not comps:
         return []
@@ -172,7 +172,9 @@ def group_by_composition(
         for _, grouped in itertools.groupby(sorted_comps, hash_composition)
     ]
 
+
 ########################################
+
 
 def _group_by_equivalence(
         structures: List[Structure], test_volume: bool = False
@@ -213,7 +215,9 @@ def _group_by_equivalence(
     matcher = StructureMatcher()
     return (matcher.group_structures(structures) + unmatchables, unmatch_count)
 
+
 ########################################
+
 
 def batch_group_by_equivalence(
         structures: Sequence[Structure],
@@ -468,8 +472,7 @@ def match_struct_dirs(
         [str]: List of paths of matching structure directories.
     """
     subtree = list(Path(path).iterdir())
-    print(f"{subtree=}")
-    print(f"{indices=}")
+
     if indices is None:
         return sorted(list(map(str, filter(is_struct_dir, subtree))))
 
@@ -483,7 +486,7 @@ def match_struct_dirs(
                 subtree        
             )
         )
-        print(f"{matching_dirs=}")
+
         if match_all and not matching_dirs:
             raise ValueError(
                 f"Index '{idx}' do not match with any structure "
