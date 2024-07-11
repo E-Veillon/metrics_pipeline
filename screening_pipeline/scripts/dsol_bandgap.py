@@ -41,7 +41,7 @@ def _assert_args(args: Namespace) -> None:
         f"Acceptable band gap values cannot have the same value."
         )
 
-    check_file_format(args.summary, format="json")
+    check_file_format(args.summary, allowed_formats="json")
 
     assert args.workers >= 1, (
         "The number of workers cannot be negative or zero."

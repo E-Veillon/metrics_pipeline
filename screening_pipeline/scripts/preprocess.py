@@ -26,8 +26,8 @@ def _assert_args(args: argparse.Namespace):
     print(f"INPUT FILE: {args.input_file}")
     print(f"OUTPUT FILE: {args.output}")
 
-    check_file_or_dir(args.input_file, "file", format="cif")
-    check_file_format(args.output, format="cif")
+    check_file_or_dir(args.input_file, "file", allowed_formats="cif")
+    check_file_format(args.output, allowed_formats="cif")
 
     print(" ")
     print("------------------------------")

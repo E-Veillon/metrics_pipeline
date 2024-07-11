@@ -6,7 +6,7 @@ Implements functions to manage and operate on paths.
 
 import os
 import warnings
-from typing import Literal
+from typing import Literal, Sequence, List, Tuple
 from pathlib import Path
 from ruamel.yaml import YAML
 
@@ -28,25 +28,37 @@ CONFIGPATH  = os.path.join(MAINDIRPATH, "config")
 ########################################
 
 
-def check_file_format(filename: PathLike, *, format: str) -> None:
+def check_file_format(filename: PathLike, *, allowed_formats: str|Sequence[str]) -> None:
     """
     Verify that extension format of given file and wanted file format match,
     no matter if given file exists or not.
 
     Parameters:
-        filename (str|Path):    Name or path of the file to check.
+        filename (str|Path):            Name or path of the file to check.
 
-        format (str):           Wanted extension format for the checked file,
-                                without the dot separator (e.g. "txt" and not ".txt").
+        allowed_formats (str|[str]):    Allowed extension formats for the checked file,
+                                        without the dot separator (e.g. "txt" and not ".txt").
+                                        Can be given in a single string or as a sequence
+                                        (list or tuple) of strings.
     """
     check_type(filename, "filename", (str, Path))
-    check_type(format, "format", (str,))
+    check_type(allowed_formats, "allowed_formats", (str, Sequence))
+    if isinstance(allowed_formats, str):
+        allowed_formats = (allowed_formats,)
+    else:
+        (
+            check_type(ext, f"allowed_formats[{idx}]", (str,))
+            for idx, ext in enumerate(allowed_formats)
+        )
 
     filename = str(filename)
     file_format = filename.split(sep=".")[-1]
-    if file_format != format:
+
+    if all(file_format != ext for ext in allowed_formats):
+        plural = "s are" if len(allowed_formats) > 1 else " is"
+        formats_str = ", ".join(["'" + ext + "'" for ext in allowed_formats])
         raise ValueError(
-            f"{filename}: expected file format is '{format}', "
+            f"{filename}: allowed file format{plural} {formats_str}, "
             f"got '{file_format}' format instead."
         )
 
@@ -58,26 +70,27 @@ def check_file_or_dir(
     path: PathLike,
     file_or_dir: Literal["file", "dir"] = "file",
     *,
-    format: str|None = None
+    allowed_formats: str|Sequence|None = None
 ) -> None:
     """
     Verify existence and optionally extension format of given path.
     
     Parameters:
-        path (str|Path):    Path to verify.
+        path (str|Path):                Path to verify.
 
-        file_or_dir (str):  Whether the path should lead to a file or a directory.
-                            If the path exists but is not the right data type,
-                            an error will still be raised for not finding it.
+        file_or_dir (str):              Whether the path should lead to a file or a directory.
+                                        If the path exists but is not the right data type,
+                                        an error will still be raised for not finding it.
 
-        format (str):       If the path should lead to a file with a specific format
-                            extension, provide here wanted extension without the dot
-                            separator (e.g. "txt" and not ".txt").
+        allowed_formats (str|[str]):    If the path should lead to a file with a specific format
+                                        extension, provide here wanted extension without the dot
+                                        separator (e.g. "txt" and not ".txt"). If several formats
+                                        are possible, give a sequence (list or tuple) of them.
     """
     check_type(path, "path", (str, Path))
     assert file_or_dir in {"file", "dir"}
-    if format is not None:
-        check_type(format, "format", (str,))
+    if allowed_formats is not None:
+        check_type(allowed_formats, "allowed_formats", (str, List, Tuple))
 
     path = str(path)
 
@@ -91,9 +104,9 @@ def check_file_or_dir(
         )
     if (
         file_or_dir == "file"
-        and format is not None
+        and allowed_formats is not None
     ):
-        check_file_format(path, format=format)
+        check_file_format(path, allowed_formats=allowed_formats)
 
 
 ########################################
@@ -148,7 +161,7 @@ class BadYamlWarning(UserWarning):
 
 def yaml_loader(file_path: PathLike, on_error: Literal["raise", "warn", "ignore"] = "warn"):
     """Load a YAML file and casts it explicitly to a dict"""
-    check_file_or_dir(file_path, "file",  format="yaml")
+    check_file_or_dir(file_path, "file",  allowed_formats="yaml")
 
     yaml = YAML()
     with open(file_path, encoding="utf-8") as yaml_file:

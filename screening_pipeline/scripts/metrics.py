@@ -21,17 +21,17 @@ from screening_pipeline.utils import (
 def _assert_args(args: argparse.Namespace) -> None:
     """Check arguments values validity."""
     if args.dataset is not None:
-        check_file_or_dir(args.dataset, "file", format="cif")
+        check_file_or_dir(args.dataset, "file", allowed_formats="cif")
     if args.generated is not None:
-        check_file_or_dir(args.generated, "file", format="cif")
+        check_file_or_dir(args.generated, "file", allowed_formats="cif")
     if args.uniques is not None:
-        check_file_or_dir(args.uniques, "file", format="cif")
+        check_file_or_dir(args.uniques, "file", allowed_formats="cif")
     if args.valid is not None:
-        check_file_or_dir(args.valid, "file", format="cif")
+        check_file_or_dir(args.valid, "file", allowed_formats="cif")
     if args.summary is not None:
-        check_file_or_dir(args.summary, "file", format="json")
+        check_file_or_dir(args.summary, "file", allowed_formats="json")
 
-    check_file_format(args.output, format="json")
+    check_file_format(args.output, allowed_formats="json")
 
     if args.workers < 1:
         raise ValueError(

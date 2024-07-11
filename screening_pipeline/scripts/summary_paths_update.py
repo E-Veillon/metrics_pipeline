@@ -17,7 +17,7 @@ from screening_pipeline.utils import check_file_or_dir
 
 def _assert_args(args: argparse.Namespace) -> None:
     """Asserting input arguments validity."""
-    check_file_or_dir(args.input_file, "file", format="json")
+    check_file_or_dir(args.input_file, "file", allowed_formats="json")
     check_file_or_dir(args.new_path, "dir")
     assert args.workers >= 1, (
         f"'workers' arg must be strictly positive."

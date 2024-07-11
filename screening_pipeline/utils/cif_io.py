@@ -38,7 +38,7 @@ def extract_cif_from_file(filename: str) -> List[str]:
     Returns:
         List[str]: List of CIF strings, each one representing a single structure.
     """
-    check_file_or_dir(filename, "file", format="cif")
+    check_file_or_dir(filename, "file", allowed_formats="cif")
 
     # load file
     with open(filename, "rt", encoding="utf-8") as input_file:
@@ -209,7 +209,7 @@ def read_cif(
         Int: Number of structures containing rare gases discarded.
         Int: Number of structures containing rare earth elements discarded.
     """
-    check_file_or_dir(filename, "file", format="cif")
+    check_file_or_dir(filename, "file", allowed_formats="cif")
     check_type(workers, "workers", (int,))
     check_num_value(workers, "workers", ">", 0)
     check_type(keep_rare_gases, "keep_rare_gases", (bool,))
@@ -261,7 +261,7 @@ def write_cif(
 
         workers (int):                Number of parallel processes to use.
     """
-    check_file_format(filename, format="cif")
+    check_file_format(filename, allowed_formats="cif")
     (
         check_type(struct, f"structures[{idx}]", (Structure,))
         for idx, struct in enumerate(structures)

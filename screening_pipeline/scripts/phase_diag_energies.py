@@ -41,12 +41,12 @@ def _assert_args(args: argparse.Namespace) -> None:
     check_file_or_dir(args.run_dir, "dir")
 
     if args.reference is not None:
-        check_file_or_dir(args.reference, "file", format="json")
+        check_file_or_dir(args.reference, "file", allowed_formats="json")
 
     if args.prev_summary is not None:
-        check_file_or_dir(args.prev_summary, "file", format="json")
+        check_file_or_dir(args.prev_summary, "file", allowed_formats="json")
 
-    check_file_format(args.summary, format="json")
+    check_file_format(args.summary, allowed_formats="json")
     check_num_value(args.limit, "--limit", ">=", float(1e-6))
     check_num_value(args.workers, "--workers", ">", 0)
 

@@ -57,7 +57,7 @@ def mp_api_download(path: str, api_key: str|None = None) -> None:
                         If not given directly, it is searched in .pmgrc.yaml with
                         the "PMG_MAPI_KEY" variable.
     """
-    check_file_format(path, format="json")
+    check_file_format(path, allowed_formats="json")
     if api_key is not None:
         check_type(api_key, "api_key", (str,))
     api_key = _mp_api_key_check(api_key)
@@ -121,7 +121,7 @@ def process_oqmd_json_file(path: str) -> None:
     Parameters:
         path (str): Path to the OQMD JSON file to process.
     """
-    check_file_or_dir(path, "file", format="json")
+    check_file_or_dir(path, "file", allowed_formats="json")
 
     with open(path, "rt", encoding="utf-8") as fp:
         data = json.load(fp)
@@ -190,7 +190,7 @@ def process_oqmd_json_file(path: str) -> None:
 
 def load_phase_diagram_entries(filename: str) -> dict:
     """Load entries data from a JSON file."""
-    check_file_or_dir(filename, "file", format="json")
+    check_file_or_dir(filename, "file", allowed_formats="json")
 
     print(f"Loading {filename}...")
     with open(filename, "rt", encoding="utf-8") as fp:

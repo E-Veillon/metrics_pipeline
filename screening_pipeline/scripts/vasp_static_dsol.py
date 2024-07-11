@@ -37,7 +37,7 @@ def _assert_args(args: argparse.Namespace) -> None:
     check_file_or_dir(args.output, "dir")
 
     if args.prev_summary is not None:
-        check_file_or_dir(args.prev_summary, "file", format="json")
+        check_file_or_dir(args.prev_summary, "file", allowed_formats="json")
 
     assert args.preset in PMGStaticSet.values or args.preset == "DsolStaticSet", (
     "Provided static preset must be one of the following:\n"
@@ -46,7 +46,7 @@ def _assert_args(args: argparse.Namespace) -> None:
 
     if args.user_settings is not None:
         settings_path = os.path.join(CONFIGPATH, args.user_settings)
-        check_file_or_dir(settings_path, "file", format="yaml")
+        check_file_or_dir(settings_path, "file", allowed_formats="yaml")
 
 
 ########################################

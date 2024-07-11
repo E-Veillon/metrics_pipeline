@@ -17,7 +17,7 @@ from screening_pipeline.utils import (
 def _assert_args(args: argparse.Namespace) -> None:
     """Check input args validity."""
     check_file_or_dir(args.input_dir, "dir")
-    check_file_format(args.output, format="json")
+    check_file_format(args.output, allowed_formats="json")
     match_struct_dirs(args.input_dir, args.indices, no_return=True)
 
 

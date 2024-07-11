@@ -25,7 +25,7 @@ from screening_pipeline.utils import (
 def _assert_args(args: argparse.Namespace) -> None:
     """Asserting input arguments validity."""
 
-    check_file_or_dir(args.input_file, "file", format="cif")
+    check_file_or_dir(args.input_file, "file", allowed_formats="cif")
 
     assert (
         args.executable_path.startswith("vasp")
@@ -40,7 +40,7 @@ def _assert_args(args: argparse.Namespace) -> None:
     )
 
     settings_path = os.path.join(CONFIGPATH, args.user_settings)
-    check_file_or_dir(settings_path, "file", format="yaml")
+    check_file_or_dir(settings_path, "file", allowed_formats="yaml")
 
     assert args.workers >= 1, (
     "'workers' argument value must be strictly positive."

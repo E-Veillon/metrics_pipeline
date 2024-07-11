@@ -63,7 +63,7 @@ def main() -> None:
         mp_api_download(args.from_mp_api, api_key=args.mp_api_key)
     
     if args.process_oqmd is not None:
-        check_file_or_dir(args.process_oqmd, "file", format="json")
+        check_file_or_dir(args.process_oqmd, "file", allowed_formats="json")
         process_oqmd_json_file(path=args.process_oqmd)
     
 
