@@ -16,7 +16,7 @@ from tqdm.contrib.concurrent import process_map
 
 # PYTHON MATERIAL GENOMICS
 from pymatgen.core import Structure, SiteCollection
-from pymatgen.io.vasp import VaspInput, Vasprun
+from pymatgen.io.vasp import VaspInput, Vasprun, Poscar, Xdatcar
 from pymatgen.io.vasp.sets import (
     DictSet, MITRelaxSet, MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet,
     MPMetalRelaxSet, MVLRelax52Set, MVLScanRelaxSet,
@@ -140,7 +140,8 @@ def write_and_run_vasp(
     """
     _check_vasp_input(vasp_input)
     check_file_or_dir(run_path, "dir")
-    check_file_or_dir(vasp_exe, "file")
+    if vasp_exe != "vasp":
+        check_file_or_dir(vasp_exe, "file")
 
     vasp_input.write_input(output_dir=run_path)
 
@@ -372,6 +373,94 @@ def vasp_static_settings(
     ).get_input_set()
 
     return vasp_input
+
+
+########################################
+
+
+def get_struct_from_vasp(
+    path: PathLike,
+    try_vasprun: bool = True,
+    try_contcar: bool = True,
+    try_xdatcar: bool = True,
+    try_poscar: bool = True
+) -> Structure:
+    """
+    Attempt to extract the best structure possible from a VASP run directory.
+    
+    Algorithm:
+        Attempt to extract a structure from a VASP run in following order,
+        passing to the next step if the current one fails:
+        1 - Tries to get the final structure from vasprun.xml
+        2 - Tries to get the final structure from CONTCAR
+        3 - Tries to get the last structure from XDATCAR
+        4 - Tries to get the initial structure from POSCAR
+    
+    Parameters:
+        path (str|Path): Path to the VASP run directory.
+
+        try_vasprun (bool): Whether to try to get a structure from vasprun.xml.
+                            Defaults to True.
+
+        try_contcar (bool): Whether to try to get a structure from CONTCAR.
+                            Defaults to True.
+
+        try_xdatcar (bool): Whether to try to get a structure from XDATCAR.
+                            Defaults to True.
+
+        try_poscar (bool):  Whether to try to get a structure from POSCAR.
+                            Defaults to True.
+
+    Raises:
+        FileNotFoundError if none of the attempts were successful.
+
+    Returns:
+        A Structure object if it could be extracted.
+    """
+    check_file_or_dir(path, "dir")
+
+    if try_vasprun:
+        try:
+            file = os.path.join(path, "vasprun.xml")
+            structure = Vasprun(
+                file, parse_dos=False, parse_eigen=False, parse_potcar_file=False
+            ).final_structure
+            return structure
+        except (FileNotFoundError, ET.ParseError, UnicodeDecodeError):
+            pass
+    
+    if try_contcar:
+        try:
+            file = os.path.join(path, "CONTCAR")
+            structure = Poscar.from_file(file).structure
+            return structure
+        except FileNotFoundError:
+            pass
+    
+    if try_xdatcar:
+        try:
+            file = os.path.join(path, "XDATCAR")
+            structure = Xdatcar(file).structures[-1]
+            return structure
+        except FileNotFoundError:
+            pass
+    
+    if try_poscar:
+        try:
+            file = os.path.join(path, "POSCAR")
+            structure = Poscar.from_file(file).structure
+            return structure
+        except FileNotFoundError:
+            pass
+
+    raise FileNotFoundError(
+        f"get_struct_from_vasp: Unable to extract a structure from '{path}'.\n"
+        "Tried files:\n"
+        f"- vasprun.xml: {try_vasprun}\n"
+        f"- CONTCAR: {try_contcar}\n"
+        f"- XDATCAR: {try_xdatcar}\n"
+        f"- POSCAR: {try_poscar}\n"
+    )
 
 
 ########################################

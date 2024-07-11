@@ -479,7 +479,6 @@ def match_struct_dirs(
     all_matching_dirs = []
 
     for idx in sorted(indices):
-        print(f"{idx=}")
         matching_dirs = list(
             filter(
                 lambda f: f.name.startswith(f"{idx}_") and is_struct_dir(f),

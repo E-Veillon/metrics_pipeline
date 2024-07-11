@@ -6,16 +6,18 @@ The relaxation results then may be used in other scripts for material properties
 """
 
 import os
+import json
 from datetime import datetime
 from argparse import ArgumentParser, Namespace
 
 # PYTHON MATERIAL GENOMICS
-from pymatgen.core.structure import SiteCollection
+from pymatgen.core import SiteCollection
 
 # LOCAL IMPORTS
 from screening_pipeline.utils import (
     CONFIGPATH, check_file_or_dir, add_new_dir, yaml_loader,
-    PMGRelaxSet, read_cif, vasp_relaxation_settings, write_and_run_vasp
+    PMGRelaxSet, read_cif, vasp_relaxation_settings, write_and_run_vasp,
+    get_struct_from_vasp
 )
 
 
@@ -25,14 +27,15 @@ from screening_pipeline.utils import (
 def _assert_args(args: Namespace) -> None:
     """Asserting input arguments validity."""
 
-    check_file_or_dir(args.input_file, "file", format="cif")
+    check_file_or_dir(args.input_file, "file", allowed_formats=("cif", "json"))
 
     assert (
         args.executable_path.startswith("vasp")
         or os.path.exists(args.executable_path)
     ), f"{args.executable_path}: executable file not found."
 
-    check_file_or_dir(args.output, "dir")
+    if args.output is not None:
+        check_file_or_dir(args.output, "dir")
 
     assert args.preset in PMGRelaxSet, (
     "Provided relaxation preset must be one of the following:\n"
@@ -40,7 +43,7 @@ def _assert_args(args: Namespace) -> None:
     )
 
     settings_path = os.path.join(CONFIGPATH, args.user_settings)
-    check_file_or_dir(settings_path, "file", format="yaml")
+    check_file_or_dir(settings_path, "file", allowed_formats="yaml")
 
     assert args.workers >= 1, (
     "'workers' argument value must be strictly positive."
@@ -74,21 +77,20 @@ def main():
 
     parser.add_argument(
         "input_file",
-        type=str,
-        help="Path to the CIF file containing structure data to read.",
-        metavar="input_file.cif"
+        help=(
+            "Path to the file containing structure data to read. "
+            "It can be a CIF file to read structure data directly, or "
+            "a JSON summary file from a previous pipeline step to extract "
+            "structure data from a previous VASP run."
+        )
     )
     parser.add_argument(
         "executable_path",
-        type=str,
         help="Path to the VASP executable.",
         metavar="PATH"
     )
     parser.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        default="./",
+        "-o", "--output",
         help=(
             "Path to the output directory where VASP files will be written. "
             "A subdirectory will be created in output directory "
@@ -97,8 +99,7 @@ def main():
         metavar="outdir"
     )
     parser.add_argument(
-        "-p",
-        "--preset",
+        "-p", "--preset",
         type=PMGRelaxSet,
         default=PMGRelaxSet.MPRELAXSET,
         help=(
@@ -111,7 +112,6 @@ def main():
     parser.add_argument(
         "-u",
         "--user-settings",
-        type=str,
         default="default_settings.yaml",
         help="Path to the .yaml file containing tags overrides to put over the PMG preset.",
         metavar="file.yaml",
@@ -140,29 +140,56 @@ def main():
 
     _assert_args(args)
 
+    if args.output is None:
+        outdir = os.path.join(os.path.dirname(args.input_file), "Relaxations")
+    else:
+        outdir = args.output
+
     user_settings = yaml_loader(os.path.join(CONFIGPATH, args.user_settings))
     struct_idx    = args.task_index
 
 
     # MAIN BLOCK
 
-    # Convert CIF data into Structure objects
-    structures, *_ = read_cif(
-        filename=args.input_file,
-        workers=args.workers,
-        keep_rare_gases=True, # Avoid calling rare gaz screening function
-        keep_rare_earths=True # Avoid calling rare earth screening function
-    )
+    if args.input_file.endswith(".cif"):
+        # Convert CIF data into Structure objects
+        structures, *_ = read_cif(
+            filename=args.input_file,
+            workers=args.workers,
+            keep_rare_gases=True, # Avoid calling rare gaz screening function
+            keep_rare_earths=True # Avoid calling rare earth screening function
+        )
+        # Get structure of interest
+        structure: SiteCollection = structures[struct_idx]
+        dir_name = f"{struct_idx}_{structure.composition.reduced_formula}"
 
-    structure: SiteCollection = structures[struct_idx]
-    dir_name = f"{struct_idx}_{structure.composition.reduced_formula}"
+    elif args.input_file.endswith(".json"):
+
+        with open(args.input_file, "rt", encoding="utf-8") as fp:
+            data = json.load(fp)
+
+        paths = [d["path"] for d in data]
+
+        try:
+            struct_dir = next(filter(
+                lambda path: os.path.basename(path).startswith(f"{struct_idx}_"),
+                paths
+            ))
+        except StopIteration as exc:
+            raise ValueError(
+                f"Given 'task_index' value ({struct_idx}) do not match any data "
+                f"in file '{args.input_file}'."
+            ) from exc
+
+        structure = get_struct_from_vasp(struct_dir, try_xdatcar=False)
+        dir_name = os.path.basename(struct_dir)
 
     vasp_input = vasp_relaxation_settings(
         structure=structure,
         preset=args.preset,
         user_corrections=user_settings
     )
-    run_dir = add_new_dir(args.output, dir_name)
+    run_dir = add_new_dir(outdir, dir_name)
 
     write_and_run_vasp(vasp_input, run_dir, args.executable_path)
 

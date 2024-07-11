@@ -8,12 +8,11 @@ from .file_io import (
 
 )
 from .vasp_io import (
-    vasp_relaxation_settings, vasp_static_settings,
     write_and_run_vasp,
-    converged_vasprun,
+    vasp_relaxation_settings, vasp_static_settings,
+    get_struct_from_vasp, converged_vasprun,
     extract_vasp_data_for_delta_sol_init, batch_extract_vasp_data,
-    dsol_calc_init,
-    batch_extract_vasp_structures,
+    batch_extract_vasp_structures, dsol_calc_init
 )
 
 # Chemistry related modules
@@ -78,10 +77,11 @@ __all__ = [
     "read_cif", "write_cif",    # cif_io
     "MAINDIRPATH", "SCRIPTSPATH", "UTILSPATH", "CONFIGPATH",                # file_io
     "check_file_format", "check_file_or_dir", "add_new_dir", "yaml_loader", #
+    "write_and_run_vasp",
     "vasp_relaxation_settings", "vasp_static_settings",                 # vasp_io
-    "write_and_run_vasp", "converged_vasprun",                          #
+    "get_struct_from_vasp", "converged_vasprun",                        #
     "extract_vasp_data_for_delta_sol_init", "batch_extract_vasp_data",  #
-    "batch_extract_vasp_structures",                                    #
+    "batch_extract_vasp_structures", "dsol_calc_init",                  #
     # Chemistry
     "U_VALUES", "EL_PER_XC_VOL",    # fitted_values
     "structure_symmetrizer", "batch_symmetrizer",   # spacegroup
