@@ -63,14 +63,11 @@ for file in "$@"; do
 	FinishedOnError $file
 	echo "Finished on VASP Error: $has_error"
 	if [ "$has_error" == "yes" ]; then
-		grep -B 2 -A 20 -m 1 "EEEEEEE" $file
+		grep -B 2 -A 30 -m 1 "EEEEEEE" $file
 	fi
 done
 
-rm "grep_iter.tmp"
-rm "tail_iter.tmp"
-rm "grep_toten.tmp"
-rm "grep_sigma_0.tmp"
+rm "grep_iter.tmp" "tail_iter.tmp" "grep_toten.tmp" "grep_sigma_0.tmp"
 
 echo " "
 echo "===== PARSING ENDED SUCCESSFULLY ====="

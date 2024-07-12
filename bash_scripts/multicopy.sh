@@ -4,23 +4,41 @@
 # If -r is used, the source directory and everything contained inside is distributed.
 # Usage: ./multicopy.sh [-r] SOURCE DEST1 DEST2 ...
 
-if [ "$1" == "-r" ]; then
-	recursive=1
-	shift
-else
-	recursive=0
-fi
+declare -i src_defined=0
+declare -i recursive=0
+dest_dirs=()
 
-src_dir="$1"
-shift
-
+while [ $# -gt 0 ]; do
+    case "$1" in
+        "-r"|"--recursive" )
+	    recursive=1
+	    echo "'recursive' flag detected"
+	    shift 1
+	    ;;
+	-* )
+	    echo "unrecognized argument specifier: $1"
+	    exit 1
+	    ;;
+	* )
+	    if [ $src_defined -eq 0 ]; then
+		src="$1"
+		echo "source file defined as $1"
+		src_defined=1
+	    else
+		dest_dirs+=("$1")
+		echo "added $1 to destinations"
+	    fi
+	    shift 1
+    esac
+done
+echo "registered destinations: ${dest_dirs[@]}"
 if [ $recursive -eq 1 ]; then
-	for dest_dir in "$@"; do
-		cp -r "$src_dir" "$dest_dir"
+	for dest in ${dest_dirs[@]}; do
+		cp -r "$src" "$dest"
 	done
 else
-	for dest_dir in "$@"; do
-		cp "$src_file" "$dest_dir"
+	for dest in ${dest_dirs[@]}; do
+		cp "$src" "$dest"
 	done
 fi
 
