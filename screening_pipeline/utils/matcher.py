@@ -251,8 +251,8 @@ def batch_group_by_equivalence(
                                     progression bar.
 
     Returns: Tuple[List[List[List[Structure]]], int]: 
-    A list containing lists of same composition containing lists of equivalent structures,
-    and total count of unmatched structures (equal to zero if test_volume is set to False).
+        A list containing lists of same composition containing lists of equivalent structures,
+        and total count of unmatched structures (equal to zero if test_volume is set to False).
     """
     check_type(structures, "structures", (Sequence,))
     (
@@ -366,14 +366,20 @@ def _get_novel_structures(
     equivalent to one of them.
 
     Parameters:
-        structures ([[[Structure]]]):   Nested list of structures as the output from
-                                        batch_group_by_equivalence().
+        structures ([[Structure]]): List of lists of equivalent structures like
+                                    the output from batch_group_by_equivalence().
 
-        dataset ([Structure]):          Reference dataset of non-novel structures.
+        dataset ([Structure]):      Reference dataset of non-novel structures.
     
     Returns: List[Structure]:
-    The list of novel structures not seen in the dataset.
+        The list of novel structures not seen in the dataset.
     """
+    # Novel structures did not match with any other structure,
+    # hence they are in one-element lists. However, some structures
+    # in dataset may have not matched any generated one either,
+    # and then are in one-element lists too, hence the double condition
+    # "len(l) == 1 and l[0] not in dataset".
+    print(f"{structures=}")
     return flatten(
         list(
             filter(
@@ -401,7 +407,7 @@ def batch_get_novel_structures(
         workers (int):                  Number of parallel processes to spawn.
     
     Returns: List[Structure]
-    The list of novel structures not seen in the dataset.
+        The list of novel structures not seen in the dataset.
     """
     check_type(workers, "workers", (int,))
     check_num_value(workers, "workers", ">", 0)

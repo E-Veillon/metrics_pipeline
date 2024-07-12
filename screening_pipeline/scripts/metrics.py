@@ -8,6 +8,7 @@ import numpy as np
 from screening_pipeline.utils import (
     check_file_format, check_file_or_dir,
     batch_extract_vasp_structures, read_cif,
+    batch_group_by_equivalence, batch_get_novel_structures,
     remove_equivalent, vectors_from_alignn,
     recall, precision, frechet_distance,
     emd_wrapper, get_densities,
@@ -131,6 +132,8 @@ def main() -> None:
 
     _assert_args(args)
 
+    # DATA LOADING BLOCK
+
     if args.dataset is not None:
         print("Loading test set...")
         dataset, _, _ = read_cif(
@@ -214,7 +217,10 @@ def main() -> None:
         ("precision", "recall", "frechet_distance", "EMD_energy", "EMD_density")
     )
 
+    # METRICS COMPUTATIONS BLOCK
+
     if args.valid is not None:
+        # Validity metric
         dft_metrics["num_valid"] = len(valids)
         prop_valid = len(valids) / len(full_generated)
         dft_metrics["percent_valid"] = round(prop_valid * 100, 6)
@@ -236,38 +242,54 @@ def main() -> None:
         dft_metrics["num_unique"] = len(uniques)
 
         # novel count
-        concat_novel, _, nbr_unmatched = remove_equivalent(
+        grouped_structs, nbr_unmatched = batch_group_by_equivalence(
             structures=full_generated + dataset,
             workers=args.workers,
-            test_volume=args.test_min_vol,
-            keep_equivalent=False
+            comment="Compare generated and dataset"
         )
-        dft_metrics["num_novel"] = len(concat_novel) - len(dataset)
+        novel_structs = batch_get_novel_structures(
+            grouped_structs, dataset, workers=args.workers
+        )
+        dft_metrics["num_novel"] = len(novel_structs)
 
         if nbr_unmatched != 0:
             dft_metrics["unmatched_novel"] = nbr_unmatched
 
         # novel + unique count
-        concat_novel_unique, _, nbr_unmatched = remove_equivalent(
+        grouped_structs, nbr_unmatched = batch_group_by_equivalence(
             structures=uniques + dataset,
             workers=args.workers,
-            test_volume=args.test_min_vol,
-            keep_equivalent=False
+            comment="Compare uniques and dataset"
         )
-        dft_metrics["num_unique_novel"] = len(concat_novel_unique) - len(dataset)
-        prop_unique_novel = dft_metrics["num_unique_novel"] / len(full_generated)
+        unique_novel_structs = batch_get_novel_structures(
+            grouped_structs, dataset, workers=args.workers
+        )
+        dft_metrics["num_unique_novel"] = len(unique_novel_structs)
+        prop_unique_novel = dft_metrics["num_unique_novel"] / dft_metrics["num_generated"]
         dft_metrics["percent_unique_novel"] = round(prop_unique_novel * 100, 6)
 
         if nbr_unmatched != 0:
-            dft_metrics["unmatched_novel_unique"] = nbr_unmatched
+            dft_metrics["unmatched_unique_novel"] = nbr_unmatched
 
         # stable count
-        dft_metrics["num_stable"] = sum(map(lambda x: x["stable"], summary))
-        prop_stable = dft_metrics["num_stable"] / len(full_generated)
+        stable_structs_paths = [
+            data["path"] for data in filter(lambda d: d["stable"], summary)
+        ]
+        dft_metrics["num_stable"] = len(stable_structs_paths) #sum(map(lambda x: x["stable"], summary))
+        prop_stable = dft_metrics["num_stable"] / dft_metrics["num_generated"]
         dft_metrics["percent_stable"] = round(prop_stable * 100, 6)
 
         # S.U.N. percentage
-        prop_sun = prop_stable * prop_unique_novel
+        stable_structs, _ = batch_extract_vasp_structures(
+            calc_dirs=stable_structs_paths, workers=args.workers
+        )
+        sun_structs = list(
+            filter(
+                lambda struct: struct in unique_novel_structs,
+                stable_structs
+            )
+        )
+        prop_sun = len(sun_structs) / dft_metrics["num_generated"]
         dft_metrics["S.U.N."] = round(prop_sun * 100, 6)
 
         print("S.U.N. metrics computed.")
