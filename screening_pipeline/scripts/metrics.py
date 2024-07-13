@@ -29,8 +29,10 @@ def _assert_args(args: argparse.Namespace) -> None:
         check_file_or_dir(args.uniques, "file", allowed_formats="cif")
     if args.valid is not None:
         check_file_or_dir(args.valid, "file", allowed_formats="cif")
-    if args.summary is not None:
-        check_file_or_dir(args.summary, "file", allowed_formats="json")
+    if args.sun_summary is not None:
+        check_file_or_dir(args.sun_summary, "file", allowed_formats="json")
+    if args.relax_summary is not None:
+        check_file_or_dir(args.relax_summary, "file", allowed_formats="json")
 
     check_file_format(args.output, allowed_formats="json")
 
@@ -66,6 +68,12 @@ def main() -> None:
         "-g", "--generated", help="Cif file containing all the generated structures."
     )
     parser.add_argument(
+        "-u", "--uniques", help="Cif file containing the preprocessed unique structures."
+    )
+    parser.add_argument(
+        "-v", "--valid", help="Cif file containing the preprocessed valid structures."
+    )
+    parser.add_argument(
         "--no-rare-gas-check",
         action="store_true",
         help=(
@@ -86,25 +94,20 @@ def main() -> None:
         dest="no_rare_earth_check",
     )
     parser.add_argument(
-        "-u", "--uniques", help="Cif file containing the preprocessed unique structures."
+        "-s", "--sun-summary",
+        help="Json file containing the summary for the phase diagrams stability step.",
     )
     parser.add_argument(
-        "-v", "--valid", help="Cif file containing the preprocessed valid structures."
+        "-r", "--relax-summary",
+        help="Json file containing a summary for the relaxation step."
     )
     parser.add_argument(
-        "-s",
-        "--summary",
-        help="Json file containing the summary generated after the stability screening.",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
+        "-o", "--output",
         default="metrics.json",
         help="Output file containing the calculated metrics (json format).",
     )
     parser.add_argument(
-        "-w",
-        "--workers",
+        "-w", "--workers",
         type=int,
         default=1,
         help="Number of parallel processes to spawn for parallelized steps.",
@@ -121,8 +124,7 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "-t",
-        "--threshold",
+        "-t", "--threshold",
         default=0.4,
         type=float,
         help="Threshold for the computation of coverage recall and coverage precision metrics.",
@@ -178,15 +180,34 @@ def main() -> None:
         )
         print("Preprocessed valid structures loaded.")
 
-    if args.summary is not None:
-        print("Loading summary file...")
-        with open(args.summary, "r") as fp:
-            summary = json.load(fp)
-        print("Summary file loaded.")
+    if args.sun_summary is not None:
+        print("Loading stability summary file...")
+        with open(args.sun_summary, "rt", encoding="utf-8") as fp:
+            sun_summary = json.load(fp)
+        print("Stability summary file loaded.")
 
-        print("Convert data from summary file to structures...")
-        vasp_structures = batch_extract_vasp_structures(
-            calc_dirs=[struct["path"] for struct in summary], workers=args.workers
+        print("Convert data from stability summary file to structures...")
+        stable_structs_paths = [
+            data["path"] for data in filter(lambda d: d["stable"], sun_summary)
+        ]
+        stable_structs, _ = batch_extract_vasp_structures(
+            calc_dirs=stable_structs_paths, workers=args.workers
+        )
+        print("Data converted.")
+
+    if args.relax_summary is not None:
+        print("Loading relaxations summary file...")
+        with open(args.relax_summary, "rt", encoding="utf-8") as fp:
+            relax_summary = json.load(fp)
+        print("Relaxations summary file loaded.")
+
+        print("Convert data from relaxations summary file to structures...")
+        converged_relax_paths = [
+            data["path"] for data in filter(lambda d: d["converged"], relax_summary)
+        ]
+        relax_structures = batch_extract_vasp_structures(
+            calc_dirs=converged_relax_paths,
+            workers=args.workers
         )
         print("Data converted.")
 
@@ -218,7 +239,7 @@ def main() -> None:
         args.dataset is not None
         and args.generated is not None
         and args.uniques is not None
-        and args.summary is not None
+        and args.sun_summary is not None
     ):
         # S.U.N. metrics
         print("Computing S.U.N. metrics...")
@@ -260,17 +281,11 @@ def main() -> None:
             dft_metrics["unmatched_unique_novel"] = nbr_unmatched
 
         # stable count
-        stable_structs_paths = [
-            data["path"] for data in filter(lambda d: d["stable"], summary)
-        ]
-        dft_metrics["num_stable"] = len(stable_structs_paths) #sum(map(lambda x: x["stable"], summary))
+        dft_metrics["num_stable"] = len(stable_structs)
         prop_stable = dft_metrics["num_stable"] / dft_metrics["num_generated"]
         dft_metrics["percent_stable"] = round(prop_stable * 100, 6)
 
-        # S.U.N. percentage
-        stable_structs, _ = batch_extract_vasp_structures(
-            calc_dirs=stable_structs_paths, workers=args.workers
-        )
+        # S.U.N. count
         sun_structs = list(
             filter(
                 lambda struct: struct in unique_novel_structs,
@@ -287,11 +302,11 @@ def main() -> None:
                 continue
             print(f"{key} = {val}")
 
-    if args.summary is not None:
+    if args.relax_summary is not None:
         # RMSD metric
         print("Computing RMSD metric...")
-        in_structs = [s for s, _ in vasp_structures]
-        out_structs = [s for _, s in vasp_structures]
+        in_structs = [s for s, _ in relax_structures]
+        out_structs = [s for _, s in relax_structures]
         dft_metrics["RMSD"] = np.mean(
             rmsd_from_structures(in_structs, out_structs)
         ).item()
