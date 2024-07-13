@@ -51,14 +51,6 @@ def main() -> None:
         )
     )
     parser.add_argument(
-        "--reject",
-        action="store_true",
-        help=(
-            "Pass this flag to reject (i.e. having a 'selected = False' key) "
-            "given structures instead of saving them (i.e. having a 'selected = True' key)."
-        )
-    )
-    parser.add_argument(
         "-o", "--output",
         default="manual_summary.json",
         help=(
@@ -66,6 +58,19 @@ def main() -> None:
             "Only affect the name of the file, its location is the path given as input_dir. "
             "Defaults to 'manual_summary.json'."
             )
+    )
+    parser.add_argument(
+        "-n", "--key-name",
+        default="selected",
+        help="Name for the dict key containing the selection boolean. Defaults to 'selected'."
+    )
+    parser.add_argument(
+        "--reject",
+        action="store_true",
+        help=(
+            "Pass this flag to reject (i.e. having a 'selected = False' key) "
+            "given structures instead of saving them (i.e. having a 'selected = True' key)."
+        )
     )
     args = parser.parse_args()
 
@@ -86,7 +91,7 @@ def main() -> None:
             {
                 "path": dir,
                 "name": os.path.basename(dir),
-                "selected": (dir in wanted_struct_dirs) ^ args.reject
+                f"{args.key_name}": (dir in wanted_struct_dirs) ^ args.reject
             }
         )
     
