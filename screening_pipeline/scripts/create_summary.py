@@ -49,7 +49,7 @@ def main() -> None:
             "(i.e. having a 'selected = True' key). "
             "All other structures detected in input_dir will get the opposite value."
             "If not given, all structures will be given the same bool value "
-            "(i.e. all set to 'false' by default, or all set to 'true' with --reject flag)."
+            "(i.e. all set to 'true' by default, or all set to 'false' with --reject flag)."
         )
     )
     parser.add_argument(
