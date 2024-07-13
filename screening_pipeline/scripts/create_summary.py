@@ -39,8 +39,8 @@ def main() -> None:
         help="Directory containing structure directories."
     )
     parser.add_argument(
-        "indices",
-        nargs="+",
+        "-i", "--indices",
+        nargs="*",
         type=int,
         help=(
             "The indices of the structures of interest "
@@ -48,6 +48,8 @@ def main() -> None:
             "By default, they are the structures to keep "
             "(i.e. having a 'selected = True' key). "
             "All other structures detected in input_dir will get the opposite value."
+            "If not given, all structures will be given the same bool value "
+            "(i.e. all set to 'false' by default, or all set to 'true' with --reject flag)."
         )
     )
     parser.add_argument(
@@ -76,12 +78,16 @@ def main() -> None:
 
     _assert_args(args)
 
-    indices = sorted(args.indices)
+    if args.indices is None:
+        indices = args.indices
+    else:
+        indices = sorted(args.indices)
+    
     outfile = os.path.join(args.input_dir, args.output)
 
 
     # MAIN BLOCK
-    
+
     all_struct_dirs = match_struct_dirs(args.input_dir)
     wanted_struct_dirs = match_struct_dirs(args.input_dir, indices)
     summary_result = []
