@@ -139,8 +139,8 @@ def main() -> None:
         dataset, _, _ = read_cif(
             filename=args.dataset,
             workers=args.workers,
-            keep_rare_gases=True,
-            keep_rare_earths=True,
+            keep_rare_gases=args.no_rare_gas_check,
+            keep_rare_earths=args.no_rare_earth_check
         )
         print("Test set loaded.")
         # remove duplicate structures from the dataset
@@ -153,8 +153,8 @@ def main() -> None:
         full_generated, _, _ = read_cif(
             filename=args.generated,
             workers=args.workers,
-            keep_rare_gases=True,
-            keep_rare_earths=True,
+            keep_rare_gases=args.no_rare_gas_check,
+            keep_rare_earths=args.no_rare_earth_check
         )
         print("Generated structures loaded.")
         #if not args.no_rare_gas_check or not args.no_rare_earth_check:
@@ -174,8 +174,8 @@ def main() -> None:
         uniques, _, _ = read_cif(
             filename=args.uniques,
             workers=args.workers,
-            keep_rare_gases=True,
-            keep_rare_earths=True,
+            keep_rare_gases=args.no_rare_gas_check,
+            keep_rare_earths=args.no_rare_earth_check
         )
         print("Preprocessed uniques structures loaded.")
 
@@ -184,8 +184,8 @@ def main() -> None:
         valids, _, _ = read_cif(
             filename=args.valid,
             workers=args.workers,
-            keep_rare_gases=True,
-            keep_rare_earths=True,
+            keep_rare_gases=args.no_rare_gas_check,
+            keep_rare_earths=args.no_rare_earth_check
         )
         print("Preprocessed valid structures loaded.")
 
@@ -208,7 +208,7 @@ def main() -> None:
             "num_unique", "num_novel",
             "num_unique_novel", "percent_unique_novel",
             "num_stable", "percent_stable",
-            "SUN",
+            "num_SUN", "percent_SUN",
             "RMSD"
         )
     )
@@ -289,8 +289,9 @@ def main() -> None:
                 stable_structs
             )
         )
-        prop_sun = len(sun_structs) / dft_metrics["num_generated"]
-        dft_metrics["S.U.N."] = round(prop_sun * 100, 6)
+        dft_metrics["num_SUN"] = len(sun_structs)
+        prop_sun = dft_metrics["num_SUN"] / dft_metrics["num_generated"]
+        dft_metrics["percent_SUN"] = round(prop_sun * 100, 6)
 
         print("S.U.N. metrics computed.")
         for key, val in dft_metrics.items():
@@ -307,7 +308,7 @@ def main() -> None:
             rmsd_from_structures(in_structs, out_structs)
         ).item()
         print("RMSD metric computed.")
-        print(f"RMSD = {dft_metrics['RMSD']}")
+        print(f"RMSD = {dft_metrics["RMSD"]}")
 
     if args.dataset is not None and args.generated is not None:
         # machine learning metrics (COV-R, COV-P, energy EMD, density EMD)
