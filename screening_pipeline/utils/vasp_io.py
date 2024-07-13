@@ -514,7 +514,7 @@ def converged_vasprun(run_path: PathLike, **kwargs) -> Union[Vasprun, None]:
     """
     check_file_or_dir(run_path, "dir")
     vasprun_path = os.path.join(run_path, "vasprun.xml")
-    check_file_or_dir(vasprun_path, "file", format="xml")
+    check_file_or_dir(vasprun_path, "file", allowed_formats="xml")
 
     try:
         vasprun = Vasprun(filename=vasprun_path, **kwargs)
