@@ -157,17 +157,6 @@ def main() -> None:
             keep_rare_earths=args.no_rare_earth_check
         )
         print("Generated structures loaded.")
-        #if not args.no_rare_gas_check or not args.no_rare_earth_check:
-        #    print("Pruning undesirable elements from generated structures...")
-        #    pruned_generated, _, _ = read_cif(
-        #        filename=args.generated,
-        #        workers=args.workers,
-        #        keep_rare_gases=args.no_rare_gas_check,
-        #        keep_rare_earths=args.no_rare_earth_check,
-        #    )
-        #    print("Pruning finished.")
-        #else:
-        #    pruned_generated = deepcopy(full_generated)
 
     if args.uniques is not None:
         print("Loading preprocessed uniques structures...")
@@ -203,7 +192,7 @@ def main() -> None:
 
     dft_metrics = dict.fromkeys(
         (
-            "num_generated",#"num_generated_wo_rare",
+            "num_generated",
             "num_valid", "percent_valid",
             "num_unique", "num_novel",
             "num_unique_novel", "percent_unique_novel",
@@ -236,7 +225,6 @@ def main() -> None:
 
         # total count
         dft_metrics["num_generated"] = len(full_generated)
-        #dft_metrics["num_generated_wo_rare"] = len(pruned_generated)
 
         # Unique count
         dft_metrics["num_unique"] = len(uniques)
