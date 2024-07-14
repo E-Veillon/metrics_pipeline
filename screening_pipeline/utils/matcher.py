@@ -379,7 +379,6 @@ def _get_novel_structures(
     # in dataset may have not matched any generated one either,
     # and then are in one-element lists too, hence the double condition
     # "len(l) == 1 and l[0] not in dataset".
-    print(f"{structures=}")
     return flatten(
         list(
             filter(

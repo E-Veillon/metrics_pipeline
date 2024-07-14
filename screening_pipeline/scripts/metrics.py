@@ -190,9 +190,10 @@ def main() -> None:
         stable_structs_paths = [
             data["path"] for data in filter(lambda d: d["stable"], sun_summary)
         ]
-        stable_structs, _ = batch_extract_vasp_structures(
+        stable_structs = batch_extract_vasp_structures(
             calc_dirs=stable_structs_paths, workers=args.workers
         )
+        stable_structs = [s for s, _ in stable_structs]
         print("Data converted.")
 
     if args.relax_summary is not None:
@@ -311,7 +312,7 @@ def main() -> None:
             rmsd_from_structures(in_structs, out_structs)
         ).item()
         print("RMSD metric computed.")
-        print(f"RMSD = {dft_metrics["RMSD"]}")
+        print(f"RMSD = {dft_metrics['RMSD']}")
 
     if args.dataset is not None and args.generated is not None:
         # machine learning metrics (COV-R, COV-P, energy EMD, density EMD)
