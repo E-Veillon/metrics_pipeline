@@ -8,6 +8,7 @@ process phase diagram entries, and compute energy above hull of entries.
 from typing import Dict, Union, Sequence, Any, List, Optional, Set, Tuple
 from functools import partial
 from tqdm.contrib.concurrent import process_map
+import timeout_decorator as timeout
 
 # PYTHON MATERIAL GENOMICS
 from pymatgen.core import Element, Composition
@@ -451,7 +452,7 @@ def _phase_diagram_init(
 
 ########################################
 
-
+@timeout.timeout(60, exception_message="The phase diagram computation timed out.")
 def _compute_e_above_hull(
     entries_to_compute: List[PDEntry],
     ref_entries: List[PDEntry],
