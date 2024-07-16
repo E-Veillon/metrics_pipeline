@@ -247,14 +247,14 @@ def get_sub_entries(
         check_type(entry, f"entry_pool[{idx}]", (PDEntry,))
         for idx, entry in enumerate(entry_pool)
     )
-
+    print("Searching for sub-entries...")
     sub_entries = list(
         filter(
             lambda entry: all(elt in main_entry.elements for elt in entry.elements),
             entry_pool,
         )
     )
-
+    print("Sub-entries found.")
     return sub_entries
 
 
@@ -385,22 +385,13 @@ def _process_pd_data(
         case (True, False): # 'entries' is given, 'ref_elts' is empty or None
             # Infer reference elements from entries
             # => data for a diagram containing all entries.
-            check_type(entries, "entries", (Sequence,))
-            (
-                check_type(entry, f"entries[{idx}]", (PDEntry,))
-                for idx, entry in enumerate(entries)
-            )
+            print("Entering (True, False) case...")
+            print("Calling 'get_element_from_entries()'...")
             ref_elts = get_elements_from_entries(entries)
 
         case (False, True): # 'ref_elts' is given, 'entries' is empty or None
             # Init default unary entries for each element
             # => data for a 'blank' diagram with only 0.0 eV entries.
-            check_type(ref_elts, "ref_elts", (str, Sequence))
-            if not isinstance(ref_elts, str):
-                (
-                    check_type(elt, f"ref_elts[{idx}]", (str, int, Element))
-                    for idx, elt in enumerate(ref_elts)
-                )
             ref_elts = get_elements(ref_elts)
             entries = get_lacking_elts_entries(entries=[], ref_elts=ref_elts)
 
@@ -408,22 +399,12 @@ def _process_pd_data(
             # Filter out entries with unmatching elements
             # Add default unary entries for elements that
             # do not have matching unary entries.
-            check_type(entries, "entries", (Sequence,))
-            (
-                check_type(entry, f"entries[{idx}]", (PDEntry,))
-                for idx, entry in enumerate(entries)
-            )
-            check_type(ref_elts, "ref_elts", (str, Sequence))
-            if not isinstance(ref_elts, str):
-                (
-                    check_type(elt, f"ref_elts[{idx}]", (str, int, Element))
-                    for idx, elt in enumerate(ref_elts)
-                )
             ref_elts = get_elements(ref_elts)
             entries  = _get_relevant_entries(entries, ref_elts)
             auto_unaries = get_lacking_elts_entries(entries, ref_elts)
             entries += auto_unaries
 
+    print(f"match-case statement successfully exited, {ref_elts=}")
     return entries, ref_elts
 
 
@@ -436,6 +417,8 @@ def _phase_diagram_init(
     verbose: bool = False
 ):
     """Compute a new PhaseDiagram object from given entries and elements."""
+    pd_name = "-".join(list(map(str, ref_elts)))
+    print(f"Initializing phase diagram '{pd_name}'")
     new_pd = PhaseDiagram(entries=entries, elements=ref_elts)
 
     if verbose:
@@ -464,14 +447,20 @@ def _compute_e_above_hull(
     results = []
     # entries_to_compute is one composition group here,
     # all structures contain the same elements
+    print("Calling 'get_sub_entries()'...")
     comp_refs = get_sub_entries(main_entry=entries_to_compute[0], entry_pool=ref_entries)
+    print("Calling '_process_pd_data()'...")
     pd_entries, pd_elts = _process_pd_data(entries=comp_refs)
+    print("Calling '_phase_diagram_init()'...")
     pd = _phase_diagram_init(pd_entries, pd_elts, verbose=verbose)
-
+    print("Phase diagram successfully initialized")
     # Compute energy above hull for each generated entry
     for entry in entries_to_compute:
+        print(f"computing e above hull of {entry.name}...")
         e_above_hull = pd.get_e_above_hull(entry, allow_negative=True)
+        print(f"{entry.name} has a e above hull of {e_above_hull} eV/atom")
         is_stable = e_above_hull <= stable_limit
+        print(f"{entry.name} is {'not' if not is_stable else ''} stable")
         if verbose:
             print(f"Entry '{entry.name}':")
             print(f"- energy_per_atom: {entry.energy_per_atom}")
@@ -484,6 +473,7 @@ def _compute_e_above_hull(
                 "stable": is_stable.item()
             }
         )
+        print(f"{entry.name}'s results successfully saved.")
     return results
 #---------------------------------------
 def batch_compute_e_above_hull(
@@ -542,14 +532,19 @@ def batch_compute_e_above_hull(
         verbose=verbose
     )
 
-    computed_energies = process_map(
-        energy_computer,
-        entries,
-        max_workers=workers,
-        chunksize=1,
-        desc="Compute above hull energies"
-    )
-    computed_energies = flatten(computed_energies)
+    #computed_energies = process_map(
+    #    energy_computer,
+    #    entries,
+    #    max_workers=workers,
+    #    chunksize=1,
+    #    desc="Compute above hull energies"
+    #)
+    #computed_energies = flatten(computed_energies)
+    computed_energies = []
+    for entry_group in entries:
+        print(f"Begin computing phase diagram {'-'.join([str(elt) for elt in entry_group[0].elements])}")
+        computed_energies += energy_computer(entry_group)
+        print("Energy computation step complete")
 
     return computed_energies
 
