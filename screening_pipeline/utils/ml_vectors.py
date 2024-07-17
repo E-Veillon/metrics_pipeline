@@ -2,7 +2,7 @@
 """Functions to compute vectors using a pretrained ALIGNN model."""
 
 
-from typing import List,Literal
+from typing import List, Literal, Optional
 import numpy as np
 import torch
 from torch_geometric.data import Dataset
@@ -73,7 +73,7 @@ class StructuresDataset(Dataset):
 def vectors_from_alignn(
     structures: List[Structure],
     batch_size: int = 128,
-    device: torch.device = None,
+    device: Optional[torch.device] = None,
     model_name: str = "mp/e_form",
     output: Literal["latent","energy"] = "latent"
 ) -> np.ndarray:
