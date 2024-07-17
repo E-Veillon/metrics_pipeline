@@ -412,15 +412,19 @@ def _phase_diagram_init(
     verbose: bool = False
 ):
     """Compute a new PhaseDiagram object from given entries and elements."""
-    new_pd = PhaseDiagram(entries=entries, elements=ref_elts)
-
     if verbose:
         pd_name = "-".join(list(map(str, ref_elts)))
         print(f"Initializing phase diagram '{pd_name}'")
+
+        new_pd = PhaseDiagram(entries=entries, elements=ref_elts)
+
         print(f"{pd_name} diagram contains following entries:")
         for entry in new_pd.qhull_entries:
             entry = PDEntry(entry.composition, entry.energy)
             print(f"{entry}, energy_per_atom = {entry.energy_per_atom}")
+
+    else:
+        new_pd = PhaseDiagram(entries=entries, elements=ref_elts)
 
     return new_pd
 
