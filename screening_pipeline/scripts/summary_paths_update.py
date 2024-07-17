@@ -8,20 +8,25 @@ import json
 from typing import List, Dict
 import argparse
 
-# LOCAL IMPORTS
-from screening_pipeline.utils import check_file_or_dir
-
 
 ########################################
 
 
 def _assert_args(args: argparse.Namespace) -> None:
     """Asserting input arguments validity."""
-    check_file_or_dir(args.input_file, "file", allowed_formats="json")
-    check_file_or_dir(args.new_path, "dir")
-    assert args.workers >= 1, (
-        f"'workers' arg must be strictly positive."
-    )
+    if not os.path.isfile(args.input_file):
+        raise FileNotFoundError(
+            f"{args.input_file}: No such file found."
+        )
+    if not args.input_file.endswith(".json"):
+        raise ValueError(
+            f"{args.input_file}: allowed file format is 'json', "
+            f"got '{args.input_file.split(sep='.')[-1]}' format instead."
+        )
+    if not os.path.isdir(args.new_path):
+        raise FileNotFoundError(
+            f"{args.input_file}: No such directory found."
+        )
 
 
 ########################################
