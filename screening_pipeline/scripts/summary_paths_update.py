@@ -44,13 +44,7 @@ def main() -> None:
     parser.add_argument(
         "-a", "--absolute",
         action="store_true",
-        help="The new path is abolutized before replacing the old one."
-    )
-    parser.add_argument(
-        "-w", "--workers",
-        type=int,
-        default=1,
-        help="Number of parallel processes to spawn."
+        help="The new path is absolutized before replacing the old one."
     )
 
     args = parser.parse_args()
