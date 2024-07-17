@@ -165,8 +165,16 @@ def main():
     generated_entries = init_entries_from_dict(
         entries_dict=structs_data, attribute="generated"
     )
-    max_dim_generated = get_max_dim(generated_entries)
-    used_elts = get_elements_from_entries(generated_entries)
+    # Eliminate high dimension structures (> 10) from computations to avoid softlock
+    gen_entries = list(
+        filter(
+            lambda entry: len(entry.composition) < 11,
+            generated_entries
+        )
+    )
+
+    max_dim_generated = get_max_dim(gen_entries)
+    used_elts = get_elements_from_entries(gen_entries)
 
     # Extract reference dataset
     if args.reference is not None:
@@ -190,7 +198,7 @@ def main():
     ref_entries += auto_elts_entries
 
     # Group generated entries by composition
-    grouped_entries = group_by_composition(comps=generated_entries)
+    grouped_entries = group_by_composition(comps=gen_entries)
 
     # Compute energy above hulls in each group
     screening_results = batch_compute_e_above_hull(
@@ -204,6 +212,25 @@ def main():
     for dct in screening_results:
         path = os.path.join(args.run_dir, dct["name"])
         dct.update({"path": os.path.abspath(path)})
+
+    # Too high dimension structures are added as not stable in results
+    high_dim_entries = list(
+        filter(
+            lambda entry: len(entry.composition) >= 11,
+            generated_entries
+        )
+    )
+    for entry in high_dim_entries:
+        msg = f"Uncomputable due to its too high dimension ({len(entry.composition)} > 10)."
+        screening_results.append(
+            {
+                "name": entry.name,
+                "path": os.path.abspath(os.path.join(args.run_dir, entry.name)),
+                "e_above_hull": None,
+                "stable": False,
+                "comment": msg
+            }
+        )
 
     def sort_by_path(dct: dict) -> str:
         return dct.get("path")
