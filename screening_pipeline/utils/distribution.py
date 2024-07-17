@@ -95,7 +95,7 @@ def frechet_distance(x: np.ndarray, y: np.ndarray) -> float:
 ########################################
 
 
-def emd_wrapper(*args, **kwargs) -> Any:
+def get_emd(*args, **kwargs) -> Any:
     """Simple wrapper for scipy.stats.wasserstein_distance."""
     return wasserstein_distance(*args, **kwargs)
 

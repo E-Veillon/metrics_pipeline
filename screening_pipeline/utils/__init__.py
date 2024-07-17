@@ -54,7 +54,7 @@ from .dataset import (
 )
 from .density import get_densities
 from .distribution import (
-    recall, precision, frechet_distance, emd_wrapper
+    recall, precision, frechet_distance, get_emd
 )
 from .matcher import (
     check_interatomic_distances, group_by_composition,
@@ -112,7 +112,7 @@ __all__ = [
     "load_phase_diagram_entries",                   # dataset
     "mp_api_download", "process_oqmd_json_file",    #
     "get_densities",    # density
-    "recall", "precision", "frechet_distance", "emd_wrapper",  # distribution
+    "recall", "precision", "frechet_distance", "get_emd",  # distribution
     "check_interatomic_distances", "group_by_composition",  # matcher
     "batch_group_by_equivalence", "remove_equivalent",      #
     "batch_get_novel_structures",                           #
