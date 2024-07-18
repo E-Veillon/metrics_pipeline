@@ -377,11 +377,11 @@ def _get_novel_structures(
     # hence they are in one-element lists. However, some structures
     # in dataset may have not matched any generated one either,
     # and then are in one-element lists too, hence the double condition
-    # "len(l) == 1 and l[0] not in dataset".
+    # "len(l) == 1 and all(l[0] != ref for ref in dataset)".
     return flatten(
         list(
             filter(
-                lambda l: len(l) == 1 and l[0] not in dataset,
+                lambda l: len(l) == 1 and all(l[0] != ref for ref in dataset),
                 structures
             )
         )
