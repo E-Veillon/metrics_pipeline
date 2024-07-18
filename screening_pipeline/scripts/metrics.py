@@ -1,12 +1,15 @@
 #!/usr/bin/python
 
-import argparse
+import os
 import json
+import argparse
+from typing import Optional
 import numpy as np
 
 # LOCAL IMPORTS
 from screening_pipeline.utils import (
-    check_file_format, check_file_or_dir,
+    check_num_value, PathLike, CONFIGPATH,
+    check_file_format, check_file_or_dir, yaml_loader,
     batch_extract_vasp_structures, read_cif,
     batch_group_by_equivalence, batch_get_novel_structures,
     remove_equivalent, vectors_from_alignn,
@@ -21,6 +24,8 @@ from screening_pipeline.utils import (
 
 def _assert_args(args: argparse.Namespace) -> None:
     """Check arguments values validity."""
+    CONFIG = os.path.join(CONFIGPATH, args.config)
+    check_file_or_dir(CONFIG, "file", format="yaml")
     if args.dataset is not None:
         check_file_or_dir(args.dataset, "file", allowed_formats="cif")
     if args.generated is not None:
@@ -33,18 +38,47 @@ def _assert_args(args: argparse.Namespace) -> None:
         check_file_or_dir(args.sun_summary, "file", allowed_formats="json")
     if args.relax_summary is not None:
         check_file_or_dir(args.relax_summary, "file", allowed_formats="json")
-
     check_file_format(args.output, allowed_formats="json")
+    check_num_value(args.workers, "--workers", ">", 0)
+    check_num_value(args.threshold, "--threshold", ">", 0.0)
 
-    if args.workers < 1:
-        raise ValueError(
-            f"'workers' argument must be strictly positive (got {args.workers})."
-        )
-    if args.threshold <= 0.0:
-        raise ValueError(
-            f"'threshold' argument must be strictly positive (got {args.threshold})."
-        )
+def _match_file_arg_need(
+    arg_name: str, filename: Optional[PathLike] = None, is_needed: bool = False
+) -> bool:
+    match (filename is not None, is_needed):
+        case (False, False):
+            return False
 
+        case (True, False):
+            print(
+                f"--{arg_name} arg was given but no activated metric needs it, "
+                "therefore its loading is skipped for efficiency."
+            )
+            return False
+
+        case (False, True):
+            raise ValueError(
+                f"Config file activates some metrics that need a {arg_name} file, "
+                f"but --{arg_name} arg was not given."
+            )
+
+        case (True, True):
+            return True
+
+def _print_metrics_config(config: dict) -> None:
+    print("- ACTIVATED METRICS -")
+    print(" ")
+    print(f"Validity: {config.get('Validity')}")
+    print(f"Stability, Unicity, Novelty (SUN): {config.get('SUN')}")
+    print(f"Avg. Root Mean Square Displacement (RMSD): {config.get('RMSD')}")
+    print(f"Coverage - Precision (COV-P): {config.get('COV-P')}")
+    print(f"Coverage - Recall (COV-R): {config.get('COV-R')}")
+    print(f"Fréchet ALIGNN Distance (FAD): {config.get('FAD')}")
+    print(f"Earth Mover's Distance (EMD) on energy: {config.get('EMD_energy')}")
+    print(f"Earth Mover's Distance (EMD) on density: {config.get('EMD_density')}")
+    print(" ")
+    print("------------------------------")
+    print(" ")
 
 ########################################
 
@@ -53,25 +87,52 @@ def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
         description=
-        "A command line tool to compute S.U.N., RMSD, Coverage Recall and Precision "
-        "(COV-R, COV-P), and Earth Mover's Distance (EMD) on densities and energies.\n"
-        "S.U.N. metrics require --dataset, --generated, --summary and --preprocessed args.\n"
-        "Coverage and EMD metrics require --dataset and --generated args.\n"
-        "RMSD metric only requires --summary arg.\n"
-        "If some args are not given, corresponding metrics computations will be skipped."
-    )
-
-    parser.add_argument(
-        "-d", "--dataset", help="Cif file containing the list of known structures."
+        "A command line tool to compute various metrics based on previously done "
+        "computations. Computable metrics are:\n"
+        "- Validity,"
+        "- Stability, Unicity, Novelty (S.U.N),\n"
+        "- Average Root Mean Square Displacement (RMSD),\n"
+        "- Coverage - Precision (COV-P) and Coverage - Recall (COV-R),\n"
+        "- Fréchet ALIGNN Distance (FAD),\n"
+        "- Earth Mover's Distance (EMD) on energy and density distributions.\n"
     )
     parser.add_argument(
-        "-g", "--generated", help="Cif file containing all the generated structures."
+        "-c", "--config",
+        default="metrics_defaults.yaml",
+        help=(
+            "Configuration file in Yaml format stating which metrics should be computed. "
+            f"The file needs to be in {CONFIGPATH} to be found. "
+            "Defaults to %(default)s. This argument adds flexibility by allowing to copy "
+            "the default config file to make several computations presets as needed and "
+            "provide the one needed here."
+        )
     )
     parser.add_argument(
-        "-u", "--uniques", help="Cif file containing the preprocessed unique structures."
+        "-d", "--dataset", help=(
+            "Cif file containing the list of known structures. "
+            "Necessary for: S.U.N., COV-P, COV-R, FAD, EMD(density), EMD(energy)."
+        )
     )
     parser.add_argument(
-        "-v", "--valid", help="Cif file containing the preprocessed valid structures."
+        "-g", "--generated",
+        help=(
+            "Cif file containing all the generated structures. "
+            "Necessary for: S.U.N., COV-P, COV-R, FAD, EMD(density), EMD(energy)."
+        )
+    )
+    parser.add_argument(
+        "-v", "--valid",
+        help=(
+            "Cif file containing the preprocessed valid structures. "
+            "Necessary for: Validity."
+        )
+    )
+    parser.add_argument(
+        "-u", "--uniques",
+        help=(
+            "Cif file containing the preprocessed unique structures."
+            "Necessary for: S.U.N."
+        )
     )
     parser.add_argument(
         "--no-rare-gas-check",
@@ -95,11 +156,17 @@ def main() -> None:
     )
     parser.add_argument(
         "-s", "--sun-summary",
-        help="Json file containing the summary for the phase diagrams stability step.",
+        help=(
+            "Json file containing the summary of phase diagrams instability energies. "
+            "Necessary for: S.U.N."
+        )
     )
     parser.add_argument(
         "-r", "--relax-summary",
-        help="Json file containing a summary for the relaxation step."
+        help=(
+            "Json file containing a summary for the relaxation step. "
+            "Necessary for: RMSD."
+        )
     )
     parser.add_argument(
         "-o", "--output",
@@ -134,25 +201,37 @@ def main() -> None:
 
     _assert_args(args)
 
-    # DATA LOADING BLOCK
+    print("===== LOAD NECESSARY DATA FILES =====")
 
-    if args.dataset is not None:
-        print("Loading test set...")
-        dataset, _, _ = read_cif(
+    CONFIG = yaml_loader(os.path.join(CONFIGPATH, args.config), on_error='raise')
+    dataset_needed = generated_needed = (
+        CONFIG.get("SUN")
+        or CONFIG.get("COV-P") or CONFIG.get("COV-R")
+        or CONFIG.get("FAD")
+        or CONFIG.get("EMD_density") or CONFIG.get("EMD_energy")
+    )
+    valid_needed = CONFIG.get("Validity")
+    uniques_needed = sun_summary_needed = CONFIG.get("SUN")
+    relax_summary_needed = CONFIG.get("RMSD")
+
+    _print_metrics_config(CONFIG)
+
+    if _match_file_arg_need("dataset", args.dataset, dataset_needed):
+        print("Loading dataset...")
+        dataset, *_ = read_cif(
             filename=args.dataset,
             workers=args.workers,
             keep_rare_gases=args.no_rare_gas_check,
             keep_rare_earths=args.no_rare_earth_check
         )
-        print("Test set loaded.")
+        print("Dataset loaded.")
         # remove duplicate structures from the dataset
         dataset, _, _ = remove_equivalent(
             structures=dataset, workers=args.workers, keep_equivalent=False
         )
-
-    if args.generated is not None:
+    if _match_file_arg_need("generated", args.generated, generated_needed):
         print("Loading generated structures...")
-        full_generated, _, _ = read_cif(
+        generated, *_ = read_cif(
             filename=args.generated,
             workers=args.workers,
             keep_rare_gases=args.no_rare_gas_check,
@@ -160,19 +239,9 @@ def main() -> None:
         )
         print("Generated structures loaded.")
 
-    if args.uniques is not None:
-        print("Loading preprocessed uniques structures...")
-        uniques, _, _ = read_cif(
-            filename=args.uniques,
-            workers=args.workers,
-            keep_rare_gases=args.no_rare_gas_check,
-            keep_rare_earths=args.no_rare_earth_check
-        )
-        print("Preprocessed uniques structures loaded.")
-
-    if args.valid is not None:
+    if _match_file_arg_need("valid", args.valid, valid_needed):
         print("Loading preprocessed valid structures...")
-        valids, _, _ = read_cif(
+        valids, *_ = read_cif(
             filename=args.valid,
             workers=args.workers,
             keep_rare_gases=args.no_rare_gas_check,
@@ -180,7 +249,17 @@ def main() -> None:
         )
         print("Preprocessed valid structures loaded.")
 
-    if args.sun_summary is not None:
+    if _match_file_arg_need("uniques", args.uniques, uniques_needed):
+        print("Loading preprocessed uniques structures...")
+        uniques, *_ = read_cif(
+            filename=args.uniques,
+            workers=args.workers,
+            keep_rare_gases=args.no_rare_gas_check,
+            keep_rare_earths=args.no_rare_earth_check
+        )
+        print("Preprocessed uniques structures loaded.")
+
+    if _match_file_arg_need("sun-summary", args.sun_summary, sun_summary_needed):
         print("Loading stability summary file...")
         with open(args.sun_summary, "rt", encoding="utf-8") as fp:
             sun_summary = json.load(fp)
@@ -196,7 +275,7 @@ def main() -> None:
         stable_structs = [s for s, _ in stable_structs]
         print("Data converted.")
 
-    if args.relax_summary is not None:
+    if _match_file_arg_need("relax-summary", args.relax_summary, relax_summary_needed):
         print("Loading relaxations summary file...")
         with open(args.relax_summary, "rt", encoding="utf-8") as fp:
             relax_summary = json.load(fp)
@@ -228,32 +307,27 @@ def main() -> None:
         ("precision", "recall", "frechet_distance", "EMD_energy", "EMD_density")
     )
 
-    # METRICS COMPUTATIONS BLOCK
+    print("===== COMPUTE ACTIVATED METRICS =====")
 
     if args.valid is not None:
         # Validity metric
         dft_metrics["num_valid"] = len(valids)
-        prop_valid = len(valids) / len(full_generated)
+        prop_valid = len(valids) / len(generated)
         dft_metrics["percent_valid"] = round(prop_valid * 100, 6)
 
-    if (
-        args.dataset is not None
-        and args.generated is not None
-        and args.uniques is not None
-        and args.sun_summary is not None
-    ):
+    if CONFIG.get("SUN"):
         # S.U.N. metrics
         print("Computing S.U.N. metrics...")
 
         # total count
-        dft_metrics["num_generated"] = len(full_generated)
+        dft_metrics["num_generated"] = len(generated)
 
         # Unique count
         dft_metrics["num_unique"] = len(uniques)
 
         # novel count
         grouped_structs, nbr_unmatched = batch_group_by_equivalence(
-            structures=full_generated + dataset,
+            structures=generated + dataset,
             workers=args.workers,
             comment="Compare generated and dataset"
         )
@@ -297,13 +371,12 @@ def main() -> None:
         prop_sun = dft_metrics["num_SUN"] / dft_metrics["num_generated"]
         dft_metrics["percent_SUN"] = round(prop_sun * 100, 6)
 
-        print("S.U.N. metrics computed.")
         for key, val in dft_metrics.items():
             if key == "RMSD":
                 continue
             print(f"{key} = {val}")
 
-    if args.relax_summary is not None:
+    if CONFIG.get("RMSD"):
         # RMSD metric
         print("Computing RMSD metric...")
         in_structs = [s for s, _ in relax_structures]
@@ -311,14 +384,13 @@ def main() -> None:
         dft_metrics["RMSD"] = np.mean(
             rmsd_from_structures(in_structs, out_structs)
         ).item()
-        print("RMSD metric computed.")
         print(f"RMSD = {dft_metrics['RMSD']}")
 
-    if args.dataset is not None and args.generated is not None:
-        # machine learning metrics (COV-R, COV-P, energy EMD, density EMD)
-        print("Computing latent space metrics (COV-R, COV-P)...")
+    if CONFIG.get("COV-P") or CONFIG.get("COV-R"):
+        # Compute Coverage (Precision, Recall)
+        print("Computing latent space metrics (COV-P, COV-R)...")
         fingerprint_dataset = to_crystalnn_fingerprint(dataset, workers=args.workers)
-        fingerprint_gen = to_crystalnn_fingerprint(full_generated, workers=args.workers)
+        fingerprint_gen = to_crystalnn_fingerprint(generated, workers=args.workers)
 
         fingerprint_dataset, fingerprint_gen = map(np.array,zip(
             *filter(
@@ -326,35 +398,40 @@ def main() -> None:
                 zip(fingerprint_dataset, fingerprint_gen),
             )
         ))
+        if CONFIG.get("COV-P"):
+            ml_metrics["precision"] = precision(
+                fingerprint_gen, fingerprint_dataset, args.threshold
+            )
+            print(f"COV-P = {ml_metrics['precision']}")
+        if CONFIG.get("COV-R"):
+            ml_metrics["recall"] = recall(
+                fingerprint_gen, fingerprint_dataset, args.threshold
+            )
+            print(f"COV-R = {ml_metrics['recall']}")
 
-        ml_metrics["precision"] = precision(
-            fingerprint_gen, fingerprint_dataset, args.threshold
-        )
-        ml_metrics["recall"] = recall(
-            fingerprint_gen, fingerprint_dataset, args.threshold
-        )
-
+    if CONFIG.get("FAD"):
+        # Compute Fréchet ALIGNN Distance
+        print("Computing Fréchet ALIGNN Distance metric...")
         latent_dataset = vectors_from_alignn(dataset, output="latent")
-        latent_gen = vectors_from_alignn(full_generated, output="latent")
+        latent_gen = vectors_from_alignn(generated, output="latent")
         ml_metrics["frechet_distance"] = frechet_distance(latent_gen, latent_dataset)
-        print("Latent space metrics computed.")
-        print(f"COV-P = {ml_metrics['precision']}")
-        print(f"COV-R = {ml_metrics['recall']}")
         print(f"Frechet Distance = {ml_metrics['frechet_distance']}")
 
-        print("Computing properties EMD metrics...")
+    if CONFIG.get("EMD_energy"):
+        print("Computing Earth Mover's Distance metric on energy...")
         energy_dataset = vectors_from_alignn(dataset, output="energy")
-        energy_gen = vectors_from_alignn(full_generated, output="energy")
+        energy_gen = vectors_from_alignn(generated, output="energy")
         ml_metrics["EMD_energy"] = get_emd(energy_dataset, energy_gen)
+        print(f"Energy EMD = {ml_metrics['EMD_energy']}")
 
+    if CONFIG.get("EMD_density"):
+        print("Computing Earth Mover's Distance metric on density...")
         densities_dataset = get_densities(dataset)
-        densities_generated = get_densities(full_generated)
+        densities_generated = get_densities(generated)
         ml_metrics["EMD_density"] = get_emd(
             densities_dataset, densities_generated
         )
-        print("Properties EMD metrics computed.")
-        print(f"Density EMD = {ml_metrics['EMD_density']}")
-        print(f"Energy EMD = {ml_metrics['EMD_energy']}")
+        print(f"Density EMD = {ml_metrics['EMD_density']}")        
 
     metrics = {"dft": dft_metrics, "ml": ml_metrics}
 
