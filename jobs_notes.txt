@@ -1,4 +1,4 @@
-===== Jobs de la pipeline lancés à partir du 01/07/2024 (Dernière MàJ: 15/07/2024 14:55) =====
+===== Jobs de la pipeline lancés à partir du 01/07/2024 (Dernière MàJ: 18/07/2024 08:39) =====
 
 diffcsp_oqmd:
 job preproc_val: 266219 (1024 structures)
@@ -47,7 +47,7 @@ job relax initial: 637825_[0-63] (walltime = 48h, NSW = 99, NELM = 100)
 - Erreurs VASP: aucune
 - Autres Erreurs: aucune
 
-job metrics: 686270 (walltime = 48h, cpus_per_task = 12)
+job metrics: 764784 (walltime = 48h, cpus_per_task = 12)
 - Result: running...
 
 ----------
@@ -97,17 +97,18 @@ job phase_diag: 597643 (walltime = 6h, cpus_per_task = 4)
 - Result: timeout (20h)
 => rerun job 676875 (walltime = 48h, cpus_per_task = 8)
 - Result: timeout (48h)
-=> debug run 707141 (walltime = 12h, cpus_per_task = 8, verbose = True)
-- Result: running...
+=> debug run 710099 (walltime = 12h, cpus_per_task = 8, verbose = True)
+- Result: stopped
+=> debugged locally (warning for structures of dim > 10)
 
-job relax initial: {à lancer}_[0-63] (walltime = 48h, NSW = 99, NELM = 100)
-- Total convergés: ??/64
+job relax initial: 769932_[0-12,14-64] (walltime = 48h, NSW = 99, NELM = 100)
+- Total convergés: ??/64 (running...)
 - Timeout (20h): 
 - NotConv (200): 
 - Erreurs VASP: 
 - Autres Erreurs: 
 
-job metrics: ?????? (walltime = 48h, cpus_per_task = 12)
+job metrics: ...... (walltime = 48h, cpus_per_task = 12)
 - Result: ...
 
 ----------
@@ -151,8 +152,15 @@ job statique rerun (MPI_init_thread): 520270_[843,848,851,855,862,865,869,885,89
 job phase_diag: 597638 (walltime = 6h, cpus_per_task = 4)
 - Result: terminated normally (written at ~/scratch_kah/Batch_gemsdiff_oqmd/SUN_Statics/summary.json)
 
-job metrics: 686119 (walltime = 48h, cpus_per_task = 12)
-- Result: running...
+job relax initial: 732003_[0-3,5-17,19-23,25-27,29-32,34-50,52-54,56-69,71] (walltime = 48h, NSW = 99, NELM = 100)
+- Total convergés: 63/64
+- Timeout (48h): aucun
+- NotConv (99): 17
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job metrics: ...... (walltime = 48h, cpus_per_task = 12)
+- Result: ...
 
 ----------
 
@@ -195,8 +203,15 @@ job static rerun (MPI_init_thread): 520293_[14,16] (walltime = 20h, NELM = 200)
 job phase_diag: 597644 (walltime = 6h, cpus_per_task = 4)
 - Result: terminated normally (written at ~/scratch_kah/Batch_gemsdiff_mp/SUN_Statics/summary.json)
 
-job metrics: 686125 (walltime = 48h, cpus_per_task = 12)
-- Result: running...
+job relax initial: 731232_[0-63] (walltime = 48h, NSW = 99, NELM = 100)
+- Total convergés: 62/64
+- Timeout (48h): aucun
+- NotConv (99): 7, 45
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job metrics: ...... (walltime = 48h, cpus_per_task = 12)
+- Result: ...
 
 ----------
 
@@ -233,8 +248,18 @@ job phase_diag: 597641 (walltime = 6h, cpus_per_task = 4)
 - Result: timeout (20h)
 => rerun job 676878 (walltime = 48h, cpus_per_task = 8)
 - Result: timeout (48h)
+=> debug rerun job 717456 (walltime = 12h, cpus_per_task = 8, verbose = True)
+- Result: stopped
+=> debugged locally (warning for structures of dim > 10)
 
-job metrics: ?????? (walltime = 48h, cpus_per_task = 12)
+job relax initial: 769923_[0-57,59-64] (walltime = 48h, NSW = 99, NELM = 100)
+- Total convergés: ../64 (running...)
+- Timeout (48h):
+- NotConv (99):
+- Erreurs VASP:
+- Autres Erreurs:
+
+job metrics: ...... (walltime = 48h, cpus_per_task = 12)
 - Result: ...
 
 ----------
@@ -272,8 +297,18 @@ job phase_diag: 597646 (walltime = 6h, cpus_per_task = 4)
 - Result: timeout (20h)
 => rerun job 676876 (walltime = 48h, cpus_per_task = 8)
 - Result: timeout (48h)
+=> debug rerun job 710297 (walltime = 12h, cpus_per_task = 8, verbose = True)
+- Result: stopped
+=> debugged locally (warning for structures of dim > 10)
 
-job metrics: ?????? (walltime = 48h, cpus_per_task = 12)
+job relax initial: 769930_[0-63] (walltime = 48h, NSW = 99, NELM = 100)
+- Total convergés: ../64 (running...)
+- Timeout (48h):
+- NotConv (99):
+- Erreurs VASP:
+- Autres Erreurs:
+
+job metrics: ...... (walltime = 48h, cpus_per_task = 12)
 - Result: ...
 
 ===== Infos de jobs à trier =====
