@@ -206,9 +206,11 @@ def main() -> None:
     CONFIG = yaml_loader(os.path.join(CONFIGPATH, args.config), on_error='raise')
     dataset_needed = generated_needed = (
         CONFIG.get("SUN")
-        or CONFIG.get("COV-P") or CONFIG.get("COV-R")
+        or CONFIG.get("COV-P")
+        or CONFIG.get("COV-R")
         or CONFIG.get("FAD")
-        or CONFIG.get("EMD_density") or CONFIG.get("EMD_energy")
+        or CONFIG.get("EMD_energy")
+        or CONFIG.get("EMD_density")
     )
     valid_needed = CONFIG.get("Validity")
     uniques_needed = sun_summary_needed = CONFIG.get("SUN")
@@ -226,7 +228,7 @@ def main() -> None:
         )
         print("Dataset loaded.")
         # remove duplicate structures from the dataset
-        dataset, _, _ = remove_equivalent(
+        dataset, *_ = remove_equivalent(
             structures=dataset, workers=args.workers, keep_equivalent=False
         )
     if _match_file_arg_need("generated", args.generated, generated_needed):
@@ -295,7 +297,8 @@ def main() -> None:
         (
             "num_generated",
             "num_valid", "percent_valid",
-            "num_unique", "num_novel",
+            "num_unique", "percent_unique",
+            "num_novel", "percent_novel",
             "num_unique_novel", "percent_unique_novel",
             "num_stable", "percent_stable",
             "num_SUN", "percent_SUN",
@@ -324,6 +327,8 @@ def main() -> None:
 
         # Unique count
         dft_metrics["num_unique"] = len(uniques)
+        prop_unique = dft_metrics["num_unique"] / dft_metrics["num_generated"]
+        dft_metrics["percent_unique"] = round(prop_unique * 100, 6)
 
         # novel count
         grouped_structs, nbr_unmatched = batch_group_by_equivalence(
@@ -335,9 +340,11 @@ def main() -> None:
             grouped_structs, dataset, workers=args.workers
         )
         dft_metrics["num_novel"] = len(novel_structs)
+        prop_novel = dft_metrics["num_novel"] / dft_metrics["num_generated"]
+        dft_metrics["percent_novel"] = round(prop_novel * 100, 6)
 
         if nbr_unmatched != 0:
-            dft_metrics["unmatched_novel"] = nbr_unmatched
+            dft_metrics["num_unmatched_novel"] = nbr_unmatched
 
         # novel + unique count
         grouped_structs, nbr_unmatched = batch_group_by_equivalence(
@@ -353,7 +360,7 @@ def main() -> None:
         dft_metrics["percent_unique_novel"] = round(prop_unique_novel * 100, 6)
 
         if nbr_unmatched != 0:
-            dft_metrics["unmatched_unique_novel"] = nbr_unmatched
+            dft_metrics["num_unmatched_unique_novel"] = nbr_unmatched
 
         # stable count
         dft_metrics["num_stable"] = len(stable_structs)
@@ -381,14 +388,17 @@ def main() -> None:
         print("Computing RMSD metric...")
         in_structs = [s for s, _ in relax_structures]
         out_structs = [s for _, s in relax_structures]
-        dft_metrics["RMSD"] = np.mean(
-            rmsd_from_structures(in_structs, out_structs)
-        ).item()
+        dft_metrics["RMSD"] = round(
+            np.mean(
+                rmsd_from_structures(in_structs, out_structs)
+            ).item(),
+            ndigits=6
+        )
         print(f"RMSD = {dft_metrics['RMSD']}")
 
     if CONFIG.get("COV-P") or CONFIG.get("COV-R"):
         # Compute Coverage (Precision, Recall)
-        print("Computing latent space metrics (COV-P, COV-R)...")
+        print("Computing fingerprints for Coverage metrics...")
         fingerprint_dataset = to_crystalnn_fingerprint(dataset, workers=args.workers)
         fingerprint_gen = to_crystalnn_fingerprint(generated, workers=args.workers)
 
@@ -399,11 +409,14 @@ def main() -> None:
             )
         ))
         if CONFIG.get("COV-P"):
+            print("Computing Coverage (Precision)...")
             ml_metrics["precision"] = precision(
                 fingerprint_gen, fingerprint_dataset, args.threshold
             )
             print(f"COV-P = {ml_metrics['precision']}")
+
         if CONFIG.get("COV-R"):
+            print("Computing Coverage (Recall)...")
             ml_metrics["recall"] = recall(
                 fingerprint_gen, fingerprint_dataset, args.threshold
             )
@@ -418,6 +431,7 @@ def main() -> None:
         print(f"Frechet Distance = {ml_metrics['frechet_distance']}")
 
     if CONFIG.get("EMD_energy"):
+        # Compute Earth Mover's Distance on energy distributions
         print("Computing Earth Mover's Distance metric on energy...")
         energy_dataset = vectors_from_alignn(dataset, output="energy")
         energy_gen = vectors_from_alignn(generated, output="energy")
@@ -425,6 +439,7 @@ def main() -> None:
         print(f"Energy EMD = {ml_metrics['EMD_energy']}")
 
     if CONFIG.get("EMD_density"):
+        # Compute Earth Mover's Distance on density distributions
         print("Computing Earth Mover's Distance metric on density...")
         densities_dataset = get_densities(dataset)
         densities_generated = get_densities(generated)

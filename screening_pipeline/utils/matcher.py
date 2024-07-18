@@ -25,9 +25,9 @@ from .flattener import flatten
 
 
 def check_interatomic_distances(
-        structures: Sequence[SiteCollection],
-        valid_tol: float = 0.5
-    ) -> Tuple[List[SiteCollection], int]:
+    structures: Sequence[SiteCollection],
+    valid_tol: float = 0.5
+) -> Tuple[List[SiteCollection], int]:
     '''
     Checks interatomic distances with respect to a tolerance in angstroms 
     for all given structures, then returns the valid ones in a list.
@@ -78,18 +78,18 @@ def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
     check_type(comp, "comp", (Composition, Entry, SiteCollection))
 
     if isinstance(comp, Composition):
-        return hash(comp.fractional_composition)
+        return hash(comp.reduced_formula)
 
-    return hash(comp.composition.fractional_composition)
+    return hash(comp.composition.reduced_formula)
 
 ########################################
 
 def group_by_stoichiometry(
-        comps: Sequence[Union[Composition, Entry, SiteCollection]]
-        ) -> List[List[Union[Composition, Entry, SiteCollection]]]:
+    comps: Sequence[Union[Composition, Entry, SiteCollection]]
+) -> List[List[Union[Composition, Entry, SiteCollection]]]:
     """
-    Group Composition objects or objects having a .composition attribute by fractional 
-    composition using the `hash_stoichiometry` hash function. Note that objects from 
+    Group Composition objects or objects having a .composition attribute by fractional
+    composition using the `hash_stoichiometry` hash function. Note that objects from
     different classes but having their respective associated composition equal will be
     grouped together anyway.
 
@@ -100,7 +100,6 @@ def group_by_stoichiometry(
     Returns:
         A list containing lists of objects with the same fractionnal composition.
     """
-
     check_type(comps, "comps", (Sequence,))
     if not comps:
         return []
@@ -142,8 +141,8 @@ def hash_composition(comp: Union[Composition, Entry, SiteCollection]) -> int:
 
 
 def group_by_composition(
-        comps: Sequence[Union[Composition, Entry, SiteCollection]]
-        ) -> List[List[Union[Composition, Entry, SiteCollection]]]:
+    comps: Sequence[Union[Composition, Entry, SiteCollection]]
+) -> List[List[Union[Composition, Entry, SiteCollection]]]:
     """
     Group Composition objects or objects having a .composition attribute by
     their contained element types. Note that objects from different classes
@@ -177,8 +176,8 @@ def group_by_composition(
 
 
 def _group_by_equivalence(
-        structures: List[Structure], test_volume: bool = False
-    ) -> Tuple[List[List[Structure]], int]:
+    structures: List[Structure], test_volume: bool = False
+) -> Tuple[List[List[Structure]], int]:
     """
     Group structures by equivalence using the StructureMatcher object.
 
@@ -219,12 +218,11 @@ def _group_by_equivalence(
 ########################################
 
 
-def batch_group_by_equivalence(
-        structures: Sequence[Structure],
-        test_volume: bool = False,
-        workers: int = 1,
-        comment: str = None
-    ) -> Tuple[List[List[List[Structure]]], int]:
+def batch_group_by_equivalence(    structures: Sequence[Structure],
+    test_volume: bool = False,
+    workers: int = 1,
+    comment: Optional[str] = None
+) -> Tuple[List[List[List[Structure]]], int]:
     """
     Group structures by equivalence in two steps:
     First, groups by stoichiometry, then pass each sub-group in
@@ -262,10 +260,11 @@ def batch_group_by_equivalence(
     check_type(test_volume, "test_volume", (bool,))
     check_type(workers, "workers", (int,))
     check_num_value(workers, "workers", ">", 0)
-    check_type(comment, "comment", (str,))
+    if comment is not None:
+        check_type(comment, "comment", (str,))
 
-    nbr_struct    = len(structures)
-    chunksize     = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
+    nbr_struct = len(structures)
+    chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
     grouped_structs = group_by_stoichiometry(structures)
     equiv_matcher = partial(_group_by_equivalence, test_volume=test_volume)
@@ -358,8 +357,8 @@ def remove_equivalent(
 
 
 def _get_novel_structures(
-        structures: List[List[Structure]],
-        dataset: List[Structure]
+    structures: List[List[Structure]],
+    dataset: List[Structure]
 ):
     """
     Filter out structures that are neither coming from the given dataset nor 
@@ -389,10 +388,10 @@ def _get_novel_structures(
     )
 #----------------------------------------
 def batch_get_novel_structures(
-        structures: List[List[List[Structure]]],
-        dataset: List[Structure],
-        workers: int = 1
-    ) -> List[Structure]:
+    structures: List[List[List[Structure]]],
+    dataset: List[Structure],
+    workers: int = 1
+) -> List[Structure]:
     """
     Filter out structures that are neither coming from the given dataset nor 
     equivalent to one of them. Can be parallelized over compositional lists.
