@@ -25,7 +25,7 @@ from screening_pipeline.utils import (
 def _assert_args(args: argparse.Namespace) -> None:
     """Check arguments values validity."""
     CONFIG = os.path.join(CONFIGPATH, args.config)
-    check_file_or_dir(CONFIG, "file", format="yaml")
+    check_file_or_dir(CONFIG, "file", allowed_formats="yaml")
     if args.dataset is not None:
         check_file_or_dir(args.dataset, "file", allowed_formats="cif")
     if args.generated is not None:
@@ -97,6 +97,12 @@ def main() -> None:
         "- Earth Mover's Distance (EMD) on energy and density distributions.\n"
     )
     parser.add_argument(
+        "generated",
+        help=(
+            "Cif file containing all the generated structures. "
+        )
+    )
+    parser.add_argument(
         "-c", "--config",
         default="metrics_defaults.yaml",
         help=(
@@ -110,13 +116,6 @@ def main() -> None:
     parser.add_argument(
         "-d", "--dataset", help=(
             "Cif file containing the list of known structures. "
-            "Necessary for: S.U.N., COV-P, COV-R, FAD, EMD(density), EMD(energy)."
-        )
-    )
-    parser.add_argument(
-        "-g", "--generated",
-        help=(
-            "Cif file containing all the generated structures. "
             "Necessary for: S.U.N., COV-P, COV-R, FAD, EMD(density), EMD(energy)."
         )
     )
@@ -204,7 +203,7 @@ def main() -> None:
     print("===== LOAD NECESSARY DATA FILES =====")
 
     CONFIG = yaml_loader(os.path.join(CONFIGPATH, args.config), on_error='raise')
-    dataset_needed = generated_needed = (
+    dataset_needed = (
         CONFIG.get("SUN")
         or CONFIG.get("COV-P")
         or CONFIG.get("COV-R")
@@ -217,6 +216,15 @@ def main() -> None:
     relax_summary_needed = CONFIG.get("RMSD")
 
     _print_metrics_config(CONFIG)
+
+    print("Loading generated structures...")
+    generated, *_ = read_cif(
+        filename=args.generated,
+        workers=args.workers,
+        keep_rare_gases=args.no_rare_gas_check,
+        keep_rare_earths=args.no_rare_earth_check
+    )
+    print("Generated structures loaded.")
 
     if _match_file_arg_need("dataset", args.dataset, dataset_needed):
         print("Loading dataset...")
@@ -231,15 +239,6 @@ def main() -> None:
         dataset, *_ = remove_equivalent(
             structures=dataset, workers=args.workers, keep_equivalent=False
         )
-    if _match_file_arg_need("generated", args.generated, generated_needed):
-        print("Loading generated structures...")
-        generated, *_ = read_cif(
-            filename=args.generated,
-            workers=args.workers,
-            keep_rare_gases=args.no_rare_gas_check,
-            keep_rare_earths=args.no_rare_earth_check
-        )
-        print("Generated structures loaded.")
 
     if _match_file_arg_need("valid", args.valid, valid_needed):
         print("Loading preprocessed valid structures...")
@@ -292,11 +291,13 @@ def main() -> None:
             workers=args.workers
         )
         print("Data converted.")
+    
+    general_metrics = dict.fromkeys(
+        ("num_generated", "num_valid", "percent_valid")
+    )
 
     dft_metrics = dict.fromkeys(
         (
-            "num_generated",
-            "num_valid", "percent_valid",
             "num_unique", "percent_unique",
             "num_novel", "percent_novel",
             "num_unique_novel", "percent_unique_novel",
@@ -312,18 +313,18 @@ def main() -> None:
 
     print("===== COMPUTE ACTIVATED METRICS =====")
 
-    if args.valid is not None:
+    # total number of generated structures
+    dft_metrics["num_generated"] = len(generated)
+
+    if CONFIG.get("Validity"):
         # Validity metric
-        dft_metrics["num_valid"] = len(valids)
+        general_metrics["num_valid"] = len(valids)
         prop_valid = len(valids) / len(generated)
-        dft_metrics["percent_valid"] = round(prop_valid * 100, 6)
+        general_metrics["percent_valid"] = round(prop_valid * 100, 6)
 
     if CONFIG.get("SUN"):
         # S.U.N. metrics
         print("Computing S.U.N. metrics...")
-
-        # total count
-        dft_metrics["num_generated"] = len(generated)
 
         # Unique count
         dft_metrics["num_unique"] = len(uniques)
@@ -347,14 +348,15 @@ def main() -> None:
             dft_metrics["num_unmatched_novel"] = nbr_unmatched
 
         # novel + unique count
-        grouped_structs, nbr_unmatched = batch_group_by_equivalence(
-            structures=uniques + dataset,
-            workers=args.workers,
-            comment="Compare uniques and dataset"
-        )
-        unique_novel_structs = batch_get_novel_structures(
-            grouped_structs, dataset, workers=args.workers
-        )
+        #grouped_structs, nbr_unmatched = batch_group_by_equivalence(
+        #    structures=uniques + dataset,
+        #    workers=args.workers,
+        #    comment="Compare uniques and dataset"
+        #)
+        #unique_novel_structs = batch_get_novel_structures(
+        #    grouped_structs, dataset, workers=args.workers
+        #)
+        unique_novel_structs = list(filter(lambda struct: any(uniq == novel for novel in novel_structs), uniques))
         dft_metrics["num_unique_novel"] = len(unique_novel_structs)
         prop_unique_novel = dft_metrics["num_unique_novel"] / dft_metrics["num_generated"]
         dft_metrics["percent_unique_novel"] = round(prop_unique_novel * 100, 6)
