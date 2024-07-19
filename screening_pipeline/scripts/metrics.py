@@ -328,7 +328,7 @@ def main() -> None:
 
         # Unique count
         dft_metrics["num_unique"] = len(uniques)
-        prop_unique = dft_metrics["num_unique"] / dft_metrics["num_generated"]
+        prop_unique = dft_metrics["num_unique"] / general_metrics["num_generated"]
         dft_metrics["percent_unique"] = round(prop_unique * 100, 6)
 
         # novel count
@@ -341,7 +341,7 @@ def main() -> None:
             grouped_structs, dataset, workers=args.workers
         )
         dft_metrics["num_novel"] = len(novel_structs)
-        prop_novel = dft_metrics["num_novel"] / dft_metrics["num_generated"]
+        prop_novel = dft_metrics["num_novel"] / general_metrics["num_generated"]
         dft_metrics["percent_novel"] = round(prop_novel * 100, 6)
 
         if nbr_unmatched != 0:
@@ -358,7 +358,7 @@ def main() -> None:
         #)
         unique_novel_structs = list(filter(lambda uniq: any(uniq == novel for novel in novel_structs), uniques))
         dft_metrics["num_unique_novel"] = len(unique_novel_structs)
-        prop_unique_novel = dft_metrics["num_unique_novel"] / dft_metrics["num_generated"]
+        prop_unique_novel = dft_metrics["num_unique_novel"] / general_metrics["num_generated"]
         dft_metrics["percent_unique_novel"] = round(prop_unique_novel * 100, 6)
 
         if nbr_unmatched != 0:
@@ -366,7 +366,7 @@ def main() -> None:
 
         # stable count
         dft_metrics["num_stable"] = len(stable_structs)
-        prop_stable = dft_metrics["num_stable"] / dft_metrics["num_generated"]
+        prop_stable = dft_metrics["num_stable"] / general_metrics["num_generated"]
         dft_metrics["percent_stable"] = round(prop_stable * 100, 6)
 
         # S.U.N. count
@@ -377,7 +377,7 @@ def main() -> None:
             )
         )
         dft_metrics["num_SUN"] = len(sun_structs)
-        prop_sun = dft_metrics["num_SUN"] / dft_metrics["num_generated"]
+        prop_sun = dft_metrics["num_SUN"] / general_metrics["num_generated"]
         dft_metrics["percent_SUN"] = round(prop_sun * 100, 6)
 
         for key, val in dft_metrics.items():

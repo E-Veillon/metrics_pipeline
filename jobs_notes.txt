@@ -1,4 +1,4 @@
-===== Jobs de la pipeline lancés à partir du 01/07/2024 (Dernière MàJ: 19/07/2024 11:00) =====
+===== Jobs de la pipeline lancés à partir du 01/07/2024 (Dernière MàJ: 19/07/2024 11:43) =====
 
 diffcsp_oqmd:
 job preproc_val: 266219 (1024 structures)
@@ -47,7 +47,7 @@ job relax initial: 637825_[0-63] (walltime = 48h, NSW = 99, NELM = 100)
 - Erreurs VASP: aucune
 - Autres Erreurs: aucune
 
-job metrics: 764784 (walltime = 48h, cpus_per_task = 12)
+job metrics: 813887 (walltime = 48h, cpus_per_task = 12)
 - Result: running...
 
 ----------
