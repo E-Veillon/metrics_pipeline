@@ -314,7 +314,7 @@ def main() -> None:
     print("===== COMPUTE ACTIVATED METRICS =====")
 
     # total number of generated structures
-    dft_metrics["num_generated"] = len(generated)
+    general_metrics["num_generated"] = len(generated)
 
     if CONFIG.get("Validity"):
         # Validity metric
@@ -356,7 +356,7 @@ def main() -> None:
         #unique_novel_structs = batch_get_novel_structures(
         #    grouped_structs, dataset, workers=args.workers
         #)
-        unique_novel_structs = list(filter(lambda struct: any(uniq == novel for novel in novel_structs), uniques))
+        unique_novel_structs = list(filter(lambda uniq: any(uniq == novel for novel in novel_structs), uniques))
         dft_metrics["num_unique_novel"] = len(unique_novel_structs)
         prop_unique_novel = dft_metrics["num_unique_novel"] / dft_metrics["num_generated"]
         dft_metrics["percent_unique_novel"] = round(prop_unique_novel * 100, 6)
@@ -450,7 +450,7 @@ def main() -> None:
         )
         print(f"Density EMD = {ml_metrics['EMD_density']}")        
 
-    metrics = {"dft": dft_metrics, "ml": ml_metrics}
+    metrics = {"general": general_metrics, "dft": dft_metrics, "ml": ml_metrics}
 
     print("Writing output file...")
 
