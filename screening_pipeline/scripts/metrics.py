@@ -348,15 +348,14 @@ def main() -> None:
             dft_metrics["num_unmatched_novel"] = nbr_unmatched
 
         # novel + unique count
-        #grouped_structs, nbr_unmatched = batch_group_by_equivalence(
-        #    structures=uniques + dataset,
-        #    workers=args.workers,
-        #    comment="Compare uniques and dataset"
-        #)
-        #unique_novel_structs = batch_get_novel_structures(
-        #    grouped_structs, dataset, workers=args.workers
-        #)
-        unique_novel_structs = list(filter(lambda uniq: any(uniq == novel for novel in novel_structs), uniques))
+        grouped_structs, nbr_unmatched = batch_group_by_equivalence(
+            structures=uniques + dataset,
+            workers=args.workers,
+            comment="Compare uniques and dataset"
+        )
+        unique_novel_structs = batch_get_novel_structures(
+            grouped_structs, dataset, workers=args.workers
+        )
         dft_metrics["num_unique_novel"] = len(unique_novel_structs)
         prop_unique_novel = dft_metrics["num_unique_novel"] / general_metrics["num_generated"]
         dft_metrics["percent_unique_novel"] = round(prop_unique_novel * 100, 6)

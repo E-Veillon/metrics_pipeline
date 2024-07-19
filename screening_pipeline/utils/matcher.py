@@ -4,7 +4,7 @@ Functions to check structures validity, compare them, and discard duplicates.
 """
 
 import re
-import itertools
+import itertools as itools
 from functools import partial
 from typing import Tuple, List, Union, Sequence, Optional
 from pathlib import Path
@@ -111,7 +111,7 @@ def group_by_stoichiometry(
 
     return [
         list(grouped)
-        for _, grouped in itertools.groupby(sorted_comps, hash_stoichiometry)
+        for _, grouped in itools.groupby(sorted_comps, hash_stoichiometry)
     ]
 
 ########################################
@@ -168,7 +168,7 @@ def group_by_composition(
 
     return [
         list(grouped)
-        for _, grouped in itertools.groupby(sorted_comps, hash_composition)
+        for _, grouped in itools.groupby(sorted_comps, hash_composition)
     ]
 
 
@@ -373,16 +373,16 @@ def _get_novel_structures(
     Returns: List[Structure]:
         The list of novel structures not seen in the dataset.
     """
-    # Novel structures did not match with any other structure,
-    # hence they are in one-element lists. However, some structures
-    # in dataset may have not matched any generated one either,
-    # and then are in one-element lists too, hence the double condition
-    # "len(l) == 1 and all(l[0] != ref for ref in dataset)".
+    # Novel structures did not match with any structure from the dataset,
+    # therefore all sub-lists containing novel structures are the ones not
+    # containing any structure from dataset, no matter how many structures
+    # are in the sub-list.
     return flatten(
         list(
             filter(
-                lambda l: len(l) == 1 and all(l[0] != ref for ref in dataset),
-                structures
+                lambda grp: all(
+                    struct != ref for struct, ref in itools.product(grp, dataset)
+                ), structures
             )
         )
     )
