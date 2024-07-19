@@ -411,11 +411,13 @@ def batch_get_novel_structures(
     check_num_value(workers, "workers", ">", 0)
 
     get_novel_structs = partial(_get_novel_structures, dataset=dataset)
+    chunksize = (min(len(structures) // 100, 10) if len(structures) >= 200 else 1)
 
     novel_structs = process_map(
         get_novel_structs,
         structures,
         max_workers=workers,
+        chunksize=chunksize,
         desc="search for novel structures"
     )
     novel_structs = flatten(novel_structs)

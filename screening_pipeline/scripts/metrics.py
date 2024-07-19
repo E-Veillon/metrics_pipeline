@@ -371,8 +371,9 @@ def main() -> None:
         # S.U.N. count
         sun_structs = list(
             filter(
-                lambda struct: struct in unique_novel_structs,
-                stable_structs
+                lambda struct:any(
+                    struct == uniq_novel for uniq_novel in unique_novel_structs
+                ), stable_structs
             )
         )
         dft_metrics["num_SUN"] = len(sun_structs)
