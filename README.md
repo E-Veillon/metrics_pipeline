@@ -1,64 +1,65 @@
-# Poetry Cheat sheet
+[Description général des objectifs de la pipeline]
+...
+
+[Définitions des métriques mesurées]
+- Validity: No pair of atom in the structure are closer than 0.5 angstroms (50 pm).
+
+- Stability, Uniqueness, Novelty (S.U.N.):
+
+    - Stability: The structure's energy per atom above the convex hull of its chemical space is below a defined threshold (default 0.1 eV/atom).
+
+    - Uniqueness: The structure is not equivalent to one previously encountered in the generation batch (Note: the first iteration of the structure is always considered unique, even if other structures are afterward considered equivalent to it).
+
+    - Novelty: The structure is not equivalent to any structure used in the model training set.
+
+- Average Root Mean Square Displacement (RMSD): Measure the mean squared distance between generated position and DFT equilibrium position of each ion in a structure, then compute the mean over all generated structures.
+
+- Coverage (COV-P, COV-R):
+
+    - Precision (COV-P):
+
+    - Recall (COV-R):
+
+- Fréchet ALIGNN Distance (FAD):
+
+- Earth Mover's Distance (EMD) on density or energy:
 
 
-Initialiser un nouveau paquet avec poetry :
-```bash
-poetry new [NomDuPaquet]
-```
+[Fonctionnement détaillé des scripts]
+0) Fichiers nécessaires avant de commencer :
+    - Un fichier CIF contenant toutes les structures de référence utilisées comme input pour la génération avec votre modèle d'IA.
+    - Un fichier CIF contenant toutes les structures générées à tester.
 
-Lancer un script dans l'environnement virtuel (sans extension) :
-```bash
-poetry run [NomDuScript]
-```
+1) Preprocess.py - Ce script permet de trier et filtrer les structures générées selon plusieurs critères.
+    Les critères de filtrage suivant sont activés par défaut, et élimineront du fichier de sortie les structures qui ne les respectent pas. Ils sont tous désactivables en passant différents drapeau dans la commande d'appel du script :
 
-Mettre à jour les dépendances et les scripts pris en compte :
-```bash
-poetry install
-```
+    - La structure est éliminée si elle contient des éléments chimiques de la famille des gaz rares ou des terres rares (désactivables respectivement avec les drapeaux --no-rare-gas-check et --no-rare-earth-check)
 
-Mettre à jour le fichier poetry.lock :
-```bash
-poetry lock
-```
+    - La structure est éliminée si elle n'est pas "valide" au sens de la métrique de Validité. Une structure est "valide" si elle ne contient aucune paire d'atome dont la distance est inférieure à 0.5 angstroms (désactivable avec le drapeau --no-valid-check)
 
-Utilisation de la pipeline sur Jean Zay :
+    - La structure est éliminée si elle est équivalente à une structure précédente du fichier donné en entrée. Ce critère définit l'équivalence selon les paramètres de tolérance par défaut du StructureMatcher de pymatgen (désactivable avec le drapeau --no-equiv-match)
 
-1) Création de l'environnement de calcul :
-    1.1 - Créer dans $SCRATCH (meilleure partition pour la lecture-écriture) un répertoire de stockage des données 
-          pour un batch de structures générées.
-    1.2 - Mettre dans le répertoire le fichier CIF concatené de la génération.
+    Fonctions supplémentaires :
 
-2) pré-processing :
-    2.1 - Dans le script de soumission "preproc_job.slurm", vérifier et modifier si besoin :
-        * Le nom du répertoire du batch dans la ligne "export RUNDIR="
-        * Le nom du fichier CIF concatené dans la ligne "export INFILE="
-        * Le nom voulu pour le fichier CIF de sortie dans la ligne "export OUTFILE="
-        * Les flags à utiliser dans la ligne d'exécution ("poetry run symmetrize --help" pour la liste des flags)
+    - Les structures restantes sont triées selon leur composition chimique (non désactivable)
 
-    2.2 - Soumettre le script preproc_job.slurm -> le fichier CIF avec le nom voulu est créé à côté du premier.
+    - Par défaut, le script va chercher à obtenir le groupe de symétrie d'espace des structures pour l'afficher dans le fichier de sortie. Cette fonction ne sert qu'à la visualisation et n'est pas nécessaire au bon fonctionnement de la pipeline, donc si elle ne vous intéresse pas, désactivez la pour gagner en temps de calcul (désactivable avec le drapeau --no-symmetrization)
 
-3) Relaxation :
-    3.1 - Dans le script de soumission "relax_job.slurm", vérifier et modifier si besoin :
-        * Le nom du répertoire du batch dans la ligne "export RUNDIR="
-        * Le nom du fichier d'entrée qui correspond à la sortie du pré-processing dans la ligne "export INFILE="
-    
-    3.2 - Utilisation des Job Arrays :
-        * Vérifier dans la ligne "#SBATCH --array=" du script de soumission que le nombre de jobs correspond 
-          au nombre de structures dans le fichier d'entrée.
-        * Le script cif_counter.py dans screening_pipeline/scripts peut être utilisé pour compter rapidement 
-          les structures dans le CIF avec la commande "python cif_counter.py chemin/du/fichier.cif"
+2) vasp_static_sun.py - Ce script fait appel au Vienna Ab-initio Simulation Package (VASP) afin de réaliser un calcul de minimisation électronique sur les structures sorties du filtrage de preprocess.py afin de mesurer leur énergie totale, nécessaire pour le calcul de stabilité de la métrique S.U.N. Les positions des ions dans les structures restent fixes lors de cette étape.
 
-        ATTENTION : Par défaut, les Job Arrays ne peuvent accepter que 1000 jobs d'un seul coup. S'il y a plus de 1000 structures à relaxer, 
-        il faudra soumettre plusieurs jobs avec des tranches d'indices différents, car le job N ira chercher la Nième structure du fichier.
-        (exemple : pour 1500 structures, il faudra d'abord soumettre un array allant de 0 à 999, puis un second array allant de 1000 à 1499)
+ATTENTION : Cette étape génère en sortie un répertoire par structure, chacun contenant plusieurs fichiers de sortie correspondant à un calcul VASP. Un grand nombre de répertoire peut être créé à l'emplacement spécifié pour la sortie (autant que de structures d'entrée), il est donc fortement recommandé d'allouer un répertoire vide uniquement dédié au stockage de ces données, qui peuvent également être relativement lourdes si certaines structures sont difficiles à calculer (i.e. nécessitent beaucoup d'itérations car éloignées de leur géométrie d'équilibre). De plus, une indexation doit être spécifiée pour traiter chaque structure indépendamment (l'index correspond à la position de la structure dans le fichier), aussi l'utilisation d'un tableau de jobs comme proposé dans le gestionnaire de jobs Slurm est également recommandé. Le script cif_counter.py permet de savoir efficacement le nombre exact de structures dans un fichier CIF, il peut être utile pour vous aider dans l'indexation.
 
-    3.3 - Soumettre le script relax_job.slurm -> un répertoire "Relaxations" est créé dans le répertoire du batch, 
-          dans lequel chaque structure possède un sous-répertoire de calcul VASP.
+3) phase_diag_energies.py - Ce script récupère les données générées par VASP via le script vasp_static_sun.py et les comparent à un fichier de base de données de structures connues afin de déterminer leur stabilité relative par rapport aux données connues du même système chimique via la construction d'enveloppes convexes, gérées par pymatgen. Ce script génère un fichier JSON (par défaut nommé "summary.json) contenant les informations de stabilité des structures générées (nom et chemin du répertoire de la structure, énergie au-dessus de l'enveloppe mesurée, la structure est-elle considérée stable ou pas).
 
-4) Stabilité :
-    4.1 - Dans le script de soumission "stability_job.slurm", vérifier et modifier si besoin :
-        * Le nom du répertoire du batch dans la ligne "export RUNDIR="
+4) vasp_relax.py - Ce script refait appel à VASP pour cette fois optimiser la géométrie des structures en entrée afin de trouver ses positions d'équilibre. Cette étape servira à mesurer la métrique de RMSD entre les structure générées et leur version calculée avec la Density Functional Theorie (DFT).
 
-    4.2 - Soumettre le script stability_job.slurm -> un fichier "summary.json" est créé dans le répertoire "Relaxations", qui donne l'énergie
-          par rapport à l'enveloppe convexe des structures issues du dataset de chaque structure générée, et indique si elle est considérée
-          stable ou non.
+ATTENTION : Cette étape peut être très coûteuse en temps de calcul si les structures sont loin de leur position d'équilibre (jusqu'à plusieurs jours par structure avec 16 coeurs CPU). Il est recommandé de la réaliser sur un supercalculateur et de définir un walltime au bout duquel le calcul s'arrête et la structure est considérée comme trop loin de son équilibre pour être mesurée dans le RMSD. Certaines structures peuvent ne jamais trouver de position d'équilibre en finissant sur un erreur VASP, en atteignant le maximum d'itérations ioniques (optimisation des positions des ions) ou le walltime défini.
+
+5) metrics.py - Ce script permet de calculer en une fois toutes les métriques supportées par la pipeline.
+Une fois que tout les fichiers nécessaires ont été rassemblés ou générés par les scripts précédents, renseignez-les dans les arguments en ligne de commande correspondants. Si certaines métriques ne vous intéressent pas, vous pouvez désactiver leur calcul avec des drapeaux. Dans ce cas, les fichiers associés peuvent ne plus être nécéssaires et ne pas être chargés. Le script génère un fichier json listant les valeurs mesurées pour les différentes métriques, et mettra la valeur "null" sur les métriques désactivées.
+
+ATTENTION :
+- Pour mesurer la Coverage (Precision, Recall), vous avez besoin d'installer CrystalNN dans les dépendances.
+- Pour mesurer la Fréchet ALIGNN Distance, assurez-vous d'avoir un accès internet là où le calcul des métriques est réalisé ou alors téléchargez le répertoire zippé du modèle ALIGNN préentrainé et déplacez-le à l'emplacement prévu par le programme.
+
+[Workflow conseillé]
