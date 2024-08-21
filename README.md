@@ -1,8 +1,47 @@
-[Description général des objectifs de la pipeline]
-...
+screening_pipeline v1.0.0
 
-[Définitions des métriques mesurées]
+The main goal of this pipeline is to measure some of the metrics that are used in recent works that propose new generative AI models which are able to predict new materials from an input of known materials.
+
+Whatever the processing done to the data before and after passing it to the model, the input and generated materials that will be used in the pipeline for evaluation have to be described, at least, by unit cell parameters, atomic compositions and positions inside the unit cell, in a CIF file format to make the pipeline work properly.
+
+Supplementary to the metrics evaluation features, there are some optional scripts:
+
+- Band Gap evaluation
+    It is possible to estimate the fundamental band gaps of the materials with this feature. It uses the Δ-Sol method proposed by Chan et al.
+    This method performs at least 3 electronic minimizations with different amount of electrons considered in the material, then computes a ponderated difference in total energy between them to estimate the gap.
+    More infos about the method in the original paper referenced below.
+    If uncertainty estimation is needed, the "--with-uncertainties" flag can be given, then 7 computations per structure are performed instead of 3.
+    WARNING: Uncertainty calculations reliability was not rigorously tested, the feature may sometimes lead to weird results. Future updates on the pipeline may try to correct this behaviour.
+
+    Reference for Δ-Sol method:
+    M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
+    
+    WARNING: This feature uses VASP to calculate band gaps, if you need to use it, it is highly recommended to first prepare an empty output directory to allow VASP to write data inside (one directory for each evaluated structure will be written, itself containing directories for each VASP calculation on the structure).
+
+- Structure perturbation
+    This feature allows efficiently generating randomly perturbed materials from ones given as input.
+    In this random generation, atomic positions and each cell parameter can be perturbed in a user given range.
+    If a generated material is obviously unphysical, it isuues a warning, discards the unphysical data and retry a random generation until it respects physicality conditions or there is no retry attempts left.
+
+- Bash scripts
+    Some convenient little bash scripts to help data management between calculation steps.
+
+    - The "distribute.sh" script allows to distribute a single file or directory (through the use of the -r flag) to several locations at once. It can be particularly convenient to distribute a same input configuration to several VASP calculations efficiently without risk of errors for example.
+
+    - The "get_common_errors.sh" script can be used on several slurm output and error files (for VASP calculations steps parallelized on a supercalculator using slurm as job management software particularly) to catch slurm and VASP errors that were eventually issued in their most common form. This script is basically just a chain of "grep" bash commands applied on common error patterns, it is not guaranteed to catch all errors if they happen to not follow the usual patterns.
+
+    - The "multidiff.sh" script is a simple extension of the bash "diff" command, that basically does the same as the "diff --from-file=[input_file] output_files" command, but with a header at the beginning of each comparison clearly stating which files are compared.
+
+    - The "outcar_parser.sh" script allows a quick and compact parsing of several OUTCAR files' main informations (Total number of ionic and electronic steps done, last printed total energies, issued VASP warnings and errors). By default the parsing is printed on terminal, but if there are a lot of OUTCAR files to parse at once (> 10), it is recommended to output the command in a file. if this script is used on anything else than a OUTCAR file, there is no error check to verify it, therefore it may make a weird output for this file.
+
+An emphasis is made on the fact that all scripts described above are purely optional, and do not affect the data or quality of the main metrics evaluation pipeline in any way. They are not guaranteed to work properly under unusual conditions or in some specific calculations cases, therefore if they are used, their outputs must be considered with care. Future updates may test more thoroughly these features and correct them if necessary.
+
+----------------------------------------
+
+General Definitions of measured metrics:
+
 - Validity: No pair of atom in the structure are closer than 0.5 angstroms (50 pm).
+The metric value is the percentage of valid structures inside given batch.
 
 - Stability, Uniqueness, Novelty (S.U.N.):
 
@@ -12,7 +51,10 @@
 
     - Novelty: The structure is not equivalent to any structure used in the model training set.
 
-- Average Root Mean Square Displacement (RMSD): Measure the mean squared distance between generated position and DFT equilibrium position of each ion in a structure, then compute the mean over all generated structures.
+The final metric value is the percentage of structures validating the 3 conditions inside given batch.
+For information, several percentages are also measured for sub-combinations of the conditions.
+
+- Average Root Mean Square Displacement (RMSD): Measures the mean squared distance between generated position and DFT equilibrium position of each ion in a structure, then computes the mean over all structures in given batch.
 
 - Coverage (COV-P, COV-R):
 
