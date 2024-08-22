@@ -12,9 +12,7 @@ E_O2_FIT = -1,36 # eV per O2 in the formation reaction
 O2 Energy as fitted by Wang et al.
 
 Reference: 
-   L. Wang, T. Maxisch, G. Ceder, 
-   Physical Review B 73 (2006) 195107.
-   (reference 14.57 in screening_pipeline/Bibliography)
+   L. Wang, T. Maxisch, G. Ceder, Physical Review B 73 (2006) 195107.
 '''
 
 ########################################
@@ -43,7 +41,6 @@ Reference:
     A. Jain, G. Hautier, C.J. Moore, S.P. Ong, 
     C.C. Fischer, T. Mueller, K.A. Persson, and G. Ceder, 
     Computational Materials Science, 50, 2295-2310 (2011)
-    (reference 14 in screening_pipeline/Bibliography)
 '''
 
 ########################################
@@ -73,7 +70,6 @@ Reference:
     A. Jain, G. Hautier, S.P. Ong, C.J. Moore, 
     C.C. Fischer, K.A. Persson, and G. Ceder, 
     Phys. Rev. B, 84, 045115 (2011)
-    (reference 31 in screening_pipeline/Bibliography)
 '''
 
 ########################################
@@ -256,13 +252,11 @@ References:
   - A. Jain, G. Hautier, S.P. Ong, C.J. Moore, 
     C.C. Fischer, K.A. Persson, and G. Ceder, 
     Phys. Rev. B, 84, 045115 (2011)
-    (reference 31 in screening_pipeline/Bibliography)
 
   - Saal, J. E., Kirklin, S., Aykol, M., Meredig, B., and Wolverton, C. 
     "Materials Design and Discovery with High-Throughput Density Functional Theory: 
     The Open Quantum Materials Database (OQMD)", JOM 65, 1501-1509 (2013). 
     doi:10.1007/s11837-013-0755-4
-    (reference OQMD1 in screening_pipeline/Bibliography)
 
   - Kirklin, S., Saal, J.E., Meredig, B., Thompson, A., 
     Doak, J.W., Aykol, M., Rühl, S. and Wolverton, C. 
@@ -270,7 +264,6 @@ References:
     assessing the accuracy of DFT formation energies", 
     npj Computational Materials 1, 15010 (2015). 
     doi:10.1038/npjcompumats.2015.10
-    (reference OQMD2 in screening_pipeline/Bibliography)
 
 OQMD Website: https://www.oqmd.org/
 '''
@@ -305,7 +298,7 @@ to add to or remove from the simulated structure in the Δ-Sol method.
 
 Reference:
     M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-    (reference 32 in screening_pipeline/Bibliography, values in Table I)
+    (values in Table I)
 '''
 
 ########################################

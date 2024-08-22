@@ -65,7 +65,6 @@ def main() -> None:
 
         Reference for Δ-Sol method:
             M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-            (reference 32 in screening_pipeline/Bibliography)
         """
     prog_missing_steps = """
         Missing steps to complete this script:

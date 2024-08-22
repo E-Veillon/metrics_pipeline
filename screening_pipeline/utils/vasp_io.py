@@ -43,7 +43,6 @@ def _mitrelaxset_incar_corrections(n_sites: int|None = None) -> Dict:
     Reference:
         A. Jain, G. Hautier, C.J. Moore, S.P. Ong, C.C. Fischer, T. Mueller,
         K.A. Persson, and G. Ceder, Computational Materials Science, 50, 2295-2310 (2011).
-        (reference 14 in screening_pipeline/Bibliography)
 
     Parameters:
         n_sites (int):  The number of sites in the structure. Used to pass explicitly
@@ -914,7 +913,7 @@ def dsol_calc_init(
 
     Reference of the Δ-Sol method:
         M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-        (reference 32 in screening_pipeline/Bibliography, values in Table I)
+        (values in Table I)
 
     Parameters:
         structure (Structure):      The input structure.

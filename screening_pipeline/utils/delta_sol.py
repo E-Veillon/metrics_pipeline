@@ -41,11 +41,9 @@ class DSolStaticSet(MPRelaxSet):
 
     References:
         - M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010).
-        (Ref 32 in screening_pipeline/Bibliography)
 
         - A. Jain, G. Hautier, C.J. Moore, S.P. Ong, C.C. Fischer, T. Mueller, 
         K.A. Persson, and G. Ceder, Computational Materials Science, 50, 2295-2310 (2011).
-        (Ref 14 in screening_pipeline/Bibliography)
 
     Args:
         structure (Structure):  The Structure to create inputs for. If None, the input
@@ -105,8 +103,8 @@ class DSolCalc(Enum):
 
 
 def get_dsol_struct_dir(
-        path: PathLike, task_id: int, with_uncertainties: bool = False
-        ) -> Tuple[str, int, int]:
+    path: PathLike, task_id: int, with_uncertainties: bool = False #type: ignore
+) -> Tuple[str, int, int]:
     """
     Determines structure index and calculation ID from the task ID,
     then finds corresponding structure directory.
@@ -244,8 +242,7 @@ def get_dsol_n_ratio(
     the structure in the Δ-Sol method developped by Chan et al.
 
     Reference:
-        M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-        (reference 32 in screening_pipeline/Bibliography)
+        M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010).
     """
     check_type(structure, "structure", (SiteCollection,))
     check_type(n_star_idx, "n_star_idx", (int,))
@@ -310,7 +307,6 @@ def get_dsol_band_gap(data: dict) -> Union[Tuple[str, float], Tuple[str, float, 
     )
 
     # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap
-    # (Ref 32 in screening_pipeline/Bibliography))
     e_diff_best = data["E_N0_plus_n_best"] + data["E_N0_minus_n_best"] - 2*data["E_N0"]
     e_bg_best = e_diff_best / n_ratio_best
 
