@@ -32,12 +32,12 @@ def _assert_args(args: Namespace) -> None:
     )
 
     if args.valid_interval is not None:
-        assert all([value >= 0.0 for value in args.valid_interval]), (
-        f"Acceptable band gap values must be positive or zero."
+        assert all(value >= 0.0 for value in args.valid_interval), (
+        "Acceptable band gap values must be positive or zero."
         )
 
         assert args.valid_interval[0] != args.valid_interval[1], (
-        f"Acceptable band gap values cannot have the same value."
+        "Acceptable band gap values cannot have the same value."
         )
 
     check_file_format(args.summary, allowed_formats="json")
@@ -50,11 +50,12 @@ def _assert_args(args: Namespace) -> None:
 ########################################
 
 
-def main():
+def main() -> None:
+    """Main function."""
     start = datetime.now()
 
     # ARGUMENTS PARSING BLOCK
-    
+
     prog_name = "dsol_bandgap"
     prog_desc = """
         A script to determine material fundamental band gap from VASP energies and Δ-Sol method.
@@ -64,8 +65,8 @@ def main():
         """
 
     parser = ArgumentParser(
-        prog=prog_name, 
-        description=prog_desc, 
+        prog=prog_name,
+        description=prog_desc,
     )
 
     parser.add_argument(
@@ -96,7 +97,7 @@ def main():
             "Valid band gaps interval in eV (default: [1.3 ; 3.6] eV).\n"
             "If another interval is given, the min AND max values must be given, "
             "even if one of them matches the default values."
-        ), 
+        ),
         metavar="float"
     )
     parser.add_argument(
@@ -121,7 +122,7 @@ def main():
     )
     parser.add_argument(
         "--with-uncertainties", 
-        action="store_true", 
+        action="store_true",
         help=(
             "Enables computation of minimal and maximal Δ-Sol band gaps.\n"
             "If enabled, it will search for uncertainty calculations results."
@@ -148,23 +149,23 @@ def main():
 
     # Extract VASP static calculations results
     bg_data = batch_extract_vasp_data(
-        method="delta_sol_calc", 
-        base_dir=input_dir, 
+        method="delta_sol_calc",
+        base_dir=input_dir,
         workers=workers
     )
 
-    E_band_gaps = batch_get_dsol_band_gaps(
+    e_band_gaps = batch_get_dsol_band_gaps(
         bg_data, dft_func, args.with_uncertainties, workers
     )
 
     good_bg_structs = list(filter(
-        lambda tup: min(valid_interval) <= tup[1]["E_band_gap"] <= max(valid_interval), 
-        list(E_band_gaps.items())
+        lambda tup: min(valid_interval) <= tup[1]["E_band_gap"] <= max(valid_interval),
+        list(e_band_gaps.items())
     ))
 
     bad_bg_structs = list(filter(
-        lambda tup: tup[1]["E_band_gap"] < min(valid_interval) or tup[1]["E_band_gap"] > max(valid_interval), 
-        list(E_band_gaps.items())
+        lambda tup: not min(valid_interval) <= tup[1]["E_band_gap"] <= max(valid_interval),
+        list(e_band_gaps.items())
     ))
 
     screening_results = []
@@ -173,35 +174,35 @@ def main():
     for struct in good_bg_structs:
         name       = struct[0]
         bgdict     = struct[1]
-        E_band_gap = round(bgdict["E_band_gap"], 6)
-        E_band_gap_rectified = max(E_band_gap, 0.0)
-        true_neg_bg = f" (true measurement: {E_band_gap})" if E_band_gap_rectified == 0.0 else ""
-        
+        e_band_gap = round(bgdict["E_band_gap"], 6)
+        e_band_gap_rectified = max(e_band_gap, 0.0)
+        true_neg_bg = f" (true measurement: {e_band_gap})" if e_band_gap_rectified == 0.0 else ""
+
         struct_dict = {
                 "path": os.path.join(str(input_dir), name),
-                "bandgap (eV)": f"{E_band_gap_rectified}{true_neg_bg}",
+                "bandgap (eV)": f"{e_band_gap_rectified}{true_neg_bg}",
                 "valid_gap": True
         }
 
         if args.with_uncertainties:
-            E_band_gap_min = round(bgdict["E_band_gap_min"], 6)
-            E_band_gap_max = round(bgdict["E_band_gap_max"], 6)
-            E_band_gap_min_rectified = max(E_band_gap_min, 0.0)
-            E_band_gap_max_rectified = max(E_band_gap_max, 0.0)
-            E_min = min(E_band_gap_min_rectified, E_band_gap_max_rectified)
-            E_max = max(E_band_gap_min_rectified, E_band_gap_max_rectified)
+            e_band_gap_min = round(bgdict["E_band_gap_min"], 6)
+            e_band_gap_max = round(bgdict["E_band_gap_max"], 6)
+            e_band_gap_min_rectified = max(e_band_gap_min, 0.0)
+            e_band_gap_max_rectified = max(e_band_gap_max, 0.0)
+            e_min = min(e_band_gap_min_rectified, e_band_gap_max_rectified)
+            e_max = max(e_band_gap_min_rectified, e_band_gap_max_rectified)
             true_neg_bg_min = (
-                f" (true measurement: {min(E_band_gap_min, E_band_gap_max)})" 
-                if E_min == 0.0 else ""
+                f" (true measurement: {min(e_band_gap_min, e_band_gap_max)})" 
+                if e_min == 0.0 else ""
             )
             true_neg_bg_max = (
-                f" (true measurement: {max(E_band_gap_min, E_band_gap_max)})" 
-                if E_max == 0.0 else ""
+                f" (true measurement: {max(e_band_gap_min, e_band_gap_max)})" 
+                if e_max == 0.0 else ""
             )
             struct_dict.update(
                 {
-                    "bandgap_min (eV)": f"{E_min}{true_neg_bg_min}",
-                    "bandgap_max (eV)": f"{E_max}{true_neg_bg_max}"
+                    "bandgap_min (eV)": f"{e_min}{true_neg_bg_min}",
+                    "bandgap_max (eV)": f"{e_max}{true_neg_bg_max}"
                 }
             )
 
@@ -211,29 +212,35 @@ def main():
     for struct in bad_bg_structs:
         name       = struct[0]
         bgdict     = struct[1]
-        E_band_gap = round(bgdict["E_band_gap"], 6)
-        E_band_gap_rectified = max(E_band_gap, 0.0)
-        true_neg_bg = f" (true measurement: {E_band_gap})" if E_band_gap_rectified == 0.0 else ""
+        e_band_gap = round(bgdict["E_band_gap"], 6)
+        e_band_gap_rectified = max(e_band_gap, 0.0)
+        true_neg_bg = f" (true measurement: {e_band_gap})" if e_band_gap_rectified == 0.0 else ""
 
         struct_dict = {
                 "path": os.path.join(str(input_dir), name),
-                "bandgap (eV)": f"{E_band_gap_rectified}{true_neg_bg}",
+                "bandgap (eV)": f"{e_band_gap_rectified}{true_neg_bg}",
                 "valid_gap": False
         }
 
         if args.with_uncertainties:
-            E_band_gap_min = round(bgdict["E_band_gap_min"], 6)
-            E_band_gap_max = round(bgdict["E_band_gap_max"], 6)
-            E_band_gap_min_rectified = max(E_band_gap_min, 0.0)
-            E_band_gap_max_rectified = max(E_band_gap_max, 0.0)
-            E_min = min(E_band_gap_min_rectified, E_band_gap_max_rectified)
-            E_max = max(E_band_gap_min_rectified, E_band_gap_max_rectified)
-            true_neg_bg_min = f" (true measurement: {min(E_band_gap_min, E_band_gap_max)})" if E_min == 0.0 else ""
-            true_neg_bg_max = f" (true measurement: {max(E_band_gap_min, E_band_gap_max)})" if E_max == 0.0 else ""
+            e_band_gap_min = round(bgdict["E_band_gap_min"], 6)
+            e_band_gap_max = round(bgdict["E_band_gap_max"], 6)
+            e_band_gap_min_rectified = max(e_band_gap_min, 0.0)
+            e_band_gap_max_rectified = max(e_band_gap_max, 0.0)
+            e_min = min(e_band_gap_min_rectified, e_band_gap_max_rectified)
+            e_max = max(e_band_gap_min_rectified, e_band_gap_max_rectified)
+            true_neg_bg_min = (
+                f" (true measurement: {min(e_band_gap_min, e_band_gap_max)})"
+                if e_min == 0.0 else ""
+            )
+            true_neg_bg_max = (
+                f" (true measurement: {max(e_band_gap_min, e_band_gap_max)})"
+                if e_max == 0.0 else ""
+            )
             struct_dict.update(
                 {
-                    "bandgap_min (eV)": f"{E_min}{true_neg_bg_min}",
-                    "bandgap_max (eV)": f"{E_max}{true_neg_bg_max}"
+                    "bandgap_min (eV)": f"{e_min}{true_neg_bg_min}",
+                    "bandgap_max (eV)": f"{e_max}{true_neg_bg_max}"
                 }
             )
 
@@ -244,7 +251,7 @@ def main():
 
     screening_results = sorted(screening_results, key=sort_by_path)
 
-    with open(summary, "w") as fp:
+    with open(summary, "w", encoding="utf-8") as fp:
         json.dump(screening_results, fp, indent=4)
 
     stop = datetime.now()

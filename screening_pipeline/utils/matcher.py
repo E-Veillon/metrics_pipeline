@@ -44,10 +44,8 @@ def check_interatomic_distances(
         int: Number of invalid structures discarded.
     '''
     check_type(structures, "structures", (Sequence,))
-    (
-        check_type(struct, f"structures[{idx}]", (SiteCollection,))
-        for idx, struct in enumerate(structures)
-    )
+    for idx, struct in enumerate(structures):
+        check_type(struct, f"structures[{idx}]", (Structure,))
     check_type(valid_tol, "valid_tol", (float,))
 
     def _is_valid(structure: SiteCollection) -> bool:
@@ -103,10 +101,9 @@ def group_by_stoichiometry(
     check_type(comps, "comps", (Sequence,))
     if not comps:
         return []
-    (
-        check_type(comp, f"comps[{idx}]", (Composition, Entry, SiteCollection))
-        for idx, comp in enumerate(comps)
-    )
+    for idx, comp in enumerate(comps):
+        check_type(comp, f"comps[{idx}]", (Composition, Entry, SiteCollection,))
+
     sorted_comps = sorted(comps, key=hash_stoichiometry)
 
     return [
@@ -159,10 +156,8 @@ def group_by_composition(
     check_type(comps, "comps", (Sequence,))
     if not comps:
         return []
-    (
-        check_type(comp, f"comps[{idx}]", (Composition, Entry, SiteCollection))
-        for idx, comp in enumerate(comps)
-    )
+    for idx, comp in enumerate(comps):
+        check_type(comp, f"comps[{idx}]", (Composition, Entry, SiteCollection,))
 
     sorted_comps = sorted(comps, key=hash_composition)
 
@@ -253,10 +248,8 @@ def batch_group_by_equivalence(    structures: Sequence[Structure],
         and total count of unmatched structures (equal to zero if test_volume is set to False).
     """
     check_type(structures, "structures", (Sequence,))
-    (
+    for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
-        for idx, struct in enumerate(structures)
-    )
     check_type(test_volume, "test_volume", (bool,))
     check_type(workers, "workers", (int,))
     check_num_value(workers, "workers", ">", 0)
@@ -320,10 +313,8 @@ def remove_equivalent(
         Int: The number of unmatched structures (zero if test_volume = False).
     """
     check_type(structures, "structures", (Sequence,))
-    (
+    for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
-        for idx, struct in enumerate(structures)
-    )
     check_type(test_volume, "test_volume", (bool,))
     check_type(workers, "workers", (int,))
     check_num_value(workers, "workers", ">", 0)
@@ -428,6 +419,10 @@ def batch_get_novel_structures(
 
 
 def is_struct_dir(path: PathLike) -> bool:
+    """
+    Checks whether given path is a directory having
+    naming convention of a structure directory.
+    """
     #NOTE: Here 'path' must be a Path object, do not change for os.path.
     path = Path(path)
     return (
@@ -488,7 +483,7 @@ def match_struct_dirs(
         matching_dirs = list(
             filter(
                 lambda f: f.name.startswith(f"{idx}_") and is_struct_dir(f),
-                subtree        
+                subtree
             )
         )
 

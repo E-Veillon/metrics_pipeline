@@ -266,7 +266,7 @@ def main() -> None:
         print(f"{nbr_equivalent} duplicates were discarded")
 
     if args.test_min_vol:
-        print(f"--test-min-vol debug flag was passed:")
+        print("--test-min-vol debug flag was passed:")
         print(f"{nbr_unmatched} structures were assumed unique.")
 
     # Ecriture du fichier CIF symétrisé et épuré des structures indésirables
@@ -299,7 +299,7 @@ def main() -> None:
 
     if not args.no_equiv_match:
         print(f"- {nbr_equivalent} structure(s) that are duplicates")
-    
+
     if args.test_min_vol:
         print(
             f"- {nbr_unmatched} structure(s) assumed unique "

@@ -27,10 +27,9 @@ from .periodic_table import get_elements
 def get_max_dim(entries: Sequence[PDEntry]) -> int:
     """Search for the maximum number of distinct elements in given entries."""
     check_type(entries, "entries", (Sequence,))
-    (
+    for idx, entry in enumerate(entries):
         check_type(entry, f"entries[{idx}]", (PDEntry,))
-        for idx, entry in enumerate(entries)
-    )
+
     return max(len(entry.elements) for entry in entries)
 
 
@@ -57,14 +56,10 @@ def init_entries_from_dict(
         List[PDEntry]: The list of phase diagram entries.
     """
     check_type(entries_dict, "entries_dict", (Dict,))
-    (
+    for idx, key in enumerate(entries_dict.keys()):
         check_type(key, f"entries_dict.keys()[{idx}]", (str,))
-        for idx, key in enumerate(entries_dict.keys())
-    )
-    (
+    for idx, val in enumerate(entries_dict.values()):
         check_type(val, f"entries_dict.values()[{idx}]", (Dict,))
-        for idx, val in enumerate(entries_dict.values())
-    )
     if attribute is not None:
         check_type(attribute, "attribute", (str,))
 
@@ -145,10 +140,9 @@ def get_elements_from_entries(entries: Sequence[PDEntry]) -> List[Element]:
     check_type(entries, "entries", (Sequence,))
     if not entries:
         return []
-    (
+    for idx, entry in enumerate(entries):
         check_type(entry, f"entries[{idx}]", (PDEntry,))
-        for idx, entry in enumerate(entries)
-    )
+
     if len(entries) == 1:
         return entries[0].elements
 
@@ -187,10 +181,8 @@ def group_by_dim_and_comp(
     check_type(entries, "entries", (Sequence,))
     if not entries:
         return []
-    (
+    for idx, entry in enumerate(entries):
         check_type(entry, f"entries[{idx}]", (PDEntry,))
-        for idx, entry in enumerate(entries)
-    )
     if max_dim is not None:
         check_type(max_dim, "max_dim", (int,))
     check_type(workers, "workers", (int,))
@@ -243,10 +235,9 @@ def get_sub_entries(
     check_type(entry_pool, "entry_pool", (Sequence,))
     if not entry_pool:
         return []
-    (
+    for idx, entry in enumerate(entry_pool):
         check_type(entry, f"entry_pool[{idx}]", (PDEntry,))
-        for idx, entry in enumerate(entry_pool)
-    )
+
     sub_entries = list(
         filter(
             lambda entry: all(elt in main_entry.elements for elt in entry.elements),
@@ -309,10 +300,9 @@ def get_lacking_elts_entries(
     if not entries:
         user_elt_entries = []
     else:
-        (
+        for idx, entry in enumerate(entries):
             check_type(entry, f"entries[{idx}]", (PDEntry,))
-            for idx, entry in enumerate(entries)
-        )
+
         user_elt_entries = list(
             filter(
                 lambda entry: entry.is_element and entry.elements[0] in ref_elts,
@@ -501,14 +491,10 @@ def batch_compute_e_above_hull(
         structure each.
     """
     check_type(entries, "entries", (Sequence,))
-    (
+    for idx, entry_group in enumerate(entries):
         check_type(entry_group, f"entries[{idx}]", (Sequence,))
-        for idx, entry_group in enumerate(entries)
-    )
-    (
-        check_type(entry, f"entries ({idx}-th entry)", (PDEntry,))
-        for idx, entry in enumerate(flatten(entries))     
-    )
+    for idx, entry in enumerate(flatten(entries)):
+        check_type(entry, f"entries[{idx}]", (PDEntry,))
     check_type(stable_limit, "stable_limit", (float,))
     check_num_value(stable_limit, "stable_limit", ">=", 0.0)
     check_type(workers, "workers", (int,))
@@ -532,7 +518,8 @@ def batch_compute_e_above_hull(
     computed_energies = flatten(computed_energies)
     #computed_energies = []
     #for entry_group in entries:
-    #    print(f"Begin computing phase diagram {'-'.join([str(elt) for elt in entry_group[0].elements])}")
+    #    pd_name = '-'.join([str(elt) for elt in entry_group[0].elements])
+    #    print(f"Begin computing phase diagram {pd_name}")
     #    computed_energies += energy_computer(entry_group)
     #    print("Energy computation step complete")
 

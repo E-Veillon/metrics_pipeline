@@ -10,8 +10,8 @@ import warnings
 from functools import partial
 from typing import Optional, Dict, List, Union, Sequence, Tuple, Literal, Any
 from pathlib import Path
-from monty.os import cd
 import xml.etree.ElementTree as ET
+from monty.os import cd
 from tqdm.contrib.concurrent import process_map
 
 # PYTHON MATERIAL GENOMICS
@@ -427,7 +427,7 @@ def get_struct_from_vasp(
             return structure
         except (FileNotFoundError, ET.ParseError, UnicodeDecodeError):
             pass
-    
+
     if try_contcar:
         try:
             file = os.path.join(path, "CONTCAR")
@@ -435,7 +435,7 @@ def get_struct_from_vasp(
             return structure
         except FileNotFoundError:
             pass
-    
+
     if try_xdatcar:
         try:
             file = os.path.join(path, "XDATCAR")
@@ -443,7 +443,7 @@ def get_struct_from_vasp(
             return structure
         except FileNotFoundError:
             pass
-    
+
     if try_poscar:
         try:
             file = os.path.join(path, "POSCAR")
@@ -937,7 +937,7 @@ def dsol_calc_init(
     check_type(calc_index, "calc_index", (int,))
     check_num_value(calc_index, "calc_index", ">=", 0)
     check_num_value(calc_index, "calc_index", "<=", 6)
-    if not preset in PMGStaticSet and not preset == "DSolStaticSet":
+    if preset not in PMGStaticSet and preset != "DSolStaticSet":
         raise ValueError(
             "'preset' argument value is not a supported preset. "
             "Supported presets are:\n"
@@ -965,7 +965,7 @@ def dsol_calc_init(
         run_set = vasp_static_settings(
             structure, preset, nelect=nelect, user_corrections=user_corrections
         )
-    
+
     else:
         run_dict = run_set.as_dict()
         run_dict["INCAR"].update({"NELECT": nelect})

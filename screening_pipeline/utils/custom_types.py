@@ -36,7 +36,7 @@ class PMGRelaxSet(Enum):
 
 class PMGStaticSet(Enum):
     """Enum class of known to date VASP static presets implemented in pymatgen."""
-    MPSTATICSET = "MPStaticSet" 
+    MPSTATICSET = "MPStaticSet"
     MATPESSTATICSET = "MatPESStaticSet"
     MPSCANSTATICSET = "MPScanStaticSet"
     MPSOCSET = "MPSOCSet"
@@ -50,4 +50,3 @@ class PMGStaticSet(Enum):
     def values(self) -> List[str]:
         """Get the list of all Enum members values."""
         return list(member.value for member in self)
-

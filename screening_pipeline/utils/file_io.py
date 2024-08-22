@@ -46,13 +46,11 @@ def check_file_format(filename: PathLike, *, allowed_formats: str|Sequence[str])
     if isinstance(allowed_formats, str):
         allowed_formats = (allowed_formats,)
     else:
-        (
-            check_type(ext, f"allowed_formats[{idx}]", (str,))
-            for idx, ext in enumerate(allowed_formats)
-        )
+        for idx, ext in enumerate(allowed_formats):
+            check_type(ext, f"structures[{idx}]", (str,))
 
     filename = str(filename)
-    file_format = filename.split(sep=".")[-1]
+    file_format = filename.rsplit(sep=".", maxsplit=1)[-1]
 
     if all(file_format != ext for ext in allowed_formats):
         plural = "s are" if len(allowed_formats) > 1 else " is"
@@ -129,10 +127,8 @@ def add_new_dir(base_dir: PathLike, *new_dirs: str) -> str:
         str: path pointing to the new subdirectory.
     """
     check_file_or_dir(base_dir, "dir")
-    (
-        check_type(new_dir, f"new_dirs[{idx}]", (str,))
-        for idx, new_dir in enumerate(new_dirs)
-    )
+    for idx, new_dir in enumerate(new_dirs):
+        check_type(new_dir, f"new_dirss[{idx}]", (str,))
 
     new_path = os.path.join(str(base_dir), *new_dirs)
     os.makedirs(new_path, exist_ok=True)

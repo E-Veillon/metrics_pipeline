@@ -34,7 +34,7 @@ def _assert_args(args: argparse.Namespace) -> None:
 
 def main() -> None:
     """Main function."""
-    
+
     # ARGUMENTS PARSING BLOCK
 
     parser = argparse.ArgumentParser(
@@ -59,27 +59,27 @@ def main() -> None:
 
     # MAIN BLOCK
 
-    with open(args.input_file, "rt") as fp:
+    with open(args.input_file, "rt", encoding="utf-8") as fp:
         data = json.load(fp)
-    
+
     assert (
         isinstance(data, List)
-        and all([isinstance(struct, Dict) for struct in data])
+        and all(isinstance(struct, Dict) for struct in data)
     ), "The data inside the JSON file must be a list of structure dicts."
 
     if args.absolute:
         new_path = os.path.abspath(args.new_path)
     else:
         new_path = args.new_path
-    
+
     for struct in data:
         old_path = struct["path"]
         struct_name = os.path.basename(old_path)
         struct["path"] = os.path.join(new_path, struct_name)
 
-    with open(args.input_file, "wt") as fp:
+    with open(args.input_file, "wt", encoding="utf-8") as fp:
         json.dump(data, fp, indent=4)
-    
+
     print(f"the file '{os.path.basename(args.input_file)}' was successfully modified.")
 
 

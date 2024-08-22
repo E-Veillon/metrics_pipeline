@@ -1,4 +1,14 @@
 #!/usr/bin/python
+"""
+A command line tool to compute various metrics based on previously done computations.
+Computable metrics are:\n
+- Validity,
+- Stability, Unicity, Novelty (S.U.N),\n
+- Average Root Mean Square Displacement (RMSD),\n
+- Coverage - Precision (COV-P) and Coverage - Recall (COV-R),\n
+- Fréchet ALIGNN Distance (FAD),\n
+- Earth Mover's Distance (EMD) on energy and density distributions.\n
+"""
 
 import os
 import json
@@ -24,8 +34,8 @@ from screening_pipeline.utils import (
 
 def _assert_args(args: argparse.Namespace) -> None:
     """Check arguments values validity."""
-    CONFIG = os.path.join(CONFIGPATH, args.config)
-    check_file_or_dir(CONFIG, "file", allowed_formats="yaml")
+    config_file = os.path.join(CONFIGPATH, args.config)
+    check_file_or_dir(config_file, "file", allowed_formats="yaml")
     if args.dataset is not None:
         check_file_or_dir(args.dataset, "file", allowed_formats="cif")
     if args.generated is not None:
@@ -291,7 +301,7 @@ def main() -> None:
             workers=args.workers
         )
         print("Data converted.")
-    
+
     general_metrics = dict.fromkeys(
         ("num_generated", "num_valid", "percent_valid")
     )
@@ -448,13 +458,13 @@ def main() -> None:
         ml_metrics["EMD_density"] = get_emd(
             densities_dataset, densities_generated
         )
-        print(f"Density EMD = {ml_metrics['EMD_density']}")        
+        print(f"Density EMD = {ml_metrics['EMD_density']}")
 
     metrics = {"general": general_metrics, "dft": dft_metrics, "ml": ml_metrics}
 
     print("Writing output file...")
 
-    with open(args.output, "w") as fp:
+    with open(args.output, "w", encoding="utf-8") as fp:
         json.dump(metrics, fp, indent=4)
 
     print(f"Output file successfully written at location '{args.output}'.")

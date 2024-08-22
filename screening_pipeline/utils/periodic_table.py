@@ -55,10 +55,8 @@ def discard_rare_gas_structures(
         Int: The number of structures discarded.
     """
     check_type(structures, "structures", (Sequence,))
-    (
+    for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (SiteCollection, str))
-        for idx, struct in enumerate(structures)
-    )
 
     structures = list(structures)
     if not structures:
@@ -112,10 +110,8 @@ def discard_rare_earth_structures(
         Int: The number of structures discarded.
     """
     check_type(structures, "structures", (Sequence,))
-    (
+    for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (SiteCollection, str))
-        for idx, struct in enumerate(structures)
-    )
 
     structures = list(structures)
     if not structures:
@@ -158,10 +154,9 @@ def get_elements(elts_data: FormulaLike) -> List[Element]:
         elts_list = Composition("".join(elts_data.split(sep="-")), strict=True).elements
 
     else:
-        (
+        for idx, data in enumerate(elts_data):
             check_type(data, f"elts_data[{idx}]", (str, int, Element))
-            for idx, data in enumerate(elts_data)
-        )
+
         elts_list = Composition([(elt, 1) for elt in elts_data], strict=True).elements
 
     return elts_list
@@ -191,10 +186,9 @@ def get_elemental_subsets(
         List of the formulas fully included in the main one.
     """
     check_type(elts_subsets, "elts_subsets", (str, Sequence))
-    (
+    for idx, data in enumerate(elts_subsets):
         check_type(data, f"elts_data[{idx}]", (str, int, Element))
-        for idx, data in enumerate(elts_subsets)
-    )
+
     ref_elts = get_elements(main_elts_set)
 
     sub_pd_list = list(filter(

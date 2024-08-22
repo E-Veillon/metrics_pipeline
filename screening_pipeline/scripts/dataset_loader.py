@@ -15,12 +15,12 @@ from screening_pipeline.utils import (
 
 def main() -> None:
     """Main entry point."""
-    
+
     # ARGUMENTS PARSING BLOCK
 
     parser = argparse.ArgumentParser(
         description="Get MP and/or process OQMD database entries for the pipeline."
-    ) 
+    )
 
     parser.add_argument(
         "--from-mp-api",
@@ -61,11 +61,11 @@ def main() -> None:
         dir_path = os.path.dirname(args.from_mp_api)
         check_file_or_dir(dir_path, "dir")
         mp_api_download(args.from_mp_api, api_key=args.mp_api_key)
-    
+
     if args.process_oqmd is not None:
         check_file_or_dir(args.process_oqmd, "file", allowed_formats="json")
         process_oqmd_json_file(path=args.process_oqmd)
-    
+
 
 if __name__ == "__main__":
     main()

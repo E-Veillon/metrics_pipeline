@@ -97,34 +97,34 @@ def check_num_value(
 
 
 if __name__ == "__main__":
-    num = 5
-    float_val = 3.14
-    bol = True
-    string = "hello"
-    sett = {1, 2, 3}
-    tup = ("cdo", 2)
-    lst = [1, 3.2, "hello"]
-    dct = {"a": 1, "b": 2, "c": 3}
-    check_type(num, "num", (int,))
-    check_type(float_val, "float_val", (float, int))
-    check_type(bol, "bol", (bool,))
-    check_type(string, "string", (str,))
-    check_type(sett, "sett", (typ.Set,))
-    check_type(sett, "sett", (set,))
-    check_type(tup ,"tup", (typ.Tuple,))
-    check_type(tup, "tup", (tuple,))
-    check_type(lst, "lst", (typ.List,))
-    check_type(lst, "lst", (list,))
-    check_type(dct, "dct", (typ.Dict,))
-    check_type(dct, "dct", (dict,))
-    check_num_value(num, "num", "==", 5)
-    check_num_value(float_val, "float_val", "<", 4.2)
+    NUM = 5
+    FLOAT = 3.14
+    BOOL = True
+    STR = "hello"
+    SET = {1, 2, 3}
+    TUPLE = ("cdo", 2)
+    LIST = [1, 3.2, "hello"]
+    DICT = {"a": 1, "b": 2, "c": 3}
+    check_type(NUM, "num", (int,))
+    check_type(FLOAT, "float_val", (float, int))
+    check_type(BOOL, "bol", (bool,))
+    check_type(STR, "string", (str,))
+    check_type(SET, "sett", (typ.Set,))
+    check_type(SET, "sett", (set,))
+    check_type(TUPLE ,"tup", (typ.Tuple,))
+    check_type(TUPLE, "tup", (tuple,))
+    check_type(LIST, "lst", (typ.List,))
+    check_type(LIST, "lst", (list,))
+    check_type(DICT, "dct", (typ.Dict,))
+    check_type(DICT, "dct", (dict,))
+    check_num_value(NUM, "num", "==", 5)
+    check_num_value(FLOAT, "float_val", "<", 4.2)
     try:
-        check_num_value(num, "num", ">", 5)
+        check_num_value(NUM, "num", ">", 5)
     except ValueError as exc:
         print("Wrong check_num_value test successfully failed for 'num'!")
     try:
-        check_num_value(float_val, "float_val", ">=", 3.5)
+        check_num_value(FLOAT, "float_val", ">=", 3.5)
     except ValueError as exc:
         print("Wrong check_num_value test successfully failed for 'float_val'!")
     print("All tests passed !")

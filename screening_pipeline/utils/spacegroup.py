@@ -115,10 +115,8 @@ def batch_symmetrizer(
         Structure object if symmetry detection failed.
     """
     check_type(structures, "structures", (List,))
-    (
+    for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
-        for idx, struct in enumerate(structures)
-    )
     check_type(symprec, "symprec", (float,))
     check_num_value(symprec, "symprec", ">=", 0.0)
     check_type(angle_tolerance, "angle_tolerance", (float,))

@@ -262,10 +262,8 @@ def write_cif(
         workers (int):                Number of parallel processes to use.
     """
     check_file_format(filename, allowed_formats="cif")
-    (
+    for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
-        for idx, struct in enumerate(structures)
-    )
     check_type(workers, "workers", (int,))
     check_num_value(workers, "workers", ">", 0)
 

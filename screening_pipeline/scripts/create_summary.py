@@ -82,7 +82,7 @@ def main() -> None:
         indices = args.indices
     else:
         indices = sorted(args.indices)
-    
+
     outfile = os.path.join(args.input_dir, args.output)
 
 
@@ -92,15 +92,15 @@ def main() -> None:
     wanted_struct_dirs = match_struct_dirs(args.input_dir, indices)
     summary_result = []
 
-    for dir in sorted(all_struct_dirs):
+    for struct_dir in sorted(all_struct_dirs):
         summary_result.append(
             {
-                "path": dir,
-                "name": os.path.basename(dir),
-                f"{args.key_name}": (dir in wanted_struct_dirs) ^ args.reject
+                "path": struct_dir,
+                "name": os.path.basename(struct_dir),
+                f"{args.key_name}": (struct_dir in wanted_struct_dirs) ^ args.reject
             }
         )
-    
+
     with open(outfile, "wt", encoding="utf-8") as fp:
         json.dump(summary_result, fp, indent=4)
 

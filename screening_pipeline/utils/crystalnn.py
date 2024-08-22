@@ -48,10 +48,8 @@ def to_crystalnn_fingerprint(
     Returns: List[ndarray]:
         List of CrystalNN fingerprints corresponding to given structures.
     """
-    (
+    for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
-        for idx, struct in enumerate(structures)
-    )
     check_type(workers, "workers", (int,))
     check_num_value(workers, "workers", ">", 0)
 

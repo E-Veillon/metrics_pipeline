@@ -82,10 +82,8 @@ def vectors_from_alignn(
     (latent or energy representation).
     """
     check_type(structures, "structures", (List,))
-    (
+    for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
-        for idx, struct in enumerate(structures)
-    )
     check_type(batch_size, "batch_size", (int,))
     if device is not None:
         check_type(device, "device", (torch.device,))

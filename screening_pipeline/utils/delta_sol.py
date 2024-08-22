@@ -5,8 +5,9 @@
 import os
 from typing import Tuple, Dict, Union, Literal, Any
 from dataclasses import dataclass
-from tqdm.contrib.concurrent import process_map
 from enum import Enum
+from tqdm.contrib.concurrent import process_map
+
 
 # PYTHON MATERIALS GENOMICS
 from pymatgen.core import SiteCollection, Structure
@@ -74,8 +75,8 @@ class DSolStaticSet(MPRelaxSet):
         if incar_nelect is None:
             try:
                 incar_nelect = get_all_valence_electrons(structure)
-            except TypeError as exc:
-                raise ValueError("Either structure or incar_nelect must be given.") from exc
+            except TypeError as e:
+                raise ValueError("Either structure or incar_nelect must be given.") from e
 
         self.incar_nelect = incar_nelect
 
@@ -90,6 +91,7 @@ class DSolStaticSet(MPRelaxSet):
 
 
 class DSolCalc(Enum):
+    """Enum class to store possible Delta-Sol calculations."""
     NEUTRAL = 0
     BEST_PLUS = 1
     BEST_MINUS = 2
@@ -137,7 +139,7 @@ def get_dsol_struct_dir(
             os.listdir(path)
             )
         )
-    except StopIteration as exc:
+    except StopIteration as e:
         raise ValueError(
             "No structure directory found with index corresponding to given 'task-id' argument.\n"
             f"Searched directory: {path}\n"
@@ -145,7 +147,7 @@ def get_dsol_struct_dir(
             f"Corresponding structure index: {struct_idx}\n"
             f"Corresponding calculation ID: {calc_idx}\n"
             "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
-        ) from exc
+        ) from e
 
     struct_path = os.path.join(path, struct_dir)
 
@@ -246,7 +248,7 @@ def get_dsol_n_ratio(
     """
     check_type(structure, "structure", (SiteCollection,))
     check_type(n_star_idx, "n_star_idx", (int,))
-    if not (0 <= n_star_idx <= 6):
+    if not 0 <= n_star_idx <= 6:
         check_num_value(n_star_idx, "n_star_idx", ">=", 0)
         check_num_value(n_star_idx, "n_star_idx", "<=", 6)
 
@@ -431,12 +433,12 @@ if __name__ == "__main__":
     # Test for the DSolStaticSet class. You may have to change the given path
     # to one pointing at a valid CIF structure file for it to work properly.
     # You'll also need to set PMG_VASP_PSP_DIR for POTCAR files in .pmgrc.yaml.
-    test_path = "/home/elohan/screening-pipeline/screening_pipeline/_benchmarks/TiO2.cif"
-    with open(test_path, "rt", encoding="utf-8") as test_file:
+    PATHTEST = "/home/elohan/screening-pipeline/screening_pipeline/_benchmarks/TiO2.cif"
+    with open(PATHTEST, "rt", encoding="utf-8") as test_file:
         struct = CifParser(test_file).parse_structures()[0]
     dset = DSolStaticSet(struct).get_input_set()
     with open(
-        os.path.join(DSolStaticSet.base_path, "DeltaVaspInput.txt"),
+        os.path.join(os.path.dirname(PATHTEST), "DeltaVaspInput.txt"),
         mode="wt", encoding="utf-8"
     ) as out:
         out.write(str(dset))
