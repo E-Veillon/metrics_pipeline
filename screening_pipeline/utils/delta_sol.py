@@ -433,7 +433,8 @@ if __name__ == "__main__":
     # Test for the DSolStaticSet class. You may have to change the given path
     # to one pointing at a valid CIF structure file for it to work properly.
     # You'll also need to set PMG_VASP_PSP_DIR for POTCAR files in .pmgrc.yaml.
-    PATHTEST = "/home/elohan/screening-pipeline/screening_pipeline/_benchmarks/TiO2.cif"
+    file_path = ""
+    PATHTEST = os.path.join(os.path.expanduser("~"), file_path)
     with open(PATHTEST, "rt", encoding="utf-8") as test_file:
         struct = CifParser(test_file).parse_structures()[0]
     dset = DSolStaticSet(struct).get_input_set()
