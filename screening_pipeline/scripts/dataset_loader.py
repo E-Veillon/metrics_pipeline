@@ -45,7 +45,7 @@ def main() -> None:
         help=(
             "Path to JSON file in OQMD RESTful API format with at least the 'entry_id', "
             "'composition', 'natoms' and 'delta_e' fields. The data will be processed to "
-            "fit data formatting needed by stability_screening script. "
+            "fit data formatting needed by phase stability computing script. "
             "The processed data is written to a file with the same name as the one given "
             "but with a '_proc' suffix, at the same location."
         ),

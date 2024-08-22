@@ -74,7 +74,7 @@ def main():
 
     parser.add_argument(
         "run_dir",
-        help="Base directory containing structure directories.",
+        help="Base directory containing structure directories with VASP runs inside.",
     )
     parser.add_argument(
         "-r", "--reference",
