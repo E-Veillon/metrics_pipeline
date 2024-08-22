@@ -1,4 +1,4 @@
-'''Functions used in the script parturbator.py.'''
+'''Functions used in the script perturbator.py.'''
 
 
 ########################################
@@ -62,7 +62,7 @@ def cif_str_to_struct(cif_str: str) -> Structure:
     """
 
     parsed_str  = CifParser.from_str(cif_string=cif_str)
-    struct_list = parsed_str.parse_structures()
+    struct_list = parsed_str.parse_structures(primitive=False)
     structure   = struct_list[0]
     return structure
 
@@ -379,7 +379,25 @@ def _perturb_site_positions(structure: Structure, min: float, max: float) -> Str
 ########################################
 
 
-def _perturb_lattice_parameters(structure: Structure, perturbs_dict: Dict) -> Structure:
+def is_valid_lattice(lattice: Lattice) -> bool:
+    """Check whether given lattice has physically valid parameters values."""
+    a0 = 0.53 # a0 = Bohr radius, approximately equal to 0.53 angstroms.
+    min_vol = (2 * a0)**3 # Minimal cell volume of (2 * a0)^3 angstroms^3.
+    min_len = 2 * a0 # a, b, c must be superior than 2 * a0 angstroms.
+    min_angle = 5.0 # alpha, beta, gamma must be superior than 5.0 degrees.
+
+    return (
+        lattice.volume >= min_vol
+        and all([length >= min_len for length in lattice.lengths]) 
+        and all([angle >= min_angle for angle in lattice.angles])
+    )
+
+
+########################################
+
+
+def _perturb_lattice_parameters(
+        structure: Structure, perturbs_dict: Dict, retries: int = 4) -> Structure:
     """
     Perturb randomly lattice parameters of a structure.
     Perturbations are ranging between values given in 'perturbs_dict'.
@@ -406,6 +424,32 @@ def _perturb_lattice_parameters(structure: Structure, perturbs_dict: Dict) -> St
         beta=new_lattice_params["beta"],
         gamma=new_lattice_params["gamma"]
     )
+    # As the process is random, it might sometimes return an unphysical lattice.
+    # If it is the case, try to get another random perturbation which leads to
+    # physically valid values.
+    if not is_valid_lattice(new_lattice):
+        if retries > 0:
+            print(f"Unphysical lattice generated, retrying... (retries left: {retries})")
+            retries -= 1
+            return _perturb_lattice_parameters(structure, perturbs_dict, retries=retries)
+        else:
+            raise ValueError(
+                "The following structure's lattice could not be perturbed "
+                "in a physically viable way, you should check if the original "
+                "structure is physical and/or if given lattice perturbation amplitudes "
+                "makes it possible to have a physical lattice "
+                "(i.e. volume > 1.2 Angstroms^3; a, b and c > 1.06 Angstroms; "
+                "angles > 1.0 degree):\n"
+                f"{structure}\n"
+                "---Given lattice perturbation parameters---\n"
+                f"on 'a' length: {perturbs_dict['a']}\n"
+                f"on 'b' length: {perturbs_dict['b']}\n"
+                f"on 'c' length: {perturbs_dict['c']}\n"
+                f"on 'alpha' angle: {perturbs_dict['alpha']}\n"
+                f"on 'beta' angle: {perturbs_dict['beta']}\n"
+                f"on 'gamma' angle: {perturbs_dict['gamma']}\n"
+            )
+
     perturbed_struct = structure.copy()
     perturbed_struct.lattice = new_lattice
 
@@ -416,8 +460,11 @@ def _perturb_lattice_parameters(structure: Structure, perturbs_dict: Dict) -> St
 
 
 def generate_perturbed_structs(
-        structure: Structure, perturbs_dict: Dict, 
-        sample_size: int = 1, modified_lattice: bool = False
+        structure: Structure,
+        perturbs_dict: Dict[str, Union[Dict[str, float], None]], 
+        sample_size: int = 1,
+        modified_lattice: bool = False,
+        lattice_retries: int = 4
     ) -> List[Structure]:
     """
     Generate perturbed structures from a reference.
@@ -425,13 +472,19 @@ def generate_perturbed_structs(
     Parameters:
         structure (Structure):      A reference structure to perturb.
 
-        perturbs_dict (Dict):       A dict containing min and max boundaries of perturbation for each
-                                    structure parameter ("sites", "a", "b", "c", "alpha", "beta", "gamma").
+        perturbs_dict (Dict):       A dict containing min and max boundaries of
+                                    perturbation for each structure parameter
+                                    ("sites", "a", "b", "c", "alpha", "beta", "gamma").
         
-        sample_size (int):          How many perturbed structures should be generated for each input structure.
-                                    Defaults to 1.
+        sample_size (int):          Number of perturbed structures should be
+                                    generated for each input structure. Defaults to 1.
         
-        modified_lattice (bool):    Whether lattice parameters should be perturbed. Defaults to False.
+        modified_lattice (bool):    Whether lattice parameters should be perturbed.
+                                    Defaults to False.
+
+        lattice_retries (int):      Number of times the lattice perturbations
+                                    can be retried when they result in an unphysical
+                                    lattice before raising an error. Defaults to 4.
         
         Returns:
             The list of generated structures.
@@ -465,12 +518,14 @@ def generate_perturbed_structs(
         if modified_lattice and perturbed_struct is not None:
             perturbed_struct = _perturb_lattice_parameters(
                 structure=perturbed_struct,
-                perturbs_dict=perturbs_dict
+                perturbs_dict=perturbs_dict,
+                retries=lattice_retries
             )
         elif modified_lattice and perturbed_struct is None:
             perturbed_struct = _perturb_lattice_parameters(
                 structure=structure,
-                perturbs_dict=perturbs_dict
+                perturbs_dict=perturbs_dict,
+                retries=lattice_retries
             )
 
         # Addition du résultat à la liste
@@ -487,21 +542,36 @@ def generate_perturbed_structs(
 
 
 def batch_generate_perturbed_structs(
-        structures: Sequence[Structure], perturbs_dict: Dict, workers: int = 1, **kwargs
+        structures: Sequence[Structure],
+        perturbs_dict: Dict[str, Union[Dict[str, float], None]],
+        sample_size: int = 1,
+        modified_lattice: bool = False,
+        lattice_retries: int = 4,
+        workers: int = 1
     ) -> List[Structure]:
     """
     Parallelized version of generate_perturbed_structs() designed for a batch of structures.
     
     Parameters:
-        structures ([Structure]): A sequence of structures to perturb.
+        structures ([Structure]):   A sequence of structures to perturb.
 
-        perturbs_dict (Dict): A dict containing min and max boundaries of perturbation for each
-            structure parameter ("sites", "a", "b", "c", "alpha", "beta", "gamma").
-
-        workers (int): Number of parallel processes to spawn.
-
-        **kwargs: Other arguments supported by generate_perturbed_structs().
+        perturbs_dict (Dict):       A dict containing min and max boundaries of
+                                    perturbation for each structure parameter
+                                    ("sites", "a", "b", "c", "alpha", "beta", "gamma").
         
+        sample_size (int):          Number of perturbed structures that should be
+                                    generated for each input structure. Defaults to 1.
+        
+        modified_lattice (bool):    Whether lattice parameters should be perturbed.
+                                    Defaults to False.
+
+        lattice_retries (int):      Number of times the lattice perturbations
+                                    can be retried when they result in an unphysical
+                                    lattice before raising an error. Defaults to 4.
+        
+        workers (int):              Number of parallel processes to spawn.
+                                    Defaults to 1.
+
         Returns:
             The list of all generated structures.
     """
@@ -512,15 +582,12 @@ def batch_generate_perturbed_structs(
     )
     assert isinstance(perturbs_dict, Dict), "'perturbs_dict' argument value must be a dict."
     assert workers >= 1, "'workers' argument value must be strictly positive."
-    
-    sample_size = kwargs.pop("sample_size", 1)
-    modified_lattice = kwargs.pop("modified_lattice", False)
-    
+
     nbr_structs = len(structures)
     chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
     perturb_setup = partial(generate_perturbed_structs,
         perturbs_dict=perturbs_dict, sample_size=sample_size, 
-        modified_lattice=modified_lattice
+        modified_lattice=modified_lattice, lattice_retries=lattice_retries
     )
 
     perturbed_structs = flatten(

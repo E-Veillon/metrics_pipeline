@@ -1,4 +1,8 @@
-from pymatgen.core import Structure, Element
+#!/usr/bin/python
+"""Functions to compute vectors using a pretrained ALIGNN model."""
+
+
+from typing import List, Literal, Optional
 import numpy as np
 import torch
 from torch_geometric.data import Dataset
@@ -6,14 +10,29 @@ from materials_toolkit.data import StructureData, StructureLoader, collate
 from materials_toolkit.models.alignn import get_pretrained_alignn
 import tqdm
 
-from typing import List,Literal
+# PYTHON MATERIALS GENOMICS
+from pymatgen.core import Structure, Element
+
+# LOCAL IMPORTS
+from .common_asserts import check_type
+
+
+########################################
 
 
 def _species_to_tensor(elements: List[Element]):
+    """Convert Element objects to a Tensor containing their atomic numbers."""
     return torch.tensor([e.Z for e in elements], dtype=torch.long)
 
 
+########################################
+
+
 class StructuresDataset(Dataset):
+    """
+    A class to store several structures data
+    and extract them into StructureData objects.
+    """
     data_class = StructureData
 
     def __init__(self, structures: List[Structure]):
@@ -32,9 +51,11 @@ class StructuresDataset(Dataset):
         self.cell = [cell for _, _, cell in data]
 
     def len(self) -> int:
+        """Number of structures in the instance."""
         return len(self.cell)
 
     def get(self, idx: int | torch.LongTensor) -> StructureData:
+        """Extract structures data from indices."""
         if isinstance(idx, torch.LongTensor):
             return collate(
                 [
@@ -45,15 +66,31 @@ class StructuresDataset(Dataset):
         return StructureData(z=self.z[idx], pos=self.x[idx], cell=self.cell[idx])
 
 
+########################################
+
+
 @torch.no_grad
 def vectors_from_alignn(
     structures: List[Structure],
     batch_size: int = 128,
-    device: torch.device = None,
-    model_name: str = "mp_e_form_alignn",
-    output: Literal["latent","energy"]="latent"
+    device: Optional[torch.device] = None,
+    model_name: str = "mp/e_form",
+    output: Literal["latent","energy"] = "latent"
 ) -> np.ndarray:
-    assert output in ("latent","energy")
+    """
+    Computes vector representation of structures with ALIGNN
+    (latent or energy representation).
+    """
+    check_type(structures, "structures", (List,))
+    (
+        check_type(struct, f"structures[{idx}]", (Structure,))
+        for idx, struct in enumerate(structures)
+    )
+    check_type(batch_size, "batch_size", (int,))
+    if device is not None:
+        check_type(device, "device", (torch.device,))
+    check_type(model_name, "model_name", (str,))
+    assert output in {"latent", "energy"}
 
     if device is None:
         if torch.cuda.is_available():
@@ -66,10 +103,18 @@ def vectors_from_alignn(
     dataset = StructuresDataset(structures)
     loader = StructureLoader(dataset, batch_size=batch_size)
     latent = []
+
+    def is_latent(output: str) -> bool:
+        """True if 'output' == "latent"."""
+        return output == "latent"
+
     for batch in tqdm.tqdm(loader):
         batch = batch.to(device)
         batch.build_graph(knn=12)
         batch.build_tripets()
-        latent.append(alignn(batch, latent=(output=="latent")).detach())
+        latent.append(alignn(batch, latent=is_latent(output)).detach())
 
     return torch.cat(latent).numpy()
+
+
+########################################

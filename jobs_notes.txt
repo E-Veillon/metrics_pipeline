@@ -1,0 +1,315 @@
+===== Jobs de la pipeline lancés à partir du 01/07/2024 (Dernière MàJ: 19/07/2024 11:43) =====
+
+diffcsp_oqmd:
+job preproc_val: 266219 (1024 structures)
+- 1022/1024 valides
+- 2/1024 non-valides
+
+job preproc_uniq: 266317 (1024 structures)
+- 1013/1024 uniques
+- 11/1024 non-uniques
+
+job preproc_for_vasp: 266415 (1024 structures)
+- 1011/1024 valides et uniques
+- 13/1024 non-valides et/ou non-uniques
+
+jobs statics initiaux: 309107_[0-2] et 309637_[3-1010] (walltime = 6h, NELM = 100)
+- Total convergés: 1005/1011
+- Timeout (6h): aucun
+- NotConv (100): 308, 938 (total: 2)
+- Erreurs VASP: (total: 1)
+	* Inconsistent Bravais lattice (SymError): 368
+- Autres Erreurs: (total: 3)
+	* Out of Memory (OoM): 171, 179, 774
+
+job static étendu (Timeout/NotConv): 415618_[308,938] (walltime = 20h, NELM = 200)
+- Total convergés: 1/2
+- Timeout (20h): aucun
+- NotConv (200): 938 (total: 1)
+- Erreurs VASP: aucun
+- Autres Erreurs: aucun
+
+job static rerun (Out of Memory): {zeus}_[171,179,774] (walltime = 20h, NELM = 200)
+- Total convergés: 0/3
+- Timeout (20h): aucun
+- NotConv (200): aucun
+- Erreurs VASP: aucune
+- Autres Erreurs: 
+	* Out of Memory (OoM): 171, 179, 774 (insolvable)
+
+job phase_diag: 596741 (walltime = 6h, cpus_per_task = 4)
+- Result: terminated normally (written at ~/scratch_kah/Batch_diffcsp_oqmd/SUN_Statics/summary.json)
+
+job relax initial: 637825_[0-63] (walltime = 48h, NSW = 99, NELM = 100)
+- Total convergés: 62/64
+- Timeout (20h): aucun
+- NotConv (200): 32, 58 (total: 2)
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job metrics: 813887 (walltime = 48h, cpus_per_task = 12)
+- Result: running...
+
+----------
+
+diffcsp_mp:
+job preproc_val: 266232 (1024 structures)
+- 974/1024 valides
+- 50/1024 non-valides
+
+job preproc_uniq: 266311 (1024 structures)
+- 1023/1024 uniques
+- 1/1024 non-uniques
+
+job preproc_for_vasp: 266424 (1024 structures)
+- 973/1024 valides et uniques
+- 51/1024 non-valides et/ou non-uniques
+
+job static initial: 309666_[0-972] (walltime = 6h, NELM = 100)
+- Total convergés: 927/973 (preprocess: 51/1024 non-valides et/ou non-uniques)
+- Timeout (6h): 128,129,756-763,767,769,774-778,785,788,789,792-797 (total: 26)
+- NotConv (100): 141,249,513,611,702,751-753,787,904,971 (total: 11)
+- Erreurs VASP: (total: 6)
+	* Call to ZHEGV failed (DiagError): 764, 768, 780, 784
+	* Inconsistent Bravais lattice (SymError): 779, 791
+- Autres Erreurs: (total: 4)
+	* Out of Memory (OoM): 13, 783, 786, 790
+
+job static étendu (Timeout/NotConv): 499830_[26TO+11NC] (walltime = 20h, NELM = 200)
+- Total convergés: 9/37
+- Timeout (20h): 128, 129, 756-762, 767, 769, 777, 778, 788, 789, 792-797 (total: 21)
+- NotConv (200): 751, 752, 763, 774, 785, 787 (total: 6)
+- Erreurs VASP: aucune
+- Autres Erreurs: (total: 1)
+	* Out of Memory (OoM): 776
+
+job static rerun (Out of Memory): {zeus}_[13,776,783,786,790] (walltime = 20h, NELM = 200)
+- Total convergés: 0/5
+- Timeout (20h): aucun
+- NotConv (200): aucun
+- Erreurs VASP: aucune
+- Autres Erreurs:
+	* Out of Memory (OoM): 13, 776, 783, 786, 790 (insolvable)
+
+job phase_diag: 597643 (walltime = 6h, cpus_per_task = 4)
+- Result: timeout (6h)
+=> rerun job 631681 (walltime = 20h, cpus_per_task = 8)
+- Result: timeout (20h)
+=> rerun job 676875 (walltime = 48h, cpus_per_task = 8)
+- Result: timeout (48h)
+=> debug run 710099 (walltime = 12h, cpus_per_task = 8, verbose = True)
+- Result: stopped
+=> debugged locally (warning for structures of dim > 10)
+
+job relax initial: 769932_[0-12,14-64] (walltime = 48h, NSW = 99, NELM = 100)
+- Total convergés: 63/64 (running...)
+- Timeout (20h): aucun
+- NotConv (200): 37 (total: 1)
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job metrics: ...... (walltime = 48h, cpus_per_task = 12)
+- Result: ...
+
+----------
+
+gemsdiff_oqmd:
+job preproc_val: 327701 (1024 structures)
+- 1010/1024 valides
+- 14/1024 non-valides
+
+job preproc_uniq: 327751 (1024 structures)
+- 1014/1024 uniques
+- 10/1024 non-uniques
+
+job preproc_for_vasp: 327810 (1024 structures)
+- 1000/1024 valides et uniques
+- 24/1024 non-valides et/ou non-uniques
+
+job static initial: 342015_[0-999] (walltime = 6h, NELM = 100)
+- Total convergés: 926/1000
+- Timeout (6h): 407 (total: 1)
+- NotConv (100): 924 (total: 1)
+- Erreurs VASP: (total: 62)
+	* Inconsistent Bravais lattice (SymError): 4, 18, 24, 28, 33, 51, 55, 70, 74, 77, 89, 99, 122, 131, 169, 175, 182, 209, 222, 263, 268, 289, 308, 345, 361, 373, 374, 379, 426, 438, 446, 474, 515, 531, 537, 564, 599-601, 622, 635, 640, 667, 673, 677, 688, 724, 727, 734, 736, 759, 833, 852, 878, 887, 906, 922, 926, 933, 938, 950, 978
+- Autres Erreurs: (total: 10)
+	* MPI_init_thread: 843, 848, 851, 855, 862, 865, 869, 885, 893, 899
+
+job static étendu (Timeout/NotConv): 508218_[407,924] (walltime = 20h, NELM = 200)
+- Total convergés: 2/2
+- Timeout (6h): aucun
+- NotConv (100): aucun
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job statique rerun (MPI_init_thread): 520270_[843,848,851,855,862,865,869,885,893,899] (walltime = 20h, NELM = 200)
+- Total convergés: 10/10
+- Timeout (6h): aucun
+- NotConv (100): aucun
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job phase_diag: 597638 (walltime = 6h, cpus_per_task = 4)
+- Result: terminated normally (written at ~/scratch_kah/Batch_gemsdiff_oqmd/SUN_Statics/summary.json)
+
+job relax initial: 732003_[0-3,5-17,19-23,25-27,29-32,34-50,52-54,56-69,71] (walltime = 48h, NSW = 99, NELM = 100)
+- Total convergés: 63/64
+- Timeout (48h): aucun
+- NotConv (99): 17 (total: 1)
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job metrics: ...... (walltime = 48h, cpus_per_task = 12)
+- Result: ...
+
+----------
+
+gemsdiff_mp:
+job preproc_val: 327676 (1024 structures)
+- 1015/1024 valides
+- 9/1024 non-valides
+
+job preproc_uniq: 327681 (1024 structures)
+- 1024/1024 uniques
+- 0/1024 non-uniques
+
+job preproc_for_vasp: 327689 (1024 structures)
+- 1015/1024 valides et uniques
+- 9/1024 non-valides et/ou non-uniques
+
+job static initial: 341993_[0-1014] (walltime = 6h, NELM = 100)
+- Total convergés: 998/1015
+- Timeout (6h): 595, 643, 701, 809, 834 (total: 5)
+- NotConv (100): 659, 660, 739 (total: 3)
+- Erreurs VASP: (total: 7)
+	* Inconsistent Bravais lattice (SymError): 108, 166, 266, 605, 826, 962, 1006
+- Autres Erreurs: (total: 2)
+	* MPI_init_thread: 14, 16
+
+job static étendu (Timeout/NotConv): 508297_[595,643,659,660,701,739,809,834] (walltime = 20h, NELM = 200)
+- Total convergés: 6/8
+- Timeout (6h): aucun
+- NotConv (100): 660, 739 (total: 2)
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job static rerun (MPI_init_thread): 520293_[14,16] (walltime = 20h, NELM = 200)
+- Total convergés: 2/2
+- Timeout (6h): aucun
+- NotConv (100): aucun
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job phase_diag: 597644 (walltime = 6h, cpus_per_task = 4)
+- Result: terminated normally (written at ~/scratch_kah/Batch_gemsdiff_mp/SUN_Statics/summary.json)
+
+job relax initial: 731232_[0-63] (walltime = 48h, NSW = 99, NELM = 100)
+- Total convergés: 62/64
+- Timeout (48h): aucun
+- NotConv (99): 7, 45 (total: 2)
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job metrics: ...... (walltime = 48h, cpus_per_task = 12)
+- Result: ...
+
+----------
+
+cdvae_oqmd:
+job preproc_val: 327706 (1024 structures)
+- 1023/1024 valides
+- 1/1024 non-valides
+
+job preproc_uniq: 327728 (1024 structures)
+- 1023/1024 uniques
+- 1/1024 non-uniques
+
+job preproc_for_vasp: 327815 (1024 structures)
+- 1022/1024 valides et uniques
+- 2/1024 non-valides et/ou non-uniques
+
+job static initial: 379117_[0-1021] (walltime = 6h, NELM = 100)
+- Total convergés: 1021/1022
+- Timeout (6h): aucun
+- NotConv (100): 648 (total: 1)
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job static étendu (Timeout/NotConv): 508459_[648] (walltime = 20h, NELM = 200)
+- Total convergés: 1/1
+- Timeout (6h): aucun
+- NotConv (100): aucun
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job phase_diag: 597641 (walltime = 6h, cpus_per_task = 4)
+- Result: timeout (6h)
+=> rerun job 631689 (walltime = 20h, cpus_per_task = 8)
+- Result: timeout (20h)
+=> rerun job 676878 (walltime = 48h, cpus_per_task = 8)
+- Result: timeout (48h)
+=> debug rerun job 717456 (walltime = 12h, cpus_per_task = 8, verbose = True)
+- Result: stopped
+=> debugged locally (warning for structures of dim > 10)
+
+job relax initial: 769923_[0-57,59-64] (walltime = 48h, NSW = 99, NELM = 100)
+- Total convergés: 64/64
+- Timeout (48h): aucun
+- NotConv (99): aucun
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job metrics: ...... (walltime = 48h, cpus_per_task = 12)
+- Result: ...
+
+----------
+
+cdvae_mp:
+job preproc_val: 327710 (1024 structures)
+- 1024/1024 valides
+- 0/1024 non-valides
+
+job preproc_uniq: 327723 (1024 structures)
+- 1023/1024 uniques
+- 1/1024 non-uniques
+
+job preproc_for_vasp: 327818 (1024 structures)
+- 1023/1024 valides et uniques
+- 1/1024 non-valides et/ou non-uniques
+
+job static initial: 378832_[0-1022] (walltime = 6h, NELM = 100)
+- Total convergés: 1020/1023
+- Timeout (6h): aucun
+- NotConv (100): 13, 457, 819 (total: 3)
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job static étendu (Timeout/NotConv): 508473_[13,457,819] (walltime = 20h, NELM = 200)
+- Total convergés: 3/3
+- Timeout (6h): aucun
+- NotConv (100): aucun
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job phase_diag: 597646 (walltime = 6h, cpus_per_task = 4)
+- Result: Out of Memory Error
+=> rerun job 631687 (walltime = 20h, cpus_per_task = 8)
+- Result: timeout (20h)
+=> rerun job 676876 (walltime = 48h, cpus_per_task = 8)
+- Result: timeout (48h)
+=> debug rerun job 710297 (walltime = 12h, cpus_per_task = 8, verbose = True)
+- Result: stopped
+=> debugged locally (warning for structures of dim > 10)
+
+job relax initial: 769930_[0-63] (walltime = 48h, NSW = 99, NELM = 100)
+- Total convergés: 64/64
+- Timeout (48h): aucun
+- NotConv (99): aucun
+- Erreurs VASP: aucune
+- Autres Erreurs: aucune
+
+job metrics: ...... (walltime = 48h, cpus_per_task = 12)
+- Result: ...
+
+===== Infos de jobs à trier =====
+

@@ -1,10 +1,16 @@
-import torch
-import torch.nn.functional as F
-from torch_scatter import scatter_mean
-from pymatgen.core import Structure
-import numpy as np
+#!/usr/bin/python
+"""Functions to compute Root Mean Square Displacement between Structures."""
+
 
 from typing import Tuple, List
+import torch
+#import torch.nn.functional as F
+from torch_scatter import scatter_mean
+import numpy as np
+
+# PYHTON MATERIALS GENOMICS
+from pymatgen.core import Structure
+
 
 offset_range = torch.arange(-5, 6, dtype=torch.float32)
 offsets = torch.stack(
@@ -18,6 +24,7 @@ def _get_shortest_paths(
     x_dst: torch.FloatTensor,
     num_atoms: torch.LongTensor,
 ) -> Tuple[torch.LongTensor, torch.FloatTensor]:
+
     idx = torch.arange(num_atoms.shape[0], dtype=torch.long, device=num_atoms.device)
     batch = idx.repeat_interleave(num_atoms)
 
@@ -47,7 +54,7 @@ def _center_around_zero(x: torch.FloatTensor) -> torch.FloatTensor:
     return (x + 0.5) % 1.0 + 0.5
 
 
-def polar(a: torch.FloatTensor) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
+def _polar(a: torch.FloatTensor) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
     w, s, vh = torch.linalg.svd(a)
     u = w @ vh
     return u, (vh.mT.conj() * s[:, None, :]) @ vh
@@ -60,12 +67,13 @@ def rmsd(
     x_dst: torch.FloatTensor,
     num_atoms: torch.LongTensor,
 ) -> torch.FloatTensor:
+    """Compute RMSD between two structures."""
     batch_atoms = torch.arange(cell_src.shape[0], dtype=torch.long).repeat_interleave(
         num_atoms
     )
 
-    _, cell_src = polar(cell_src)
-    _, cell_dst = polar(cell_dst)
+    _, cell_src = _polar(cell_src)
+    _, cell_dst = _polar(cell_dst)
     x_src = _center_around_zero(x_src)
     x_dst = _center_around_zero(x_dst)
 
@@ -76,24 +84,34 @@ def rmsd(
 
     avg_path = scatter_mean(paths, batch_atoms, dim=0, dim_size=num_atoms.shape[0])
 
-    distance = (paths - avg_path[batch_atoms]).norm(dim=1)
+    distance = (paths - avg_path[batch_atoms]).pow(2).sum(dim=1)
 
-    return scatter_mean(distance, batch_atoms, dim=0, dim_size=num_atoms.shape[0])
+    return scatter_mean(
+        distance, batch_atoms, dim=0, dim_size=num_atoms.shape[0]
+    ).sqrt()
 
 
 def rmsd_from_structures(
     struct1: List[Structure], struct2: List[Structure]
 ) -> np.ndarray:
+    """
+    Computes RMSD of each given pair of structure (pairing by index matching),
+    and returns all results in a single array.
+    """
     num_atoms = torch.tensor([len(s) for s in struct1], dtype=torch.long)
 
     assert (
         num_atoms == torch.tensor([len(s) for s in struct2], dtype=torch.long)
     ).all()
 
-    x_src = torch.tensor([s.frac_coords for s in struct1], dtype=torch.long)
-    cell_src = torch.tensor([s.lattice.matrix for s in struct1], dtype=torch.long)
+    x_src = torch.cat(
+        [torch.tensor(s.frac_coords, dtype=torch.float32) for s in struct1], dim=0
+    )
+    cell_src = torch.tensor([s.lattice.matrix for s in struct1], dtype=torch.float32)
 
-    x_dst = torch.tensor([s.frac_coords for s in struct2], dtype=torch.long)
-    cell_dst = torch.tensor([s.lattice.matrix for s in struct2], dtype=torch.long)
+    x_dst = torch.cat(
+        [torch.tensor(s.frac_coords, dtype=torch.float32) for s in struct2], dim=0
+    )
+    cell_dst = torch.tensor([s.lattice.matrix for s in struct2], dtype=torch.float32)
 
     return rmsd(cell_src, x_src, cell_dst, x_dst, num_atoms).numpy()

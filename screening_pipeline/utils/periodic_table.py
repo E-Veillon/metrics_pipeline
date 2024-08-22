@@ -1,35 +1,24 @@
-'''
+#!/usr/bin/python
+"""
 Functions relative to Periodic Table's (PT) elements properties.
-'''
+"""
 
 
-########################################
-# TYPE HINTING
-
-from typing import Union, Iterable, List, Tuple, Literal, Sequence
-
-########################################
-# OPTIMIZATION MODULES
-
-import sys
 import re
 from itertools import filterfalse
+from typing import Union, List, Tuple, Literal, Sequence
 
-########################################
-# PYTHON MATERIAL GENOMICS PACKAGE
-
-from pymatgen.core.structure import SiteCollection, Composition
-from pymatgen.core.periodic_table import Element
+# PYTHON MATERIAL GENOMICS
+from pymatgen.core import SiteCollection, Composition, Element
 from pymatgen.io.cif import CifBlock
 
-########################################
-# LOCAL MODULES
+# LOCAL IMPORTS
+from .common_asserts import check_type
+from .custom_types import FormulaLike
 
-#from screening_pipeline.utils.fitted_values import EL_PER_XC_VOL
-from screening_pipeline.utils.custom_types import FormulaLike
 
 ########################################
-# LOCAL FUNCTIONS
+
 
 def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
     """
@@ -41,38 +30,48 @@ def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
     Returns:
         bool: True if the formula contains rare gases, False otherwise.
     """
-
-    assert isinstance(structure, (SiteCollection, str))
+    check_type(structure, "structure", (SiteCollection, str))
 
     if isinstance(structure, SiteCollection):
         return structure.composition.contains_element_type("noble_gas")
 
     return re.search(r"(He|Ne|Ar|Kr|Xe|Rn|Og)", structure) is not None
 
+
+########################################
+
+
 def discard_rare_gas_structures(
-        structures: Iterable[Union[SiteCollection, str]]
+        structures: Sequence[Union[SiteCollection, str]]
     ) -> Tuple[List[Union[SiteCollection, str]], int]:
-    '''
+    """
     Eliminates structures containing rare gases and counts the number eliminated.
 
     Parameters:
-        structures (Iterable[SiteCollection | str]]): the structure data to scan.
+        structures ([SiteCollection | str]): the structure data to scan.
     
     Returns:
         List[Union[SiteCollection, str]]: The list of data not containing rare gases.
         Int: The number of structures discarded.
-    '''
-
-    assert isinstance(structures, Iterable), \
-    f"Provided 'structures' argument is not iterable (got {type(structures)} instead)."
+    """
+    check_type(structures, "structures", (Sequence,))
+    (
+        check_type(struct, f"structures[{idx}]", (SiteCollection, str))
+        for idx, struct in enumerate(structures)
+    )
 
     structures = list(structures)
-    if not len(structures): return [], 0
+    if not structures:
+        return [], 0
 
     nbr_discarded = len(list(filter(has_rare_gas, structures)))
     kept_structs  = list(filterfalse(has_rare_gas, structures))
 
     return kept_structs, nbr_discarded
+
+
+########################################
+
 
 def has_rare_earth(structure: Union[SiteCollection, str]) -> bool:
     """
@@ -84,47 +83,55 @@ def has_rare_earth(structure: Union[SiteCollection, str]) -> bool:
     Returns:
         bool: True if the formula contains rare earth, False otherwise.
     """
-
-    assert isinstance(structure, (SiteCollection, str))
+    check_type(structure, "structure", (SiteCollection, str))
 
     if isinstance(structure, SiteCollection):
         return structure.composition.contains_element_type("f-block")
-    
+
     elts_grps_list = get_all_elements_groups(structure)
-    has_lanthanoid = 'L' in elts_grps_list
-    has_actinoid   = 'A' in elts_grps_list
+    has_lanthanoid = "L" in elts_grps_list
+    has_actinoid   = "A" in elts_grps_list
 
     return has_lanthanoid or has_actinoid
 
+
+########################################
+
+
 def discard_rare_earth_structures(
-        structures: Iterable[Union[SiteCollection, str]]
+        structures: Sequence[Union[SiteCollection, str]]
     ) -> Tuple[List[Union[SiteCollection, str]], int]:
-    '''
+    """
     Eliminates structures containing rare earth elements and counts the number eliminated.
 
     Parameters:
-        structures (Iterable[SiteCollection | str]]): the structure data to scan.
+        structures ([SiteCollection | str]): the structure data to scan.
     
     Returns:
         List[Union[SiteCollection, str]]: The list of data not containing rare earth elements.
         Int: The number of structures discarded.
-    '''
-
-    assert isinstance(structures, Iterable), \
-    f"Provided 'structures' argument is not iterable (got {type(structures)} instead)."
+    """
+    check_type(structures, "structures", (Sequence,))
+    (
+        check_type(struct, f"structures[{idx}]", (SiteCollection, str))
+        for idx, struct in enumerate(structures)
+    )
 
     structures = list(structures)
-    if not len(structures): return [], 0
+    if not structures:
+        return [], 0
 
     nbr_discarded = len(list(filter(has_rare_earth, structures)))
     kept_structs  = list(filterfalse(has_rare_earth, structures))
-    
+
     return kept_structs, nbr_discarded
 
-def get_elements(
-        elts_data: Union[str, Sequence[Union[str,int,Element]]]
-    ) -> List[Element]:
-    '''
+
+########################################
+
+
+def get_elements(elts_data: FormulaLike) -> List[Element]:
+    """
     Flexible converter to get a list of unique Element objects from a single string or any 
     iterable providing valid element symbols, atomic numbers, Element objects, or a mixture 
     of the three.
@@ -132,9 +139,9 @@ def get_elements(
     Parameters:
         elts_data (str|[str|int|Element]):  The data to parse Elements objects from.
                                             If a single string is provided, it can either 
-                                            be a raw formula (eg. 'FePO4') or a composition 
+                                            be a raw formula (eg. "FePO4") or a composition 
                                             string containing element symbols separated by 
-                                            '-' (eg. 'Fe-P-O').
+                                            "-" (eg. "Fe-P-O").
                                             If an iterable is given, it can contain valid 
                                             element symbols, atomic numbers and/or Element 
                                             objects.
@@ -144,25 +151,30 @@ def get_elements(
 
     Returns: 
         A list of parsed Element objects.
-    '''
-
-    assert isinstance(elts_data, Iterable), \
-    f"Provided 'elts_data' argument is not iterable (got {type(elts_data)} instead)."
+    """
+    check_type(elts_data, "elts_data", (str, Sequence))
 
     if isinstance(elts_data, str):
-        elts_list = Composition(''.join(elts_data.split(sep='-')), strict=True).elements
-    
+        elts_list = Composition("".join(elts_data.split(sep="-")), strict=True).elements
+
     else:
-        assert all([isinstance(elt, (str, int, Element)) for elt in elts_data])
+        (
+            check_type(data, f"elts_data[{idx}]", (str, int, Element))
+            for idx, data in enumerate(elts_data)
+        )
         elts_list = Composition([(elt, 1) for elt in elts_data], strict=True).elements
 
     return elts_list
 
+
+########################################
+
+
 def get_elemental_subsets(
-        main_elts_set: FormulaLike, 
+        main_elts_set: FormulaLike,
         elts_subsets: Sequence[FormulaLike]
     ) -> List[str]:
-    '''
+    """
     Flexible function to extract all formulas from a given sequence that are fully made 
     of same elements as the given main formula. The atomic fractions are not taken into 
     account, only presence and absence of the elements are checked.
@@ -177,61 +189,94 @@ def get_elemental_subsets(
                 
     Returns:
         List of the formulas fully included in the main one.
-    '''
-    
+    """
+    check_type(elts_subsets, "elts_subsets", (str, Sequence))
+    (
+        check_type(data, f"elts_data[{idx}]", (str, int, Element))
+        for idx, data in enumerate(elts_subsets)
+    )
     ref_elts = get_elements(main_elts_set)
 
     sub_pd_list = list(filter(
-        lambda pd_elts: all([elt in ref_elts for elt in get_elements(pd_elts)]), 
+        lambda pd_elts: all(elt in ref_elts for elt in get_elements(pd_elts)),
         elts_subsets
     ))
 
     return sub_pd_list
 
+
+########################################
+
+
 def get_element_group(
-        atom: Union[Element, str], 
-        return_type: Literal['int', 'str'] = 'str'
+        atom: Union[Element, str],
+        return_type: Literal["int", "str"] = "str"
     ) -> Union[int, str]:
-    '''
+    """
     Finds the Periodic Table group of an element given as a string or Element object.
 
     Parameters:
         atom (str|Element):         The element to find the group for.
 
-        return_type ('int'|'str'):  Whether to return the group number as an int
-                                    (from 1 to 18, returns, 19 for Lanthanides and
+        return_type ("int"|"str"):  Whether to return the group number as an int
+                                    (from 1 to 18, returns 19 for Lanthanides and
                                     20 for Actinides), or as a str representing the 
-                                    group relative to electronic structure ('S1', 
-                                    'S2', then from 'D1' to 'D10', then from 'P1' 
-                                    to 'P6', 'L' for Lanthanides and 'A' for Actinides).
+                                    group relative to electronic structure ("S1", 
+                                    "S2", then from "D1" to "D10", then from "P1" 
+                                    to "P6", "L" for Lanthanides and "A" for Actinides).
     
     Returns:
-        int|str:    For return_type = 'str', the group of the element in 
-                    '[block][group number in block]' format, e.g. for Fe it will return 'D6'.
+        int|str:    For return_type = "str", the group of the element in 
+                    "[block][group number in block]" format, e.g. for Fe it will return "D6".
                     For f-block elements, a lone letter will be returned, as Δ-Sol method
                     is not usable for these at the moment.
-                    For return_type = 'int', the number of the group of the element, 
+                    For return_type = "int", the number of the group of the element, 
                     Lanthanides considered in "group 19" and Actinides in "group 20" as to
                     have a unique return for each group of elements, even if according to 
                     periodic table the best classification should be group 3 for both.
-    '''
+    """
+    check_type(atom, "atom", (str, Element))
+    assert return_type in {"str", "int"}
 
-    assert return_type == 'str' or return_type == 'int'
+    try:
+        atom = Element(atom)
+    except ValueError as exc:
+        raise ValueError(
+            f"'atom' arg value '{atom}' is not recognized as an element."
+        ) from exc
 
-    try: atom = Element(atom)
-    except TypeError:
-        sys.exit(f"Provided 'atom' argument should be a str or Element, got {type(atom)} instead.")
-    except ValueError:
-        sys.exit(f'Provided str ({atom}) is not recognized as an element.')
+    match atom.block:
+        case "s":
+            return (
+                (atom.block.upper() + str(atom.group))
+                if return_type == "str" else atom.group
+            )
+        case "p":
+            return (
+                (atom.block.upper() + str(atom.group - 12))
+                if return_type == "str" else atom.group
+            )
+        case "d":
+            return (
+                (atom.block.upper() + str(atom.group - 2))
+                if return_type == "str" else atom.group
+            )
+        case "f":
+            return (
+                ("L" if return_type == "str" else 19) if atom.row == 6
+                else ("A" if return_type == "str" else 20)
+            )
+        case _:
+            raise NotImplementedError(
+                f"{atom.block}: Unrecognized Periodic Table block."
+            )
 
-    if atom.block == 's': return ((atom.block.upper() + str(atom.group)) if return_type == 'str' else atom.group)
-    elif atom.block == 'p': return ((atom.block.upper() + str(atom.group - 12)) if return_type == 'str' else atom.group)
-    elif atom.block == 'd': return ((atom.block.upper() + str(atom.group - 2)) if return_type == 'str' else atom.group)
-    elif atom.block == 'f': return (('L' if return_type == 'str' else 19) if atom.row == 6 else ('A' if return_type == 'str' else 20))
-    else: return None
+
+########################################
+
 
 def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
-    '''
+    """
     Finds PT group of each element contained in a structure.
     Provided structure can either be a pymatgen SiteCollection object,
     or a CIF formatted string containing a structural formula.
@@ -240,18 +285,16 @@ def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
         formula (SiteCollection|str): The structure to search element groups in.
     
     Returns:
-        List[str]:  The group of each element in '[block][group number in block]' format,
-                    e.g. for Fe it will return 'D6', in a list.
+        List[str]:  The group of each element in "[block][group number in block]" format,
+                    e.g. for Fe it will return "D6", in a list.
                     For f-block elements, a lone letter will be returned, as Δ-Sol method
                     is not usable for these at the moment.
-    '''
-
-    assert isinstance(structure, (SiteCollection, str)), \
-    'Provided structure must be a SiteCollection object or a CIF string'
+    """
+    check_type(structure, "structure", (SiteCollection, str))
 
     if isinstance(structure, SiteCollection):
         elts_list = list(structure.composition.keys())
-    
+
     elif isinstance(structure, str):
         formula   = CifBlock.from_str(structure).data["_chemical_formula_structural"]
         comp      = Composition(formula)
@@ -260,8 +303,12 @@ def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
     grps_list = list(map(get_element_group, elts_list))
     return grps_list
 
+
+########################################
+
+
 def get_element_valence_electrons(atom: Union[str,Element]) -> int:
-    '''
+    """
     Gets the number of valence electrons of an element according to its group.
 
     Parameters:
@@ -269,29 +316,32 @@ def get_element_valence_electrons(atom: Union[str,Element]) -> int:
     
     Returns:
         int: The number of valence electrons corresponding to the element's group.
-    '''
-    group = get_element_group(atom)
-    if group == 'S1': return 1
-    if group == 'S2': return 2
-    if group == 'D1' or group == 'P1': return 3
-    if group == 'D2' or group == 'P2': return 4
-    if group == 'D3' or group == 'P3': return 5
-    if group == 'D4' or group == 'P4': return 6
-    if group == 'D5' or group == 'P5': return 7
-    if group == 'D6' or group == 'P6': return 8
-    if group == 'D7': return 9
-    if group == 'D8': return 10
-    if group == 'D9': return 11
-    if group == 'D10': return 12
-        # Δ-Sol method counts all outermost s and d electrons in transition metals, 
+    """
+    check_type(atom, "atom", (str, Element))
+
+    group = get_element_group(atom, return_type="str")
+
+    if group.startswith("S"):
+        nb_val_elec = int(group[1])
+
+    elif group.startswith("D") or group.startswith("P"):
+        nb_val_elec = int(group[1]) + 2
+        # Δ-Sol method counts all outermost s and d electrons in transition metals,
         # even for d10 ones.
-    if group == 'L' or group == 'A': raise NotImplementedError(
-            'f-block elements are not taken into account yet.'
-            )
-    else: raise ValueError('Provided string is not a recognized element')
+    elif group in {"L", "A"}:
+        raise NotImplementedError(
+            "f-block elements are not yet supported."
+        )
+    else: raise ValueError("Provided string is not a recognized element group.")
+
+    return nb_val_elec
+
+
+########################################
+
 
 def get_all_valence_electrons(structure: SiteCollection) -> int:
-    '''
+    """
     Computes the number of valence electrons per unit cell.
 
     Parameters:
@@ -299,46 +349,18 @@ def get_all_valence_electrons(structure: SiteCollection) -> int:
     
     Returns:
         int: The number of valence electrons in the unit cell.
-    '''
-    
+    """
+    check_type(structure, "structure", (SiteCollection,))
+
     nbr_val_elec = 0
-    elts_dict    = structure.composition.element_composition.as_dict()
+    elts_dict = structure.composition.element_composition.as_dict()
 
     for elt, number in elts_dict.items():
-        nbr_val_elec += get_element_valence_electrons(elt)*int(number)
-    
+        nbr_val_elec += get_element_valence_electrons(elt) * int(number)
+
     nbr_val_elec -= structure.charge #e.g. a charge of +1 means there is 1 less electron
-    
+
     return nbr_val_elec
 
-def get_delta_sol_el_ratio(
-        structure: SiteCollection, 
-        dft_functional: Literal['LDA','PBE','AM05'] = 'PBE', 
-        n_star_type: Literal['MIN', 'BEST', 'MAX'] = 'BEST'
-    ) -> float:
-    '''
-    Computes n = N0/N* the electron ratio to add or remove from 
-    the structure in the Δ-Sol method developped by Chan et al.
 
-    Reference:
-        M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-        (reference 32 in screening_pipeline/Bibliography)
-    '''
-    from screening_pipeline.utils import EL_PER_XC_VOL
-    
-    val_elec_type = 'sp'
-
-    for elt in structure.elements:
-        if elt.block == 's' or elt.block == 'p': continue
-        elif elt.block == 'd': 
-            val_elec_type = 'spd'
-            break
-        elif elt.block == 'f': raise NotImplementedError('f-block elements are not taken into accoount in Δ-Sol method.')
-        else: raise ValueError('Something is wrong with this loop or Element objects "block" property.')
-    
-    N_0        = get_all_valence_electrons(structure)
-    value_name = '_'.join((dft_functional, val_elec_type))
-    N_star     = EL_PER_XC_VOL[n_star_type][value_name]
-    n          = float(N_0) / float(N_star)
-
-    return n
+########################################
