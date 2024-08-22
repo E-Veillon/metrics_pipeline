@@ -307,6 +307,7 @@ def get_dsol_band_gap(data: dict) -> Union[Tuple[str, float], Tuple[str, float, 
     )
 
     # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap
+    # (Reference of the method: M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010))
     e_diff_best = data["E_N0_plus_n_best"] + data["E_N0_minus_n_best"] - 2*data["E_N0"]
     e_bg_best = e_diff_best / n_ratio_best
 
