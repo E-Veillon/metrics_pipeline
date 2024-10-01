@@ -2,10 +2,7 @@
 name = "screening-pipeline"
 version = "1.0.0"
 description = "Screening pipeline for metrics evaluation in Generative AI for materials"
-authors = [
-    "Elohan Veillon <elohan.veillon@univ-artois.fr>",
-    "Astrid Klipfel <astridklipfel@gmail.com>",
-]
+authors = []
 readme = "README.md"
 
 [tool.poetry.dependencies]
