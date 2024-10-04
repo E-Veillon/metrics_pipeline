@@ -27,7 +27,7 @@ def main() -> None:
         help=(
             "Path to the JSON file to create and store the Materials Project data in."
             "Fetches entries with thermodynamic data via the Materials Project's REST API, "
-            "and store them in a json file usable in the stability_screening script in the "
+            "and store them in a json file usable for the phase_diag_energies.py script at the "
             "--reference argument."
         ),
         metavar="path"
@@ -47,7 +47,7 @@ def main() -> None:
             "'composition', 'natoms' and 'delta_e' fields. The data will be processed to "
             "fit data formatting needed by phase stability computing script. "
             "The processed data is written to a file with the same name as the one given "
-            "but with a '_proc' suffix, at the same location."
+            "but with a '_proc' suffix, at the same location as the one given."
         ),
         metavar="path"
     )

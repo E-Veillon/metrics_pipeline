@@ -100,9 +100,9 @@ def mp_api_print_avail_fields(endpoint: str, api_key: str|None = None) -> None:
 
     with MPRester(api_key) as mpr:
         if endpoint == "materials":
-            print(mpr.materials.thermo.available_fields)
-        elif endpoint == "thermo":
             print(mpr.materials.available_fields)
+        elif endpoint == "thermo":
+            print(mpr.materials.thermo.available_fields)
         else:
             raise NotImplementedError(
                 "Given 'endpoint' arg does not match any implemented doc."
@@ -126,6 +126,7 @@ def process_oqmd_json_file(path: str) -> None:
     with open(path, "rt", encoding="utf-8") as fp:
         data = json.load(fp)
 
+    processed_prefix = "proc-oqmd-"
     processed_data = {}
 
     for name, struct in data.items():
@@ -137,9 +138,9 @@ def process_oqmd_json_file(path: str) -> None:
             or struct.get("natoms") is None
             or struct.get("delta_e") is None
         ):
-            if name.startswith("proc-oqmd-"):
+            if name.startswith(processed_prefix):
                 raise ValueError(
-                    f"structure '{name}' was already processed (begins with 'proc-oqmd-'). "
+                    f"structure '{name}' was already processed (begins with '{processed_prefix}'). "
                     "Please verify that you are not processing the same data more than "
                     "once, as it may cause wrong total energy computations."
                 )
@@ -167,7 +168,7 @@ def process_oqmd_json_file(path: str) -> None:
             composition: Dict[str, int] = composition.get_el_amt_dict()
 
         total_energy: float = struct.get("delta_e") * struct.get("natoms")
-        new_name: str = "proc-oqmd-" + entry_id
+        new_name: str = processed_prefix + entry_id
 
         processed_data.update(
             {
