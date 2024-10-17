@@ -1,1 +1,1 @@
-# GenMat
+# Metrics pipeline
