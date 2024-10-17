@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "screening-pipeline"
+version = "1.0.0"
+description = "Screening pipeline for metrics evaluation in Generative AI for materials"
+authors = []
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pymatgen = ">=2023.10.11"
+spglib = ">=2.0.0"
+torch = "~2.3.0"
+torch-cluster = {version = "^1.6.3+pt23cpu", source = "pytorch-geometric"}
+torch-scatter = {version = "^2.1.2+pt23cpu", source = "pytorch-geometric"}
+torch-geometric = "^2.3.0"
+materials-toolkit = { git = "https://github.com/materials-toolkits/pymaterials.git", branch = "pre-release", rev="c777b3a" }
+matminer = "^0.9.2"
+mp-api = "^0.41.2"
+
+[tool.poetry.scripts]
+cif_counter = 'screening_pipeline.scripts.cif_counter:main'
+dataset_loader = 'screening_pipeline.scripts.dataset_loader:main'
+preprocess = 'screening_pipeline.scripts.preprocess:main'
+vasp_static_sun = 'screening_pipeline.scripts.vasp_static_sun:main'
+create_summary = 'screening_pipeline.scripts.create_summary:main'
+phase_diag_energies = 'screening_pipeline.scripts.phase_diag_energies:main'
+summary_paths_update = 'screening_pipeline.scripts.summary_paths_update:main'
+vasp_relax = 'screening_pipeline.scripts.vasp_relax:main'
+metrics = 'screening_pipeline.scripts.metrics:main'
+vasp_static_dsol = 'screening_pipeline.scripts.vasp_static_dsol:main'
+dsol_bandgap = 'screening_pipeline.scripts.dsol_bandgap:main'
+
+[[tool.poetry.source]]
+name = "pytorch-geometric"
+url = "https://data.pyg.org/whl/torch-2.3.0+cpu.html"
+priority = "explicit"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

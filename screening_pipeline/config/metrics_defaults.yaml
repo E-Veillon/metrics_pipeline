@@ -1,0 +1,14 @@
+# Configuration file telling to the metrics.py script which metrics should be computed.
+# All disabled metrics computations will result in a default 'null' value for the
+# corresponding metric in the Json output file.
+# If one needs to save several configuration presets, copy this file and provide the name
+# of the wanted file to the --config arg of metrics.py.
+
+Validity: true
+SUN: true
+RMSD: true
+COV-P: true
+COV-R: true
+FAD: true
+EMD_energy: true
+EMD_density: true

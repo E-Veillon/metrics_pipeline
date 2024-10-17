@@ -1,0 +1,14 @@
+# User can enter modifications that will override chosen Pymatgen VASP preset's corresponding tags here.
+# If distinct modifications are necessary for several steps of the pipeline, just copy and rename this file.
+# In that case, do not forget to provide the name of the right file with -u arg in corresponding steps calls.
+#
+# WARNING: 
+# Putting '~' as value cancels the tag value used in the preset (interpreted as None).
+# If no modification of the original value is what you need, comment or remove the tag.
+
+#INCAR:
+
+#KPOINTS:
+
+#POTCAR_FUNCTIONAL:
+#POTCAR:
