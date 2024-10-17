@@ -20,7 +20,7 @@ NOTE: The "dataset_loader.py" script can automatically download and format entri
 
 1) Preprocess.py
 
-Generate 3 output files from the same generated structures file:
+Generate 3 output files from the same "generated structures" file input:
 
 - one containing valid structures with all other features deactivated, for Validity metric;
 
