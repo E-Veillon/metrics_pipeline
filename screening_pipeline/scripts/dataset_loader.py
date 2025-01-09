@@ -1,8 +1,8 @@
 #!/usr/bin/python
 """Get MP and/or process OQMD database entries for the pipeline."""
 
-import argparse
 import os
+import argparse as argp
 
 # LOCAL IMPORTS
 from screening_pipeline.utils import (
@@ -13,12 +13,8 @@ from screening_pipeline.utils import (
 ########################################
 
 
-def main() -> None:
-    """Main entry point."""
-
-    # ARGUMENTS PARSING BLOCK
-
-    parser = argparse.ArgumentParser(
+def _parse_input_args() -> argp.Namespace:
+    parser = argp.ArgumentParser(
         description="Get MP and/or process OQMD database entries for the pipeline."
     )
 
@@ -54,8 +50,15 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    return args
 
-    # MAIN BLOCK
+
+########################################
+
+
+def main() -> None:
+    """Main entry point."""
+    args = _parse_input_args()
 
     if args.from_mp_api is not None:
         dir_path = os.path.dirname(args.from_mp_api)

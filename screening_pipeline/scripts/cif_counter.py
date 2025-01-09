@@ -2,11 +2,39 @@
 """Counts the number of structures in given CIF files."""
 
 import os
-from argparse import ArgumentParser
-from typing import List
+import argparse as argp
 
 
 ########################################
+
+
+def _parse_input_args() -> argp.Namespace:
+    parser = argp.ArgumentParser(
+        prog="cif_counter.py",
+        description="Counts the number of structures in given CIF files."
+    )
+
+    parser.add_argument(
+        "filenames", 
+        nargs="+",
+        help="files to count structures in."
+    )
+    parser.add_argument(
+        "--cut",
+        type=int,
+        help=(
+            "create a truncated copy of the tested file containing only given "
+            "number of structures, going from the first one. If given value is not "
+            "integer compatible, it will be ignored."
+        ),
+        metavar="int"
+    )
+
+    args = parser.parse_args()
+
+    args.cut_nbr = args.cut if isinstance(args.cut, int) and (args.cut >= 1) else None
+
+    return args
 
 
 def has_str(string: str, pattern: str) -> bool:
@@ -22,10 +50,11 @@ def has_str(string: str, pattern: str) -> bool:
     """
     return string.find(pattern) > -1
 
+
 def write_cut_file(
         filename: str,
-        file_lines: List[str],
-        data_breakpoints: List[str],
+        file_lines: list[str],
+        data_breakpoints: list[str],
         cut_nbr: int,
     ) -> None:
     """
@@ -99,33 +128,7 @@ def write_cut_file(
 
 def main() -> None:
     """Main function."""
-
-    # ARGUMENTS PARSING BLOCK
-
-    parser = ArgumentParser(
-        prog="cif_counter.py",
-        description="Counts the number of structures in given CIF files."
-    )
-
-    parser.add_argument(
-        "filenames", 
-        nargs="+",
-        help="files to count structures in."
-    )
-    parser.add_argument(
-        "--cut",
-        type=int,
-        help=(
-            "create a truncated copy of the tested file containing only given "
-            "number of structures, going from the first one. If given value is not "
-            "integer compatible, it will be ignored."
-        ),
-        metavar="int"
-    )
-
-    args = parser.parse_args()
-    cut_nbr = args.cut if isinstance(args.cut, int) and (args.cut >= 1) else None
-
+    args = _parse_input_args()
 
     for file in args.filenames:
 
@@ -140,16 +143,16 @@ def main() -> None:
         data_breakpoints = list(filter(lambda line: has_str(line, "data_"), lines))
         nbr_structs = len(data_breakpoints)
 
-        if cut_nbr is not None and cut_nbr >= nbr_structs:
+        if args.cut_nbr is not None and args.cut_nbr >= nbr_structs:
             print(
-                f"Provided 'cut' arg ({cut_nbr}) is larger or equal "
+                f"Provided 'cut' arg ({args.cut_nbr}) is larger or equal "
                 f"to the total number of structures in '{file}'.\n"
                 "Therefore, as it will not change anything, "
                 "the cut option will now be deactivated."
             )
 
-        elif cut_nbr is not None:
-            write_cut_file(file, lines, data_breakpoints, cut_nbr)
+        elif args.cut_nbr is not None:
+            write_cut_file(file, lines, data_breakpoints, args.cut_nbr)
 
         print(f"{nbr_structs} structures found in file '{file}'.")
 

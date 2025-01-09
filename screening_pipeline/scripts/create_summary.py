@@ -3,7 +3,7 @@
 
 import os
 import json
-import argparse
+import argparse as argp
 
 # LOCAL IMPORTS
 from screening_pipeline.utils import (
@@ -14,23 +14,9 @@ from screening_pipeline.utils import (
 ########################################
 
 
-def _assert_args(args: argparse.Namespace) -> None:
-    """Check input args validity."""
-    check_file_or_dir(args.input_dir, "dir")
-    check_file_format(args.output, allowed_formats="json")
-    match_struct_dirs(args.input_dir, args.indices, no_return=True)
-
-
-########################################
-
-
-def main() -> None:
-    """Main function."""
-
-    # ARGUMENTS PARSING BLOCK
-
-    parser = argparse.ArgumentParser(
-        prog="create_summary",
+def _parse_input_args() -> argp.Namespace:
+    parser = argp.ArgumentParser(
+        prog="create_summary.py",
         description="A script to generate a JSON summary from manually rejected structures."
     )
 
@@ -76,20 +62,27 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    _assert_args(args)
+    check_file_or_dir(args.input_dir, "dir")
+    check_file_format(args.output, allowed_formats="json")
+    match_struct_dirs(args.input_dir, args.indices, no_return=True)
 
-    if args.indices is None:
-        indices = args.indices
-    else:
-        indices = sorted(args.indices)
+    if args.indices is not None:
+        args.indices = sorted(args.indices)
 
-    outfile = os.path.join(args.input_dir, args.output)
+    args.outfile = os.path.join(args.input_dir, args.output)
+
+    return args
 
 
-    # MAIN BLOCK
+########################################
+
+
+def main() -> None:
+    """Main function."""
+    args = _parse_input_args()
 
     all_struct_dirs = match_struct_dirs(args.input_dir)
-    wanted_struct_dirs = match_struct_dirs(args.input_dir, indices)
+    wanted_struct_dirs = match_struct_dirs(args.input_dir, args.indices)
     summary_result = []
 
     for struct_dir in sorted(all_struct_dirs):
@@ -101,7 +94,7 @@ def main() -> None:
             }
         )
 
-    with open(outfile, "wt", encoding="utf-8") as fp:
+    with open(args.outfile, "wt", encoding="utf-8") as fp:
         json.dump(summary_result, fp, indent=4)
 
 
