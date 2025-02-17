@@ -13,7 +13,7 @@ import argparse
 from pymatgen.core.structure import SiteCollection
 
 # LOCAL IMPORTS
-from screening_pipeline.utils import (
+from .utils import (
     CONFIGPATH, check_file_or_dir, add_new_dir, yaml_loader,
     PMGStaticSet, read_cif, vasp_static_settings, write_and_run_vasp
 )
@@ -115,7 +115,7 @@ def main():
         default="default_settings.yaml",
         help=(
             "Name of the .yaml file containing tags overrides to put over the PMG preset.\n"
-            "The file must be at location screening_pipeline/config to be found."
+            "The file must be at location metrics_pipeline/config to be found."
         ),
         metavar="FILENAME",
         dest="user_settings"

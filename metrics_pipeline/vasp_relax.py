@@ -14,7 +14,7 @@ from argparse import ArgumentParser, Namespace
 from pymatgen.core import SiteCollection
 
 # LOCAL IMPORTS
-from screening_pipeline.utils import (
+from .utils import (
     CONFIGPATH, check_file_or_dir, add_new_dir, yaml_loader,
     PMGRelaxSet, read_cif, vasp_relaxation_settings, write_and_run_vasp,
     get_struct_from_vasp

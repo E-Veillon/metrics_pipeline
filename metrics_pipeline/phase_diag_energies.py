@@ -24,7 +24,7 @@ import argparse
 from datetime import datetime
 
 # LOCAL IMPORTS
-from screening_pipeline.utils import (
+from .utils import (
     check_file_format, check_file_or_dir, check_num_value,
     get_max_dim, init_entries_from_dict, filter_database_entries,
     get_elements_from_entries, get_lacking_elts_entries,

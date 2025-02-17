@@ -5,7 +5,7 @@ import os
 import argparse as argp
 
 # LOCAL IMPORTS
-from screening_pipeline.utils import (
+from .utils import (
     check_file_or_dir, mp_api_download, process_oqmd_json_file
 )
 

@@ -135,7 +135,7 @@ def write_and_run_vasp(
 
         vasp_exe (str|Path):    Absolute path to the VASP executable.
                                 If not given, attempt the usual shortcut
-                                "vasp" launch command at given path.
+                                "vasp" launch command at given run_path.
     """
     _check_vasp_input(vasp_input)
     check_file_or_dir(run_path, "dir")
