@@ -9,7 +9,7 @@ from datetime import datetime
 import argparse
 
 # LOCAL IMPORTS
-from screening_pipeline.utils import (
+from .utils import (
     CONFIGPATH, check_file_or_dir, add_new_dir, yaml_loader,
     PMGStaticSet, extract_vasp_data_for_delta_sol_init,
     get_dsol_struct_dir, calc_idx_to_dir_name, dsol_calc_init,

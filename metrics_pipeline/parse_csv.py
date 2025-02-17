@@ -10,7 +10,7 @@ import numpy as np
 
 from pymatgen.io.cif import CifParser, CifWriter
 
-from screening_pipeline.utils import (
+from .utils import (
     check_interatomic_distances,
     remove_equivalent,
     discard_rare_gas_structures,

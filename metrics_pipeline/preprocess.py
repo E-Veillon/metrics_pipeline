@@ -9,7 +9,7 @@ from datetime import datetime
 import argparse
 
 # LOCAL IMPORTS
-from screening_pipeline.utils import (
+from .utils import (
     check_file_format, check_file_or_dir,
     read_cif, write_cif, check_interatomic_distances,
     batch_symmetrizer, remove_equivalent

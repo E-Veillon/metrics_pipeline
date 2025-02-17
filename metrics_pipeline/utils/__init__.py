@@ -1,4 +1,4 @@
-"""Screening pipeline utils module init."""
+"""Screening pipeline utils subpackage."""
 
 # I/O modules
 from .cif_io import read_cif, write_cif

@@ -1,7 +1,9 @@
 #!/usr/bin/python
 """This module defines common guard clauses used throughout the pipeline."""
 
+
 import typing as typ
+
 
 CompareStr = typ.Union[
     typ.Literal["=="],
@@ -12,9 +14,11 @@ CompareStr = typ.Union[
     typ.Literal[">"],
 ]
 
+
 def _get_class_name(class_str: str) -> str:
     """Extract the class name from a string of the form '<class 'name'>'."""
     return class_str.split()[-1].rstrip(">")
+
 
 def check_type(
     obj: typ.Any, obj_name: str, wanted_types: typ.Tuple[typ.Type, ...]

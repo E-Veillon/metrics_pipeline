@@ -133,12 +133,14 @@ def main() -> None:
     for file in args.filenames:
 
         if not os.path.isfile(file):
-            raise FileNotFoundError(f"{file}: No such file found.")
+            print(f"FileNotFoundError: {file}: No such file found, skipped.")
+            continue
         if not file.endswith(".cif"):
-            raise ValueError(f"{file} is not a valid CIF file.")
+            print(f"ValueError: {file} is not a valid CIF file, skipped.")
+            continue
 
         with open(file, mode="r", encoding="utf-8") as data:
-            lines = data.read().splitlines()
+            lines = data.readlines()
 
         data_breakpoints = list(filter(lambda line: has_str(line, "data_"), lines))
         nbr_structs = len(data_breakpoints)

@@ -13,7 +13,7 @@ from datetime import datetime
 
 
 # LOCAL IMPORTS
-from screening_pipeline.utils import (
+from .utils import (
     check_file_format, check_file_or_dir,
     batch_extract_vasp_data, batch_get_dsol_band_gaps
 )

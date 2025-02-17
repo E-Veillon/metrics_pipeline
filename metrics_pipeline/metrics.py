@@ -17,7 +17,7 @@ from typing import Optional
 import numpy as np
 
 # LOCAL IMPORTS
-from screening_pipeline.utils import (
+from .utils import (
     check_num_value, PathLike, CONFIGPATH,
     check_file_format, check_file_or_dir, yaml_loader,
     batch_extract_vasp_structures, read_cif,
