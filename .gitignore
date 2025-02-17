@@ -16,3 +16,4 @@ poetry.lock
 slurm-*
 .local
 .cache
+tests.py
