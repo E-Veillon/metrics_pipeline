@@ -3,16 +3,19 @@
 
 import os
 import argparse as argp
+import typing as typ
+
+# LOCAL IMPORTS
+from . import _parse_input_args
+from .utils import check_type
 
 
 ########################################
+# ARGUMENTS HANDLING
 
-
-def _parse_input_args() -> argp.Namespace:
-    parser = argp.ArgumentParser(
-        prog="cif_counter.py",
-        description="Counts the number of structures in given CIF files."
-    )
+def _get_command_line_args() -> argp.Namespace:
+    """Command-line arguments UI."""
+    parser = argp.ArgumentParser(prog="cif_counter.py", description=__doc__)
 
     parser.add_argument(
         "filenames", 
@@ -29,12 +32,32 @@ def _parse_input_args() -> argp.Namespace:
         ),
         metavar="int"
     )
-
     args = parser.parse_args()
-
-    args.cut_nbr = args.cut if isinstance(args.cut, int) and (args.cut >= 1) else None
-
     return args
+
+
+def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+    """Handle input arguments assertions and processing."""
+    if args_dict is None:
+        raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
+    
+    check_type(args_dict, "args_dict", (dict,))
+
+    # Set default values for unset optional arguments
+    args_dict.setdefault("cut", 0)
+
+    # Assert set arguments conformity
+    check_type(args_dict.get("filenames"), "filenames", (list, tuple))
+    check_type(args_dict.get("cut"), "--cut", (int,))
+
+    # Additional arguments processing
+    if args_dict.get("cut") < 1:
+        args_dict.pop("cut")
+    
+    return args_dict
+
+
+########################################
 
 
 def has_str(string: str, pattern: str) -> bool:
@@ -126,16 +149,30 @@ def write_cut_file(
 ########################################
 
 
-def main() -> None:
-    """Main function."""
-    args = _parse_input_args()
+def main(standalone: bool = True, **kwargs) -> None:
+    """
+    Counts the number of structures in given CIF files.
+    
+    Args:
+        standalone (bool):      Whether parsed script is used directly through
+                                command-line (stand-alone script) or in an external
+                                pipeline script.
 
-    for file in args.filenames:
+        filenames ([str|Path]): Files to count structures in.
+
+        cut (int):              Create a truncated copy of the tested file containing only given
+                                number of structures, going from the first one.
+                                If given value is invalid, the cut step is skipped.
+    """
+    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+
+    for file in args.get("filenames"):
 
         if not os.path.isfile(file):
             print(f"FileNotFoundError: {file}: No such file found, skipped.")
             continue
-        if not file.endswith(".cif"):
+
+        if not str(file).endswith(".cif"):
             print(f"ValueError: {file} is not a valid CIF file, skipped.")
             continue
 
@@ -145,16 +182,19 @@ def main() -> None:
         data_breakpoints = list(filter(lambda line: has_str(line, "data_"), lines))
         nbr_structs = len(data_breakpoints)
 
-        if args.cut_nbr is not None and args.cut_nbr >= nbr_structs:
+        if args.get("cut") is None:
+            pass
+
+        elif args.get("cut") >= nbr_structs:
             print(
-                f"Provided 'cut' arg ({args.cut_nbr}) is larger or equal "
+                f"Provided '--cut' arg ({args.get('cut')}) is greater or equal "
                 f"to the total number of structures in '{file}'.\n"
                 "Therefore, as it will not change anything, "
-                "the cut option will now be deactivated."
+                "the cut step is skipped for efficiency."
             )
 
-        elif args.cut_nbr is not None:
-            write_cut_file(file, lines, data_breakpoints, args.cut_nbr)
+        else:
+            write_cut_file(file, lines, data_breakpoints, args.get("cut"))
 
         print(f"{nbr_structs} structures found in file '{file}'.")
 

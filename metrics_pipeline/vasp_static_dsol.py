@@ -5,12 +5,14 @@ for structures not already rejected.
 """
 
 import os
+import typing as typ
 from datetime import datetime
-import argparse
+import argparse as argp
 
 # LOCAL IMPORTS
+from . import CONFIGPATH, _parse_input_args
 from .utils import (
-    CONFIGPATH, check_file_or_dir, add_new_dir, yaml_loader,
+    check_type, check_num_value, check_file_or_dir, add_new_dir, yaml_loader,
     PMGStaticSet, extract_vasp_data_for_delta_sol_init,
     get_dsol_struct_dir, calc_idx_to_dir_name, dsol_calc_init,
     write_and_run_vasp
@@ -18,68 +20,11 @@ from .utils import (
 
 
 ########################################
+# ARGUMENTS HANDLING
 
-
-def _assert_args(args: argparse.Namespace) -> None:
-    """Asserting input arguments validity."""
-
-    check_file_or_dir(args.input_dir, "dir")
-
-    assert (
-        args.executable_path.startswith("vasp")
-        or os.path.exists(args.executable_path)
-    ), f"{args.executable_path}: Executable file not found."
-
-    assert args.task_id >= 0, (
-        "task-id argument must be positive or zero."
-    )
-
-    check_file_or_dir(args.output, "dir")
-
-    if args.prev_summary is not None:
-        check_file_or_dir(args.prev_summary, "file", allowed_formats="json")
-
-    assert args.preset in PMGStaticSet.values or args.preset == "DsolStaticSet", (
-    "Provided static preset must be one of the following:\n"
-    f"{PMGStaticSet.values} or 'DsolStaticSet'."
-    )
-
-    if args.user_settings is not None:
-        settings_path = os.path.join(CONFIGPATH, args.user_settings)
-        check_file_or_dir(settings_path, "file", allowed_formats="yaml")
-
-
-########################################
-
-
-def main() -> None:
-    """Main function."""
-    start = datetime.now()
-
-    # ARGUMENTS PARSING BLOCK
-
-    prog_name = "vasp_delta_sol_statics.py"
-    prog_desc = """
-        Parses previous VASP data and launches Δ-Sol static calculations for structures not already rejected.
-        Uses job arrays properties to maximize the parallelization efficiency.
-
-        Reference for Δ-Sol method:
-            M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-        """
-    prog_missing_steps = """
-        Missing steps to complete this script:
-            - Mandatory job array id
-            - First verify that corresponding structure is not rejected
-            - If rejected, stop the sub-job with a simple message in output about it
-            - Else, extract the structure, prepare corresponding calculation and launch it
-        """
-
-    parser = argparse.ArgumentParser(
-        prog=prog_name,
-        description=prog_desc,
-        epilog=prog_missing_steps
-    )
-
+def _get_command_line_args() -> argp.Namespace:
+    """Command-line arguments UI."""
+    parser = argp.ArgumentParser(description=__doc__)
     parser.add_argument(
         "input_dir",
         help="Base directory containing structure directories.",
@@ -129,21 +74,23 @@ def main() -> None:
     )
     parser.add_argument(
         "-p", "--preset",
-        default="MPStaticSet",
+        default=PMGStaticSet.MPSTATICSET.value,
         help=(
             "The pymatgen preset to use for VASP static calculations.\n"
-            f"Supported presets: {PMGStaticSet}"
+            f"Supported presets: {PMGStaticSet}."
             "More info on possible presets in pymatgen documentation:\n"
             "https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets."
         )
     )
     parser.add_argument(
         "-u", "--user-settings",
+        default="DSolStaticSet.yaml",
         help=(
-            "Path to the .yaml file containing user defined VASP tags "
-            "that will override those of the preset."
+            "Name of the YAML file containing user defined VASP tags that will override "
+            f"those of the preset. Given file must be located in {CONFIGPATH} to be found. "
+            "Defaults to %(default)s."
         ),
-        metavar="file.yaml",
+        metavar="<filename>",
     )
     parser.add_argument(
         "--with-uncertainties",
@@ -154,44 +101,139 @@ def main() -> None:
         )
     )
 
-    args: argparse.Namespace = parser.parse_args()
+    args: argp.Namespace = parser.parse_args()
+    return args
 
-    _assert_args(args)
 
-    # Positional args
-    input_dir = args.input_dir
-    exe_path  = args.executable_path
-    task_id   = args.task_id
+def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+    """Handle input arguments assertions and processing."""
+    if args_dict is None:
+        raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
+    
+    check_type(args_dict, "args_dict", (dict,))
 
-    if preset != "DsolStaticSet":
-        preset = PMGStaticSet(preset)
+    # Set default values for unset optional arguments
+    args_dict.setdefault("executable_path", "vasp")
+    # WARNING:
+    # Usual VASP shortcut, but may activate wrong VASP version if several are installed.
+    # Prefer giving a true VASP executable path for unambiguous computation.
+    default_output = os.path.join(os.path.dirname(args_dict.get("input_dir")), "Band_gaps")
+    args_dict.setdefault("output", default_output)
+    args_dict.setdefault("preset", PMGStaticSet.MPSTATICSET.value)
+    args_dict.setdefault("user_settings", "DSolStaticSet.yaml")
+    args_dict.setdefault("with_uncertainties", False)
 
-    # Optional args
-    if args.output is None:
-        outdir = os.path.join(os.path.dirname(input_dir), "Band_gaps")
-    else:
-        outdir = args.output
+    # Assert set arguments conformity
+    check_file_or_dir(args_dict.get("input_dir"), "dir")
 
-    prev_summary = args.prev_summary or None
-    preset = args.preset
-    user_settings = yaml_loader(args.user_settings)
+    if not str(args_dict.get("executable_path")).startswith("vasp"):
+        check_file_or_dir(args_dict.get("executable_path"), "file")
+    
+    check_type(args_dict.get("task_id"), (int,))
+    check_num_value(args_dict.get("task_id"), "task_id", ">=", 0)
+    check_file_or_dir(args_dict.get("output"), "dir")
+
+    if args_dict.get("prev_summary") is not None:
+        check_file_or_dir(args_dict.get("prev_summary"), "file", allowed_formats="json")
+
+        if args_dict.get("key_to_check") is None:
+            raise ValueError(
+                f"'prev_summary' argument was provided ({args_dict.get('prev_summary')}),
+                therefore 'key-to-check' argument has to be given as well."
+            )
+
+    if args_dict.get("key_to_check") is not None:
+        check_type(args_dict.get("key_to_check"), "key_to_check", (str,))
+    
+    assert args_dict.get("preset") in PMGStaticSet.values or args_dict.get("preset") == "DSolStaticSet", (
+    "Provided static preset must be one of the following:\n"
+    f"{PMGStaticSet.values} or 'DsolStaticSet'."
+    )
+    config_path = os.path.join(CONFIGPATH, args_dict.get("user_settings"))
+    check_file_or_dir(config_path, "file", allowed_formats=("yml", "yaml"))
+    check_type(args_dict.get("with_uncertainties"), (bool,))
+
+    # Additional arguments processing
+    os.makedirs(args_dict.get("output"), exist_ok=True)
+
+    if args_dict.get("preset") != "DsolStaticSet":
+        args_dict["preset"] = PMGStaticSet(args_dict.get("preset"))
+
+    args_dict["settings"] = yaml_loader(config_path)
+
+    return args_dict
+
+
+########################################
+
+
+def main(standalone: bool = True, **kwargs) -> None:
+    """
+    Parses previous VASP data and launches Δ-Sol static calculations for structures not
+    already rejected.
+
+    Args:
+        standalone (bool):          Whether parsed script is used directly through
+                                    command-line (stand-alone script) or in an external
+                                    pipeline script.
+
+        input_dir (str|Path):       Base directory containing structure directories.
+
+        executable_path (str|Path): Path to the VASP executable.
+
+        task_id (int):              Provide here the job array task ID that will treat one
+                                    calculation for one structure. The total number of jobs
+                                    should be the number of structures multiplied by the number
+                                    of calculations for one structure (3 for a direct estimation
+                                    only, 7 with uncertainties).
+
+        output (str|Path):          Path to the output directory where VASP files will be written.
+                                    A subdirectory will be created in this directory for each Δ-Sol
+                                    calculation. If not provided, a 'Band_gaps' directory is
+                                    created at the same path as the directory provided in the
+                                    'input_dir' argument.
+
+        prev_summary (str|Path):    Path to a JSON summary file produced by a previous screening
+                                    step. If given, the file will be checked to filter structures
+                                    that are already rejected.
+
+        key_to_check (str):         The dict key associated to the bool used to verify eligibility
+                                    in the previous summary file. If prev_summary is given, it must
+                                    be given too.
+
+        preset (str):               The pymatgen preset to use for VASP static calculations.
+                                    List of currently supported presets can be checked in command
+                                    line within the --help documentation of this argument for this
+                                    script. More info on possible presets in pymatgen documentation:
+                                    https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets.
+
+        user_settings (str):        Name of the YAML file containing user defined VASP tags that will
+                                    override those of the preset. Given file must be located in
+                                    'metrics_pipeline/config' to be found.
+                                    Defaults to 'DSolStaticSet.yaml'.
+
+        with_uncertainties (bool):  Pass this flag to enable computation of minimal and maximal Δ-Sol
+                                    band gaps. This will need two more VASP static total energy
+                                    computation for each limit.
+    """
+    start = datetime.now()
+    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Variables deduced from args
     struct_path, struct_idx, calc_idx = get_dsol_struct_dir(
-        input_dir, task_id, with_uncertainties=args.with_uncertainties
+        path=args.get("input_dir"),
+        task_id=args.get("task_id"),
+        with_uncertainties=args.get("with_uncertainties")
     )
 
-
-    # MAIN BLOCK
-
     struct_data = extract_vasp_data_for_delta_sol_init(
-        struct_dir=struct_path, path_to_summary=prev_summary
+        struct_dir=struct_path, path_to_summary=args.get("prev_summary")
     )
     if not struct_data:
         raise ValueError(
             "The structure data corresponding to given 'task-id' argument "
             "was not found or is already rejected in the summary file from previous step.\n"
-            f"Given task-id argument: {args.task_id}\n"
+            f"Given task-id argument: {args.get("task_id")}\n"
             f"Corresponding structure index: {struct_idx}\n"
             f"Corresponding calculation ID: {calc_idx}\n"
             "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
@@ -200,15 +242,15 @@ def main() -> None:
     input_data = dsol_calc_init(
         structure=struct_data[1]["structure"],
         calc_index=calc_idx,
-        preset=preset,
-        user_corrections=user_settings
+        preset=args.get("preset"),
+        user_corrections=args.get("settings")
     )
 
     dir_name   = f"{struct_idx}_{struct_data[1]['structure'].composition.reduced_formula}"
     calc_name  = calc_idx_to_dir_name(dir_name, calc_idx)
-    calc_dir   = add_new_dir(outdir, dir_name, calc_name)
+    calc_dir   = add_new_dir(args.get("output"), dir_name, calc_name)
 
-    write_and_run_vasp(input_data, calc_dir, exe_path)
+    write_and_run_vasp(input_data, calc_dir, args.get("executable_path"))
 
     stop = datetime.now()
     print(f"elapsed time: {stop-start}")

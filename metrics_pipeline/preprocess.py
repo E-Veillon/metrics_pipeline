@@ -5,11 +5,15 @@ It filters out too bad and / or duplicated data, finds symmetry space group
 and format the valid data in a way that will be more readable for further calculations.
 """
 
+import os
+import typing as typ
 from datetime import datetime
-import argparse
+import argparse as argp
 
 # LOCAL IMPORTS
+from . import _parse_input_args
 from .utils import (
+    check_type, check_num_value,
     check_file_format, check_file_or_dir,
     read_cif, write_cif, check_interatomic_distances,
     batch_symmetrizer, remove_equivalent
@@ -17,100 +21,21 @@ from .utils import (
 
 
 ########################################
+# ARGUMENTS HANDLING
 
-
-def _assert_args(args: argparse.Namespace):
-    """Asserting input arguments validity."""
-
-    print(" - I/O ARGUMENTS - ")
-    print(f"INPUT FILE: {args.input_file}")
-    print(f"OUTPUT FILE: {args.output}")
-
-    check_file_or_dir(args.input_file, "file", allowed_formats="cif")
-    check_file_format(args.output, allowed_formats="cif")
-
-    print(" ")
-    print("------------------------------")
-    print(" ")
-    print(" - ACTIVATED FEATURES - ")
-    print(f"CHECK RARE GASES: {not args.no_rare_gas_check}")
-    print(f"CHECK RARE EARTHS: {not args.no_rare_earth_check}")
-    print(f"CHECK INTERATOMIC DISTANCES: {not args.no_dist_check}")
-    print(
-        f"* Distance tolerance: {args.dist_tolerance} Angstroms "
-        f"{'(ignored)' if args.no_dist_check else ''}"
-    )
-
-    if not args.no_dist_check:
-        assert args.dist_tolerance > 0.0, (
-            "Interatomic distance tolerance must be strictly positive."
-        )
-    print(f"SYMMETRIZATION: {not args.no_symmetrization}")
-    print(
-        f"* Fractional coordinates tolerance: {args.symprec} "
-        f"{'(ignored)' if args.no_symmetrization else ''}"
-    )
-
-    if not args.no_symmetrization:
-        assert (0.0 <= args.symprec <= 0.5), (
-        "Fractional coordinates tolerance must be between 0.0 and 0.5 "
-        "to retain some reliability."
-        )
-
-    print(
-        f"* Angles tolerance: {args.angleprec} degrees "
-        f"{'(ignored)' if args.no_symmetrization else ''}"
-    )
-
-    if not args.no_symmetrization:
-        assert (0.0 <= args.angleprec <= 30.0), (
-            "Angles tolerance must be between 0.0 and 20.0 degrees to retain some reliability."
-        )
-    print(f"STRUCTURE MATCHING: {not args.no_equiv_match}")
-    print(f"NUMBER OF WORKERS: {args.workers}")
-
-    assert args.workers >= 1, "The number of workers must be positive."
-
-    print(" ")
-    print("------------------------------")
-    print(" ")
-
-
-########################################
-
-
-def main() -> None:
-    """Main function."""
-    start = datetime.now()
-
-    # ARGUMENTS PARSING BLOCK
-
-    prog_name = "preprocess.py"
-    prog_description = (
-        "A script to preprocess structures in a CIF file using pymatgen. "
-        "It filters out too bad and duplicated data, finds symmetry space group "
-        "and format the valid data in a way that will be more readable "
-        "for further calculations."
-    )
-
-    parser = argparse.ArgumentParser(
-        prog=prog_name,
-        description=prog_description
-    )
-
+def _get_command_line_args() -> argp.Namespace:
+    """Command-line arguments UI."""
+    parser = argp.ArgumentParser(prog="create_summary.py", description=__doc__)
     parser.add_argument(
         "input_file",
-        type=str,
-        help="Name or path to the CIF file containing structure data to process.",
+        help="Path to the CIF file containing structure data to process.",
     )
     parser.add_argument(
         "-o",
         "--output",
-        type=str,
-        default=None,
         help=(
-            "Name or path to wanted CIF output file where processed structures "
-            "will be stored. If not specified, output file is written in input file "
+            "Path to wanted CIF output file where processed structures "
+            "will be stored. If not given, output file is written in input file "
             "directory with the same name with a '_out' suffix added."
         ),
     )
@@ -187,28 +112,148 @@ def main() -> None:
         "-w",
         "--workers",
         type=int,
-        default=1,
-        help="Number of parallel processes to spawn (Default: %(default)s).",
+        help=(
+            "Number of parallel processes to spawn for parallelized steps. "
+            "If not given, If not given, default value is the 'max_workers' "
+            "default value from tqdm.contrib.concurrent.process_map function."
+        ),
         metavar="int",
     )
-
-    args: argparse.Namespace = parser.parse_args()
-
-    if args.output is None:
-        args.output = args.input_file.replace(".cif", "_out.cif")
-
-    _assert_args(args)
+    args: argp.Namespace = parser.parse_args()
+    return args
 
 
-    # MAIN BLOCK
+def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+    """Handle input arguments assertions and processing."""
+    if args_dict is None:
+        raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
+    
+    check_type(args_dict, "args_dict", (dict,))
+
+    # Set default values for unset optional arguments
+    default_output = str(args_dict.get("input_file")).replace(".cif", "_out.cif")
+    args_dict.setdefault("output", default_output)
+    args_dict.setdefault("no_rare_gas_check", False)
+    args_dict.setdefault("no_rare_earth_check", False)
+    args_dict.setdefault("no_dist_check", False)
+    args_dict.setdefault("dist_tolerance", 0.5)
+    args_dict.setdefault("no_symmetrization", False)
+    args_dict.setdefault("symprec", 0.01)
+    args_dict.setdefault("angleprec", 5.0)
+    args_dict.setdefault("no_equiv_match", False)
+    args_dict.setdefault("test_min_vol", False)
+
+    # Assert set arguments conformity
+    check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="cif")
+    check_file_format(args_dict.get("output"), allowed_formats="cif")
+    check_type(args_dict.get("dist_tolerance"), "dist_tolerance", (float,))
+    check_num_value(args_dict.get("dist_tolerance"), "dist_tolerance", ">", 0.0)
+    check_type(args_dict.get("symprec"), "symprec", (float,))
+    check_num_value(args_dict.get("symprec"), "symprec", ">=", 0.0)
+    check_num_value(args_dict.get("symprec"), "symprec", "<=", 1.0)
+    check_type(args_dict.get("angleprec"), "angleprec", (float,))
+    check_num_value(args_dict.get("angleprec"), "angleprec", ">=", 0.0)
+    check_num_value(args_dict.get("angleprec"), "angleprec", "<=", 90.0)
+
+    if args_dict.get("workers") is not None:
+        check_type(args_dict.get("workers"), "workers", (int,))
+        check_num_value(args_dict.get("workers"), "workers", ">", 0)
+
+    # Print final configuration
+    print(" - I/O ARGUMENTS - ")
+    print(f"INPUT FILE: {args_dict.get('input_file')}")
+    print(f"OUTPUT FILE: {args_dict.get('output')}")
+    print(" ")
+    print("------------------------------")
+    print(" ")
+    print(" - ACTIVATED FEATURES - ")
+    print(f"CHECK RARE GASES: {not args_dict.get('no_rare_gas_check')}")
+    print(f"CHECK RARE EARTHS: {not args_dict.get('no_rare_earth_check')}")
+    print(f"CHECK INTERATOMIC DISTANCES: {not args_dict.get('no_dist_check')}")
+    print(
+        f"* Distance tolerance: {args_dict.get('dist_tolerance')} Angstroms "
+        f"{'(ignored)' if args_dict.get('no_dist_check') else ''}"
+    )
+    print(f"SYMMETRIZATION: {not args_dict.get('no_symmetrization')}")
+    print(
+        f"* Fractional coordinates tolerance: {args_dict.get('symprec')} "
+        f"{'(ignored)' if args_dict.get('no_symmetrization') else ''}"
+    )
+    print(
+        f"* Angles tolerance: {args_dict.get('angleprec')} degrees "
+        f"{'(ignored)' if args_dict.get('no_symmetrization') else ''}"
+    )
+    print(f"STRUCTURE MATCHING: {not args_dict.get('no_equiv_match')}")
+    print(f"NUMBER OF WORKERS: {args_dict.get('workers')}")
+    print(" ")
+    print("------------------------------")
+    print(" ")
+
+    return args_dict
+
+########################################
+
+
+def main(standalone: bool = True, **kwargs) -> None:
+    """
+    A script to preprocess structures in a CIF file using pymatgen.
+    It filters out too bad and / or duplicated data, finds symmetry space group
+    and format the valid data in a way that will be more readable for further calculations.
+
+    Args:
+        standalone (bool):          Whether parsed script is used directly through
+                                    command-line (stand-alone script) or in an external
+                                    pipeline script.
+
+        input_file (str|Path):      Path to the CIF file containing structure data to process.
+
+        output (str|Path):          Path to wanted CIF output file where processed structures
+                                    will be stored. If not given, output file is written in input
+                                    file directory with the same name with a '_out' suffix added.
+
+        no_rare_gas_check (bool):   Whether to disable elimination of structures containing rare
+                                    gas elements. Defaults to False.
+
+        no_rare_earth_check (bool): Whether to disable elimination of structures containing f-block
+                                    elements. Defaults to False.
+
+        no_dist_check (bool):       Whether to disable structures interatomic distances checking.
+
+        dist_tolerance (float):     Tolerance for checking interatomic distances in Angstroms.
+                                    Structures containing atoms that are closer than this value
+                                    will be discarded from output. Defaults to 0.5 Angstroms.
+
+        no_symmetrization (bool):   Whether to disable search of structures symmetry space groups.
+                                    Defaults to False.
+
+        symprec (float):            Fractional coordinates tolerance for symmetry finding.
+                                    Defaults to 0.01.
+
+        angleprec (float):          Angle tolerance for symmetry finding in degrees.
+                                    Defaults to 5.0 degrees.
+
+        no_equiv_match (bool):      Whether to disable structure matching and elimination of
+                                    duplicates. Defaults to False.
+
+        test_min_vol (bool):        A debug arg to assume unicity of unlikely structures having
+                                    a volume under 1 Angström^3 without passing them into structure
+                                    matching, which could cause the program to be softlocked. Only
+                                    pass it if such problems were to arise when no_dist_check is
+                                    set to True and no_equiv_match is set to False.
+
+        workers (int):              Number of parallel processes to spawn for parallelized steps.
+                                    If not given, If not given, default value is the 'max_workers'
+                                    default value from tqdm.contrib.concurrent.process_map function.
+    """
+    start = datetime.now()
+    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Extraction des données CIF et conversion en structures
-
     structures, nbr_rare_gas_structs, nbr_rare_earth_structs = read_cif(
-        filename=args.input_file,
-        workers=args.workers,
-        keep_rare_gases=args.no_rare_gas_check,
-        keep_rare_earths=args.no_rare_earth_check
+        filename=args.get("input_file"),
+        workers=args.get("workers"),
+        keep_rare_gases=args.get("no_rare_gas_check"),
+        keep_rare_earths=args.get("no_rare_earth_check")
     )
 
     nbr_loaded_structs = len(structures)
@@ -217,34 +262,34 @@ def main() -> None:
 
     print(f"{nbr_total_structs} structures detected in total")
 
-    if not args.no_rare_gas_check:
+    if not args.get("no_rare_gas_check"):
         print(f"{nbr_rare_gas_structs} structures containing rare gases were ignored")
 
-    if not args.no_rare_earth_check:
+    if not args.get("no_rare_earth_check"):
         print(f"{nbr_rare_earth_structs} structures containing rare earths were ignored")
 
     print(f"{nbr_loaded_structs} structures are kept for further processing")
 
     # Vérification des distances interatomiques
 
-    if not args.no_dist_check:
+    if not args.get("no_dist_check"):
         structures, nbr_not_valid = check_interatomic_distances(
-            structures, valid_tol=args.dist_tolerance
+            structures, valid_tol=args.get("dist_tolerance")
         )
         print(f"{nbr_not_valid} structures having too close atoms were discarded")
 
     # Calcul de la symétrie d'espace des structures
 
-    if args.no_symmetrization:
+    if args.get("no_symmetrization"):
         symmetrized_structs = structures
     else:
         symmetrized_structs = list(filter(
             None,
             batch_symmetrizer(
                 structures=structures,
-                symprec=args.symprec,
-                angle_tolerance=args.angleprec,
-                workers=args.workers
+                symprec=args.get("symprec"),
+                angle_tolerance=args.get("angleprec"),
+                workers=args.get("workers")
             )
         ))
 
@@ -254,60 +299,55 @@ def main() -> None:
 
     kept_structs, nbr_equivalent, nbr_unmatched = remove_equivalent(
             structures=symmetrized_structs,
-            workers=args.workers,
-            test_volume=args.test_min_vol,
-            keep_equivalent=args.no_equiv_match
+            workers=args.get("workers"),
+            test_volume=args.get("test_min_vol"),
+            keep_equivalent=args.get("no_equiv_match")
     )
 
     nbr_unique_structs = len(kept_structs)
 
-    if not args.no_equiv_match:
+    if not args.get("no_equiv_match"):
         print(f"{nbr_unique_structs} unique structures detected")
         print(f"{nbr_equivalent} duplicates were discarded")
 
-    if args.test_min_vol:
+    if args.get("test_min_vol"):
         print("--test-min-vol debug flag was passed:")
         print(f"{nbr_unmatched} structures were assumed unique.")
 
     # Ecriture du fichier CIF symétrisé et épuré des structures indésirables
     write_cif(
-        filename=args.output,
+        filename=args.get("output"),
         structures=kept_structs,
-        workers=args.workers,
+        workers=args.get("workers"),
     )
 
     # Calcul du temps total pris par la procédure
 
     stop = datetime.now()
 
-    print(" ")
-    print("------------------------------")
-    print(" ")
-    print("SUMMARY OF THE CALCULATION")
-    print(" ")
+    print("\n------------------------------")
+    print("\nSUMMARY OF THE CALCULATION")
     print(f"{nbr_total_structs} structures detected in total, including:")
     print(f"- {nbr_unique_structs} unique structure(s)")
 
-    if not args.no_rare_gas_check:
+    if not args.get("no_rare_gas_check"):
         print(f"- {nbr_rare_gas_structs} structure(s) containing rare gases")
 
-    if not args.no_rare_earth_check:
+    if not args.get("no_rare_earth_check"):
         print(f"- {nbr_rare_earth_structs} structure(s) containing rare earths")
 
-    if not args.no_dist_check:
+    if not args.get("no_dist_check"):
         print(f"- {nbr_not_valid} structure(s) with too small interatomic distances")
 
-    if not args.no_equiv_match:
+    if not args.get("no_equiv_match"):
         print(f"- {nbr_equivalent} structure(s) that are duplicates")
 
-    if args.test_min_vol:
+    if args.get("test_min_vol"):
         print(
             f"- {nbr_unmatched} structure(s) assumed unique "
             f"because of {'its' if nbr_unmatched < 2 else 'their'} unphysical volume"
         )
-
-    print(" ")
-    print(f"Output results written in '{args.output}'")
+    print(f"\nOutput results written in {args.get('output')}")
     print(f"elapsed time: {stop-start}")
 
 
