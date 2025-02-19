@@ -153,6 +153,7 @@ def main(standalone: bool = True, **kwargs):
     for phase diagrams computations.
     
     Args:
+<<<<<<< HEAD
         standalone (bool):          Whether parsed script is used directly through
                                     command-line (stand-alone script) or in an external
                                     pipeline script.
@@ -185,6 +186,12 @@ def main(standalone: bool = True, **kwargs):
                                     treat according to task IDs (e.g. if task ID 0 treats structure
                                     0 and so on, just provide the task ID). If not given, it will
                                     default to the first possible index, i.e. index 0.
+        
+        standalone (bool):      Whether parsed script is used directly through
+                                command-line (stand-alone script) or in an external
+                                pipeline script.
+
+        input_file (str|Path):  Path to the CIF file containing structure data to read.
     """
     start = datetime.now()
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
