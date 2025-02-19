@@ -1,4 +1,4 @@
-metrics_pipeline v1.0.2
+metrics_pipeline v1.1.0
 
 The main goal of this pipeline is to measure some of the metrics that are often used in recent works that propose generative AI models to predict new materials from an input of known materials.
 
