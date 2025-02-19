@@ -9,12 +9,14 @@ Reference for Δ-Sol method:
 import os
 import json
 import argparse as argp
+import typing as typ
 from datetime import datetime
 
 
 # LOCAL IMPORTS
+from . import _parse_input_args
 from .utils import (
-    check_file_format, check_file_or_dir,
+    check_type, check_num_value, check_file_format, check_file_or_dir,
     batch_extract_vasp_data, batch_get_dsol_band_gaps
 )
 
@@ -22,24 +24,12 @@ from .utils import (
 ########################################
 
 
-def _parse_input_args() -> argp.Namespace:
-    prog_name = "dsol_bandgap"
-    prog_desc = """
-        A script to determine material fundamental band gap from VASP energies and Δ-Sol method.
-
-        Reference for Δ-Sol method:
-            M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010)
-        """
-
-    parser = argp.ArgumentParser(
-        prog=prog_name,
-        description=prog_desc,
-    )
-
+def _get_command_line_args() -> argp.Namespace:
+    """Command-line arguments UI."""
+    parser = argp.ArgumentParser(prog="dsol_bandgap", description=__doc__)
     parser.add_argument(
         "input_dir",
         type=str,
-        default=None,
         help=(
             "Base directory containing structures directories, "
             "themself containing static calculations directories."
@@ -59,7 +49,6 @@ def _parse_input_args() -> argp.Namespace:
         "-v", "--valid-interval",
         nargs=2,
         type=float,
-        default=None,
         help=(
             "Valid band gaps interval in eV (default: [1.3 ; 3.6] eV).\n"
             "If another interval is given, the min AND max values must be given, "
@@ -70,8 +59,11 @@ def _parse_input_args() -> argp.Namespace:
     parser.add_argument(
         "-w", "--workers",
         type=int,
-        default=1,
-        help="Number of parallel processes to spawn for parallelized steps.",
+        help=(
+            "Number of parallel processes to spawn for parallelized steps. "
+            "If not given, If not given, default value is the 'max_workers' "
+            "default value from tqdm.contrib.concurrent.process_map function."
+        ),
         metavar="int",
     )
     parser.add_argument(
@@ -85,7 +77,7 @@ def _parse_input_args() -> argp.Namespace:
             "This arg only changes the file name, "
             "its path is automatically set in the step directory."
         ),
-        metavar="summary.json"
+        metavar="<new_file_name>"
     )
     parser.add_argument(
         "--with-uncertainties", 
@@ -95,67 +87,111 @@ def _parse_input_args() -> argp.Namespace:
             "If enabled, it will search for uncertainty calculations results."
         )
     )
-
     args = parser.parse_args()
+    return args
 
-    check_file_or_dir(args.input_dir, "dir")
 
-    assert args.functional in {"LDA", "PBE", "AM05"}, (
-        f"{args.functional} is not supported by delta-Sol. "
+def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+    """Handle input arguments assertions and processing."""
+    if args_dict is None:
+        raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
+    
+    check_type(args_dict, "args_dict", (dict,))
+
+    # Set default values for unset optional arguments
+    args_dict.setdefault("functional", "PBE")
+    args_dict.setdefault("valid_interval", (1.3, 3.6))
+    args_dict.setdefault("summary", "summary.json")
+    args_dict.setdefault("with_uncertainties", False)
+
+    # Assert set arguments conformity
+    check_file_or_dir(args_dict.get("input_dir"), "dir")
+
+    assert args_dict.get("functional") in {"LDA", "PBE", "AM05"}, (
+        f"{args_dict.get('functional')} is not supported by delta-Sol. "
         "See --help for valid functional argument values."
     )
-
-    if args.valid_interval is not None:
-        assert all(value >= 0.0 for value in args.valid_interval), (
+    assert all(value >= 0.0 for value in args_dict.get("valid_interval")), (
         "Acceptable band gap values must be positive or zero."
-        )
-
-        assert args.valid_interval[0] != args.valid_interval[1], (
-        "Acceptable band gap values cannot have the same value."
-        )
-
-    check_file_format(args.summary, allowed_formats="json")
-
-    assert args.workers >= 1, (
-        "The number of workers cannot be negative or zero."
     )
+    assert args_dict.get("valid_interval")[0] != args_dict.get("valid_interval")[1], (
+        "Acceptable band gap values cannot have the exact same value."
+    )
+    check_file_format(args_dict.get("summary"), allowed_formats="json")
 
-    if args.valid_interval is None:
-        args.valid_interval = (1.3, 3.6)
-    else:
-        args.valid_interval = sorted(args.valid_interval)
+    if args_dict.get("workers") is not None:
+        check_num_value(args_dict.get("workers"), "workers", ">", 0)
 
-    args.summaryfile = os.path.join(args.input_dir, args.summary)
+    # Additional arguments processing
+    args_dict["valid_interval"] = sorted(args_dict.get("valid_interval"))
+    args_dict["summary"] = os.path.basename(args_dict.get("summary"))
+    args_dict["summaryfile"] = os.path.join(args_dict.get("input_dir"), args_dict.get("summary"))
 
-    return args
+    return args_dict
 
 
 ########################################
 
 
-def main() -> None:
-    """Main function."""
+def main(standalone: bool = True, **kwargs) -> None:
+    """
+    A script to determine material fundamental band gap from VASP energies and Δ-Sol method.
+
+    Reference for Δ-Sol method:
+        M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010).
+    
+    Args:
+        standalone (bool):              Whether parsed script is used directly through
+                                        command-line (stand-alone script) or in an external
+                                        pipeline script.
+
+        input_dir (str|Path):           Base directory containing structures directories,
+                                        themself containing static calculations directories.
+
+        functional (str):               DFT functional used for static calculations.
+                                        Can be chosen between 'LDA', 'PBE', and 'AM05'.
+                                        Defaults to 'PBE'.
+
+        valid_interval ((int, int)):    Valid band gaps interval in eV (default: [1.3 ; 3.6] eV).
+                                        If another interval is given, the min AND max values must
+                                        be given, even if one of them matches the default values.
+
+        workers (int):                  Number of parallel processes to spawn for parallelized
+                                        steps. If not given, default value is the 'max_workers'
+                                        default value from tqdm.contrib.concurrent.process_map
+                                        function.
+
+        summmary (str):                 Output file indicating calculation results for this step
+                                        (json format). Also usable by further steps to filter out
+                                        structures rejected in this step. This arg only changes
+                                        the file name, its path is automatically set in the step
+                                        directory.
+
+        with_uncertainties (bool):      Enables computation of minimal and maximal Δ-Sol band gaps.
+                                        If enabled, it will search for uncertainty calculations
+                                        results.
+    """
     start = datetime.now()
-    args = _parse_input_args()
+    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Extract VASP static calculations results
     bg_data = batch_extract_vasp_data(
         method="delta_sol_calc",
-        base_dir=args.input_dir,
-        workers=args.workers
+        base_dir=args.get("input_dir"),
+        workers=args.get("workers")
     )
 
     e_band_gaps = batch_get_dsol_band_gaps(
-        bg_data, args.functional, args.with_uncertainties, args.workers
+        bg_data, args.get("functional"), args.get("with_uncertainties"), args.get("workers")
     )
 
     good_bg_structs = list(filter(
-        lambda tup: min(args.valid_interval) <= tup[1]["E_band_gap"] <= max(args.valid_interval),
+        lambda tup: min(args.get("valid_interval")) <= tup[1]["E_band_gap"] <= max(args.get("valid_interval")),
         list(e_band_gaps.items())
     ))
 
     bad_bg_structs = list(filter(
-        lambda tup: not min(args.valid_interval) <= tup[1]["E_band_gap"] <= max(args.valid_interval),
+        lambda tup: not min(args.get("valid_interval")) <= tup[1]["E_band_gap"] <= max(args.get("valid_interval")),
         list(e_band_gaps.items())
     ))
 
@@ -170,12 +206,12 @@ def main() -> None:
         true_neg_bg = f" (true measurement: {e_band_gap})" if e_band_gap_rectified == 0.0 else ""
 
         struct_dict = {
-                "path": os.path.join(str(args.input_dir), name),
+                "path": os.path.join(str(args.get("input_dir")), name),
                 "bandgap (eV)": f"{e_band_gap_rectified}{true_neg_bg}",
                 "valid_gap": True
         }
 
-        if args.with_uncertainties:
+        if args.get("with_uncertainties"):
             e_band_gap_min = round(bgdict["E_band_gap_min"], 6)
             e_band_gap_max = round(bgdict["E_band_gap_max"], 6)
             e_band_gap_min_rectified = max(e_band_gap_min, 0.0)
@@ -208,12 +244,12 @@ def main() -> None:
         true_neg_bg = f" (true measurement: {e_band_gap})" if e_band_gap_rectified == 0.0 else ""
 
         struct_dict = {
-                "path": os.path.join(str(args.input_dir), name),
+                "path": os.path.join(str(args.get("input_dir")), name),
                 "bandgap (eV)": f"{e_band_gap_rectified}{true_neg_bg}",
                 "valid_gap": False
         }
 
-        if args.with_uncertainties:
+        if args.get("with_uncertainties"):
             e_band_gap_min = round(bgdict["E_band_gap_min"], 6)
             e_band_gap_max = round(bgdict["E_band_gap_max"], 6)
             e_band_gap_min_rectified = max(e_band_gap_min, 0.0)
@@ -242,7 +278,7 @@ def main() -> None:
 
     screening_results = sorted(screening_results, key=sort_by_path)
 
-    with open(args.summaryfile, "w", encoding="utf-8") as fp:
+    with open(args.get("summaryfile"), "w", encoding="utf-8") as fp:
         json.dump(screening_results, fp, indent=4)
 
     stop = datetime.now()

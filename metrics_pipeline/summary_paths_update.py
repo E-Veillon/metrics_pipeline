@@ -5,41 +5,20 @@ Update paths keys in a summary json file when the corresponding structure direct
 
 import os
 import json
-from typing import List, Dict
-import argparse
+import typing as typ
+import argparse as argp
+
+# LOCAL IMPORTS
+from . import _parse_input_args
+from .utils import check_type, check_file_or_dir
 
 
 ########################################
+# ARGUMENTS HANDLING
 
-
-def _assert_args(args: argparse.Namespace) -> None:
-    """Asserting input arguments validity."""
-    if not os.path.isfile(args.input_file):
-        raise FileNotFoundError(
-            f"{args.input_file}: No such file found."
-        )
-    if not args.input_file.endswith(".json"):
-        raise ValueError(
-            f"{args.input_file}: allowed file format is 'json', "
-            f"got '{args.input_file.split(sep='.')[-1]}' format instead."
-        )
-    if not os.path.isdir(args.new_path):
-        raise FileNotFoundError(
-            f"{args.input_file}: No such directory found."
-        )
-
-
-########################################
-
-
-def main() -> None:
-    """Main function."""
-
-    # ARGUMENTS PARSING BLOCK
-
-    parser = argparse.ArgumentParser(
-        description="A command-line tool to modify path designation in JSON summary files."
-    )
+def _get_command_line_args() -> argp.Namespace:
+    """Command-line arguments UI."""
+    parser = argp.ArgumentParser(description=__doc__)
     parser.add_argument(
         "input_file", help="Path to the JSON file to update paths in."
     )
@@ -51,36 +30,73 @@ def main() -> None:
         action="store_true",
         help="The new path is absolutized before replacing the old one."
     )
-
     args = parser.parse_args()
+    return args
 
-    _assert_args(args)
+
+def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+    """Handle input arguments assertions and processing."""
+    if args_dict is None:
+        raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
+    
+    check_type(args_dict, "args_dict", (dict,))
+
+    # Set default values for unset optional arguments
+    args_dict.setdefault("absolute", False)
+
+    # Assert set arguments conformity
+    check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="json")
+    check_file_or_dir(args_dict.gat("new_path"), "dir")
+    check_type(args_dict.get("absolute"), "absolute", (bool,))
+
+    return args_dict
 
 
-    # MAIN BLOCK
+########################################
 
-    with open(args.input_file, "rt", encoding="utf-8") as fp:
+
+def main(standalone: bool = True, **kwargs) -> None:
+    """
+    Update paths keys in a summary json file when the corresponding structure directories are moved.
+
+    Args:
+        standalone (bool):      Whether parsed script is used directly through
+                                command-line (stand-alone script) or in an external
+                                pipeline script.
+
+        input_file (str|Path):  Path to the JSON file to update paths in.
+
+        new_path (str|Path):    Path to the directory where structure directories are actually
+                                stored.
+
+        absolute (bool):        If set to True, the new path is absolutized before replacing
+                                the old one. Defaults to False.
+    """
+    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+
+    with open(args.get("input_file"), "rt", encoding="utf-8") as fp:
         data = json.load(fp)
 
     assert (
-        isinstance(data, List)
-        and all(isinstance(struct, Dict) for struct in data)
+        isinstance(data, list)
+        and all(isinstance(struct, dict) for struct in data)
     ), "The data inside the JSON file must be a list of structure dicts."
 
-    if args.absolute:
-        new_path = os.path.abspath(args.new_path)
+    if args.get("absolute"):
+        new_path = os.path.realpath(args.get("new_path"))
     else:
-        new_path = args.new_path
+        new_path = args.get("new_path")
 
     for struct in data:
         old_path = struct["path"]
         struct_name = os.path.basename(old_path)
         struct["path"] = os.path.join(new_path, struct_name)
 
-    with open(args.input_file, "wt", encoding="utf-8") as fp:
+    with open(args.get("input_file"), "wt", encoding="utf-8") as fp:
         json.dump(data, fp, indent=4)
 
-    print(f"the file '{os.path.basename(args.input_file)}' was successfully modified.")
+    file = args.get("input_file")
+    print(f"the file '{os.path.basename(file)}' was successfully modified.")
 
 
 if __name__ == "__main__":

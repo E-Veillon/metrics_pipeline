@@ -6,74 +6,27 @@ Energy results may be used for phase diagrams computations.
 """
 
 import os
+import typing as typ
 from datetime import datetime
-import argparse
+import argparse as argp
 
 # PYTHON MATERIAL GENOMICS
 from pymatgen.core.structure import SiteCollection
 
 # LOCAL IMPORTS
+from . import CONFIGPATH, _parse_input_args
 from .utils import (
-    CONFIGPATH, check_file_or_dir, add_new_dir, yaml_loader,
+    check_type, check_num_value, check_file_or_dir, add_new_dir, yaml_loader,
     PMGStaticSet, read_cif, vasp_static_settings, write_and_run_vasp
 )
 
 
 ########################################
+# ARGUMENTS HANDLING
 
-
-def _assert_args(args: argparse.Namespace) -> None:
-    """Asserting input arguments validity."""
-
-    check_file_or_dir(args.input_file, "file", allowed_formats="cif")
-
-    assert (
-        args.executable_path.startswith("vasp")
-        or os.path.exists(args.executable_path)
-    ), f"{args.executable_path}: executable file not found."
-
-    check_file_or_dir(args.output, "dir")
-
-    assert args.preset in PMGStaticSet, (
-    "Provided relaxation preset must be one of the following:\n"
-    f"{PMGStaticSet.values}"
-    )
-
-    settings_path = os.path.join(CONFIGPATH, args.user_settings)
-    check_file_or_dir(settings_path, "file", allowed_formats="yaml")
-
-    assert args.workers >= 1, (
-    "'workers' argument value must be strictly positive."
-    )
-
-    if args.task_index is not None:
-        assert args.task_index >= 0, (
-        "'task_index' argument value must be positive or zero."
-        )
-
-
-########################################
-
-
-def main():
-    """Main function."""
-    start = datetime.now()
-
-    # ARGUMENTS PARSING BLOCK
-
-    prog_name = "vasp_static_sun.py"
-    prog_description = (
-        "A script that writes and performs VASP static runs on structure data "
-        "read from CIF files, using pymatgen as a setting interface between "
-        "raw data and VASP.\n"
-        "Energy results may be used for phase diagrams computations."
-    )
-
-    parser = argparse.ArgumentParser(
-        prog=prog_name,
-        description=prog_description
-    )
-
+def _get_command_line_args() -> argp.Namespace:
+    """Command-line arguments UI."""
+    parser = argp.ArgumentParser(description=__doc__)
     parser.add_argument(
         "input_file",
         type=str,
@@ -88,19 +41,18 @@ def main():
     )
     parser.add_argument(
         "-o", "--output",
-        type=str,
-        default="./",
         help=(
             "Path to the output directory where VASP files will be written. "
-            "A subdirectory will be created in output directory "
-            "for each structure found in input_file."
+            "A subdirectory will be created in output directory for each structure "
+            "found in input_file. By default, it will create a 'Statics' directory "
+            "in the input_file directory and write structures runs in it."
         ),
         metavar="outdir"
     )
     parser.add_argument(
         "-p", "--preset",
         type=PMGStaticSet,
-        default=PMGStaticSet.MPSTATICSET,
+        default=PMGStaticSet.MPSTATICSET.value,
         help=(
             "The pymatgen preset to use for VASP static run. "
             "More info on possible presets in pymatgen documentation:\n"
@@ -123,8 +75,11 @@ def main():
     parser.add_argument(
         "-w", "--workers",
         type=int,
-        default=1,
-        help="Number of parallel processes to spawn for parallelized steps."
+        help=(
+            "Number of parallel processes to spawn for parallelized steps. "
+            "If not given, default value is the 'max_workers' default value "
+            "from tqdm.contrib.concurrent.process_map function."
+        )
     )
     parser.add_argument(
         "-t",
@@ -138,37 +93,94 @@ def main():
             "If not given, it will default to the first index possible, i.e. index 0."
         ),
     )
-
-    args: argparse.Namespace = parser.parse_args()
-
-    _assert_args(args)
-
-    settings = os.path.join(CONFIGPATH, args.user_settings)
-    user_settings = yaml_loader(settings)
-    struct_idx    = args.task_index
+    args: argp.Namespace = parser.parse_args()
+    return args
 
 
-    # MAIN BLOCK
+def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+    """Handle input arguments assertions and processing."""
+    if args_dict is None:
+        raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
+    
+    check_type(args_dict, "args_dict", (dict,))
+
+    # Set default values for unset optional arguments
+    args_dict.setdefault("executable_path", "vasp")
+    # WARNING:
+    # Usual VASP shortcut, but may activate wrong VASP version if several are installed.
+    # Prefer giving a true VASP executable path for unambiguous computation.
+    default_output = os.path.join(os.path.dirname(args_dict.get("input_file")), "Statics")
+    args_dict.setdefault("output", default_output)
+    args_dict.setdefault("preset", PMGStaticSet.MPSTATICSET.value)
+    args_dict.setdefault("user_settings", "default_settings.yaml")
+    args_dict.setdefault("task_index", 0)
+
+    # Assert set arguments conformity
+    check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="cif")
+
+    if not str(args_dict.get("executable_path")).startswith("vasp"):
+        check_file_or_dir(args_dict.get("executable_path"), "file")
+
+    assert args_dict.get("preset") in PMGStaticSet.values, (
+    "Provided static preset must be one of the following:\n"
+    f"{PMGStaticSet.values}."
+    )
+    config_path = os.path.join(CONFIGPATH, args_dict.get("user_settings"))
+    check_file_or_dir(config_path, "file", allowed_formats=("yml", "yaml"))
+    
+    if args_dict.get("workers") is not None:
+        check_type(args_dict.get("workers"), (int,))
+        check_num_value(args_dict.get("workers"), "workers", ">", 0)
+    
+    check_type(args_dict.get("task_index"), (int,))
+    check_num_value(args_dict.get("task_index"), "task_index", ">=", 0)
+
+    # Additional arguments processing
+    os.makedirs(args_dict.get("output"), exist_ok=True)
+    args_dict["preset"] = PMGStaticSet(args_dict.get("preset"))
+    args_dict["settings"] = yaml_loader(config_path)
+
+    return args_dict
+
+
+########################################
+
+
+def main(standalone: bool = True, **kwargs):
+    """
+    A script that writes and performs VASP static run on structure data read from CIF files,
+    using pymatgen as a setting interface between raw data and VASP. Energy results may be used
+    for phase diagrams computations.
+    
+    Args:
+        standalone (bool):      Whether parsed script is used directly through
+                                command-line (stand-alone script) or in an external
+                                pipeline script.
+
+        input_file (str|Path):  Path to the CIF file containing structure data to read.
+    """
+    start = datetime.now()
+    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Convert CIF data into Structure objects
     structures, *_ = read_cif(
-        filename=args.input_file,
-        workers=args.workers,
+        filename=args.get("input_file"),
+        workers=args.get("workers"),
         keep_rare_gases=True, # Avoid calling rare gaz screening function
         keep_rare_earths=True # Avoid calling rare earth screening function
     )
 
-    structure: SiteCollection = structures[struct_idx]
-    dir_name = f"{struct_idx}_{structure.composition.reduced_formula}"
+    structure: SiteCollection = structures[args.get("task_index")]
+    dir_name = f"{args.get('task_index')}_{structure.composition.reduced_formula}"
 
     vasp_input = vasp_static_settings(
         structure=structure,
-        preset=args.preset,
-        user_corrections=user_settings
+        preset=args.get("preset"),
+        user_corrections=args.get("settings")
     )
-    run_dir = add_new_dir(args.output, dir_name)
+    run_dir = add_new_dir(args.get("output"), dir_name)
 
-    write_and_run_vasp(vasp_input, run_dir, args.executable_path)
+    write_and_run_vasp(vasp_input, run_dir, args.get("executable_path"))
 
     stop = datetime.now()
     print(f"Elapsed time: {stop-start}")

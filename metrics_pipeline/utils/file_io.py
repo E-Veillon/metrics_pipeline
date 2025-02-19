@@ -6,7 +6,7 @@ Implements functions to manage and operate on paths.
 
 import os
 import warnings
-from typing import Literal, Sequence, List, Tuple
+import typing as typ
 from pathlib import Path
 from ruamel.yaml import YAML
 
@@ -15,7 +15,7 @@ from .common_asserts import check_type
 from .custom_types import PathLike
 
 # Main paths inside pipeline file tree
-MAINDIRPATH = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+MAINDIRPATH = os.path.realpath(os.path.dirname(os.path.dirname(__file__)))
 """Absolute path to the main pipeline directory."""
 SCRIPTSPATH = os.path.join(MAINDIRPATH, "scripts")
 """Absolute path to the pipeline scripts directory containing executable scripts."""
@@ -28,7 +28,7 @@ CONFIGPATH  = os.path.join(MAINDIRPATH, "config")
 ########################################
 
 
-def check_file_format(filename: PathLike, *, allowed_formats: str|Sequence[str]) -> None:
+def check_file_format(filename: PathLike, *, allowed_formats: str|typ.Sequence[str]) -> None:
     """
     Verify that extension format of given file and wanted file format match,
     no matter if given file exists or not.
@@ -42,7 +42,7 @@ def check_file_format(filename: PathLike, *, allowed_formats: str|Sequence[str])
                                         (list or tuple) of strings.
     """
     check_type(filename, "filename", (str, Path))
-    check_type(allowed_formats, "allowed_formats", (str, Sequence))
+    check_type(allowed_formats, "allowed_formats", (str, typ.Sequence))
     if isinstance(allowed_formats, str):
         allowed_formats = (allowed_formats,)
     else:
@@ -66,9 +66,9 @@ def check_file_format(filename: PathLike, *, allowed_formats: str|Sequence[str])
 
 def check_file_or_dir(
     path: PathLike,
-    file_or_dir: Literal["file", "dir"] = "file",
+    file_or_dir: typ.Literal["file", "dir"] = "file",
     *,
-    allowed_formats: str|Sequence|None = None
+    allowed_formats: str|typ.Sequence|None = None
 ) -> None:
     """
     Verify existence and optionally extension format of given path.
@@ -88,7 +88,7 @@ def check_file_or_dir(
     check_type(path, "path", (str, Path))
     assert file_or_dir in {"file", "dir"}
     if allowed_formats is not None:
-        check_type(allowed_formats, "allowed_formats", (str, List, Tuple))
+        check_type(allowed_formats, "allowed_formats", (str, list, tuple))
 
     path = str(path)
 
@@ -155,7 +155,7 @@ class BadYamlWarning(UserWarning):
 ########################################
 
 
-def yaml_loader(file_path: PathLike, on_error: Literal["raise", "warn", "ignore"] = "warn"):
+def yaml_loader(file_path: PathLike, on_error: typ.Literal["raise", "warn", "ignore"] = "warn"):
     """Load a YAML file and casts it explicitly to a dict"""
     check_file_or_dir(file_path, "file",  allowed_formats="yaml")
 

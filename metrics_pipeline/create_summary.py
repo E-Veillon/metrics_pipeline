@@ -1,11 +1,13 @@
 #!/usr/bin/python
-"""A script to generate a JSON summary from manually rejected structures."""
+"""A script to generate a JSON summary from manually selected structures."""
 
 import os
 import json
 import argparse as argp
 import typing as typ
 
+# LOCAL IMPORTS
+from . import _parse_input_args
 from .utils import (
     check_type, check_file_format, check_file_or_dir, match_struct_dirs
 )
@@ -65,18 +67,21 @@ def _get_command_line_args() -> argp.Namespace:
 def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     """Handle input arguments assertions and processing."""
     if args_dict is None:
-        raise ValueError("No arguments found at 'create_summary.py' script call.")
+        raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
     
-    check_type(args_dict, "args_dict", (dict))
+    check_type(args_dict, "args_dict", (dict,))
 
+    # Set default values for unset optional arguments
     args_dict.setdefault("output", "manual_summary.json")
     args_dict.setdefault("key_name", "selected")
     args_dict.setdefault("reject", False)
 
+    # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_dir"), "dir")
     check_file_format(args_dict.get("output"), allowed_formats="json")
     match_struct_dirs(args_dict.get("input_dir"), args_dict.get("indices"), no_return=True)
 
+    # Additional arguments processing
     if args_dict.get("indices") is not None:
         args_dict["indices"] = sorted(args_dict.get("indices"))
 
@@ -85,27 +90,18 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     return args_dict
 
 
-def _parse_input_args(**kwargs) -> dict[str, typ.Any]:
-    """Gather and process input arguments, either from command-line or external script."""
-    if __name__ == "__main__": # Direct use of the script through command line
-        args = _get_command_line_args()
-        args = args.__dict__
-    else: # Indirect use of the script as part of a pipeline script in another file
-        args = kwargs
-
-    args: dict[str, typ.Any] = _process_input_args(args)
-
-    return args
-
-
 ########################################
 
 
-def main(**kwargs) -> None:
+def main(standalone: bool = True, **kwargs) -> None:
     """
-    create_summary.py: A script to generate a JSON summary from manually rejected structures.
+    A script to generate a JSON summary from manually selected structures.
     
-    Possible kwargs:
+    Args:
+        standalone (bool):      Whether parsed script is used directly through
+                                command-line (stand-alone script) or in an external
+                                pipeline script.
+
         input_dir (str|Path):   Directory containing structure directories.
 
         indices ([int]):        List of the indices of the structures of interest
@@ -128,7 +124,7 @@ def main(**kwargs) -> None:
                                 given structures instead of saving them
                                 (i.e. having a 'selected = True' key).
     """
-    args = _parse_input_args(**kwargs)
+    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     all_struct_dirs = match_struct_dirs(args.get("input_dir"))
     wanted_struct_dirs = match_struct_dirs(args.get("input_dir"), args.get("indices"))
