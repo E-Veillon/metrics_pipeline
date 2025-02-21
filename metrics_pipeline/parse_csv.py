@@ -25,8 +25,8 @@ from .utils import (
 # ARGUMENTS HANDLING
 
 def _get_command_line_args() -> argp.Namespace:
-    """Command-line arguments UI."""
-    parser = argp.ArgumentParser(description=__doc__)
+    """Command Line Interface (CLI)."""
+    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument("infile",help="CSV file containing a 'cif' data column to process.")
     parser.add_argument("-o","--output",help="Path to write processed CSV file.")
     parser.add_argument(
@@ -97,6 +97,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     check_type(args_dict, "args_dict", (dict,))
 
     # Set default values for unset optional arguments
+    args_dict = {k: v for k, v in args_dict.items() if v is not None}
     default_output = str(args_dict.get("infile")).replace(".csv","_parsed.csv")
     args_dict.setdefault("output", default_output)
     args_dict.setdefault("no_rare_gas_check", False)

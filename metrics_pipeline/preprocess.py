@@ -24,8 +24,8 @@ from .utils import (
 # ARGUMENTS HANDLING
 
 def _get_command_line_args() -> argp.Namespace:
-    """Command-line arguments UI."""
-    parser = argp.ArgumentParser(prog="create_summary.py", description=__doc__)
+    """Command Line Interface (CLI)."""
+    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument(
         "input_file",
         help="Path to the CIF file containing structure data to process.",
@@ -120,6 +120,7 @@ def _get_command_line_args() -> argp.Namespace:
         metavar="int",
     )
     args: argp.Namespace = parser.parse_args()
+    print(f"Detected command-line arguments:\n{args}")
     return args
 
 
@@ -131,6 +132,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     check_type(args_dict, "args_dict", (dict,))
 
     # Set default values for unset optional arguments
+    args_dict = {k: v for k, v in args_dict.items() if v is not None}
     default_output = str(args_dict.get("input_file")).replace(".cif", "_out.cif")
     args_dict.setdefault("output", default_output)
     args_dict.setdefault("no_rare_gas_check", False)
