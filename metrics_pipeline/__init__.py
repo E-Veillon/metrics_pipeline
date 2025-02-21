@@ -42,11 +42,11 @@ def _parse_input_args(
         Dict of input arguments names and values.
     """
     if standalone: # Direct use of the script through command line
-        print("Command line mode detected, parsing arguments...")
+        print("Command line mode detected.")
         args = cmd_line_func()
         args = args.__dict__
     else: # Indirect use of the script as part of a pipeline script in another file
-        print("Pipeline mode detected, processing arguments...")
+        print("Pipeline mode detected.")
         args = kwargs
 
     args: dict[str, Any] = process_args_func(args)

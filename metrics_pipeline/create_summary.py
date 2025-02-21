@@ -17,8 +17,8 @@ from .utils import (
 # ARGUMENTS HANDLING
 
 def _get_command_line_args() -> argp.Namespace:
-    """Command-line arguments UI."""
-    parser = argp.ArgumentParser(prog="create_summary.py", description=__doc__)
+    """Command Line Interface (CLI)."""
+    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
 
     parser.add_argument(
         "input_dir",
@@ -72,6 +72,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     check_type(args_dict, "args_dict", (dict,))
 
     # Set default values for unset optional arguments
+    args_dict = {k: v for k, v in args_dict.items() if v is not None}
     args_dict.setdefault("output", "manual_summary.json")
     args_dict.setdefault("key_name", "selected")
     args_dict.setdefault("reject", False)

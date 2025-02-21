@@ -39,8 +39,8 @@ from .utils import (
 # ARGUMENTS HANDLING
 
 def _get_command_line_args() -> argp.Namespace:
-    """Command-line arguments UI."""
-    parser = argp.ArgumentParser(description=__doc__)
+    """Command Line Interface (CLI)."""
+    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument(
         "run_dir",
         help="Base directory containing structure directories with VASP runs inside.",
@@ -127,6 +127,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     check_type(args_dict, "args_dict", (dict,))
 
     # Set default values for unset optional arguments
+    args_dict = {k: v for k, v in args_dict.items() if v is not None}
     args_dict.setdefault("summary", "summary.json")
     args_dict.setdefault("limit", 0.1)
     args_dict.setdefault("verbose", False)
