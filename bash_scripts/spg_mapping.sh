@@ -5,16 +5,16 @@
 # This script's main goal is to show the symmetrization results from metrics_pipeline/preprocess.py.
 
 GetSpgCount10 () {
-	local spg0=$1
-	local spg1=$(($spg0 + 1))
-	local spg2=$(($spg1 + 1))
-	local spg3=$(($spg2 + 1))
-	local spg4=$(($spg3 + 1))
-	local spg5=$(($spg4 + 1))
-	local spg6=$(($spg5 + 1))
-	local spg7=$(($spg6 + 1))
-	local spg8=$(($spg7 + 1))
-	local spg9=$(($spg8 + 1))
+	spg0=$1
+	spg1=$(($spg0 + 1))
+	spg2=$(($spg1 + 1))
+	spg3=$(($spg2 + 1))
+	spg4=$(($spg3 + 1))
+	spg5=$(($spg4 + 1))
+	spg6=$(($spg5 + 1))
+	spg7=$(($spg6 + 1))
+	spg8=$(($spg7 + 1))
+	spg9=$(($spg8 + 1))
 	count0=$(grep -c "^_symmetry_Int_Tables_number   $spg0$" "$2")
 	count1=$(grep -c "^_symmetry_Int_Tables_number   $spg1$" "$2")
 	count2=$(grep -c "^_symmetry_Int_Tables_number   $spg2$" "$2")
@@ -25,6 +25,8 @@ GetSpgCount10 () {
 	count7=$(grep -c "^_symmetry_Int_Tables_number   $spg7$" "$2")
 	count8=$(grep -c "^_symmetry_Int_Tables_number   $spg8$" "$2")
 	count9=$(grep -c "^_symmetry_Int_Tables_number   $spg9$" "$2")
+
+	# Formatting outputs
 	printf -v fspg0 "%03d" $spg0
 	printf -v fspg1 "%03d" $spg1
 	printf -v fspg2 "%03d" $spg2
@@ -47,28 +49,93 @@ GetSpgCount10 () {
 	printf -v fcount9 "%0$3d" $count9
 }
 
+CountCrystalSystem () {
+	if [ $1 -le 2 ]; then
+		triclinic=$(($triclinic + $2))
+	elif [ $1 -le 15 ]; then
+		monoclinic=$(($monoclinic + $2))
+	elif [ $1 -le 74 ]; then
+		orthorombic=$(($orthorombic + $2))
+	elif [ $1 -le 142 ]; then
+		quadratic=$(($quadratic + $2))
+	elif [ $1 -le 167 ]; then
+		trigonal=$(($trigonal + $2))
+	elif [ $1 -le 194 ]; then
+		hexagonal=$(($hexagonal + $2))
+	else
+		cubic=$(($cubic + $2))
+	fi
+}
+
+FormatCrystalSystemCounts () {
+	printf -v tric "%0$1d" $triclinic
+	printf -v mono "%0$1d" $monoclinic
+	printf -v orth "%0$1d" $orthorombic
+	printf -v quad "%0$1d" $quadratic
+	printf -v trig "%0$1d" $trigonal
+	printf -v hexa "%0$1d" $hexagonal
+	printf -v cubi "%0$1d" $cubic
+}
+
+debug=0
+
 for file in "$@"; do
+	if [ $file == "--debug" ]; then
+		debug=1
+		continue
+	fi
+
 	echo "Analysing symmetries in $file:"
+	triclinic=0
+	monoclinic=0
+	orthorombic=0
+	quadratic=0
+	trigonal=0
+	hexagonal=0
+	cubic=0
 	structs_num=$(grep -c "^data_" "$file")
 	spg_num=$(grep -c "^_symmetry_Int_Tables_number" "$file")
 	max_digit=${#spg_num}
+	echo ""
 	echo "Spacegroups details:"
 	spgsum=0
 	for spg in {1..221..10}; do
 		GetSpgCount10 $spg "$file" $max_digit
-		echo "$fspg0: $fcount0, $fspg1: $fcount1, $fspg2: $fcount2, $fspg3: $fcount3, $fspg4: $fcount4, $fspg5: $fcount5, $fspg6: $fcount6, $fspg7: $fcount7, $fspg8: $fcount8, $fspg9: $fcount9"
+		echo "$fspg0: $fcount0 | $fspg1: $fcount1 | $fspg2: $fcount2 | $fspg3: $fcount3 | $fspg4: $fcount4 | $fspg5: $fcount5 | $fspg6: $fcount6 | $fspg7: $fcount7 | $fspg8: $fcount8 | $fspg9: $fcount9"
 		spgsum=$(($spgsum + $count0 + $count1 + $count2 + $count3 + $count4 + $count5 + $count6 + $count7 + $count8 + $count9))
+		CountCrystalSystem $spg0 $count0
+		CountCrystalSystem $spg1 $count1
+		CountCrystalSystem $spg2 $count2
+		CountCrystalSystem $spg3 $count3
+		CountCrystalSystem $spg4 $count4
+		CountCrystalSystem $spg5 $count5
+		CountCrystalSystem $spg6 $count6
+		CountCrystalSystem $spg7 $count7
+		CountCrystalSystem $spg8 $count8
+		CountCrystalSystem $spg9 $count9
 	done
+	echo ""
+	echo "Crystal Systems details:"
+	cs_sum=$(($triclinic + $monoclinic + $orthorombic + $quadratic + $trigonal + $hexagonal + $cubic))
+	FormatCrystalSystemCounts $max_digit
+	echo "Triclinic: $tric | Monoclinic: $mono | Orthorombic: $orth | Quadratic:   $quad"
+	echo "Trigonal:  $trig | Hexagonal:  $hexa | Cubic:       $cubi | Total (Tcs): $cs_sum"
+	echo ""
 	echo "Total number of structures (Tst): $structs_num"
 	echo "Total number of spacegroups (Tsg): $spg_num"
 	echo "Sum of listed spacegroups (Ssg): $spgsum"
+	echo ""
 done
 
-echo "|----------------------------------------------------------------------------------------|"
-echo "| Debug Notes:                                                                           |"
-echo "| For each file analysis:                                                                |"
-echo "| - (Tst == Tsg == Ssg != 0) => Everything is fine, result is reliable.                  |"
-echo "| - Tst == 0 => Verify that the file respects CIF formatting.                            |"
-echo "| - Tst > Tsg => Some data do not contain the '_symmetry_Int_Tables_number' line header. |"
-echo "| - Tst == Tsg != Ssg => An edge case in file is probably causing a bug in the script.   |"
-echo "|----------------------------------------------------------------------------------------|"
+if [ $debug -eq 1 ]; then
+	echo "|----------------------------------------------------------------------------------------|"
+	echo "| Debug Notes:                                                                           |"
+	echo "| For each file analysis:                                                                |"
+	echo "| - (Tcs == Tst == Tsg == Ssg != 0) => Everything is fine, result is reliable.           |"
+	echo "| - Tcs < Tsg => The CountCrystalSystem function skipped some counting.                  |"
+	echo "| - Tst == 0 => Verify that the file respects CIF formatting.                            |"
+	echo "| - Tst > Tsg => Some data do not contain the '_symmetry_Int_Tables_number' line header. |"
+	echo "| - Tst == Tsg != Ssg => An edge case in file is probably causing a bug in the script.   |"
+	echo "|----------------------------------------------------------------------------------------|"
+	echo ""
+fi
