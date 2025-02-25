@@ -68,23 +68,46 @@ CountCrystalSystem () {
 }
 
 FormatCrystalSystemCounts () {
-	printf -v tric "%0$1d" $triclinic
-	printf -v mono "%0$1d" $monoclinic
-	printf -v orth "%0$1d" $orthorombic
-	printf -v quad "%0$1d" $quadratic
-	printf -v trig "%0$1d" $trigonal
-	printf -v hexa "%0$1d" $hexagonal
-	printf -v cubi "%0$1d" $cubic
+	printf -v tric "%0$1d" $2
+	printf -v mono "%0$1d" $3
+	printf -v orth "%0$1d" $4
+	printf -v quad "%0$1d" $5
+	printf -v trig "%0$1d" $6
+	printf -v hexa "%0$1d" $7
+	printf -v cubi "%0$1d" $8
+}
+
+StoreCrystalSystemCounts () {
+	total_triclinic=$(($total_triclinic + $triclinic))
+	total_monoclinic=$(($total_monoclinic + $monoclinic))
+	total_orthorombic=$(($total_orthorombic + $orthorombic))
+	total_quadratic=$(($total_quadratic + $quadratic))
+	total_trigonal=$(($total_trigonal + $trigonal))
+	total_hexagonal=$(($total_hexagonal + $hexagonal))
+	total_cubic=$(($total_cubic + $cubic))
 }
 
 debug=0
+compute_sum=0
+total_triclinic=0
+total_monoclinic=0
+total_orthorombic=0
+total_quadratic=0
+total_trigonal=0
+total_hexagonal=0
+total_cubic=0
+args=$@
 
 for file in "$@"; do
 	if [ $file == "--debug" ]; then
 		debug=1
 		continue
+	elif [ $file == "--sum" ]; then
+		compute_sum=1
+		continue
 	fi
 
+	echo ""
 	echo "Analysing symmetries in $file:"
 	triclinic=0
 	monoclinic=0
@@ -114,28 +137,41 @@ for file in "$@"; do
 		CountCrystalSystem $spg8 $count8
 		CountCrystalSystem $spg9 $count9
 	done
+	StoreCrystalSystemCounts
+	file_cs_sum=$(($triclinic + $monoclinic + $orthorombic + $quadratic + $trigonal + $hexagonal + $cubic))
+	FormatCrystalSystemCounts $max_digit $triclinic $monoclinic $orthorombic $quadratic $trigonal $hexagonal $cubic
 	echo ""
 	echo "Crystal Systems details:"
-	cs_sum=$(($triclinic + $monoclinic + $orthorombic + $quadratic + $trigonal + $hexagonal + $cubic))
-	FormatCrystalSystemCounts $max_digit
-	echo "Triclinic: $tric | Monoclinic: $mono | Orthorombic: $orth | Quadratic:   $quad"
-	echo "Trigonal:  $trig | Hexagonal:  $hexa | Cubic:       $cubi | Total (Tcs): $cs_sum"
+	echo "Triclinic: $tric | Monoclinic: $mono | Orthorombic: $orth | Quadratic: $quad"
+	echo "Trigonal:  $trig | Hexagonal:  $hexa | Cubic:       $cubi | Sum (Scs): $file_cs_sum"
 	echo ""
-	echo "Total number of structures (Tst): $structs_num"
-	echo "Total number of spacegroups (Tsg): $spg_num"
+	echo "Number of structures (Nst): $structs_num"
+	echo "Number of spacegroups (Nsg): $spg_num"
 	echo "Sum of listed spacegroups (Ssg): $spgsum"
 	echo ""
 done
 
+if [ $compute_sum -eq 1 ]; then
+	total_sum=$(($total_triclinic + $total_monoclinic + $total_orthorombic + $total_quadratic + $total_trigonal + $total_hexagonal + $total_cubic))
+	total_max_digit=${#total_sum}
+	FormatCrystalSystemCounts $total_max_digit $total_triclinic $total_monoclinic $total_orthorombic $total_quadratic $total_trigonal $total_hexagonal $total_cubic
+	echo ""
+	echo "Total sum of Crystal system distributions from all evaluated files:"
+	echo "Triclinic: $tric | Monoclinic: $mono | Orthorombic: $orth | Quadratic: $quad"
+	echo "Trigonal:  $trig | Hexagonal:  $hexa | Cubic:       $cubi | Total Sum: $total_sum"
+	echo ""
+fi
+
 if [ $debug -eq 1 ]; then
+	echo ""
 	echo "|----------------------------------------------------------------------------------------|"
 	echo "| Debug Notes:                                                                           |"
 	echo "| For each file analysis:                                                                |"
-	echo "| - (Tcs == Tst == Tsg == Ssg != 0) => Everything is fine, result is reliable.           |"
-	echo "| - Tcs < Tsg => The CountCrystalSystem function skipped some counting.                  |"
-	echo "| - Tst == 0 => Verify that the file respects CIF formatting.                            |"
-	echo "| - Tst > Tsg => Some data do not contain the '_symmetry_Int_Tables_number' line header. |"
-	echo "| - Tst == Tsg != Ssg => An edge case in file is probably causing a bug in the script.   |"
+	echo "| - (Scs == Nst == Nsg == Ssg != 0) => Everything is fine, result is reliable.           |"
+	echo "| - Scs < Nsg => The CountCrystalSystem function skipped some counting.                  |"
+	echo "| - Nst == 0 => Verify that the file respects CIF formatting.                            |"
+	echo "| - Nst > Nsg => Some data do not contain the '_symmetry_Int_Tables_number' line header. |"
+	echo "| - Nst == Nsg != Ssg => An edge case in file is probably causing a bug in the script.   |"
 	echo "|----------------------------------------------------------------------------------------|"
 	echo ""
 fi
