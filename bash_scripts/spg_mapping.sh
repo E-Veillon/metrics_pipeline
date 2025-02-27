@@ -4,160 +4,358 @@
 # Pymatgen's CifWriter, is used to define the spacegroup number of all structures.
 # This script's main goal is to show the symmetrization results from metrics_pipeline/preprocess.py.
 
-GetSpgCount10 () {
-	spg0=$1
-	spg1=$(($spg0 + 1))
-	spg2=$(($spg1 + 1))
-	spg3=$(($spg2 + 1))
-	spg4=$(($spg3 + 1))
-	spg5=$(($spg4 + 1))
-	spg6=$(($spg5 + 1))
-	spg7=$(($spg6 + 1))
-	spg8=$(($spg7 + 1))
-	spg9=$(($spg8 + 1))
-	count0=$(grep -c "^_symmetry_Int_Tables_number   $spg0$" "$2")
-	count1=$(grep -c "^_symmetry_Int_Tables_number   $spg1$" "$2")
-	count2=$(grep -c "^_symmetry_Int_Tables_number   $spg2$" "$2")
-	count3=$(grep -c "^_symmetry_Int_Tables_number   $spg3$" "$2")
-	count4=$(grep -c "^_symmetry_Int_Tables_number   $spg4$" "$2")
-	count5=$(grep -c "^_symmetry_Int_Tables_number   $spg5$" "$2")
-	count6=$(grep -c "^_symmetry_Int_Tables_number   $spg6$" "$2")
-	count7=$(grep -c "^_symmetry_Int_Tables_number   $spg7$" "$2")
-	count8=$(grep -c "^_symmetry_Int_Tables_number   $spg8$" "$2")
-	count9=$(grep -c "^_symmetry_Int_Tables_number   $spg9$" "$2")
+# File Counters
+declare -i structs_num=0
+declare -i spg_num=0
+declare -i S1=0
+declare -i S2=0
+declare -i S3=0
+declare -a Spgs
+declare -A PointGroups
+declare -A CrystalSystems
 
-	# Formatting outputs
-	printf -v fspg0 "%03d" $spg0
-	printf -v fspg1 "%03d" $spg1
-	printf -v fspg2 "%03d" $spg2
-	printf -v fspg3 "%03d" $spg3
-	printf -v fspg4 "%03d" $spg4
-	printf -v fspg5 "%03d" $spg5
-	printf -v fspg6 "%03d" $spg6
-	printf -v fspg7 "%03d" $spg7
-	printf -v fspg8 "%03d" $spg8
-	printf -v fspg9 "%03d" $spg9
-	printf -v fcount0 "%0$3d" $count0
-	printf -v fcount1 "%0$3d" $count1
-	printf -v fcount2 "%0$3d" $count2
-	printf -v fcount3 "%0$3d" $count3
-	printf -v fcount4 "%0$3d" $count4
-	printf -v fcount5 "%0$3d" $count5
-	printf -v fcount6 "%0$3d" $count6
-	printf -v fcount7 "%0$3d" $count7
-	printf -v fcount8 "%0$3d" $count8
-	printf -v fcount9 "%0$3d" $count9
-}
+# Total Counters
+declare -i total_structs_num=0
+declare -i total_spg_num=0
+declare -i total_S1=0
+declare -i total_S2=0
+declare -i total_S3=0
+declare -a TotalSpgs
+declare -A TotalPG
+declare -A TotalCS
 
-CountCrystalSystem () {
-	if [ $1 -le 2 ]; then
-		triclinic=$(($triclinic + $2))
-	elif [ $1 -le 15 ]; then
-		monoclinic=$(($monoclinic + $2))
-	elif [ $1 -le 74 ]; then
-		orthorombic=$(($orthorombic + $2))
-	elif [ $1 -le 142 ]; then
-		quadratic=$(($quadratic + $2))
-	elif [ $1 -le 167 ]; then
-		trigonal=$(($trigonal + $2))
-	elif [ $1 -le 194 ]; then
-		hexagonal=$(($hexagonal + $2))
-	else
-		cubic=$(($cubic + $2))
+# Flags detection
+declare -i debug=0
+declare -i compute_sum=0
+
+CheckFlags () {
+	isFlag=0
+	if [ $1 == "--debug" ]; then
+		debug=1
+		isFlag=1
+	elif [ $1 == "--sum" ]; then
+		compute_sum=1
+		isFlag=1
 	fi
 }
 
-FormatCrystalSystemCounts () {
-	printf -v tric "%0$1d" $2
-	printf -v mono "%0$1d" $3
-	printf -v orth "%0$1d" $4
-	printf -v quad "%0$1d" $5
-	printf -v trig "%0$1d" $6
-	printf -v hexa "%0$1d" $7
-	printf -v cubi "%0$1d" $8
+ResetFileCounters () {
+    for key in {1..230}; do
+        Spgs[$key]=0
+    done
+
+	for key in "${!PointGroups[@]}"; do
+		PointGroups[$key]=0
+	done
+
+	for key in "${!CrystalSystems[@]}"; do
+		CrystalSystems[$key]=0
+	done
 }
 
-StoreCrystalSystemCounts () {
-	total_triclinic=$(($total_triclinic + $triclinic))
-	total_monoclinic=$(($total_monoclinic + $monoclinic))
-	total_orthorombic=$(($total_orthorombic + $orthorombic))
-	total_quadratic=$(($total_quadratic + $quadratic))
-	total_trigonal=$(($total_trigonal + $trigonal))
-	total_hexagonal=$(($total_hexagonal + $hexagonal))
-	total_cubic=$(($total_cubic + $cubic))
+SumArrayValues () {
+    local -a array=${@}
+    sum=0
+    for i in ${array[@]}; do
+        let sum+=$i
+    done
 }
 
-debug=0
-compute_sum=0
-total_triclinic=0
-total_monoclinic=0
-total_orthorombic=0
-total_quadratic=0
-total_trigonal=0
-total_hexagonal=0
-total_cubic=0
+CountSpgs () {
+    for i in {1..230}; do
+        Spgs[$i]=$(grep -c "^_symmetry_Int_Tables_number   $i$" "$1")
+    done
+}
+
+ClassifySpgs () {
+    local -a tric_arr=("${@:1:2}")
+    local -a mono_arr=("${@:3:13}")
+    local -a orth_arr=("${@:16:59}")
+    local -a quad_arr=("${@:75:68}")
+    local -a trig_arr=("${@:143:25}")
+    local -a hexa_arr=("${@:168:27}")
+    local -a cubi_arr=("${@:195}")
+
+    # Triclinic groups
+    PointGroups["1"]=${tric_arr[0]}; PointGroups["-1"]=${tric_arr[1]}
+    SumArrayValues ${tric_arr[@]}; CrystalSystems[triclinic]=$sum
+
+    # Monoclinic groups
+    SumArrayValues ${mono_arr[@]::3}; PointGroups["2"]=$sum
+    SumArrayValues ${mono_arr[@]:3:4}; PointGroups["m"]=$sum
+    SumArrayValues ${mono_arr[@]:7}; PointGroups["2/m"]=$sum
+    SumArrayValues ${mono_arr[@]}; CrystalSystems[monoclinic]=$sum
+
+    # Orthorombic groups
+    SumArrayValues ${orth_arr[@]::9}; PointGroups["222"]=$sum
+    SumArrayValues ${orth_arr[@]:9:22}; PointGroups["mm2"]=$sum
+    SumArrayValues ${orth_arr[@]:31}; PointGroups["mmm"]=$sum
+    SumArrayValues ${orth_arr[@]}; CrystalSystems[orthorombic]=$sum
+
+    # Quadratic groups
+    SumArrayValues ${quad_arr[@]::6}; PointGroups["4"]=$sum
+    SumArrayValues ${quad_arr[@]:6:2}; PointGroups["-4"]=$sum
+    SumArrayValues ${quad_arr[@]:8:6}; PointGroups["4/m"]=$sum
+    SumArrayValues ${quad_arr[@]:14:10}; PointGroups["422"]=$sum
+    SumArrayValues ${quad_arr[@]:24:12}; PointGroups["4mm"]=$sum
+    SumArrayValues ${quad_arr[@]:36:12}; PointGroups["-42m"]=$sum
+    SumArrayValues ${quad_arr[@]:48}; PointGroups["4/mmm"]=$sum
+    SumArrayValues ${quad_arr[@]}; CrystalSystems[quadratic]=$sum
+
+    # Trigonal groups
+    SumArrayValues ${trig_arr[@]::4}; PointGroups["3"]=$sum
+    SumArrayValues ${trig_arr[@]:4:2}; PointGroups["-3"]=$sum
+    SumArrayValues ${trig_arr[@]:6:7}; PointGroups["32"]=$sum
+    SumArrayValues ${trig_arr[@]:13:6}; PointGroups["3m"]=$sum
+    SumArrayValues ${trig_arr[@]:19}; PointGroups["-3_2/m"]=$sum
+    SumArrayValues ${trig_arr[@]}; CrystalSystems[trigonal]=$sum
+
+    # Hexagonal groups
+    SumArrayValues ${hexa_arr[@]::6}; PointGroups["6"]=$sum
+    SumArrayValues ${hexa_arr[@]:6:1}; PointGroups["-6"]=$sum
+    SumArrayValues ${hexa_arr[@]:7:2}; PointGroups["6/m"]=$sum
+    SumArrayValues ${hexa_arr[@]:9:6}; PointGroups["622"]=$sum
+    SumArrayValues ${hexa_arr[@]:15:4}; PointGroups["6mm"]=$sum
+    SumArrayValues ${hexa_arr[@]:19:4}; PointGroups["-6m2"]=$sum
+    SumArrayValues ${hexa_arr[@]:23}; PointGroups["6/mmm"]=$sum
+    SumArrayValues ${hexa_arr[@]}; CrystalSystems[hexagonal]=$sum
+
+    # Cubic groups
+    SumArrayValues ${cubi_arr[@]::5}; PointGroups["23"]=$sum
+    SumArrayValues ${cubi_arr[@]:5:7}; PointGroups["2/m_-3"]=$sum
+    SumArrayValues ${cubi_arr[@]:12:8}; PointGroups["432"]=$sum
+    SumArrayValues ${cubi_arr[@]:20:6}; PointGroups["-43m"]=$sum
+    SumArrayValues ${cubi_arr[@]:26}; PointGroups["4/m_-3_2/m"]=$sum
+    SumArrayValues ${cubi_arr[@]}; CrystalSystems[cubic]=$sum
+}
+
+SaveCSCounts () {
+    for key in ${!CrystalSystems[@]}; do
+        TotalCS[$key]=$((${TotalCS[$key]} + ${CrystalSystems[$key]}))
+    done
+}
+
+FormatCrystalSystems () {
+    for key in ${!CrystalSystems[@]}; do
+        CrystalSystems[$key]=$(printf "%*d" $1 ${CrystalSystems[$key]})
+    done
+}
+
+SavePGCounts () {
+    for key in ${!PointGroups[@]}; do
+        TotalPG[$key]=$((${TotalPG[$key]} + ${PointGroups[$key]}))
+    done
+}
+
+FormatPointGroups () {
+    for key in ${!PointGroups[@]}; do
+        PointGroups[$key]=$(printf "%*d" $1 ${PointGroups[$key]})
+    done
+}
+
+SaveSpgsCounts () {
+    for key in ${!Spgs[@]}; do
+        TotalSpgs[$key]=$((${TotalSpgs[$key]} + ${Spgs[$key]}))
+    done
+}
+
+FormatSpgs () {
+    for key in ${!Spgs[@]}; do
+        Spgs[$key]=$(printf "%*d" $1 ${Spgs[$key]})
+    done
+}
+
+FormatTotals () {
+    for key in ${!TotalCS[@]}; do
+        TotalCS[$key]=$(printf "%*d" $1 ${TotalCS[$key]})
+    done
+
+    for key in ${!TotalPG[@]}; do
+        TotalPG[$key]=$(printf "%*d" $1 ${TotalPG[$key]})
+    done
+
+    for key in ${!TotalSpgs[@]}; do
+        TotalSpgs[$key]=$(printf "%*d" $1 ${TotalSpgs[$key]})
+    done
+
+    total_S1=$(printf "%*d" $1 $total_S1)
+    total_S2=$(printf "%*d" $1 $total_S2)
+    total_S3=$(printf "%*d" $1 $total_S3)
+}
 
 for file in "$@"; do
-	if [ $file == "--debug" ]; then
-		debug=1
-		continue
-	elif [ $file == "--sum" ]; then
-		compute_sum=1
-		continue
-	fi
+    CheckFlags $file
+    if [ $isFlag -eq 1 ]; then
+        continue
+    fi
+
+    ResetFileCounters
 
 	echo ""
-	echo "Analysing symmetries in $file:"
-	triclinic=0
-	monoclinic=0
-	orthorombic=0
-	quadratic=0
-	trigonal=0
-	hexagonal=0
-	cubic=0
+	echo "Analysing symmetries in $file..."
 	structs_num=$(grep -c "^data_" "$file")
 	spg_num=$(grep -c "^_symmetry_Int_Tables_number" "$file")
-	max_digit=${#spg_num}
+	max_digits=${#spg_num}
+    CountSpgs $file
+    ClassifySpgs ${Spgs[@]}
+    SumArrayValues ${CrystalSystems[@]}
+    S1=$sum
+    SaveCSCounts
+    FormatCrystalSystems $max_digits
+    echo ""
+	echo "Number of detected structures (Nst): $structs_num"
+	echo "Number of detected spacegroups (Nsg): $spg_num"
+    echo ""
+    echo "Crystal Systems distribution:"
+	echo "Triclinic: ${CrystalSystems[triclinic]}"\
+         "| Monoclinic: ${CrystalSystems[monoclinic]}"\
+         "| Orthorombic: ${CrystalSystems[orthorombic]}"\
+         "| Quadratic: ${CrystalSystems[quadratic]}"
+	echo "Trigonal:  ${CrystalSystems[trigonal]}"\
+         "| Hexagonal:  ${CrystalSystems[hexagonal]}"\
+         "| Cubic:       ${CrystalSystems[cubic]}"\
+         "| Sum (S1):  $S1"
+    SumArrayValues ${PointGroups[@]}
+    S2=$sum
+    SavePGCounts
+    FormatPointGroups $max_digits
 	echo ""
-	echo "Spacegroups details:"
-	spgsum=0
-	for spg in {1..221..10}; do
-		GetSpgCount10 $spg "$file" $max_digit
-		echo "$fspg0: $fcount0 | $fspg1: $fcount1 | $fspg2: $fcount2 | $fspg3: $fcount3 | $fspg4: $fcount4 | $fspg5: $fcount5 | $fspg6: $fcount6 | $fspg7: $fcount7 | $fspg8: $fcount8 | $fspg9: $fcount9"
-		spgsum=$(($spgsum + $count0 + $count1 + $count2 + $count3 + $count4 + $count5 + $count6 + $count7 + $count8 + $count9))
-		CountCrystalSystem $spg0 $count0
-		CountCrystalSystem $spg1 $count1
-		CountCrystalSystem $spg2 $count2
-		CountCrystalSystem $spg3 $count3
-		CountCrystalSystem $spg4 $count4
-		CountCrystalSystem $spg5 $count5
-		CountCrystalSystem $spg6 $count6
-		CountCrystalSystem $spg7 $count7
-		CountCrystalSystem $spg8 $count8
-		CountCrystalSystem $spg9 $count9
-	done
-	StoreCrystalSystemCounts
-	file_cs_sum=$(($triclinic + $monoclinic + $orthorombic + $quadratic + $trigonal + $hexagonal + $cubic))
-	FormatCrystalSystemCounts $max_digit $triclinic $monoclinic $orthorombic $quadratic $trigonal $hexagonal $cubic
+    echo "Point Groups distribution:"
+	echo "'1':   ${PointGroups["1"]}"\
+         "| '-1':     ${PointGroups["-1"]}"
+	echo "'2':   ${PointGroups["2"]}"\
+         "| 'm':      ${PointGroups["m"]}"\
+         "| '2/m': ${PointGroups["2/m"]}"
+	echo "'222': ${PointGroups["222"]}"\
+         "| 'mm2':    ${PointGroups["mm2"]}"\
+         "| 'mmm': ${PointGroups["mmm"]}"
+	echo "'4':   ${PointGroups["4"]}"\
+         "| '-4':     ${PointGroups["-4"]}"\
+         "| '4/m': ${PointGroups["4/m"]}"\
+         "| '422':  ${PointGroups["422"]}"\
+		 "| '4mm':        ${PointGroups["4mm"]}"\
+         "| '-42m': ${PointGroups["-42m"]}"\
+         "| '4/mmm': ${PointGroups["4/mmm"]}"
+	echo "'3':   ${PointGroups["3"]}"\
+         "| '-3':     ${PointGroups["-3"]}"\
+         "| '32':  ${PointGroups["32"]}"\
+         "| '3m':   ${PointGroups["3m"]}"\
+         "| '-3 2/m':     ${PointGroups["-3_2/m"]}"
+	echo "'6':   ${PointGroups["6"]}"\
+         "| '-6':     ${PointGroups["-6"]}"\
+         "| '6/m': ${PointGroups["6/m"]}"\
+         "| '622':  ${PointGroups["622"]}"\
+	     "| '6mm':        ${PointGroups["6mm"]}"\
+         "| '-6m2': ${PointGroups["-6m2"]}"\
+         "| '6/mmm': ${PointGroups["6/mmm"]}"
+	echo "'23':  ${PointGroups["23"]}"\
+         "| '2/m -3': ${PointGroups["2/m_-3"]}"\
+         "| '432': ${PointGroups["432"]}"\
+		 "| '-43m': ${PointGroups["-43m"]}"\
+         "| '4/m -3 2/m': ${PointGroups["4/m_-3_2/m"]}"
+	echo "Sum of Point Groups (S2): $S2"
+    SumArrayValues ${Spgs[@]}
+    S3=$sum
+    SaveSpgsCounts
+    FormatSpgs $max_digits
 	echo ""
-	echo "Crystal Systems details:"
-	echo "Triclinic: $tric | Monoclinic: $mono | Orthorombic: $orth | Quadratic: $quad"
-	echo "Trigonal:  $trig | Hexagonal:  $hexa | Cubic:       $cubi | Sum (Scs): $file_cs_sum"
+    echo "Spacegroups distribution:"
+    for spg in {1..221..10}; do
+        spg1=$(($spg + 1)); spg2=$(($spg + 2)); spg3=$(($spg + 3))
+        spg4=$(($spg + 4)); spg5=$(($spg + 5)); spg6=$(($spg + 6))
+        spg7=$(($spg + 7)); spg8=$(($spg + 8)); spg9=$(($spg + 9))
+        echo "$(printf "%03d" $spg): ${Spgs[$spg]}"\
+             "| $(printf "%03d" $spg1): ${Spgs[$spg1]}"\
+             "| $(printf "%03d" $spg2): ${Spgs[$spg2]}"\
+             "| $(printf "%03d" $spg3): ${Spgs[$spg3]}"\
+             "| $(printf "%03d" $spg4): ${Spgs[$spg4]}"\
+             "| $(printf "%03d" $spg5): ${Spgs[$spg5]}"\
+             "| $(printf "%03d" $spg6): ${Spgs[$spg6]}"\
+             "| $(printf "%03d" $spg7): ${Spgs[$spg7]}"\
+             "| $(printf "%03d" $spg8): ${Spgs[$spg8]}"\
+             "| $(printf "%03d" $spg9): ${Spgs[$spg9]}"
+    done
+    echo "Sum of spacegroups (S3): $S3"
 	echo ""
-	echo "Number of structures (Nst): $structs_num"
-	echo "Number of spacegroups (Nsg): $spg_num"
-	echo "Sum of listed spacegroups (Ssg): $spgsum"
-	echo ""
+    echo "--------------------------------------------------"
+    let total_structs_num+=$structs_num
+    let total_spg_num+=$spg_num
+    let total_S1+=$S1
+    let total_S2+=$S2
+    let total_S3+=$S3
 done
 
 if [ $compute_sum -eq 1 ]; then
-	total_sum=$(($total_triclinic + $total_monoclinic + $total_orthorombic + $total_quadratic + $total_trigonal + $total_hexagonal + $total_cubic))
-	total_max_digit=${#total_sum}
-	FormatCrystalSystemCounts $total_max_digit $total_triclinic $total_monoclinic $total_orthorombic $total_quadratic $total_trigonal $total_hexagonal $total_cubic
+    total_max_digits=${#total_spg_num}
+    FormatTotals $total_max_digits
+    echo ""
+    echo "Summation of data counts from all files..."
+    echo
+	echo "Total detected structures (Tst): $total_structs_num"
+	echo "Total detected spacegroups (Tsg): $total_spg_num"
+    echo ""
+    echo "Total Crystal Systems distribution:"
+	echo "Triclinic: ${TotalCS[triclinic]}"\
+         "| Monoclinic: ${TotalCS[monoclinic]}"\
+         "| Orthorombic: ${TotalCS[orthorombic]}"\
+         "| Quadratic:       ${TotalCS[quadratic]}"
+	echo "Trigonal:  ${TotalCS[trigonal]}"\
+         "| Hexagonal:  ${TotalCS[hexagonal]}"\
+         "| Cubic:       ${TotalCS[cubic]}"\
+         "| Total Sum (TS1): $total_S1"
 	echo ""
-	echo "Total sum of Crystal system distributions from all evaluated files:"
-	echo "Triclinic: $tric | Monoclinic: $mono | Orthorombic: $orth | Quadratic: $quad"
-	echo "Trigonal:  $trig | Hexagonal:  $hexa | Cubic:       $cubi | Total Sum: $total_sum"
+    echo "Total Point Groups distribution:"
+	echo "'1':   ${TotalPG["1"]}"\
+         "| '-1':     ${TotalPG["-1"]}"
+	echo "'2':   ${TotalPG["2"]}"\
+         "| 'm':      ${TotalPG["m"]}"\
+         "| '2/m': ${TotalPG["2/m"]}"
+	echo "'222': ${TotalPG["222"]}"\
+         "| 'mm2':    ${TotalPG["mm2"]}"\
+         "| 'mmm': ${TotalPG["mmm"]}"
+	echo "'4':   ${TotalPG["4"]}"\
+         "| '-4':     ${TotalPG["-4"]}"\
+         "| '4/m': ${TotalPG["4/m"]}"\
+         "| '422':  ${TotalPG["422"]}"\
+		 "| '4mm':        ${TotalPG["4mm"]}"\
+         "| '-42m': ${TotalPG["-42m"]}"\
+         "| '4/mmm': ${TotalPG["4/mmm"]}"
+	echo "'3':   ${TotalPG["3"]}"\
+         "| '-3':     ${TotalPG["-3"]}"\
+         "| '32':  ${TotalPG["32"]}"\
+         "| '3m':   ${TotalPG["3m"]}"\
+         "| '-3 2/m':     ${TotalPG["-3_2/m"]}"
+	echo "'6':   ${TotalPG["6"]}"\
+         "| '-6':     ${TotalPG["-6"]}"\
+         "| '6/m': ${TotalPG["6/m"]}"\
+         "| '622':  ${TotalPG["622"]}"\
+	     "| '6mm':        ${TotalPG["6mm"]}"\
+         "| '-6m2': ${TotalPG["-6m2"]}"\
+         "| '6/mmm': ${TotalPG["6/mmm"]}"
+	echo "'23':  ${TotalPG["23"]}"\
+         "| '2/m -3': ${TotalPG["2/m_-3"]}"\
+         "| '432': ${TotalPG["432"]}"\
+		 "| '-43m': ${TotalPG["-43m"]}"\
+         "| '4/m -3 2/m': ${TotalPG["4/m_-3_2/m"]}"
+	echo "Total Sum of Point Groups (TS2): $total_S2"
+	echo ""
+    echo "Total Spacegroups distribution:"
+    for spg in {1..221..10}; do
+        spg1=$(($spg + 1)); spg2=$(($spg + 2)); spg3=$(($spg + 3))
+        spg4=$(($spg + 4)); spg5=$(($spg + 5)); spg6=$(($spg + 6))
+        spg7=$(($spg + 7)); spg8=$(($spg + 8)); spg9=$(($spg + 9))
+        echo "$(printf "%03d" $spg): ${TotalSpgs[$spg]}"\
+             "| $(printf "%03d" $spg1): ${TotalSpgs[$spg1]}"\
+             "| $(printf "%03d" $spg2): ${TotalSpgs[$spg2]}"\
+             "| $(printf "%03d" $spg3): ${TotalSpgs[$spg3]}"\
+             "| $(printf "%03d" $spg4): ${TotalSpgs[$spg4]}"\
+             "| $(printf "%03d" $spg5): ${TotalSpgs[$spg5]}"\
+             "| $(printf "%03d" $spg6): ${TotalSpgs[$spg6]}"\
+             "| $(printf "%03d" $spg7): ${TotalSpgs[$spg7]}"\
+             "| $(printf "%03d" $spg8): ${TotalSpgs[$spg8]}"\
+             "| $(printf "%03d" $spg9): ${TotalSpgs[$spg9]}"
+    done
+    echo "Total Sum of spacegroups (TS3): $total_S3"
 	echo ""
 fi
 
@@ -166,11 +364,19 @@ if [ $debug -eq 1 ]; then
 	echo "|----------------------------------------------------------------------------------------|"
 	echo "| Debug Notes:                                                                           |"
 	echo "| For each file analysis:                                                                |"
-	echo "| - (Scs == Nst == Nsg == Ssg != 0) => Everything is fine, result is reliable.           |"
-	echo "| - Scs < Nsg => The CountCrystalSystem function skipped some counting.                  |"
-	echo "| - Nst == 0 => Verify that the file respects CIF formatting.                            |"
+	echo "| - (S1 == S2 == S3 == Nst == Nsg != 0) => Everything is fine, result is reliable.       |"
+	echo "| - Nst == 0 => Verify that the file respects CIF formatting specifications.             |"
 	echo "| - Nst > Nsg => Some data do not contain the '_symmetry_Int_Tables_number' line header. |"
-	echo "| - Nst == Nsg != Ssg => An edge case in file is probably causing a bug in the script.   |"
+    echo "| - Any inequality between S1, S2, S3 => Unexpected case brought unreliable counting.    |"
+    echo "|                                                                                        |"
+    echo "| For total summation (if activated):                                                    |"
+	echo "| - (TS1 == TS2 == TS3 == Tst == Tsg != 0) => Everything is fine, result is reliable.    |"
+	echo "| - Tst == 0 => Verify for all files that they respect CIF formatting specifications.    |"
+	echo "| - Tst > Tsg => Some data do not contain the '_symmetry_Int_Tables_number' line header, |"
+    echo "|   verify Nst and Nsg in each file analysis to spot the problem location.               |"
+    echo "| - Any inequality between TS1, TS2, TS3 => Unexpected case brought unreliable counting  |"
+    echo "|   in some files, check for the same inequality between S1, S2 and S3 in each file      |"
+    echo "|   analysis to spot the problem.                                                        |"
 	echo "|----------------------------------------------------------------------------------------|"
 	echo ""
 fi
