@@ -23,14 +23,27 @@ def _get_command_line_args() -> argp.Namespace:
         help="files to count structures in."
     )
     parser.add_argument(
-        "--cut",
+        "--cut", "-c",
+        nargs="*",
         type=int,
         help=(
-            "create a truncated copy of the tested file containing only given "
-            "number of structures, going from the first one. If given value is not "
-            "integer compatible, it will be ignored."
+            "Create a truncated copy of the tested file containing only some of the "
+            "structures data from original file. Takes 1 or more integer values depending "
+            "on chosen cutting algorithm. See '--how-to-cut' for more infos."
         ),
         metavar="int"
+    )
+    parser.add_argument(
+        "--how-to-cut",
+        default="from_start",
+        help=(
+            "Which cutting algorithm to use. "
+            "Supports 'from_start', keeping the first <cut value> data (default); "
+            "'from_end', keeping the last <cut value> data; "
+            "'interval', keeping data between <cut value 1> and <cut value 2> indices (limits included); "
+            "'select', keeping only data at given <list of cut values> indices. "
+            "Indexation of data is zero-based, and in the file order."
+        )
     )
     args = parser.parse_args()
     return args
@@ -40,111 +53,137 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     """Handle input arguments assertions and processing."""
     if args_dict is None:
         raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
-    
+
     check_type(args_dict, "args_dict", (dict,))
 
     # Set default values for unset optional arguments
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
-    args_dict.setdefault("cut", 0)
+    args_dict.setdefault("how_to_cut", "from_start")
 
     # Assert set arguments conformity
     check_type(args_dict.get("filenames"), "filenames", (list, tuple))
-    check_type(args_dict.get("cut"), "--cut", (int,))
 
-    # Additional arguments processing
-    if args_dict.get("cut") < 1:
-        args_dict.pop("cut")
-    
+    if args_dict.get("cut") is not None:
+        for val in args_dict.get("cut"):
+            check_type(val, "--cut", (int,))
+
+    valid_cut_algos = ("from_start", "from_end", "interval", "select")
+    if args_dict.get("how_to_cut") not in valid_cut_algos:
+        raise ValueError(
+            f"'how-to-cut' arg must be one of {', '.join(valid_cut_algos)}, "
+            f"got {args_dict.get('how_to_cut')} instead."
+        )
+    if args_dict.get("cut") is not None and (
+        args_dict.get("how_to_cut") in ("from_start", "from_end") and len(args_dict.get("cut")) != 1
+        or args_dict.get("how_to_cut") == "interval" and len(args_dict.get("cut")) != 2
+    ):
+        raise ValueError(
+            "The number of values given to the 'cut' argument does not match with the "
+            "algorithm given to the 'how-to-cut' argument. See --help for more infos "
+            "on how to set those values properly."
+        )
+
     return args_dict
 
 
 ########################################
 
 
-def has_str(string: str, pattern: str) -> bool:
-    """
-    Returns True if pattern is in string, otherwise returns False.
-
-    Parameters:
-        string (str): string to search in.
-        pattern (str): which string to search.
-    
-    Returns:
-        Whether the searched string was found or not.
-    """
-    return string.find(pattern) > -1
-
-
 def write_cut_file(
         filename: str,
         file_lines: list[str],
-        data_breakpoints: list[str],
-        cut_nbr: int,
+        data_breakpoints: list[tuple[int, str]],
+        cut_idx: list[int],
+        cut_algo: str,
     ) -> None:
     """
-    Searches in the file the right line where it should be truncated, 
-    then writes a truncated copy with a suffix denoting the number of 
-    structures kept in the file name.
+    Create a truncated copy of given CIF file according to given algorithm.
 
     Parameters:
-        filename (str):             The name of the original file.
+        filename (str):                     The name of the original file.
     
-        file_lines ([str]):         The original file data as a list of its lines.
+        file_lines ([str]):                 The original file data as a list of its lines.
 
-        data_breakpoints ([str]):   List of the lines starting with "data_" denoting
-                                    the beginning of the data of each structure.
+        data_breakpoints ([(int, str)]):    List of the lines starting with "data_" denoting
+                                            the beginning of the data of each structure.
 
-        cut_nbr (int):              The number of structures to keep in the truncated file.
+        cut_idx ([int]):                    Indices indicating which data to keep.
+
+        cut_algo (str):                     Cutting algorithm to use for the truncation.
     """
-    wrong_cut = False
-    idx_changed_lines = []
-    cut_line = data_breakpoints[cut_nbr]
+    valid_cut_idx = list(filter(lambda idx: 0 <= idx < len(data_breakpoints), cut_idx))
+    skipped_idx = list(filter(lambda idx: idx < 0 or idx >= len(data_breakpoints), cut_idx))
 
-    # Case where an identical line appears before the one wanted
-    if data_breakpoints.index(cut_line) < cut_nbr:
-        nbr_iter = 0
-
-        while True:
-            idx_same_line = data_breakpoints.index(cut_line)
-
-            if idx_same_line == cut_nbr:
-                break
-
-            if idx_same_line > cut_nbr:
-                print(
-                    "Unexpected behaviour happened while trying to cut the file.\n"
-                    "The cutting option will stop here without doing anything."
-                )
-                wrong_cut = True
-                break
-
-            if idx_same_line < cut_nbr:
-                idx_changed_lines.append(idx_same_line)
-                data_breakpoints[idx_same_line] = f"data_xx{nbr_iter}xx"
-                file_lines[file_lines.index(cut_line)] = data_breakpoints[idx_same_line]
-                nbr_iter += 1
-
-    if not wrong_cut:
-        cut_lines = file_lines[:file_lines.index(cut_line)]
-
-        if cut_lines[-1] == "# generated using pymatgen":
-            cut_lines = cut_lines[:-1]
-
-        for idx in idx_changed_lines:
-            line_to_restore = data_breakpoints[idx]
-            idx_to_restore = file_lines.index(line_to_restore)
-            cut_lines[idx_to_restore] = cut_line
-
-        cut_text = "\n".join(cut_lines)
-        cut_file = filename.replace(".cif", f"_{cut_nbr}.cif")
-
-        with open(cut_file, mode="wt", encoding="utf-8") as outfile:
-            outfile.write(cut_text)
-
+    if not valid_cut_idx:
         print(
-            f"The file '{cut_file}' containing the first {cut_nbr} structure(s) "
-            f"from '{filename}' was successfully created."
+            "All given '--cut' argument indices are greater or equal "
+            f"to the total number of structures in '{filename}'.\n"
+            "Cutting algorithm skipped."
         )
+        return
+
+    if skipped_idx:
+        print(
+            "WARNING: Some of given '--cut' argument indices are out of the range "
+            f"of the total number of structures in '{filename}'.\n"
+            f"These indices are ignored (skipped indices: {', '.join(skipped_idx)})."
+        )
+
+    if (
+        cut_algo in ("from_start", "from_end") and len(valid_cut_idx) != 1
+        or cut_algo == "interval" and len(valid_cut_idx) != 2
+    ):
+        print(
+            "After removing out-of-range indices, the number of left indices"
+            "does not match with the cutting algorithm anymore. "
+            "Cutting algorithm skipped."
+        )
+        return
+
+    print("Cutting file...")
+
+    match cut_algo:
+        case "from_start":
+            cut_line_idx = data_breakpoints[valid_cut_idx[0]][0]
+            lines_left = file_lines[:cut_line_idx]
+            cut_text = "".join(lines_left)
+            suffix = f"_first_{valid_cut_idx[0]}"
+
+        case "from_end":
+            cut_line_idx = data_breakpoints[-valid_cut_idx[0]][0]
+            lines_left = file_lines[cut_line_idx:]
+            cut_text = "".join(lines_left)
+            suffix = f"_last_{valid_cut_idx[0]}"
+
+        case "interval":
+            first_line_idx = data_breakpoints[min(valid_cut_idx)][0]
+            last_line_idx = data_breakpoints[max(valid_cut_idx) + 1][0]
+            lines_left = file_lines[first_line_idx:last_line_idx]
+            cut_text = "".join(lines_left)
+            suffix = f"_{min(valid_cut_idx)}_to_{max(valid_cut_idx)}"
+
+        case "select":
+            valid_cut_idx = sorted(valid_cut_idx)
+            kept_cifs = []
+            for idx in valid_cut_idx:
+                data_lines_idx = (data_breakpoints[idx][0], data_breakpoints[idx + 1][0])
+                selected_data = file_lines[data_lines_idx[0]:data_lines_idx[1]]
+                kept_cifs.append("".join(selected_data))
+            cut_text = "".join(kept_cifs)
+            suffix = f"_select_{'-'.join(valid_cut_idx)}"
+
+        case _:
+            valid_cut_algos = ("from_start", "from_end", "interval", "select")
+            raise ValueError(
+                f"'how-to-cut' arg must be one of {', '.join(valid_cut_algos)}, "
+                f"got {cut_algo} instead."
+            )
+
+    cut_file = filename.replace(".cif", f"{suffix}.cif")
+    with open(cut_file, mode="wt", encoding="utf-8") as outfile:
+        outfile.write(cut_text)
+
+    print(f"The file {cut_file} truncated from {filename} was successfully created.")
 
 
 ########################################
@@ -161,9 +200,18 @@ def main(standalone: bool = True, **kwargs) -> None:
 
         filenames ([str|Path]): Files to count structures in.
 
-        cut (int):              Create a truncated copy of the tested file containing only given
-                                number of structures, going from the first one.
-                                If given value is invalid, the cut step is skipped.
+        cut ([int]):            Create a truncated copy of the tested file containing only some
+                                of the structures data from original file. Takes 1 or more integer
+                                values depending on chosen cutting algorithm.
+                                See 'how-to-cut' for more infos.
+
+        how_to_cut (str):       Which cutting algorithm to use.
+                                Supports 'from_start', keeping the first <cut value> data (default);
+                                'from_end', keeping the last <cut value> data;
+                                'interval', keeping data between <cut value 1> and <cut value 2>
+                                indices (limits included);
+                                'select', keeping only data at given <list of cut values> indices.
+                                Indexation of data is zero-based, and in the file order.
     """
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
@@ -180,24 +228,12 @@ def main(standalone: bool = True, **kwargs) -> None:
         with open(file, mode="r", encoding="utf-8") as data:
             lines = data.readlines()
 
-        data_breakpoints = list(filter(lambda line: has_str(line, "data_"), lines))
+        data_breakpoints = list(filter(lambda idxline: idxline[1].startswith("data_"), enumerate(lines)))
         nbr_structs = len(data_breakpoints)
-
-        if args.get("cut") is None:
-            pass
-
-        elif args.get("cut") >= nbr_structs:
-            print(
-                f"Provided '--cut' arg ({args.get('cut')}) is greater or equal "
-                f"to the total number of structures in '{file}'.\n"
-                "Therefore, as it will not change anything, "
-                "the cut step is skipped for efficiency."
-            )
-
-        else:
-            write_cut_file(file, lines, data_breakpoints, args.get("cut"))
-
         print(f"{nbr_structs} structures found in file '{file}'.")
+
+        if args.get("cut") is not None:
+            write_cut_file(file, lines, data_breakpoints, args.get("cut"), args.get("how_to_cut"))
 
 
 if __name__ == "__main__":
