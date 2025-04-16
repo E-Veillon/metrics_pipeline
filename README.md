@@ -1,12 +1,24 @@
-metrics_pipeline v1.1.5
+metrics_pipeline v1.1.6
 
 The main goal of this pipeline is to measure some of the metrics that are often used in recent works that propose generative AI models to predict new materials from an input of known materials.
 
 Whatever the processing done to the data before and after passing it to the model, the input and generated materials that will be used in the pipeline for evaluation have to be described, at least, by unit cell parameters, atomic compositions and positions inside the unit cell, in a CIF file format to make the pipeline work properly.
 
-Usual workflow to evaluate metrics:
+# Installation
 
-0) Needed data before beginning
+We recommend using poetry to install dependencies.
+Install poetry from PyPI:
+```bash
+pip install poetry
+```
+Make it create a virtual environment using provided pyproject.toml once positionned in this directory:
+```bash
+poetry install
+```
+
+# Usual workflow to evaluate metrics
+
+## 0 - Needed data before beginning
 
 - A CIF file containing all reference structures used as input to the model.
 
@@ -18,7 +30,7 @@ WARNING: Note that material databases often give total energies in electronvolts
 
 NOTE: The "dataset_loader.py" script can automatically download and format entries from the Materials Project using their API, and format an already downloaded JSON file of Open Quantum Materials Database (OQMD) entries if the right fields are included (see script documentation with the "python dataset_loader.py --help" command for more details). For other databases, the OQMD JSON formatting can still work if the fields have the same name and contain the same information as OQMD fields.
 
-1) Preprocess.py
+## 1 - Preprocess.py
 
 Generate 3 output files from the same "generated structures" file input:
 
@@ -30,25 +42,25 @@ Generate 3 output files from the same "generated structures" file input:
     
 Note: if rare elements must be discarded from the generated data, for consistency they must be also discarded from all reference files to not get wrong percentage results on metrics measurements (for the model input CIF file) and save time on filtering unused structures (for the JSON database file).
 
-2) vasp_static_sun.py
+## 2 - vasp_static_sun.py
 
 This script calls on the Vienna Ab-initio Simulation Package (VASP) to compute total energies of structures with DFT. First, prepare an empty directory for output data as this step generates a lot (one directory per structure computed, containing several configuration and output files each). Pass the CIF file containing only valid and unique structures to it, the path to the prepared output directory to the "--output" argument and an index to the "--task-index" argument to tell which structure in the file must be calculated.
 
 NOTE: This step needs parallelisation to not take a prohibitive computation time. It is higly recommended to run it on a supercalculator. In this case, taking 16 CPU cores per structure works fine in general. If a job management software that proposes job arrays is used (like slurm), it is recommended to use it and pass the sub-job array ID in the "--task-index" argument to treat all (or a big part of) the structures in one go. 
 
-3) phase_diag_energies.py
+## 3 - phase_diag_energies.py
 
 Once ALL calculations from the previous step are finished in the output directory, pass the path to it to this script with the database JSON file in the "--reference" argument" to compute reference convex hulls that corresponds to the generated structures' chemical spaces and compare them to the hulls to determine their phase stability for S.U.N. metric "Stability" part (see below for metrics definitions).
 A single JSON summary file will be generated at the end, containing for each structure its directory name and path, its energy per atom above the hull, and whether it is considered stable according to the threshold set in the "--limit" argument (0.1 eV/atom by default).
 
-4) vasp_relax.py
+## 4 - vasp_relax.py
 
 This script is only used to compute Average RMSD metric and is the most time consuming one.
 The VASP software is called to optimise given structures geometry.
 As for vasp_static_sun.py, it is prohibitively time consuming if not parallelised. See step 2) for parallelisation recommendations on a supercalculator.
 The CIF file containing valid and unique structures generated from step 1 or the JSON file generated from step 3 can be passed. As only structures that did not issued VASP errors and converged normally in the "simple" static calculation are present in the JSON summary file, it is recommended to pass this one in order to limitate time consuming errors during this step. However, this method uses the paths indicated in the JSON file to collect structures data, hence make sure when running this step that structures data are still in the right location, and if not it is possible to update the location stated in the file by using the "summary_paths_update.py" script. This script modifies all paths in the JSON file to a new path, hence make sure that all structure data stated in the JSON file are still present in the same directory to avoid "FileNotFound" errors.
 
-5) metrics.py
+## 5 - metrics.py
 
 Finally, once all data have been collected, pass all necessary files in corresponding arguments to this script to compute the metrics. If not all implemented metrics interest you, flags can be passed to deactivate the computation of each metric individually. Files that are no longer needed for deactivated metrics do not have to be given and are skipped if given anyway. A single JSON file will be generated, containing all metrics values, with a "null" for deactivated ones.
 
@@ -58,7 +70,7 @@ NOTE:
 
 ----------------------------------------
 
-Definitions of measured metrics:
+# Definitions of measured metrics
 
 - Validity: No pair of atom in the structure are closer than 0.5 angstroms (50 pm).
 The metric value is the percentage of valid structures inside given batch.
@@ -95,7 +107,7 @@ Compare CrystalNN generated fingerprints distributions of ground truth and gener
 
 ----------------------------------------
 
-Supplementary optional scripts
+# Supplementary optional scripts
 
 - Band Gap evaluation
     It is possible to estimate the fundamental band gaps of the materials with "vasp_static_dsol.py" and "dsol_bandgap.py" scripts. It uses the Δ-Sol method proposed by Chan et al.
@@ -129,4 +141,4 @@ Supplementary optional scripts
 
     - The "spg_mapping.sh" script allows a comprehensive parsing of spacegroup numbers distributions in symmetrized concatenated CIF files. The '_symmetry_Int_Tables_number' line header (automatically generated by Pymatgen CifWriter during the use of preprocessing.py) is assumed to be the one used to define spacegroup number of all structures in the screened file.
 
-An emphasis is made on the fact that all scripts described above are purely optional, and do not affect the data or quality of the main metrics evaluation pipeline in any way. They are not guaranteed to work properly under unusual conditions or in some specific calculations cases, therefore if they are used, their outputs must be considered with care. Future updates may test more thoroughly these features and correct them if necessary.
+An emphasis is made on the fact that all scripts described in this section are purely optional, and do not affect the data or quality of the main metrics evaluation pipeline in any way. They are not guaranteed to work properly under unusual conditions or in some specific calculations cases, therefore if they are used, their outputs must be considered with care. Future updates may test more thoroughly these features and correct them if necessary.
