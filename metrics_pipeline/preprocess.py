@@ -119,8 +119,17 @@ def _get_command_line_args() -> argp.Namespace:
         ),
         metavar="int",
     )
+    parser.add_argument(
+        "-S", "--sequential",
+        action="store_true",
+        help=(
+            "Pass this flag to deactivate multiprocessing handling and switch to "
+            "sequential computation. Generally, multiprocess is faster, but sometimes "
+            "(e.g. when data is very big) it can softlock into resource distribution. "
+            "Switch to more stable sequential computing if such problem  were to arise."
+        )
+    )
     args: argp.Namespace = parser.parse_args()
-    print(f"Detected command-line arguments:\n{args}")
     return args
 
 
@@ -144,6 +153,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     args_dict.setdefault("angleprec", 5.0)
     args_dict.setdefault("no_equiv_match", False)
     args_dict.setdefault("test_min_vol", False)
+    args_dict.setdefault("sequential", False)
 
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="cif")
@@ -186,7 +196,12 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
         f"{'(ignored)' if args_dict.get('no_symmetrization') else ''}"
     )
     print(f"STRUCTURE MATCHING: {not args_dict.get('no_equiv_match')}")
-    print(f"NUMBER OF WORKERS: {args_dict.get('workers')}")
+    print(f"IS SEQUENTIAL: {args_dict.get('sequential')}")
+    print(
+        "NUMBER OF WORKERS: "
+        f"{'auto' if args_dict.get('workers') is None else args_dict.get('workers')} "
+        f"{'(ignored)' if args_dict.get('sequential') else ''}"
+    )
     print(" ")
     print("------------------------------")
     print(" ")
@@ -253,9 +268,10 @@ def main(standalone: bool = True, **kwargs) -> None:
     # Extraction des données CIF et conversion en structures
     structures, nbr_rare_gas_structs, nbr_rare_earth_structs = read_cif(
         filename=args.get("input_file"),
-        workers=args.get("workers"),
         keep_rare_gases=args.get("no_rare_gas_check"),
-        keep_rare_earths=args.get("no_rare_earth_check")
+        keep_rare_earths=args.get("no_rare_earth_check"),
+        workers=args.get("workers"),
+        sequential=args.get("sequential")
     )
 
     nbr_loaded_structs = len(structures)
@@ -291,7 +307,8 @@ def main(standalone: bool = True, **kwargs) -> None:
                 structures=structures,
                 symprec=args.get("symprec"),
                 angle_tolerance=args.get("angleprec"),
-                workers=args.get("workers")
+                workers=args.get("workers"),
+                sequential=args.get("sequential")
             )
         ))
 
@@ -303,7 +320,8 @@ def main(standalone: bool = True, **kwargs) -> None:
             structures=symmetrized_structs,
             workers=args.get("workers"),
             test_volume=args.get("test_min_vol"),
-            keep_equivalent=args.get("no_equiv_match")
+            keep_equivalent=args.get("no_equiv_match"),
+            sequential=args.get("sequential")
     )
 
     nbr_unique_structs = len(kept_structs)
@@ -321,6 +339,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         filename=args.get("output"),
         structures=kept_structs,
         workers=args.get("workers"),
+        sequential=args.get("sequential")
     )
 
     # Calcul du temps total pris par la procédure

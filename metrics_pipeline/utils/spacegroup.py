@@ -7,6 +7,7 @@ Functions to find spacegroup symmetry on pymatgen Structure objects.
 import warnings
 from typing import List, Union
 from functools import partial
+from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 
 # PYTHON MATERIAL GENOMICS
@@ -92,7 +93,8 @@ def batch_symmetrizer(
         structures: List[Structure],
         symprec: float = 0.01,
         angle_tolerance: float = 5.0,
-        workers: int = 1
+        workers: int|None = None,
+        sequential: bool = False
     ):
     """
     Use multiprocess to find symmetry spacegroups for a list of pymatgen Structure objects.
@@ -109,6 +111,10 @@ def batch_symmetrizer(
         
         workers (int):              Number of parallel processes to create.
 
+        sequential (bool):          Whether to use sequential for-loop instead of multiprocessing
+                                    scheme. If set to True, the 'workers' arg is ignored.
+                                    Defaults to False.
+
     Returns:
         A list of either pymatgen SymmetrizedStructure objects
         when symmetry detection worked properly, or the unchanged
@@ -121,6 +127,9 @@ def batch_symmetrizer(
     check_num_value(symprec, "symprec", ">=", 0.0)
     check_type(angle_tolerance, "angle_tolerance", (float,))
     check_num_value(angle_tolerance, "angle_tolerance", ">=", 0.0)
+    if workers is not None:
+        check_type(workers, "workers", (int,))
+        check_num_value(workers, "workers", ">", 0)
 
     nbr_structs = len(structures)
     chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
@@ -130,16 +139,23 @@ def batch_symmetrizer(
         angle_tolerance=angle_tolerance
     )
 
-    return list(filter(
-        None,
-        process_map(
-            set_structure_symmetrizer,
-            structures,
-            max_workers=workers,
-            chunksize=chunksize,
-            desc="Symmetrize structures"
-        )
-    ))
+    if sequential:
+        sym_structs = []
+        for struct in tqdm(structures, desc="Symmetrize structures"):
+            sym_structs.append(set_structure_symmetrizer(struct))
+
+    else:
+        sym_structs = list(filter(
+            None,
+            process_map(
+                set_structure_symmetrizer,
+                structures,
+                max_workers=workers,
+                chunksize=chunksize,
+                desc="Symmetrize structures"
+            )
+        ))
+    return sym_structs
 
 
 ########################################
