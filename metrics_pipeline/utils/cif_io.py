@@ -6,6 +6,7 @@ Functions to load and write CIF formatted data with multiple processes.
 
 import re
 from typing import Tuple, List
+from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 
 # PYTHON MATERIALS GENOMICS
@@ -54,7 +55,7 @@ def extract_cif_from_file(filename: str) -> List[str]:
 ########################################
 
 
-def cif_str_to_struct(cif_str: str) -> Structure:
+def cif_str_to_struct(cif_str: str) -> Structure|str:
     """
     Parses data from a cif formatted string and converts it to a pymatgen Structure object.
 
@@ -62,14 +63,18 @@ def cif_str_to_struct(cif_str: str) -> Structure:
         cif_str (str): The string of a structure encoded in the cif format.
 
     Returns:
-        A Pymatgen Structure object.
+        A Pymatgen Structure object, or unchanged string if conversion failed.
     """
     check_type(cif_str, "cif_str", (str,))
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
         parsed_str  = CifParser.from_str(cif_string=cif_str)
-        struct_list = parsed_str.parse_structures(primitive=False)
-        structure   = struct_list[0]
+        try:
+            struct_list = parsed_str.parse_structures(primitive=False)
+        except ValueError as exc:
+            return cif_str
+
+        structure = struct_list[0]
         return structure
 
 
@@ -186,23 +191,28 @@ def struct_to_cif_str(
 
 def read_cif(
     filename: str,
-    workers: int = 1,
     keep_rare_gases: bool = False,
-    keep_rare_earths: bool = False
+    keep_rare_earths: bool = False,
+    workers: int|None = None,
+    sequential: bool = False
 ) -> Tuple[List[Structure], int, int]:
     """
     Reads a cif file containing concatenated structures data and decode them using multiprocess.
 
     Parameters:
-        filename (str):         Name of the input CIF file.
+        filename (str):             Name of the input CIF file.
         
-        workers (int):          Number of processes to use in parallel.
+        workers (int):              Number of processes to use in parallel.
         
-        keep_rare_gases (bool): Whether structures containing rare gases should be kept. 
-                                Defaults to false.
+        keep_rare_gases (bool):     Whether structures containing rare gases should be kept. 
+                                    Defaults to false.
         
-        keep_rare_earths (bool): Whether structures containing f-block elements should be kept.
-                                Defaults to False.
+        keep_rare_earths (bool):    Whether structures containing f-block elements should be kept.
+                                    Defaults to False.
+
+        sequential (bool):          Whether to use sequential for-loop instead of multiprocessing
+                                    scheme. If set to True, the 'workers' arg is ignored.
+                                    Defaults to False.
     
     Returns:
         List[Structure]: Decoded Structure objects in a list.
@@ -210,10 +220,12 @@ def read_cif(
         Int: Number of structures containing rare earth elements discarded.
     """
     check_file_or_dir(filename, "file", allowed_formats="cif")
-    check_type(workers, "workers", (int,))
-    check_num_value(workers, "workers", ">", 0)
     check_type(keep_rare_gases, "keep_rare_gases", (bool,))
     check_type(keep_rare_earths, "keep_rare_earths", (bool,))
+    if workers is not None:
+        check_type(workers, "workers", (int,))
+        check_num_value(workers, "workers", ">", 0)
+    check_type(sequential, "sequential", (bool,))
 
     struct_strings = extract_cif_from_file(filename)
     nbr_rare_gas_structs, nbr_rare_earth_structs = 0, 0
@@ -232,13 +244,29 @@ def read_cif(
     )
     chunksize = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
-    structs_list = list(process_map(
-        cif_str_to_struct,
-        struct_strings,
-        max_workers=workers,
-        chunksize=chunksize,
-        desc="load and read data",
-    ))
+    if sequential:
+        data_list = []
+        for struct_string in tqdm(struct_strings, desc="load and read data"):
+            data_list.append(cif_str_to_struct(struct_string))
+    
+    else:
+        data_list = list(process_map(
+            cif_str_to_struct,
+            struct_strings,
+            max_workers=workers,
+            chunksize=chunksize,
+            desc="load and read data",
+        ))
+    structs_list: list[Structure] = list(filter(lambda data: isinstance(data, Structure), data_list))
+    unparsed_cifs: list[str] = list(filter(lambda data: isinstance(data, str), data_list))
+    if unparsed_cifs:
+        print(
+            f"WARNING: {len(unparsed_cifs)} data could not be parsed into "
+            "Structure objects, they will be removed from processing and "
+            "written as-is in a 'pmg_unparsed.cif' file."
+        )
+    with open("pmg_unparsed.cif","wt") as fp:
+        fp.write("\n".join(unparsed_cifs))
 
     return structs_list, nbr_rare_gas_structs, nbr_rare_earth_structs
 
@@ -249,39 +277,50 @@ def read_cif(
 def write_cif(
     filename: str,
     structures: List[Structure],
-    workers: int = 1,
+    workers: int|None = None,
+    sequential: bool = False
 ) -> None:
     """
     Encode multiple structures in CIF format and write them in a file using multiprocess.
 
     Parameters:
-        filename (str):               Name of the input file.
+        filename (str):                 Name of the input file.
 
-        structures (List[Structure]): The structures to encode.
+        structures (List[Structure]):   The structures to encode.
 
-        workers (int):                Number of parallel processes to use.
+        workers (int):                  Number of parallel processes to use.
+
+        sequential (bool):              Whether to use sequential for-loop instead of
+                                        multiprocessing scheme. If set to True, the
+                                        'workers' arg is ignored. Defaults to False.
     """
     check_file_format(filename, allowed_formats="cif")
     for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
-    check_type(workers, "workers", (int,))
-    check_num_value(workers, "workers", ">", 0)
+    if workers is not None:
+        check_type(workers, "workers", (int,))
+        check_num_value(workers, "workers", ">", 0)
 
     nbr_struct = len(structures)
     chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
     #def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
     #    return [(struct, symprec, angle_tolerance) for struct in structures]
+    if sequential:
+        encoded_cif = []
+        for struct in tqdm(structures, desc="Writing data in cif format"):
+            encoded_cif.append(struct_to_cif_str(struct))
 
-    encoded_cif = list(
-        process_map(
-            struct_to_cif_str,
-            structures,
-            max_workers=workers,
-            chunksize=chunksize,
-            desc="Writing data in cif format"
+    else:
+        encoded_cif = list(
+            process_map(
+                struct_to_cif_str,
+                structures,
+                max_workers=workers,
+                chunksize=chunksize,
+                desc="Writing data in cif format"
+            )
         )
-    )
 
     with open(filename, "wt", encoding="utf-8") as out_file:
         out_file.write("\n".join(encoded_cif))

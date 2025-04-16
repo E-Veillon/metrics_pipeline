@@ -8,6 +8,7 @@ import itertools as itools
 from functools import partial
 from typing import Tuple, List, Union, Sequence, Optional
 from pathlib import Path
+from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 
 # PYTHON MATERIAL GENOMICS
@@ -213,10 +214,12 @@ def _group_by_equivalence(
 ########################################
 
 
-def batch_group_by_equivalence(    structures: Sequence[Structure],
+def batch_group_by_equivalence(
+    structures: Sequence[Structure],
     test_volume: bool = False,
     workers: int = 1,
-    comment: Optional[str] = None
+    comment: Optional[str] = None,
+    sequential: bool = False
 ) -> Tuple[List[List[List[Structure]]], int]:
     """
     Group structures by equivalence in two steps:
@@ -243,6 +246,10 @@ def batch_group_by_equivalence(    structures: Sequence[Structure],
         comment (str):              Optional message to print next to tqdm
                                     progression bar.
 
+        sequential (bool):          Whether to use sequential for-loop instead of multiprocessing
+                                    scheme. If set to True, the 'workers' arg is ignored.
+                                    Defaults to False.
+
     Returns: Tuple[List[List[List[Structure]]], int]: 
         A list containing lists of same composition containing lists of equivalent structures,
         and total count of unmatched structures (equal to zero if test_volume is set to False).
@@ -262,13 +269,20 @@ def batch_group_by_equivalence(    structures: Sequence[Structure],
     grouped_structs = group_by_stoichiometry(structures)
     equiv_matcher = partial(_group_by_equivalence, test_volume=test_volume)
 
-    match_results = process_map(
-        equiv_matcher,
-        grouped_structs,
-        max_workers=workers,
-        chunksize=chunksize,
-        desc=comment
-    )
+    if sequential:
+        match_results = []
+        for grp in tqdm(grouped_structs, desc=comment):
+            match_results.append(equiv_matcher(grp))
+
+    else:
+        match_results = process_map(
+            equiv_matcher,
+            grouped_structs,
+            max_workers=workers,
+            chunksize=chunksize,
+            desc=comment
+        )
+
     equivalent_structs = [t[0] for t in match_results] #type: List[List[List[Structure]]]
     total_unmatch_count = sum(t[1] for t in match_results)
 
@@ -280,9 +294,10 @@ def batch_group_by_equivalence(    structures: Sequence[Structure],
 
 def remove_equivalent(
     structures: List[Structure],
-    workers: int = 1,
+    workers: int|None = None,
     test_volume: bool = False,
-    keep_equivalent: bool = False
+    keep_equivalent: bool = False,
+    sequential: bool = False
 ) -> Tuple[List[Structure], int, int]:
     """
     Group structures by equivalence using multiple processes, then discards the duplicates.
@@ -307,6 +322,10 @@ def remove_equivalent(
                                         If True, structures will be sorted by equivalence
                                         but not be discarded. Defaults to False.
 
+        sequential (bool):              Whether to use sequential for-loop instead of multiprocessing
+                                        scheme. If set to True, the 'workers' arg is ignored.
+                                        Defaults to False.
+
     Returns:
         List[Structure]: The list of unique (or sorted) structures.
         Int: The number of discarded structures.
@@ -316,9 +335,10 @@ def remove_equivalent(
     for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
     check_type(test_volume, "test_volume", (bool,))
-    check_type(workers, "workers", (int,))
-    check_num_value(workers, "workers", ">", 0)
     check_type(keep_equivalent, "keep_equivalent", (bool,))
+    if workers is not None:
+        check_type(workers, "workers", (int,))
+        check_num_value(workers, "workers", ">", 0)
 
     process_description = (
         "removing duplicates" if not keep_equivalent
@@ -329,7 +349,8 @@ def remove_equivalent(
         structures=structures,
         workers=workers,
         test_volume=test_volume,
-        comment=process_description
+        comment=process_description,
+        sequential=sequential
     )
 
     nbr_discarded = 0
