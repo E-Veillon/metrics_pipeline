@@ -1,7 +1,7 @@
 """Screening pipeline utils subpackage."""
 
 # I/O modules
-from .cif_io import read_cif, write_cif
+from .cif_io import read_cif, write_cif, symmetrize_and_write_cif
 from .file_io import (
     MAINDIRPATH, SCRIPTSPATH, UTILSPATH, CONFIGPATH,
     check_file_format, check_file_or_dir, add_new_dir, yaml_loader
@@ -76,7 +76,7 @@ from .redirect import redirect_c_stdout, redirect_c_stderr
 
 __all__ = [
     # I/O
-    "read_cif", "write_cif",    # cif_io
+    "read_cif", "write_cif", "symmetrize_and_write_cif",    # cif_io
     "MAINDIRPATH", "SCRIPTSPATH", "UTILSPATH", "CONFIGPATH",                # file_io
     "check_file_format", "check_file_or_dir", "add_new_dir", "yaml_loader", #
     "write_and_run_vasp",

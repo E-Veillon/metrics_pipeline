@@ -31,7 +31,7 @@ def structure_symmetrizer(
         structure: Structure,
         symprec: float = 0.01,
         angle_tolerance: float = 5.0
-    ) -> Union[Structure, SymmetrizedStructure, None]:
+    ) -> Union[Structure, SymmetrizedStructure]:
     """
     Try to find spacegroup symmetry of a structure using spglib via pymatgen.
     If the first try does not work, it will retry several times with loosened tolerances.
