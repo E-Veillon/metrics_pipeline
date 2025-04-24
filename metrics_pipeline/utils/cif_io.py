@@ -6,6 +6,7 @@ Functions to load and write CIF formatted data with multiple processes.
 
 import re
 from typing import Tuple, List
+from functools import partial
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
 
@@ -55,27 +56,50 @@ def extract_cif_from_file(filename: str) -> List[str]:
 ########################################
 
 
-def cif_str_to_struct(cif_str: str) -> Structure|str:
+def cif_str_to_struct(
+    cif_str: str, special_keys: list[str]|None = None
+) -> Structure|str:
     """
     Parses data from a cif formatted string and converts it to a pymatgen Structure object.
 
     Parameters:
-        cif_str (str): The string of a structure encoded in the cif format.
+        cif_str (str):          The string of a structure encoded in the cif format.
+
+        special_keys ([str]):   CIF Labels to store into structure properties, e.g.
+                                can be used to save structure identifiers attached to it
+                                throughout its manipulation as a python object. Pass "header"
+                                to save the original header.
 
     Returns:
         A Pymatgen Structure object, or unchanged string if conversion failed.
     """
     check_type(cif_str, "cif_str", (str,))
+    if special_keys is not None:
+        check_type(special_keys, "special_keys", (list,))
+        for idx, elt in enumerate(special_keys):
+            check_type(elt, f"special_keys[{idx}]", (str,))
 
     with redirect_c_stdout(None), redirect_c_stderr(None):
-        parsed_str  = CifParser.from_str(cif_string=cif_str)
+        parser = CifParser.from_str(cif_string=cif_str)
         try:
-            struct_list = parsed_str.parse_structures(primitive=False)
+            struct_list = parser.parse_structures(primitive=False)
         except ValueError as exc:
             return cif_str
 
-        structure = struct_list[0]
-        return structure
+    structure = struct_list[0]
+
+    if special_keys is not None:
+        props = dict.fromkeys(special_keys)
+        cif_dict: dict = parser.as_dict().popitem()[1]
+        for key in special_keys:
+            if key == "header":
+                props[key] = parser._cif.data.popitem()[1].header
+            else:
+                props[key] = cif_dict.get(key)
+
+        structure.properties.update(props)
+
+    return structure
 
 
 ########################################
@@ -193,6 +217,7 @@ def read_cif(
     filename: str,
     keep_rare_gases: bool = False,
     keep_rare_earths: bool = False,
+    special_keys: list[str]|None = None,
     workers: int|None = None,
     sequential: bool = False
 ) -> Tuple[List[Structure], int, int]:
@@ -201,19 +226,23 @@ def read_cif(
 
     Parameters:
         filename (str):             Name of the input CIF file.
-        
-        workers (int):              Number of processes to use in parallel.
-        
+
         keep_rare_gases (bool):     Whether structures containing rare gases should be kept. 
                                     Defaults to false.
-        
+
         keep_rare_earths (bool):    Whether structures containing f-block elements should be kept.
                                     Defaults to False.
+
+        special_keys ([str]):       CIF Labels to store into structure properties, e.g.
+                                    can be used to save structure identifiers attached to it
+                                    throughout its manipulation as a python object.
+
+        workers (int):              Number of processes to use in parallel.
 
         sequential (bool):          Whether to use sequential for-loop instead of multiprocessing
                                     scheme. If set to True, the 'workers' arg is ignored.
                                     Defaults to False.
-    
+
     Returns:
         List[Structure]: Decoded Structure objects in a list.
         Int: Number of structures containing rare gases discarded.
@@ -244,14 +273,19 @@ def read_cif(
     )
     chunksize = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
+    if special_keys is not None:
+        partial_fn = partial(cif_str_to_struct, special_keys=special_keys)
+    else:
+        partial_fn = cif_str_to_struct
+
     if sequential:
         data_list = []
         for struct_string in tqdm(struct_strings, desc="load and read data"):
-            data_list.append(cif_str_to_struct(struct_string))
+            data_list.append(partial_fn(struct_string))
     
     else:
         data_list = list(process_map(
-            cif_str_to_struct,
+            partial_fn,
             struct_strings,
             max_workers=workers,
             chunksize=chunksize,
@@ -327,3 +361,180 @@ def write_cif(
 
 
 ########################################
+
+
+def struct_to_sym_cif_str(
+    structure: Structure,
+    significant_figures: int = 8,
+    symprec: float|None = 0.01,
+    angleprec: float = 5.0,
+    special_keys: list[str]|None = None
+) -> str:
+    """
+    Symmetrize and converts a pymatgen Structure object into a CIF formatted string.
+
+    Parameters:
+        structure (Structure):      Structure object to convert.
+
+        significant_figures (int):  Number of decimal places to keep for atomic positions.
+
+        symprec (float|None):       Fractional position tolerance to find symmetry.
+                                    If set to None, symmetry finding is disabled.
+                                    Defaults to 0.01.
+
+        angleprec (float):          Angle tolerance to find symmetry. Defaults to 5 degrees.
+
+        special_keys ([str]):       CIF Labels to store into structure properties, e.g.
+                                    can be used to save structure identifiers attached to it
+                                    throughout its manipulation as a python object.
+
+    Returns:
+        str: CIF formatted string.
+    """
+    check_type(structure, "structure", (Structure,))
+    check_type(significant_figures, "significant_figures", (int,))
+    check_num_value(significant_figures, "significant_figures", ">=", 0)
+    if symprec is not None:
+        check_type(symprec, "symprec", (float,))
+        check_num_value(symprec, "symprec", ">=", 0.0)
+        check_type(angleprec, "angleprec", (float,))
+        check_num_value(angleprec, "angleprec", ">=", 0.0)
+    if special_keys is not None:
+        check_type(special_keys, "special_keys", (list,))
+        for idx, elt in enumerate(special_keys):
+            check_type(elt, f"special_keys[{idx}]", (str,))
+
+    writer = CifWriter(
+            struct=structure,
+            symprec=symprec,
+            significant_figures=significant_figures,
+            angle_tolerance=angleprec
+        )
+
+    if special_keys is not None:
+        final_cif = []
+        auto_cif = str(writer).splitlines(keepends=True)
+
+        # Remove comment lines
+        auto_cif = list(filter(lambda line: not line.startswith("#"), auto_cif))
+
+        # Recovery of the saved header
+        if "header" in special_keys:
+            final_cif.append(f"data_{structure.properties.pop('header')}\n")
+        else:
+            final_cif.append(auto_cif[0])
+
+        # Recovery of saved attributes
+        for key in special_keys:
+            if key == "header":
+                continue
+            final_cif.append(f"{key}   {structure.properties.get(key)}\n")
+
+        # Addition of the generated CIF data
+        final_cif.extend(auto_cif[1:])
+        final_cif = "".join(final_cif)
+
+    else:
+        final_cif = str(writer)
+
+    return final_cif
+
+
+########################################
+
+
+def symmetrize_and_write_cif(
+    filename: str,
+    structures: List[Structure],
+    significant_figures: int = 8,
+    symmetrize: bool = True,
+    symprec: float = 0.01,
+    angleprec: float = 5.0,
+    special_keys: list[str]|None = None,
+    workers: int|None = None,
+    sequential: bool = False
+) -> None:
+    """
+    Symmetrize and encode multiple structures in CIF format and write them in a file
+    using multiprocess.
+
+    Parameters:
+        filename (str):                 Name of the input file.
+
+        structures (List[Structure]):   The structures to encode.
+
+        significant_figures (int):      Number of decimal places to keep for atomic positions.
+
+        symmetrize (bool):              Whether to search for structures spacegroup symmetry
+                                        and refine their atomic positions according to found
+                                        symmetry before encoding them. Defaults to True.
+
+        symprec (float):                Fractional position tolerance to find symmetry.
+                                        Defaults to 0.01.
+
+        angleprec (float):              Angle tolerance to find symmetry.
+                                        Defaults to 5 degrees.
+
+        special_keys ([str]):           CIF Labels to store into structure properties, e.g.
+                                        can be used to save structure identifiers attached to it
+                                        throughout its manipulation as a python object.
+
+        workers (int):                  Number of parallel processes to use.
+
+        sequential (bool):              Whether to use sequential for-loop instead of
+                                        multiprocessing scheme. If set to True, the
+                                        'workers' arg is ignored. Defaults to False.
+    """
+    check_file_format(filename, allowed_formats="cif")
+    for idx, struct in enumerate(structures):
+        check_type(struct, f"structures[{idx}]", (Structure,))
+    if symmetrize:
+        check_type(symprec, "symprec", (float,))
+        check_num_value(symprec, "symprec", ">=", 0)
+        check_type(angleprec, "angleprec", (float,))
+        check_num_value(angleprec, "angleprec", ">=", 0)
+    if workers is not None:
+        check_type(workers, "workers", (int,))
+        check_num_value(workers, "workers", ">", 0)
+
+    nbr_struct = len(structures)
+    chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
+
+    if symmetrize:
+        partial_fn = partial(
+            struct_to_sym_cif_str,
+            significant_figures=significant_figures,
+            symprec=symprec,
+            angleprec=angleprec,
+            special_keys=special_keys
+        )
+    else:
+        partial_fn = partial(
+            struct_to_sym_cif_str,
+            significant_figures=significant_figures,
+            symprec=None,
+            special_keys=special_keys
+        )
+
+    if sequential:
+        encoded_cif = []
+        for struct in tqdm(structures, desc="Writing data in cif format"):
+            encoded_cif.append(partial_fn(struct))
+
+    else:
+        encoded_cif = list(
+            process_map(
+                partial_fn,
+                structures,
+                max_workers=workers,
+                chunksize=chunksize,
+                desc="Writing data in cif format"
+            )
+        )
+
+    with open(filename, "wt", encoding="utf-8") as out_file:
+        out_file.write("\n".join(encoded_cif))
+
+
+########################################
+

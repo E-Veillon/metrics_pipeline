@@ -16,7 +16,7 @@ from .utils import (
     check_type, check_num_value,
     check_file_format, check_file_or_dir,
     read_cif, write_cif, check_interatomic_distances,
-    batch_symmetrizer, remove_equivalent
+    batch_symmetrizer, remove_equivalent, symmetrize_and_write_cif
 )
 
 
@@ -99,6 +99,15 @@ def _get_command_line_args() -> argp.Namespace:
         dest="no_equiv_match"
     )
     parser.add_argument(
+        "-sk", "--special-keys",
+        nargs="*",
+        help=(
+            "CIF Labels to store into structure properties, e.g. can be used "
+            "to save structure identifiers attached to it throughout its manipulation "
+            "as a python object."
+        )
+    )
+    parser.add_argument(
         "--test-min-vol",
         action="store_true",
         help=(
@@ -167,14 +176,26 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     check_num_value(args_dict.get("angleprec"), "angleprec", ">=", 0.0)
     check_num_value(args_dict.get("angleprec"), "angleprec", "<=", 90.0)
 
+    if args_dict.get("special_keys") is not None:
+        check_type(args_dict.get("special_keys"), "special_keys", (list,))
+        for idx, elt in enumerate(args_dict.get("special_keys")):
+            check_type(elt, f"special_keys[{idx}]", (str,))
+
     if args_dict.get("workers") is not None:
         check_type(args_dict.get("workers"), "workers", (int,))
         check_num_value(args_dict.get("workers"), "workers", ">", 0)
 
     # Print final configuration
+    print(" ")
+    print("------------------------------")
+    print(" ")
     print(" - I/O ARGUMENTS - ")
     print(f"INPUT FILE: {args_dict.get('input_file')}")
     print(f"OUTPUT FILE: {args_dict.get('output')}")
+    print(f"SPECIAL KEYS: {'None' if args_dict.get('special_keys') is None else ''}")
+    if args_dict.get("special_keys") is not None:
+        keys_lst = '\n'.join(args_dict.get('special_keys'))
+        print(f"{keys_lst}") 
     print(" ")
     print("------------------------------")
     print(" ")
@@ -207,6 +228,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     print(" ")
 
     return args_dict
+
 
 ########################################
 
@@ -252,6 +274,10 @@ def main(standalone: bool = True, **kwargs) -> None:
         no_equiv_match (bool):      Whether to disable structure matching and elimination of
                                     duplicates. Defaults to False.
 
+        special_keys ([str]):       CIF Labels to store into structure properties, e.g.
+                                    can be used to save structure identifiers attached to it
+                                    throughout its manipulation as a python object.
+
         test_min_vol (bool):        A debug arg to assume unicity of unlikely structures having
                                     a volume under 1 Angström^3 without passing them into structure
                                     matching, which could cause the program to be softlocked. Only
@@ -270,6 +296,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         filename=args.get("input_file"),
         keep_rare_gases=args.get("no_rare_gas_check"),
         keep_rare_earths=args.get("no_rare_earth_check"),
+        special_keys=args.get("special_keys"),
         workers=args.get("workers"),
         sequential=args.get("sequential")
     )
@@ -298,7 +325,7 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     # Calcul de la symétrie d'espace des structures
 
-    if args.get("no_symmetrization"):
+    """if args.get("no_symmetrization"):
         symmetrized_structs = structures
     else:
         symmetrized_structs = list(filter(
@@ -312,12 +339,12 @@ def main(standalone: bool = True, **kwargs) -> None:
             )
         ))
 
-        print(f"{len(symmetrized_structs)} structures were symmetrized")
+        print(f"{len(symmetrized_structs)} structures were symmetrized")"""
 
     # Comparaison des structures pour éliminer les doublons
 
     kept_structs, nbr_equivalent, nbr_unmatched = remove_equivalent(
-            structures=symmetrized_structs,
+            structures=structures,
             workers=args.get("workers"),
             test_volume=args.get("test_min_vol"),
             keep_equivalent=args.get("no_equiv_match"),
@@ -334,10 +361,19 @@ def main(standalone: bool = True, **kwargs) -> None:
         print("--test-min-vol debug flag was passed:")
         print(f"{nbr_unmatched} structures were assumed unique.")
 
-    # Ecriture du fichier CIF symétrisé et épuré des structures indésirables
-    write_cif(
+    # Symétrisation et écriture du fichier CIF épuré des structures indésirables
+    if args.get("no_symmetrization"):
+        print("Symmetrization is deactivated, now writing CIF file...")
+    else:
+        print("Symmetrization is activated, now symmetrizing and writing CIF file...")
+
+    symmetrize_and_write_cif(
         filename=args.get("output"),
         structures=kept_structs,
+        symmetrize=(not args.get("no_symmetrization")),
+        symprec=args.get("symprec"),
+        angleprec=args.get("angleprec"),
+        special_keys=args.get("special_keys"),
         workers=args.get("workers"),
         sequential=args.get("sequential")
     )
