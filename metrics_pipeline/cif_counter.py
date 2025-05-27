@@ -64,7 +64,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     check_type(args_dict.get("filenames"), "filenames", (list, tuple))
 
     if args_dict.get("cut") is not None:
-        for val in args_dict.get("cut"):
+        for val in args_dict["cut"]:
             check_type(val, "--cut", (int,))
 
     valid_cut_algos = ("from_start", "from_end", "interval", "select")
@@ -74,8 +74,8 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
             f"got {args_dict.get('how_to_cut')} instead."
         )
     if args_dict.get("cut") is not None and (
-        args_dict.get("how_to_cut") in ("from_start", "from_end") and len(args_dict.get("cut")) != 1
-        or args_dict.get("how_to_cut") == "interval" and len(args_dict.get("cut")) != 2
+        args_dict.get("how_to_cut") in ("from_start", "from_end") and len(args_dict["cut"]) != 1
+        or args_dict.get("how_to_cut") == "interval" and len(args_dict["cut"]) != 2
     ):
         raise ValueError(
             "The number of values given to the 'cut' argument does not match with the "
@@ -113,6 +113,7 @@ def write_cut_file(
     """
     valid_cut_idx = list(filter(lambda idx: 0 <= idx < len(data_breakpoints), cut_idx))
     skipped_idx = list(filter(lambda idx: idx < 0 or idx >= len(data_breakpoints), cut_idx))
+    skipped_idx = list(map(str, skipped_idx))
 
     if not valid_cut_idx:
         print(
@@ -170,7 +171,7 @@ def write_cut_file(
                 selected_data = file_lines[data_lines_idx[0]:data_lines_idx[1]]
                 kept_cifs.append("".join(selected_data))
             cut_text = "".join(kept_cifs)
-            suffix = f"_select_{'-'.join(valid_cut_idx)}"
+            suffix = f"_select_{'-'.join(list(map(str, valid_cut_idx)))}"
 
         case _:
             valid_cut_algos = ("from_start", "from_end", "interval", "select")
@@ -215,7 +216,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     """
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
-    for file in args.get("filenames"):
+    for file in args["filenames"]:
 
         if not os.path.isfile(file):
             print(f"FileNotFoundError: {file}: No such file found, skipped.")
@@ -233,7 +234,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         print(f"{nbr_structs} structures found in file '{file}'.")
 
         if args.get("cut") is not None:
-            write_cut_file(file, lines, data_breakpoints, args.get("cut"), args.get("how_to_cut"))
+            write_cut_file(file, lines, data_breakpoints, args["cut"], args["how_to_cut"])
 
 
 if __name__ == "__main__":

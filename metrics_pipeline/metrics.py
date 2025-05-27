@@ -158,7 +158,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     args_dict.setdefault("threshold", 0.4)
 
     # Assert set arguments conformity
-    config_file = os.path.join(CONFIGPATH, args_dict.get("config"))
+    config_file = os.path.join(CONFIGPATH, args_dict["config"])
     check_file_or_dir(config_file, "file", allowed_formats=("yml","yaml"))
 
     if args_dict.get("dataset") is not None:
@@ -302,67 +302,73 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     print("===== LOAD NECESSARY DATA FILES =====")
 
-    CONFIG = yaml_loader(os.path.join(CONFIGPATH, args.get("config")), on_error='raise')
-    dataset_needed = (
-        CONFIG.get("SUN")
-        or CONFIG.get("COV-P")
-        or CONFIG.get("COV-R")
-        or CONFIG.get("FAD")
-        or CONFIG.get("EMD_energy")
-        or CONFIG.get("EMD_density")
+    CONFIG = yaml_loader(os.path.join(CONFIGPATH, args["config"]), on_error='raise')
+    dataset_needed: bool = (
+        CONFIG.get("SUN", False)
+        or CONFIG.get("COV-P", False)
+        or CONFIG.get("COV-R", False)
+        or CONFIG.get("FAD", False)
+        or CONFIG.get("EMD_energy", False)
+        or CONFIG.get("EMD_density", False)
     )
-    valid_needed = CONFIG.get("Validity")
-    uniques_needed = sun_summary_needed = CONFIG.get("SUN")
-    relax_summary_needed = CONFIG.get("RMSD")
+    valid_needed: bool = CONFIG.get("Validity", False)
+    uniques_needed = sun_summary_needed = CONFIG.get("SUN", False)
+    relax_summary_needed = CONFIG.get("RMSD", False)
 
     _print_metrics_config(CONFIG)
 
     print("Loading generated structures...")
     generated, *_ = read_cif(
-        filename=args.get("generated"),
+        filename=args["generated"],
         workers=args.get("workers"),
-        keep_rare_gases=args.get("no_rare_gas_check"),
-        keep_rare_earths=args.get("no_rare_earth_check")
+        keep_rare_gases=args["no_rare_gas_check"],
+        keep_rare_earths=args["no_rare_earth_check"]
     )
     print("Generated structures loaded.")
 
-    if _match_file_arg_need("dataset", args.get("dataset"), dataset_needed):
+    if _match_file_arg_need("dataset", args.get("dataset", False), dataset_needed):
         print("Loading dataset...")
         dataset, *_ = read_cif(
-            filename=args.get("dataset"),
+            filename=args["dataset"],
             workers=args.get("workers"),
-            keep_rare_gases=args.get("no_rare_gas_check"),
-            keep_rare_earths=args.get("no_rare_earth_check")
+            keep_rare_gases=args["no_rare_gas_check"],
+            keep_rare_earths=args["no_rare_earth_check"]
         )
         print("Dataset loaded.")
         # remove duplicate structures from the dataset
         dataset, *_ = remove_equivalent(
             structures=dataset, workers=args.get("workers"), keep_equivalent=False
         )
+    else:
+        dataset = []
 
-    if _match_file_arg_need("valid", args.get("valid"), valid_needed):
+    if _match_file_arg_need("valid", args.get("valid", False), valid_needed):
         print("Loading preprocessed valid structures...")
         valids, *_ = read_cif(
-            filename=args.get("valid"),
+            filename=args["valid"],
             workers=args.get("workers"),
-            keep_rare_gases=args.get("no_rare_gas_check"),
-            keep_rare_earths=args.get("no_rare_earth_check")
+            keep_rare_gases=args["no_rare_gas_check"],
+            keep_rare_earths=args["no_rare_earth_check"]
         )
         print("Preprocessed valid structures loaded.")
+    else:
+        valids = []
 
-    if _match_file_arg_need("uniques", args.get("uniques"), uniques_needed):
+    if _match_file_arg_need("uniques", args.get("uniques", False), uniques_needed):
         print("Loading preprocessed uniques structures...")
         uniques, *_ = read_cif(
-            filename=args.get("uniques"),
+            filename=args["uniques"],
             workers=args.get("workers"),
-            keep_rare_gases=args.get("no_rare_gas_check"),
-            keep_rare_earths=args.get("no_rare_earth_check")
+            keep_rare_gases=args["no_rare_gas_check"],
+            keep_rare_earths=args["no_rare_earth_check"]
         )
         print("Preprocessed uniques structures loaded.")
+    else:
+        uniques = []
 
-    if _match_file_arg_need("sun-summary", args.get("sun_summary"), sun_summary_needed):
+    if _match_file_arg_need("sun-summary", args.get("sun_summary", False), sun_summary_needed):
         print("Loading stability summary file...")
-        with open(args.get("sun_summary"), "rt", encoding="utf-8") as fp:
+        with open(args["sun_summary"], "rt", encoding="utf-8") as fp:
             sun_summary = json.load(fp)
         print("Stability summary file loaded.")
 
@@ -375,10 +381,12 @@ def main(standalone: bool = True, **kwargs) -> None:
         )
         stable_structs = [s for s, _ in stable_structs]
         print("Data converted.")
+    else:
+        stable_structs = []
 
-    if _match_file_arg_need("relax-summary", args.get("relax_summary"), relax_summary_needed):
+    if _match_file_arg_need("relax-summary", args.get("relax_summary", False), relax_summary_needed):
         print("Loading relaxations summary file...")
-        with open(args.get("relax_summary"), "rt", encoding="utf-8") as fp:
+        with open(args["relax_summary"], "rt", encoding="utf-8") as fp:
             relax_summary = json.load(fp)
         print("Relaxations summary file loaded.")
 
@@ -391,6 +399,8 @@ def main(standalone: bool = True, **kwargs) -> None:
             workers=args.get("workers")
         )
         print("Data converted.")
+    else:
+        relax_structures = []
 
     general_metrics = dict.fromkeys(
         ("num_generated", "num_valid", "percent_valid")
@@ -399,8 +409,8 @@ def main(standalone: bool = True, **kwargs) -> None:
     dft_metrics = dict.fromkeys(
         (
             "num_unique", "percent_unique",
-            "num_novel", "percent_novel",
-            "num_unique_novel", "percent_unique_novel",
+            "num_novel", "num_unmatched_novel", "percent_novel",
+            "num_unique_novel", "num_unmatched_unique_novel", "percent_unique_novel",
             "num_stable", "percent_stable",
             "num_SUN", "percent_SUN",
             "RMSD"
@@ -416,7 +426,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     # total number of generated structures
     general_metrics["num_generated"] = len(generated)
 
-    if CONFIG.get("Validity"):
+    if CONFIG.get("Validity", False):
         # Validity metric
         print("Computing Validity metric...")
         general_metrics["num_valid"] = len(valids)
@@ -424,7 +434,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         general_metrics["percent_valid"] = round(prop_valid * 100, 6)
         print(f"Validity = {general_metrics.get('percent_valid')}%")
 
-    if CONFIG.get("SUN"):
+    if CONFIG.get("SUN", False):
         # S.U.N. metrics
         print("Computing S.U.N. metrics...")
 
@@ -487,7 +497,7 @@ def main(standalone: bool = True, **kwargs) -> None:
                 continue
             print(f"{key} = {val}")
 
-    if CONFIG.get("RMSD"):
+    if CONFIG.get("RMSD", False):
         # RMSD metric
         print("Computing RMSD metric...")
         in_structs = [s for s, _ in relax_structures]
@@ -500,7 +510,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         )
         print(f"RMSD = {dft_metrics['RMSD']}")
 
-    if CONFIG.get("COV-P") or CONFIG.get("COV-R"):
+    if CONFIG.get("COV-P", False) or CONFIG.get("COV-R", False):
         # Compute Coverage (Precision, Recall)
         print("Computing fingerprints for Coverage metrics...")
         fingerprint_dataset = to_crystalnn_fingerprint(dataset, workers=args.get("workers"))
@@ -512,21 +522,21 @@ def main(standalone: bool = True, **kwargs) -> None:
                 zip(fingerprint_dataset, fingerprint_gen),
             )
         ))
-        if CONFIG.get("COV-P"):
+        if CONFIG.get("COV-P", False):
             print("Computing Coverage (Precision)...")
             ml_metrics["precision"] = precision(
-                fingerprint_gen, fingerprint_dataset, args.get("threshold")
+                fingerprint_gen, fingerprint_dataset, args["threshold"]
             )
             print(f"COV-P = {ml_metrics['precision']}")
 
-        if CONFIG.get("COV-R"):
+        if CONFIG.get("COV-R", False):
             print("Computing Coverage (Recall)...")
             ml_metrics["recall"] = recall(
-                fingerprint_gen, fingerprint_dataset, args.get("threshold")
+                fingerprint_gen, fingerprint_dataset, args["threshold"]
             )
             print(f"COV-R = {ml_metrics['recall']}")
 
-    if CONFIG.get("FAD"):
+    if CONFIG.get("FAD", False):
         # Compute Fréchet ALIGNN Distance
         print("Computing Fréchet ALIGNN Distance metric...")
         latent_dataset = vectors_from_alignn(dataset, output="latent")
@@ -534,7 +544,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         ml_metrics["frechet_distance"] = frechet_distance(latent_gen, latent_dataset)
         print(f"Frechet Distance = {ml_metrics['frechet_distance']}")
 
-    if CONFIG.get("EMD_energy"):
+    if CONFIG.get("EMD_energy", False):
         # Compute Earth Mover's Distance on energy distributions
         print("Computing Earth Mover's Distance metric on energy...")
         energy_dataset = vectors_from_alignn(dataset, output="energy")
@@ -542,7 +552,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         ml_metrics["EMD_energy"] = get_emd(energy_dataset, energy_gen)
         print(f"Energy EMD = {ml_metrics['EMD_energy']}")
 
-    if CONFIG.get("EMD_density"):
+    if CONFIG.get("EMD_density", False):
         # Compute Earth Mover's Distance on density distributions
         print("Computing Earth Mover's Distance metric on density...")
         densities_dataset = get_densities(dataset)
@@ -556,10 +566,10 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     print("Writing output file...")
 
-    with open(args.get("output"), "w", encoding="utf-8") as fp:
+    with open(args["output"], "w", encoding="utf-8") as fp:
         json.dump(metrics, fp, indent=4)
 
-    print(f"Output file successfully written at location '{args.get("output")}'.")
+    print(f"Output file successfully written at location {args['output']}.")
     print(json.dumps(metrics, indent=4))
 
 

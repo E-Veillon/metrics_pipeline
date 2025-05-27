@@ -39,7 +39,7 @@ def check_type(
         )
 
 def check_num_value(
-    val: int|float, val_name: str, cdt: CompareStr = "==", ref_val: int|float = 0
+    val: int|float|None, val_name: str, cdt: CompareStr = "==", ref_val: int|float = 0
 ) -> None:
     """
     Test given condition on given numeric value (int or float),
@@ -55,6 +55,11 @@ def check_num_value(
 
         ref_val (int|float):    The value to compare 'val' to. Defaults to 0.
     """
+    check_type(val, "val", (int, float))
+    assert val is not None, "Never triggered, used for type checker."
+    check_type(val_name, "val_name", (str,))
+    check_type(ref_val, "ref_val", (int, float))
+
     match cdt:
         case "==":
             if val != ref_val:

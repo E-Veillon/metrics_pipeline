@@ -62,7 +62,8 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
 
     # Assert set arguments conformity
-    check_file_or_dir(os.path.dirname(args_dict.get("from_mp_api")), "dir")
+    if args_dict.get("from_mp_api") is not None:
+        check_file_or_dir(os.path.dirname(args_dict["from_mp_api"]), "dir")
     check_file_or_dir(args_dict.get("process_oqmd"), "file", allowed_formats="json")
 
     return args_dict
@@ -103,13 +104,13 @@ def main(standalone: bool = True, **kwargs) -> None:
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     if args.get("from_mp_api") is not None:
-        dir_path = os.path.dirname(args.get("from_mp_api"))
+        dir_path = os.path.dirname(args["from_mp_api"])
         check_file_or_dir(dir_path, "dir")
-        mp_api_download(args.get("from_mp_api"), api_key=args.get("mp_api_key"))
+        mp_api_download(args["from_mp_api"], api_key=args.get("mp_api_key"))
 
     if args.get("process_oqmd") is not None:
         check_file_or_dir(args.get("process_oqmd"), "file", allowed_formats="json")
-        process_oqmd_json_file(path=args.get("process_oqmd"))
+        process_oqmd_json_file(path=args["process_oqmd"])
 
 
 if __name__ == "__main__":

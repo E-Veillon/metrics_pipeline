@@ -34,7 +34,7 @@ def _structure_to_fingerprint(struct: Structure):
 
 def to_crystalnn_fingerprint(
     structures: List[Structure],
-    workers: int = 1
+    workers: int | None = None
 ) -> List[np.ndarray]:
     """
     Convert given structures to their CrystalNN fingerprints.
@@ -44,14 +44,17 @@ def to_crystalnn_fingerprint(
         structures ([Structure]):   Structures whoes fingerprint isneeded.
 
         workers (int):              Number of parallel processes to spawn.
+                                    If not given, tqdm.contrib.concurrent.process_map
+                                    default is used.
     
     Returns: List[ndarray]:
         List of CrystalNN fingerprints corresponding to given structures.
     """
     for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
-    check_type(workers, "workers", (int,))
-    check_num_value(workers, "workers", ">", 0)
+    if workers is not None:
+        check_type(workers, "workers", (int,))
+        check_num_value(workers, "workers", ">", 0)
 
     nb_structs = len(structures)
     chunksize = (min(nb_structs // 100, 10) if nb_structs >= 200 else 1)

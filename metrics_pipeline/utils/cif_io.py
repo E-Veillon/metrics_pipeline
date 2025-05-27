@@ -5,7 +5,7 @@ Functions to load and write CIF formatted data with multiple processes.
 
 
 import re
-from typing import Tuple, List
+import typing as tp
 from functools import partial
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
@@ -22,12 +22,13 @@ from .periodic_table import (
     discard_rare_gas_structures, discard_rare_earth_structures
 )
 from .redirect import redirect_c_stdout, redirect_c_stderr
+from .custom_types import PathLike, VisualIterator
 
 
 ##################################################
 
 
-def extract_cif_from_file(filename: str) -> List[str]:
+def extract_cif_from_file(filename: PathLike) -> list[str]:
     """
     Separates concatenated structures from a cif file.
 
@@ -149,7 +150,7 @@ def struct_to_cif_str(
     def _frac_coord_sort_key(s: SymmetrizedStructure):
         return tuple(abs(x) for x in s.frac_coords)
 
-    unique_sites: List[Tuple[PeriodicSite, int]] = [
+    unique_sites: list[tuple[PeriodicSite, int]] = [
         (
             sorted(sites, key=_frac_coord_sort_key)[0],
             len(sites)
@@ -158,10 +159,10 @@ def struct_to_cif_str(
 
     # Between non-equivalent sites, we sort them firstly by ascending electronegativity,
     # then by descending multiplicity, then by ascending frac coordinates
-    def _electroneg_sort_key(t: Tuple):
+    def _electroneg_sort_key(t: tuple):
         return (t[0].species.average_electroneg, -t[1], t[0].a, t[0].b, t[0].c)
 
-    sorted_unique_sites: List[Tuple[PeriodicSite, int]] = sorted(
+    sorted_unique_sites: list[tuple[PeriodicSite, int]] = sorted(
         unique_sites, key=_electroneg_sort_key
     )
 
@@ -214,13 +215,13 @@ def struct_to_cif_str(
 
 
 def read_cif(
-    filename: str,
+    filename: PathLike,
     keep_rare_gases: bool = False,
     keep_rare_earths: bool = False,
-    special_keys: list[str]|None = None,
-    workers: int|None = None,
+    special_keys: list[str] | None = None,
+    workers: int | None = None,
     sequential: bool = False
-) -> Tuple[List[Structure], int, int]:
+) -> tuple[list[Structure], int, int]:
     """
     Reads a cif file containing concatenated structures data and decode them using multiprocess.
 
@@ -248,6 +249,7 @@ def read_cif(
         Int: Number of structures containing rare gases discarded.
         Int: Number of structures containing rare earth elements discarded.
     """
+    # Security check block
     check_file_or_dir(filename, "file", allowed_formats="cif")
     check_type(keep_rare_gases, "keep_rare_gases", (bool,))
     check_type(keep_rare_earths, "keep_rare_earths", (bool,))
@@ -256,6 +258,7 @@ def read_cif(
         check_num_value(workers, "workers", ">", 0)
     check_type(sequential, "sequential", (bool,))
 
+    # Actual function
     struct_strings = extract_cif_from_file(filename)
     nbr_rare_gas_structs, nbr_rare_earth_structs = 0, 0
 
@@ -279,9 +282,10 @@ def read_cif(
         partial_fn = cif_str_to_struct
 
     if sequential:
-        data_list = []
-        for struct_string in tqdm(struct_strings, desc="load and read data"):
-            data_list.append(partial_fn(struct_string))
+        data_list = [
+            partial_fn(struct_string)
+            for struct_string in VisualIterator(struct_strings, desc="Read and load data")
+        ]
     
     else:
         data_list = list(process_map(
@@ -310,7 +314,7 @@ def read_cif(
 
 def write_cif(
     filename: str,
-    structures: List[Structure],
+    structures: list[Structure],
     workers: int|None = None,
     sequential: bool = False
 ) -> None:
@@ -338,7 +342,7 @@ def write_cif(
     nbr_struct = len(structures)
     chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
 
-    #def feed_args(structures, symprec, angle_tolerance) -> List[Tuple]:
+    #def feed_args(structures, symprec, angle_tolerance) -> List[tuple]:
     #    return [(struct, symprec, angle_tolerance) for struct in structures]
     if sequential:
         encoded_cif = []
@@ -445,7 +449,7 @@ def struct_to_sym_cif_str(
 
 def symmetrize_and_write_cif(
     filename: str,
-    structures: List[Structure],
+    structures: list[Structure],
     significant_figures: int = 8,
     symmetrize: bool = True,
     symprec: float = 0.01,
@@ -517,9 +521,10 @@ def symmetrize_and_write_cif(
         )
 
     if sequential:
-        encoded_cif = []
-        for struct in tqdm(structures, desc="Writing data in cif format"):
-            encoded_cif.append(partial_fn(struct))
+        encoded_cif = [
+            partial_fn(struct)
+            for struct in VisualIterator(structures, desc="Writing data in cif format")
+        ]
 
     else:
         encoded_cif = list(

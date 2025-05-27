@@ -12,7 +12,7 @@ from datetime import datetime
 import argparse as argp
 
 # PYTHON MATERIAL GENOMICS
-from pymatgen.core import SiteCollection
+from pymatgen.core import Structure
 
 # LOCAL IMPORTS
 from . import CONFIGPATH, _parse_input_args
@@ -112,7 +112,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     # WARNING:
     # Usual VASP shortcut, but may activate wrong VASP version if several are installed.
     # Prefer giving a true VASP executable path for unambiguous computation.
-    default_output = os.path.join(os.path.dirname(args_dict.get("input_file")), "Relaxations")
+    default_output = os.path.join(os.path.dirname(args_dict.get("input_file", "")), "Relaxations")
     args_dict.setdefault("output", default_output)
     args_dict.setdefault("preset", PMGRelaxSet.MPRELAXSET.value)
     args_dict.setdefault("user_settings", "default_settings.yaml")
@@ -125,11 +125,11 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
         check_file_or_dir(args_dict.get("executable_path"), "file")
 
     check_file_or_dir(args_dict.get("output"), "dir")
-    assert args_dict.get("preset") in PMGRelaxSet.values, (
+    assert args_dict.get("preset", "") in PMGRelaxSet.values, (
     "Provided relaxation preset must be one of the following:\n"
     f"{PMGRelaxSet.values}"
     )
-    config_path = os.path.join(CONFIGPATH, args_dict.get("user_settings"))
+    config_path = os.path.join(CONFIGPATH, args_dict["user_settings"])
     check_file_or_dir(config_path, "file", allowed_formats=("yml", "yaml"))
     
     if args_dict.get("workers") is not None:
@@ -140,7 +140,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     check_num_value(args_dict.get("task_index"), "task_index", ">=", 0)
 
     # Additional arguments processing
-    os.makedirs(args_dict.get("output"), exist_ok=True)
+    os.makedirs(args_dict["output"], exist_ok=True)
     args_dict["preset"] = PMGRelaxSet(args_dict.get("preset"))
     args_dict["settings"] = yaml_loader(config_path)
 
@@ -197,18 +197,19 @@ def main(standalone: bool = True, **kwargs):
     if str(args.get("input_file")).endswith(".cif"):
         # Convert CIF data into Structure objects
         structures, *_ = read_cif(
-            filename=args.get("input_file"),
+            filename=args["input_file"],
             workers=args.get("workers"),
-            keep_rare_gases=True, # Avoid calling rare gaz screening function
+            keep_rare_gases=True, # Avoid calling rare gas screening function
             keep_rare_earths=True # Avoid calling rare earth screening function
         )
         # Get structure of interest
-        structure: SiteCollection = structures[args.get("task_index")]
-        dir_name = f"{args.get("task_index")}_{structure.composition.reduced_formula}"
+        task_idx: int = args["task_index"]
+        structure: Structure = structures[task_idx]
+        dir_name = f"{args['task_index']}_{structure.composition.reduced_formula}"
 
-    elif str(args.get("input_file")).endswith(".json"):
+    elif str(args["input_file"]).endswith(".json"):
 
-        with open(args.get("input_file"), "rt", encoding="utf-8") as fp:
+        with open(args["input_file"], "rt", encoding="utf-8") as fp:
             data = json.load(fp)
 
         paths = [d["path"] for d in data]
@@ -229,12 +230,12 @@ def main(standalone: bool = True, **kwargs):
 
     vasp_input = vasp_relaxation_settings(
         structure=structure,
-        preset=args.get("preset"),
+        preset=args["preset"],
         user_corrections=args.get("settings")
     )
-    run_dir = add_new_dir(args.get("output"), dir_name)
+    run_dir = add_new_dir(args["output"], dir_name)
 
-    write_and_run_vasp(vasp_input, run_dir, args.get("executable_path"))
+    write_and_run_vasp(vasp_input, run_dir, args["executable_path"])
 
     stop = datetime.now()
     print(f"Elapsed time: {stop-start}")

@@ -5,7 +5,7 @@ import os
 import json
 from typing import Dict, Any
 from mp_api.client import MPRester
-from emmet.core.thermo import ThermoType
+from emmet.core.thermo import ThermoType, ThermoDoc
 
 # PYTHON MATERIALS GENOMICS
 from pymatgen.core import SETTINGS, Composition
@@ -73,6 +73,8 @@ def mp_api_download(path: str, api_key: str|None = None) -> None:
 
         final_data = {}
         for entry in data:
+            if isinstance(entry, ThermoDoc): # Never triggered, but satisfies type checker
+                continue
             nb_atoms = Composition(entry["composition"]).num_atoms
             final_data.update(
                 {
@@ -153,28 +155,28 @@ def process_oqmd_json_file(path: str) -> None:
         entry_id: str = str(struct.get("entry_id"))
 
         if isinstance(struct.get("composition"), Dict):
-            composition: Dict[str, int] = struct.get("composition")
+            comp_dict: Dict[str, int|float] = struct["composition"]
 
-        elif isinstance(struct.get("composition"), str):
-            old_comp = Composition("".join(struct.get("composition").split()), strict=True)
+        elif isinstance(struct["composition"], str):
+            old_comp = Composition("".join(struct["composition"].split()), strict=True)
 
-            if old_comp.num_atoms == struct.get("natoms"):
+            if old_comp.num_atoms == struct["natoms"]:
                 composition: Composition = old_comp.copy()
 
             else: # The composition is a reduced form
-                mult_factor: int = struct.get("natoms") // old_comp.num_atoms
+                mult_factor: int = struct["natoms"] // old_comp.num_atoms
                 composition: Composition = old_comp * mult_factor
 
-            composition: Dict[str, int] = composition.get_el_amt_dict()
+            comp_dict: Dict[str, int|float] = composition.get_el_amt_dict()
 
-        total_energy: float = struct.get("delta_e") * struct.get("natoms")
+        total_energy: float = struct["delta_e"] * struct.get("natoms")
         new_name: str = processed_prefix + entry_id
 
         processed_data.update(
             {
                 new_name: {
                     "entry_id": entry_id,
-                    "composition": composition,
+                    "composition": comp_dict,
                     "final_energy": total_energy
                 }
             }

@@ -21,7 +21,7 @@ Algorithm:
 import os
 import json
 import argparse as argp
-import typing as typ
+import typing as tp
 from datetime import datetime
 
 # LOCAL IMPORTS
@@ -119,7 +119,7 @@ def _get_command_line_args() -> argp.Namespace:
     return args
 
 
-def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     """Handle input arguments assertions and processing."""
     if args_dict is None:
         raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
@@ -143,8 +143,8 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
 
         if args_dict.get("key_to_check") is None:
             raise ValueError(
-                f"'prev_summary' argument was provided ({args_dict.get('prev_summary')}),
-                therefore 'key-to-check' argument has to be given as well."
+                f"'prev_summary' argument was provided ({args_dict.get('prev_summary')}), "
+                "therefore 'key-to-check' argument has to be given as well."
             )
 
     if args_dict.get("key_to_check") is not None:
@@ -159,8 +159,8 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
         check_num_value(args_dict.get("workers"), "workers", ">", 0)
 
     # Additional arguments processing
-    args_dict["limit"] = round(args_dict.get("limit"), 8)
-    args_dict["summarypath"] = os.path.join(args_dict.get("run_dir"), args_dict.get("summary"))
+    args_dict["limit"] = round(args_dict["limit"], 8)
+    args_dict["summarypath"] = os.path.join(args_dict["run_dir"], args_dict["summary"])
 
     return args_dict
 
@@ -229,7 +229,7 @@ def main(standalone: bool = True, **kwargs):
     # Extract generated data
     structs_data = batch_extract_vasp_data(
         method="convex_hull",
-        base_dir=args.get("run_dir"),
+        base_dir=args["run_dir"],
         path_to_summary=args.get("prev_summary"),
         key_to_check=args.get("key_to_check"),
         workers=args.get("workers"),
@@ -250,7 +250,7 @@ def main(standalone: bool = True, **kwargs):
 
     # Extract reference dataset
     if args.get("reference") is not None:
-        ref_data = load_phase_diagram_entries(args.get("reference"))
+        ref_data = load_phase_diagram_entries(args["reference"])
         ref_entries = init_entries_from_dict(
             entries_dict=ref_data, attribute="ref_structs"
         )
@@ -276,13 +276,13 @@ def main(standalone: bool = True, **kwargs):
     screening_results = batch_compute_e_above_hull(
         entries=grouped_entries,
         ref_entries=ref_entries,
-        stable_limit=args.get("limit"),
+        stable_limit=args["limit"],
         workers=args.get("workers"),
-        verbose=args.get("verbose")
+        verbose=args.get("verbose", False)
     )
 
     for dct in screening_results:
-        path = os.path.join(args.get("run_dir"), dct["name"])
+        path = os.path.join(args["run_dir"], dct["name"]) # type: ignore
         dct.update({"path": os.path.abspath(path)})
 
     # Too high dimension structures are added as not stable in results
@@ -297,19 +297,19 @@ def main(standalone: bool = True, **kwargs):
         screening_results.append(
             {
                 "name": entry.name,
-                "path": os.path.abspath(os.path.join(args.get("run_dir"), entry.name)),
-                "e_above_hull": None,
+                "path": os.path.abspath(os.path.join(args["run_dir"], entry.name)),
+                "e_above_hull": None, # type: ignore
                 "stable": False,
                 "comment": msg
             }
         )
 
     def sort_by_path(dct: dict) -> str:
-        return dct.get("path")
+        return dct["path"]
 
     screening_results = sorted(screening_results, key=sort_by_path)
 
-    with open(args.get("summarypath"), mode="wt", encoding="utf-8") as fp:
+    with open(args["summarypath"], mode="wt", encoding="utf-8") as fp:
         json.dump(screening_results, fp, indent=4)
 
     stop = datetime.now()

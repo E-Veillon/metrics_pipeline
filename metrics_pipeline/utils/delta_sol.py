@@ -70,7 +70,7 @@ class DSolStaticSet(MPRelaxSet):
             **kwargs
         ) -> None:
         """DSolStaticSet init."""
-        super().__init__(structure, **kwargs)
+        super().__init__(structure, **kwargs) # type: ignore
 
         if incar_nelect is None:
             try:
@@ -157,11 +157,13 @@ def get_dsol_struct_dir(
 ########################################
 
 
-def _get_dsol_calc(calc_idx: int) -> str|None:
+def _get_dsol_calc(calc_idx: int) -> str:
     for calc in DSolCalc:
         if calc_idx == calc.value:
             return calc.name
-    return None
+    check_num_value(calc_idx, "calc_idx", ">=", 0)
+    check_num_value(calc_idx, "calc_idx", "<=", 6)
+    raise NotImplementedError
 
 
 ########################################
@@ -173,21 +175,16 @@ def calc_idx_to_dir_name(struct_dir_name: str, calc_index: int) -> str:
     check_type(calc_index, "calc_index", (int,))
 
     calc_type = _get_dsol_calc(calc_index)
-
-    if calc_type is None:
-        check_num_value(calc_index, "calc_index", ">=", 0)
-        check_num_value(calc_index, "calc_index", "<=", 6)
-
     return "_".join((struct_dir_name, calc_type.lower()))
 
 
 ########################################
 
 
-def _match_n_star_idx(n_star_idx: int) -> str|None:
+def _match_n_star_idx(n_star_idx: int) -> str:
     """Get delta-sol N* type name (e.g. "BEST")."""
     n_star_type = _get_dsol_calc(n_star_idx)
-    return n_star_type if n_star_type is None else n_star_type.split(sep="_")[0]
+    return n_star_type.split(sep="_")[0]
 
 
 ########################################
@@ -305,7 +302,7 @@ def get_dsol_band_gap(data: dict) -> Union[Tuple[str, float], Tuple[str, float, 
     assert all(has_str_key(data, key) for key in data_keys)
 
     n_ratio_best = get_dsol_n_ratio(
-        data["structure"], dft_functional=data["functional"], n_star_idx="BEST"
+        data["structure"], dft_functional=data["functional"], n_star_idx=1
     )
 
     # E_FG = [E(N0 + n) + E(N0 - n) - 2*E(N0)]/n -> Δ-Sol band gap
@@ -318,10 +315,10 @@ def get_dsol_band_gap(data: dict) -> Union[Tuple[str, float], Tuple[str, float, 
         return (data["name"], e_bg_best)
 
     n_ratio_min = get_dsol_n_ratio(
-        data["structure"], dft_functional=data["functional"], n_star_idx="MIN"
+        data["structure"], dft_functional=data["functional"], n_star_idx=3
     )
     n_ratio_max = get_dsol_n_ratio(
-        data["structure"], dft_functional=data["functional"], n_star_idx="MAX"
+        data["structure"], dft_functional=data["functional"], n_star_idx=5
     )
     e_diff_min = data["E_N0_plus_n_min"] + data["E_N0_minus_n_min"] - 2*data["E_N0"]
     e_bg_min = e_diff_min / n_ratio_min
@@ -339,8 +336,8 @@ def batch_get_dsol_band_gaps(
         bg_data: dict,
         dft_functional: Literal["LDA","PBE","AM05"] = "PBE",
         with_uncertainties: bool = False,
-        workers: int = 1
-    ) -> Dict[str, float]:
+        workers: int | None = None
+    ) -> dict[str, dict[str, float]]:
     """
     Calculate Δ-Sol band gap value for every structure in a batch
     from their data, as provided by extract_vasp_data_for_delta_sol
@@ -357,16 +354,19 @@ def batch_get_dsol_band_gaps(
         with_uncertainties (bool):  Whether to include uncertainty calculations data
                                     in the results. Defaults to False.
 
-        workers (int):              The number of parallel processes to spawn. Defaults to 1.
+        workers (int):              Number of parallel processes to spawn.
+                                    If not given, tqdm.contrib.concurrent.process_map
+                                    default is used.
 
-    Returns: Dict[str, float]:
+    Returns:
         Dict of Band gap values associated with the original structure directory name.
     """
     check_type(bg_data, "bg_data", (Dict,))
     assert dft_functional in {"LDA", "PBE", "AM05"}
     check_type(with_uncertainties, "with_uncertainties", (bool,))
-    check_type(workers, "workers", (int,))
-    check_num_value(workers, "workers", ">", 0)
+    if workers is not None:
+        check_type(workers, "workers", (int,))
+        check_num_value(workers, "workers", ">", 0)
 
     if not with_uncertainties:
         final_energies = {
@@ -436,16 +436,16 @@ if __name__ == "__main__":
     file_path = ""
     PATHTEST = os.path.join(os.path.expanduser("~"), file_path)
     with open(PATHTEST, "rt", encoding="utf-8") as test_file:
-        struct = CifParser(test_file).parse_structures()[0]
+        struct = CifParser(test_file).parse_structures()[0] # type: ignore
     dset = DSolStaticSet(struct).get_input_set()
     with open(
         os.path.join(os.path.dirname(PATHTEST), "DeltaVaspInput.txt"),
         mode="wt", encoding="utf-8"
     ) as out:
         out.write(str(dset))
-    print(dset.incar_nelect)
-    dset.incar_nelect = 58
-    print(dset.incar_nelect)
+    print(dset.incar_nelect) # type: ignore
+    dset.incar_nelect = 58 # type: ignore
+    print(dset.incar_nelect) # type: ignore
 
     # Unit test for _match_calc_index().
     print("Wanted output:")

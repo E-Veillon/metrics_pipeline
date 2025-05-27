@@ -9,7 +9,7 @@ Reference for Δ-Sol method:
 import os
 import json
 import argparse as argp
-import typing as typ
+import typing as tp
 from datetime import datetime
 
 
@@ -91,7 +91,7 @@ def _get_command_line_args() -> argp.Namespace:
     return args
 
 
-def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     """Handle input arguments assertions and processing."""
     if args_dict is None:
         raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
@@ -112,21 +112,29 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
         f"{args_dict.get('functional')} is not supported by delta-Sol. "
         "See --help for valid functional argument values."
     )
-    assert all(value >= 0.0 for value in args_dict.get("valid_interval")), (
+    check_type(args_dict.get("valid_interval"), "valid_interval", (tuple, list))
+    assert len(args_dict["valid_interval"]) == 2, (
+        "An interval should be between 2 values, "
+        f"got {len(args_dict['valid_interval'])} instead."
+    )
+    for idx, elt in enumerate(args_dict["valid_interval"]):
+        check_type(elt, f"valid_interval[{idx}]", (float, int))
+
+    assert all(value >= 0.0 for value in args_dict["valid_interval"]), (
         "Acceptable band gap values must be positive or zero."
     )
-    assert args_dict.get("valid_interval")[0] != args_dict.get("valid_interval")[1], (
+    assert args_dict["valid_interval"][0] != args_dict["valid_interval"][1], (
         "Acceptable band gap values cannot have the exact same value."
     )
     check_file_format(args_dict.get("summary"), allowed_formats="json")
 
     if args_dict.get("workers") is not None:
-        check_num_value(args_dict.get("workers"), "workers", ">", 0)
+        check_num_value(args_dict["workers"], "workers", ">", 0)
 
     # Additional arguments processing
-    args_dict["valid_interval"] = sorted(args_dict.get("valid_interval"))
-    args_dict["summary"] = os.path.basename(args_dict.get("summary"))
-    args_dict["summaryfile"] = os.path.join(args_dict.get("input_dir"), args_dict.get("summary"))
+    args_dict["valid_interval"] = sorted(args_dict["valid_interval"])
+    args_dict["summary"] = os.path.basename(args_dict["summary"])
+    args_dict["summaryfile"] = os.path.join(args_dict["input_dir"], args_dict["summary"])
 
     return args_dict
 
@@ -178,25 +186,25 @@ def main(standalone: bool = True, **kwargs) -> None:
     # Extract VASP static calculations results
     bg_data = batch_extract_vasp_data(
         method="delta_sol_calc",
-        base_dir=args.get("input_dir"),
+        base_dir=args["input_dir"],
         workers=args.get("workers")
     )
 
     e_band_gaps = batch_get_dsol_band_gaps(
-        bg_data, args.get("functional"), args.get("with_uncertainties"), args.get("workers")
+        bg_data, args["functional"], args["with_uncertainties"], args.get("workers")
     )
 
     good_bg_structs = list(filter(
-        lambda tup: min(args.get("valid_interval")) <= tup[1]["E_band_gap"] <= max(args.get("valid_interval")),
+        lambda tup: min(args["valid_interval"]) <= tup[1]["E_band_gap"] <= max(args["valid_interval"]),
         list(e_band_gaps.items())
     ))
 
     bad_bg_structs = list(filter(
-        lambda tup: not min(args.get("valid_interval")) <= tup[1]["E_band_gap"] <= max(args.get("valid_interval")),
+        lambda tup: not min(args["valid_interval"]) <= tup[1]["E_band_gap"] <= max(args["valid_interval"]),
         list(e_band_gaps.items())
     ))
 
-    screening_results = []
+    screening_results: list[dict[str, tp.Any]] = []
 
     # Keep good structures
     for struct in good_bg_structs:
@@ -206,7 +214,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         e_band_gap_rectified = max(e_band_gap, 0.0)
         true_neg_bg = f" (true measurement: {e_band_gap})" if e_band_gap_rectified == 0.0 else ""
 
-        struct_dict = {
+        struct_dict: dict[str, tp.Any] = {
                 "path": os.path.join(str(args.get("input_dir")), name),
                 "bandgap (eV)": f"{e_band_gap_rectified}{true_neg_bg}",
                 "valid_gap": True
@@ -275,11 +283,11 @@ def main(standalone: bool = True, **kwargs) -> None:
         screening_results.append(struct_dict)
 
     def sort_by_path(dct: dict) -> str:
-        return dct.get("path")
+        return dct["path"]
 
     screening_results = sorted(screening_results, key=sort_by_path)
 
-    with open(args.get("summaryfile"), "w", encoding="utf-8") as fp:
+    with open(args["summaryfile"], "wt", encoding="utf-8") as fp:
         json.dump(screening_results, fp, indent=4)
 
     stop = datetime.now()

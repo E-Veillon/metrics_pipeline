@@ -9,7 +9,7 @@ from itertools import filterfalse
 from typing import Union, List, Tuple, Literal, Sequence
 
 # PYTHON MATERIAL GENOMICS
-from pymatgen.core import SiteCollection, Composition, Element
+from pymatgen.core import SiteCollection, Composition, Element, Species, DummySpecies
 from pymatgen.io.cif import CifBlock
 
 # LOCAL IMPORTS
@@ -126,7 +126,7 @@ def discard_rare_earth_structures(
 ########################################
 
 
-def get_elements(elts_data: FormulaLike) -> List[Element]:
+def get_elements(elts_data: FormulaLike) -> List[Element|Species|DummySpecies]:
     """
     Flexible converter to get a list of unique Element objects from a single string or any 
     iterable providing valid element symbols, atomic numbers, Element objects, or a mixture 
@@ -151,15 +151,17 @@ def get_elements(elts_data: FormulaLike) -> List[Element]:
     check_type(elts_data, "elts_data", (str, Sequence))
 
     if isinstance(elts_data, str):
-        elts_list = Composition("".join(elts_data.split(sep="-")), strict=True).elements
+        return Composition(
+            "".join(elts_data.split(sep="-")), strict=True
+        ).element_composition.elements
 
     else:
         for idx, data in enumerate(elts_data):
             check_type(data, f"elts_data[{idx}]", (str, int, Element))
 
-        elts_list = Composition([(elt, 1) for elt in elts_data], strict=True).elements
-
-    return elts_list
+        return Composition(
+            [(elt, 1) for elt in elts_data], strict=True
+        ).element_composition.elements
 
 
 ########################################
@@ -168,7 +170,7 @@ def get_elements(elts_data: FormulaLike) -> List[Element]:
 def get_elemental_subsets(
         main_elts_set: FormulaLike,
         elts_subsets: Sequence[FormulaLike]
-    ) -> List[str]:
+    ) -> List[FormulaLike]:
     """
     Flexible function to extract all formulas from a given sequence that are fully made 
     of same elements as the given main formula. The atomic fractions are not taken into 
@@ -295,7 +297,7 @@ def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
         elts_list = list(comp.keys())
 
     grps_list = list(map(get_element_group, elts_list))
-    return grps_list
+    return grps_list # type: ignore
 
 
 ########################################
@@ -315,11 +317,11 @@ def get_element_valence_electrons(atom: Union[str,Element]) -> int:
 
     group = get_element_group(atom, return_type="str")
 
-    if group.startswith("S"):
-        nb_val_elec = int(group[1])
+    if group.startswith("S"): # type: ignore
+        nb_val_elec = int(group[1]) # type: ignore
 
-    elif group.startswith("D") or group.startswith("P"):
-        nb_val_elec = int(group[1]) + 2
+    elif group.startswith("D") or group.startswith("P"): # type: ignore
+        nb_val_elec = int(group[1]) + 2 # type: ignore
         # Δ-Sol method counts all outermost s and d electrons in transition metals,
         # even for d10 ones.
     elif group in {"L", "A"}:
@@ -334,7 +336,7 @@ def get_element_valence_electrons(atom: Union[str,Element]) -> int:
 ########################################
 
 
-def get_all_valence_electrons(structure: SiteCollection) -> int:
+def get_all_valence_electrons(structure: SiteCollection) -> float:
     """
     Computes the number of valence electrons per unit cell.
 

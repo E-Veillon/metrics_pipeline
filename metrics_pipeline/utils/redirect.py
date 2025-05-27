@@ -16,7 +16,7 @@ c_stdout = ctypes.c_void_p.in_dll(libc, "stdout")
 
 
 @contextmanager
-def redirect_c_stdout(stream: TextIO = None):
+def redirect_c_stdout(stream: TextIO | None = None):
     """
     A context when redirecting stdout to a given stream.
 
@@ -51,7 +51,7 @@ def redirect_c_stdout(stream: TextIO = None):
         tfile.flush()
         tfile.seek(0, io.SEEK_SET)
         if stream is not None:
-            stream.write(tfile.read())
+            stream.write(str(tfile.read()))
     finally:
         tfile.close()
         os.close(saved_stdout_fd)
@@ -61,7 +61,7 @@ c_stderr = ctypes.c_void_p.in_dll(libc, "stderr")
 
 
 @contextmanager
-def redirect_c_stderr(stream: TextIO = None):
+def redirect_c_stderr(stream: TextIO | None = None):
     """
     A context when redirecting stderr to a given stream.
 
@@ -96,7 +96,7 @@ def redirect_c_stderr(stream: TextIO = None):
         tfile.flush()
         tfile.seek(0, io.SEEK_SET)
         if stream is not None:
-            stream.write(tfile.read())
+            stream.write(str(tfile.read()))
     finally:
         tfile.close()
         os.close(saved_stderr_fd)

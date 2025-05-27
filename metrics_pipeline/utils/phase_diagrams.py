@@ -10,7 +10,7 @@ from functools import partial
 from tqdm.contrib.concurrent import process_map
 
 # PYTHON MATERIAL GENOMICS
-from pymatgen.core import Element, Composition
+from pymatgen.core import Element, Composition, Species, DummySpecies
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 # LOCAL IMPORTS
@@ -127,7 +127,7 @@ def filter_database_entries(
 ########################################
 
 
-def get_elements_from_entries(entries: Sequence[PDEntry]) -> List[Element]:
+def get_elements_from_entries(entries: Sequence[PDEntry]) -> List[Element|Species|DummySpecies]:
     """
     Get a list of all unique elements present in a sequence of PDEntry objects.
 
@@ -373,24 +373,24 @@ def _process_pd_data(
         case (True, False): # 'entries' is given, 'ref_elts' is empty or None
             # Infer reference elements from entries
             # => data for a diagram containing all entries.
-            ref_elts = get_elements_from_entries(entries)
+            ref_elts = get_elements_from_entries(entries) # type: ignore
 
         case (False, True): # 'ref_elts' is given, 'entries' is empty or None
             # Init default unary entries for each element
             # => data for a 'blank' diagram with only 0.0 eV entries.
-            ref_elts = get_elements(ref_elts)
-            entries = get_lacking_elts_entries(entries=[], ref_elts=ref_elts)
+            ref_elts = get_elements(ref_elts) # type: ignore
+            entries = get_lacking_elts_entries(entries=[], ref_elts=ref_elts) # type: ignore
 
         case (True, True): # Both 'entries' and 'ref_elts' are given
             # Filter out entries with unmatching elements
             # Add default unary entries for elements that
             # do not have matching unary entries.
-            ref_elts = get_elements(ref_elts)
-            entries  = _get_relevant_entries(entries, ref_elts)
-            auto_unaries = get_lacking_elts_entries(entries, ref_elts)
+            ref_elts = get_elements(ref_elts) # type: ignore
+            entries  = _get_relevant_entries(entries, ref_elts) # type: ignore
+            auto_unaries = get_lacking_elts_entries(entries, ref_elts) # type: ignore
             entries += auto_unaries
 
-    return entries, ref_elts
+    return entries, ref_elts # type: ignore
 
 
 ########################################
@@ -441,7 +441,7 @@ def _compute_e_above_hull(
     # Compute energy above hull for each generated entry
     for entry in entries_to_compute:
         e_above_hull = pd.get_e_above_hull(entry, allow_negative=True)
-        is_stable = e_above_hull <= stable_limit
+        is_stable = e_above_hull <= stable_limit if e_above_hull is not None else False
         if verbose:
             print(f"Entry '{entry.name}':")
             print(f"- energy_per_atom: {entry.energy_per_atom}")
@@ -451,7 +451,7 @@ def _compute_e_above_hull(
             {
                 "name": entry.name,
                 "e_above_hull": e_above_hull,
-                "stable": is_stable.item()
+                "stable": is_stable.item() if hasattr(is_stable, "item") else is_stable # type: ignore
             }
         )
     return results
@@ -460,7 +460,7 @@ def batch_compute_e_above_hull(
     entries: List[List[PDEntry]],
     ref_entries: List[PDEntry],
     stable_limit: float = 0.1,
-    workers: int = 1,
+    workers: int | None = None,
     verbose: bool = False
 ) -> List[Dict[str, Union[str, float]]]:
     """
@@ -481,6 +481,8 @@ def batch_compute_e_above_hull(
                                     Defaults to 0.1 eV/atom.
 
         workers (int):              Number of parallel processes to spawn.
+                                    If not given, tqdm.contrib.concurrent.process_map
+                                    default is used.
 
         verbose (bool):             Whether to print each reference entry used when
                                     building a phase diagram.
