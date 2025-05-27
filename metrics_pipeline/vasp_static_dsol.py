@@ -5,9 +5,11 @@ for structures not already rejected.
 """
 
 import os
-import typing as typ
+import typing as tp
 from datetime import datetime
 import argparse as argp
+
+from pymatgen.core import Structure
 
 # LOCAL IMPORTS
 from . import CONFIGPATH, _parse_input_args
@@ -104,7 +106,7 @@ def _get_command_line_args() -> argp.Namespace:
     return args
 
 
-def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     """Handle input arguments assertions and processing."""
     if args_dict is None:
         raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
@@ -117,7 +119,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     # WARNING:
     # Usual VASP shortcut, but may activate wrong VASP version if several are installed.
     # Prefer giving a true VASP executable path for unambiguous computation.
-    default_output = os.path.join(os.path.dirname(args_dict.get("input_dir")), "Band_gaps")
+    default_output = os.path.join(os.path.dirname(args_dict.get("input_dir", "")), "Band_gaps")
     args_dict.setdefault("output", default_output)
     args_dict.setdefault("preset", PMGStaticSet.MPSTATICSET.value)
     args_dict.setdefault("user_settings", "DSolStaticSet.yaml")
@@ -129,7 +131,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     if not str(args_dict.get("executable_path")).startswith("vasp"):
         check_file_or_dir(args_dict.get("executable_path"), "file")
     
-    check_type(args_dict.get("task_id"), (int,))
+    check_type(args_dict.get("task_id"), "task_id", (int,))
     check_num_value(args_dict.get("task_id"), "task_id", ">=", 0)
     check_file_or_dir(args_dict.get("output"), "dir")
 
@@ -138,23 +140,23 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
 
         if args_dict.get("key_to_check") is None:
             raise ValueError(
-                f"'prev_summary' argument was provided ({args_dict.get('prev_summary')}),
-                therefore 'key-to-check' argument has to be given as well."
+                f"'prev_summary' argument was provided ({args_dict.get('prev_summary')}), "
+                "therefore 'key-to-check' argument has to be given as well."
             )
 
     if args_dict.get("key_to_check") is not None:
         check_type(args_dict.get("key_to_check"), "key_to_check", (str,))
     
-    assert args_dict.get("preset") in PMGStaticSet.values or args_dict.get("preset") == "DSolStaticSet", (
+    assert args_dict["preset"] in PMGStaticSet.values or args_dict.get("preset") == "DSolStaticSet", (
     "Provided static preset must be one of the following:\n"
     f"{PMGStaticSet.values} or 'DsolStaticSet'."
     )
-    config_path = os.path.join(CONFIGPATH, args_dict.get("user_settings"))
+    config_path = os.path.join(CONFIGPATH, args_dict.get("user_settings", "DSolStaticSet.yaml"))
     check_file_or_dir(config_path, "file", allowed_formats=("yml", "yaml"))
-    check_type(args_dict.get("with_uncertainties"), (bool,))
+    check_type(args_dict["with_uncertainties"], "with-uncertainties", (bool,))
 
     # Additional arguments processing
-    os.makedirs(args_dict.get("output"), exist_ok=True)
+    os.makedirs(args_dict["output"], exist_ok=True)
 
     if args_dict.get("preset") != "DsolStaticSet":
         args_dict["preset"] = PMGStaticSet(args_dict.get("preset"))
@@ -221,9 +223,9 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     # Variables deduced from args
     struct_path, struct_idx, calc_idx = get_dsol_struct_dir(
-        path=args.get("input_dir"),
-        task_id=args.get("task_id"),
-        with_uncertainties=args.get("with_uncertainties")
+        path=args["input_dir"],
+        task_id=args["task_id"],
+        with_uncertainties=args["with_uncertainties"]
     )
 
     struct_data = extract_vasp_data_for_delta_sol_init(
@@ -233,7 +235,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         raise ValueError(
             "The structure data corresponding to given 'task-id' argument "
             "was not found or is already rejected in the summary file from previous step.\n"
-            f"Given task-id argument: {args.get("task_id")}\n"
+            f"Given task-id argument: {args['task_id']}\n"
             f"Corresponding structure index: {struct_idx}\n"
             f"Corresponding calculation ID: {calc_idx}\n"
             "(0 = E(N0), 1-2 = E(N0 +/- n(best)), 3-4 = E(N0 +/- n(min)), 5-6 = E(N0 +/- n(max)))."
@@ -242,15 +244,15 @@ def main(standalone: bool = True, **kwargs) -> None:
     input_data = dsol_calc_init(
         structure=struct_data[1]["structure"],
         calc_index=calc_idx,
-        preset=args.get("preset"),
+        preset=args["preset"],
         user_corrections=args.get("settings")
     )
-
-    dir_name   = f"{struct_idx}_{struct_data[1]['structure'].composition.reduced_formula}"
+    structure: Structure = struct_data[1]["structure"]
+    dir_name   = f"{struct_idx}_{structure.composition.reduced_formula}" # type: ignore
     calc_name  = calc_idx_to_dir_name(dir_name, calc_idx)
-    calc_dir   = add_new_dir(args.get("output"), dir_name, calc_name)
+    calc_dir   = add_new_dir(args["output"], dir_name, calc_name)
 
-    write_and_run_vasp(input_data, calc_dir, args.get("executable_path"))
+    write_and_run_vasp(input_data, calc_dir, args["executable_path"])
 
     stop = datetime.now()
     print(f"elapsed time: {stop-start}")

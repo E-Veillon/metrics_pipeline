@@ -23,7 +23,7 @@ def _get_shortest_paths(
     cell_src: torch.FloatTensor,
     x_dst: torch.FloatTensor,
     num_atoms: torch.LongTensor,
-) -> Tuple[torch.LongTensor, torch.FloatTensor]:
+) -> torch.Tensor:
 
     idx = torch.arange(num_atoms.shape[0], dtype=torch.long, device=num_atoms.device)
     batch = idx.repeat_interleave(num_atoms)
@@ -51,7 +51,7 @@ def _to_inner(x: torch.FloatTensor, cell: torch.FloatTensor, batch: torch.LongTe
 
 
 def _center_around_zero(x: torch.FloatTensor) -> torch.FloatTensor:
-    return (x + 0.5) % 1.0 + 0.5
+    return (x + 0.5) % 1.0 + 0.5 # type: ignore
 
 
 def _polar(a: torch.FloatTensor) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
@@ -77,16 +77,16 @@ def rmsd(
     x_src = _center_around_zero(x_src)
     x_dst = _center_around_zero(x_dst)
 
-    x_src_euc = _to_euc(x_src, cell_src, batch_atoms)
-    x_dst_euc = _to_euc(x_dst, cell_dst, batch_atoms)
+    x_src_euc = _to_euc(x_src, cell_src, batch_atoms) # type: ignore
+    x_dst_euc = _to_euc(x_dst, cell_dst, batch_atoms) # type: ignore
 
-    paths = _get_shortest_paths(x_src_euc, cell_src, x_dst_euc, num_atoms)
+    paths = _get_shortest_paths(x_src_euc, cell_src, x_dst_euc, num_atoms) # type: ignore
 
     avg_path = scatter_mean(paths, batch_atoms, dim=0, dim_size=num_atoms.shape[0])
 
     distance = (paths - avg_path[batch_atoms]).pow(2).sum(dim=1)
 
-    return scatter_mean(
+    return scatter_mean( # type: ignore
         distance, batch_atoms, dim=0, dim_size=num_atoms.shape[0]
     ).sqrt()
 
@@ -114,4 +114,4 @@ def rmsd_from_structures(
     )
     cell_dst = torch.tensor([s.lattice.matrix for s in struct2], dtype=torch.float32)
 
-    return rmsd(cell_src, x_src, cell_dst, x_dst, num_atoms).numpy()
+    return rmsd(cell_src, x_src, cell_dst, x_dst, num_atoms).numpy() # type: ignore

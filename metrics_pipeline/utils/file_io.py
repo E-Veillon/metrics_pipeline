@@ -28,7 +28,9 @@ CONFIGPATH  = os.path.join(MAINDIRPATH, "config")
 ########################################
 
 
-def check_file_format(filename: PathLike, *, allowed_formats: str|typ.Sequence[str]) -> None:
+def check_file_format(
+    filename: PathLike | None, *, allowed_formats: str|typ.Sequence[str]
+) -> None:
     """
     Verify that extension format of given file and wanted file format match,
     no matter if given file exists or not.
@@ -65,7 +67,7 @@ def check_file_format(filename: PathLike, *, allowed_formats: str|typ.Sequence[s
 
 
 def check_file_or_dir(
-    path: PathLike,
+    path: PathLike | None,
     file_or_dir: typ.Literal["file", "dir"] = "file",
     *,
     allowed_formats: str|typ.Sequence|None = None

@@ -16,12 +16,12 @@ from .common_asserts import check_type, check_num_value
 
 def _get_distance_closest(source: np.ndarray, target: np.ndarray) -> np.ndarray:
     """Computes the smallest distance between two structures as coordinate arrays."""
-    source = torch.from_numpy(source)
-    target = torch.from_numpy(target)
+    src: torch.Tensor = torch.from_numpy(source) # type: ignore
+    tgt: torch.Tensor = torch.from_numpy(target) # type: ignore
 
-    idx_src, idx_tgt = knn(target, source, 1)
+    idx_src, idx_tgt = knn(tgt, src, 1)
 
-    closest_distance = (source[idx_src] - target[idx_tgt]).norm(dim=1)
+    closest_distance = (src[idx_src] - tgt[idx_tgt]).norm(dim=1)
 
     return closest_distance.numpy()
 

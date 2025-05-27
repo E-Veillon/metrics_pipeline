@@ -47,7 +47,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
 
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="json")
-    check_file_or_dir(args_dict.gat("new_path"), "dir")
+    check_file_or_dir(args_dict.get("new_path"), "dir")
     check_type(args_dict.get("absolute"), "absolute", (bool,))
 
     return args_dict
@@ -75,7 +75,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     """
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
-    with open(args.get("input_file"), "rt", encoding="utf-8") as fp:
+    with open(args["input_file"], "rt", encoding="utf-8") as fp:
         data = json.load(fp)
 
     assert (
@@ -84,19 +84,19 @@ def main(standalone: bool = True, **kwargs) -> None:
     ), "The data inside the JSON file must be a list of structure dicts."
 
     if args.get("absolute"):
-        new_path = os.path.realpath(args.get("new_path"))
+        new_path = os.path.realpath(args["new_path"])
     else:
-        new_path = args.get("new_path")
+        new_path = args["new_path"]
 
     for struct in data:
         old_path = struct["path"]
         struct_name = os.path.basename(old_path)
         struct["path"] = os.path.join(new_path, struct_name)
 
-    with open(args.get("input_file"), "wt", encoding="utf-8") as fp:
+    with open(args["input_file"], "wt", encoding="utf-8") as fp:
         json.dump(data, fp, indent=4)
 
-    file = args.get("input_file")
+    file = args["input_file"]
     print(f"the file '{os.path.basename(file)}' was successfully modified.")
 
 

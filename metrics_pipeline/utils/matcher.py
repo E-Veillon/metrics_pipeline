@@ -18,7 +18,7 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 
 # LOCAL IMPORTS
 from .common_asserts import check_type, check_num_value
-from .custom_types import PathLike
+from .custom_types import PathLike, VisualIterator
 from .flattener import flatten
 
 
@@ -26,9 +26,9 @@ from .flattener import flatten
 
 
 def check_interatomic_distances(
-    structures: Sequence[SiteCollection],
+    structures: Sequence[Structure],
     valid_tol: float = 0.5
-) -> Tuple[List[SiteCollection], int]:
+) -> Tuple[List[Structure], int]:
     '''
     Checks interatomic distances with respect to a tolerance in angstroms 
     for all given structures, then returns the valid ones in a list.
@@ -217,7 +217,7 @@ def _group_by_equivalence(
 def batch_group_by_equivalence(
     structures: Sequence[Structure],
     test_volume: bool = False,
-    workers: int = 1,
+    workers: int | None = None,
     comment: Optional[str] = None,
     sequential: bool = False
 ) -> Tuple[List[List[List[Structure]]], int]:
@@ -241,7 +241,8 @@ def batch_group_by_equivalence(
                                     Defaults to False.
 
         workers (int):              Number of parallel processes to spawn.
-                                    Defaults to 1.
+                                    If not given, tqdm.contrib.concurrent.process_map
+                                    default is used.
 
         comment (str):              Optional message to print next to tqdm
                                     progression bar.
@@ -258,8 +259,9 @@ def batch_group_by_equivalence(
     for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
     check_type(test_volume, "test_volume", (bool,))
-    check_type(workers, "workers", (int,))
-    check_num_value(workers, "workers", ">", 0)
+    if workers is not None:
+        check_type(workers, "workers", (int,))
+        check_num_value(workers, "workers", ">", 0)
     if comment is not None:
         check_type(comment, "comment", (str,))
 
@@ -270,9 +272,9 @@ def batch_group_by_equivalence(
     equiv_matcher = partial(_group_by_equivalence, test_volume=test_volume)
 
     if sequential:
-        match_results = []
-        for grp in tqdm(grouped_structs, desc=comment):
-            match_results.append(equiv_matcher(grp))
+        match_results = [
+            equiv_matcher(grp) for grp in VisualIterator(grouped_structs, desc=comment)
+        ]
 
     else:
         match_results = process_map(
@@ -316,7 +318,8 @@ def remove_equivalent(
                                         Defaults to False.
 
         workers (int):                  The number of parallel processes to use.
-                                        Defaults to 1.
+                                        If not given, tqdm.contrib.concurrent.process_map
+                                        default is used.
 
         keep_equivalent (bool):         Whether to keep equivalent structures.
                                         If True, structures will be sorted by equivalence
@@ -402,7 +405,7 @@ def _get_novel_structures(
 def batch_get_novel_structures(
     structures: List[List[List[Structure]]],
     dataset: List[Structure],
-    workers: int = 1
+    workers: int | None = None
 ) -> List[Structure]:
     """
     Filter out structures that are neither coming from the given dataset nor 
@@ -415,12 +418,15 @@ def batch_get_novel_structures(
         dataset ([Structure]):          Reference dataset of non-novel structures.
 
         workers (int):                  Number of parallel processes to spawn.
+                                        If not given, tqdm.contrib.concurrent.process_map
+                                        default is used.
     
     Returns: List[Structure]
         The list of novel structures not seen in the dataset.
     """
-    check_type(workers, "workers", (int,))
-    check_num_value(workers, "workers", ">", 0)
+    if workers is not None:
+        check_type(workers, "workers", (int,))
+        check_num_value(workers, "workers", ">", 0)
 
     get_novel_structs = partial(_get_novel_structures, dataset=dataset)
     chunksize = (min(len(structures) // 100, 10) if len(structures) >= 200 else 1)

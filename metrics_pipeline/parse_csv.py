@@ -2,7 +2,7 @@
 """Process CSV data according to its 'cif' column (TODO: WORK IN PROGRESS)."""
 
 import os
-import typing as typ
+import typing as tp
 import argparse as argp
 from tqdm import tqdm
 
@@ -89,7 +89,7 @@ def _get_command_line_args() -> argp.Namespace:
     return args
 
 
-def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     """Handle input arguments assertions and processing."""
     if args_dict is None:
         raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
@@ -164,7 +164,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     """
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
-    df = pd.read_csv(args.get("infile"))
+    df = pd.read_csv(args["infile"])
     ids: list[int] = df["material_id"].tolist()
     cifs: list[str] = df["cif"].tolist()
     step_sep = "\n------------------------------\n"
@@ -210,7 +210,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     if not args.get("no_dist_check"):
         # Process structures
         print(f"Searching for non-valid structures (atom pairs closer than {args.get('dist_tolerance')}A)...")
-        valid_structs, nbr_no_valid = check_interatomic_distances(new_data, valid_tol=args.get("dist_tolerance"))
+        valid_structs, nbr_no_valid = check_interatomic_distances(new_data, valid_tol=args["dist_tolerance"])
         new_data = valid_structs
         print(f"Number of not valid structures: {nbr_no_valid}")
         print(f"Structures left: {len(valid_structs)}")
@@ -230,12 +230,12 @@ def main(standalone: bool = True, **kwargs) -> None:
     print(f"Number of kept ids: {len(kept_ids)}")
 
     # Build a new DataFrame with valid structures data only from the old DataFrame
-    def by_Series_idx(row_tuple: tuple[int, pd.Series]):
+    def by_Series_idx(row_tuple: tuple[int, pd.Series]) -> int:
         return row_tuple[0]
 
     kept_rows = list(filter(lambda row: row[1].material_id in kept_ids, df.iterrows()))
     print(f"Number of kept data rows: {len(kept_rows)}")
-    sorted_rows = [row[1] for row in sorted(kept_rows, key=by_Series_idx)]
+    sorted_rows = [row[1] for row in sorted(kept_rows, key=by_Series_idx)] # type: ignore
     print(f"Number of kept data rows sorted: {len(sorted_rows)}")
     parsed_df = pd.DataFrame(data=sorted_rows)
     print(f"DataFrame built, {len(parsed_df)=}.")

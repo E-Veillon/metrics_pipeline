@@ -153,6 +153,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
     default_output = str(args_dict.get("input_file")).replace(".cif", "_out.cif")
     args_dict.setdefault("output", default_output)
+    args_dict["output"] = os.path.realpath(args_dict["output"])
     args_dict.setdefault("no_rare_gas_check", False)
     args_dict.setdefault("no_rare_earth_check", False)
     args_dict.setdefault("no_dist_check", False)
@@ -178,7 +179,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
 
     if args_dict.get("special_keys") is not None:
         check_type(args_dict.get("special_keys"), "special_keys", (list,))
-        for idx, elt in enumerate(args_dict.get("special_keys")):
+        for idx, elt in enumerate(args_dict["special_keys"]):
             check_type(elt, f"special_keys[{idx}]", (str,))
 
     if args_dict.get("workers") is not None:
@@ -194,8 +195,8 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     print(f"OUTPUT FILE: {args_dict.get('output')}")
     print(f"SPECIAL KEYS: {'None' if args_dict.get('special_keys') is None else ''}")
     if args_dict.get("special_keys") is not None:
-        keys_lst = '\n'.join(args_dict.get('special_keys'))
-        print(f"{keys_lst}") 
+        keys_lst = '\n'.join(args_dict["special_keys"])
+        print(f"{keys_lst}")
     print(" ")
     print("------------------------------")
     print(" ")
@@ -287,18 +288,24 @@ def main(standalone: bool = True, **kwargs) -> None:
         workers (int):              Number of parallel processes to spawn for parallelized steps.
                                     If not given, If not given, default value is the 'max_workers'
                                     default value from tqdm.contrib.concurrent.process_map function.
+
+        sequential (bool):          Pass this flag to deactivate multiprocessing handling and
+                                    switch to sequential computation. Generally, multiprocess
+                                    is faster, but sometimes (e.g. when data is very big) it
+                                    can softlock into resource distribution. Switch to more
+                                    stable sequential computing if such problem  were to arise.
     """
     start = datetime.now()
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Extraction des données CIF et conversion en structures
     structures, nbr_rare_gas_structs, nbr_rare_earth_structs = read_cif(
-        filename=args.get("input_file"),
-        keep_rare_gases=args.get("no_rare_gas_check"),
-        keep_rare_earths=args.get("no_rare_earth_check"),
+        filename=args["input_file"],
+        keep_rare_gases=args["no_rare_gas_check"],
+        keep_rare_earths=args["no_rare_earth_check"],
         special_keys=args.get("special_keys"),
         workers=args.get("workers"),
-        sequential=args.get("sequential")
+        sequential=args["sequential"]
     )
 
     nbr_loaded_structs = len(structures)
@@ -307,35 +314,35 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     print(f"{nbr_total_structs} structures detected in total")
 
-    if not args.get("no_rare_gas_check"):
+    if not args["no_rare_gas_check"]:
         print(f"{nbr_rare_gas_structs} structures containing rare gases were ignored")
 
-    if not args.get("no_rare_earth_check"):
+    if not args["no_rare_earth_check"]:
         print(f"{nbr_rare_earth_structs} structures containing rare earths were ignored")
 
     print(f"{nbr_loaded_structs} structures are kept for further processing")
 
     # Vérification des distances interatomiques
 
-    if not args.get("no_dist_check"):
+    if not args["no_dist_check"]:
         structures, nbr_not_valid = check_interatomic_distances(
-            structures, valid_tol=args.get("dist_tolerance")
+            structures, valid_tol=args["dist_tolerance"]
         )
         print(f"{nbr_not_valid} structures having too close atoms were discarded")
 
     # Calcul de la symétrie d'espace des structures
 
-    """if args.get("no_symmetrization"):
+    """if args["no_symmetrization"]:
         symmetrized_structs = structures
     else:
         symmetrized_structs = list(filter(
             None,
             batch_symmetrizer(
                 structures=structures,
-                symprec=args.get("symprec"),
-                angle_tolerance=args.get("angleprec"),
-                workers=args.get("workers"),
-                sequential=args.get("sequential")
+                symprec=args["symprec"],
+                angle_tolerance=args["angleprec"],
+                workers=args["workers"],
+                sequential=args["sequential"]
             )
         ))
 
@@ -346,36 +353,36 @@ def main(standalone: bool = True, **kwargs) -> None:
     kept_structs, nbr_equivalent, nbr_unmatched = remove_equivalent(
             structures=structures,
             workers=args.get("workers"),
-            test_volume=args.get("test_min_vol"),
-            keep_equivalent=args.get("no_equiv_match"),
-            sequential=args.get("sequential")
+            test_volume=args["test_min_vol"],
+            keep_equivalent=args["no_equiv_match"],
+            sequential=args["sequential"]
     )
 
     nbr_unique_structs = len(kept_structs)
 
-    if not args.get("no_equiv_match"):
+    if not args["no_equiv_match"]:
         print(f"{nbr_unique_structs} unique structures detected")
         print(f"{nbr_equivalent} duplicates were discarded")
 
-    if args.get("test_min_vol"):
+    if args["test_min_vol"]:
         print("--test-min-vol debug flag was passed:")
         print(f"{nbr_unmatched} structures were assumed unique.")
 
     # Symétrisation et écriture du fichier CIF épuré des structures indésirables
-    if args.get("no_symmetrization"):
+    if args["no_symmetrization"]:
         print("Symmetrization is deactivated, now writing CIF file...")
     else:
         print("Symmetrization is activated, now symmetrizing and writing CIF file...")
 
     symmetrize_and_write_cif(
-        filename=args.get("output"),
+        filename=args["output"],
         structures=kept_structs,
-        symmetrize=(not args.get("no_symmetrization")),
-        symprec=args.get("symprec"),
-        angleprec=args.get("angleprec"),
+        symmetrize=(not args["no_symmetrization"]),
+        symprec=args["symprec"],
+        angleprec=args["angleprec"],
         special_keys=args.get("special_keys"),
         workers=args.get("workers"),
-        sequential=args.get("sequential")
+        sequential=args["sequential"]
     )
 
     # Calcul du temps total pris par la procédure
@@ -387,24 +394,24 @@ def main(standalone: bool = True, **kwargs) -> None:
     print(f"{nbr_total_structs} structures detected in total, including:")
     print(f"- {nbr_unique_structs} unique structure(s)")
 
-    if not args.get("no_rare_gas_check"):
+    if not args["no_rare_gas_check"]:
         print(f"- {nbr_rare_gas_structs} structure(s) containing rare gases")
 
-    if not args.get("no_rare_earth_check"):
+    if not args["no_rare_earth_check"]:
         print(f"- {nbr_rare_earth_structs} structure(s) containing rare earths")
 
-    if not args.get("no_dist_check"):
+    if not args["no_dist_check"]:
         print(f"- {nbr_not_valid} structure(s) with too small interatomic distances")
 
-    if not args.get("no_equiv_match"):
+    if not args["no_equiv_match"]:
         print(f"- {nbr_equivalent} structure(s) that are duplicates")
 
-    if args.get("test_min_vol"):
+    if args["test_min_vol"]:
         print(
             f"- {nbr_unmatched} structure(s) assumed unique "
             f"because of {'its' if nbr_unmatched < 2 else 'their'} unphysical volume"
         )
-    print(f"\nOutput results written in {args.get('output')}")
+    print(f"\nOutput results written in {args['output']}")
     print(f"elapsed time: {stop-start}")
 
 

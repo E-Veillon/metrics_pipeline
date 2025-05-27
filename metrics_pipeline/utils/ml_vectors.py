@@ -11,7 +11,7 @@ from materials_toolkit.models.alignn import get_pretrained_alignn
 import tqdm
 
 # PYTHON MATERIALS GENOMICS
-from pymatgen.core import Structure, Element
+from pymatgen.core import Structure, Element, Species
 
 # LOCAL IMPORTS
 from .common_asserts import check_type
@@ -20,8 +20,11 @@ from .common_asserts import check_type
 ########################################
 
 
-def _species_to_tensor(elements: List[Element]):
+def _species_to_tensor(elements: List[Element | Species]):
     """Convert Element objects to a Tensor containing their atomic numbers."""
+    for idx, elt in enumerate(elements):
+        if isinstance(elt, Species):
+            elements[idx] = elt.element
     return torch.tensor([e.Z for e in elements], dtype=torch.long)
 
 
@@ -59,11 +62,11 @@ class StructuresDataset(Dataset):
         if isinstance(idx, torch.LongTensor):
             return collate(
                 [
-                    StructureData(z=self.z[i], pos=self.x[i], cell=self.cell[i])
+                    StructureData(z=self.z[i], pos=self.x[i], cell=self.cell[i]) # type: ignore
                     for i in idx
                 ]
             )
-        return StructureData(z=self.z[idx], pos=self.x[idx], cell=self.cell[idx])
+        return StructureData(z=self.z[idx], pos=self.x[idx], cell=self.cell[idx]) # type: ignore
 
 
 ########################################
@@ -73,7 +76,7 @@ class StructuresDataset(Dataset):
 def vectors_from_alignn(
     structures: List[Structure],
     batch_size: int = 128,
-    device: Optional[torch.device] = None,
+    device: torch.device | str | None = None,
     model_name: str = "mp/e_form",
     output: Literal["latent","energy"] = "latent"
 ) -> np.ndarray:
@@ -96,7 +99,7 @@ def vectors_from_alignn(
         else:
             device = "cpu"
 
-    alignn = get_pretrained_alignn(model_name).to(device)
+    alignn = get_pretrained_alignn(model_name).to(device) # type: ignore
 
     dataset = StructuresDataset(structures)
     loader = StructureLoader(dataset, batch_size=batch_size)

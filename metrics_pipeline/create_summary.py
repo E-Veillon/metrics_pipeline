@@ -80,13 +80,13 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_dir"), "dir")
     check_file_format(args_dict.get("output"), allowed_formats="json")
-    match_struct_dirs(args_dict.get("input_dir"), args_dict.get("indices"), no_return=True)
+    match_struct_dirs(args_dict["input_dir"], args_dict.get("indices"), no_return=True)
 
     # Additional arguments processing
     if args_dict.get("indices") is not None:
-        args_dict["indices"] = sorted(args_dict.get("indices"))
+        args_dict["indices"] = sorted(args_dict["indices"])
 
-    args_dict["outfile"] = os.path.join(args_dict.get("input_dir"), args_dict.get("output"))
+    args_dict["outfile"] = os.path.join(args_dict["input_dir"], args_dict["output"])
 
     return args_dict
 
@@ -127,8 +127,8 @@ def main(standalone: bool = True, **kwargs) -> None:
     """
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
-    all_struct_dirs = match_struct_dirs(args.get("input_dir"))
-    wanted_struct_dirs = match_struct_dirs(args.get("input_dir"), args.get("indices"))
+    all_struct_dirs = match_struct_dirs(args["input_dir"])
+    wanted_struct_dirs = match_struct_dirs(args["input_dir"], args.get("indices"))
     summary_result = []
 
     for struct_dir in sorted(all_struct_dirs):
@@ -136,11 +136,11 @@ def main(standalone: bool = True, **kwargs) -> None:
             {
                 "path": struct_dir,
                 "name": os.path.basename(struct_dir),
-                f"{args.get('key_name')}": (struct_dir in wanted_struct_dirs) ^ args.get("reject")
+                f"{args.get('key_name')}": (struct_dir in wanted_struct_dirs) ^ args["reject"]
             }
         )
 
-    with open(args.get("outfile"), "wt", encoding="utf-8") as fp:
+    with open(args["outfile"], "wt", encoding="utf-8") as fp:
         json.dump(summary_result, fp, indent=4)
 
 

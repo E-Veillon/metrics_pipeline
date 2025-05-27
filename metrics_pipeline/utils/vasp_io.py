@@ -226,7 +226,7 @@ def _relax_set_init(
                 user_potcar_functional=potcar_functional_correction,
             )
 
-    return preset_obj
+    return preset_obj # type: ignore
 
 
 ########################################
@@ -234,7 +234,7 @@ def _relax_set_init(
 
 def _static_set_init(
     structure: SiteCollection,
-    preset: Union[PMGStaticSet, Literal["DsolStaticSet"]] = PMGStaticSet.MPSTATICSET,
+    preset: PMGStaticSet | Literal["DSolStaticSet"] = PMGStaticSet.MPSTATICSET,
     nelect: float|None = None,
     corrections: Optional[Dict] = None,
 ) -> DictSet:
@@ -256,7 +256,7 @@ def _static_set_init(
             user_potcar_functional=potcar_functional_correction,
         )
     else:
-        match preset.value:
+        match preset.value: # type: ignore
             case "MPStaticSet":
                 preset_obj = MPStaticSet(
                     structure=structure,
@@ -290,7 +290,7 @@ def _static_set_init(
                     user_potcar_functional=potcar_functional_correction,
                 )
 
-    return preset_obj
+    return preset_obj # type: ignore
 
 
 ########################################
@@ -334,10 +334,10 @@ def vasp_relaxation_settings(
 
 
 def vasp_static_settings(
-    structure: Optional[SiteCollection] = None,
-    preset: Union[PMGStaticSet, Literal["DsolStaticSet"]] = PMGStaticSet.MPSTATICSET,
+    structure: SiteCollection|None = None,
+    preset: PMGStaticSet|Literal["DSolStaticSet"] = PMGStaticSet.MPSTATICSET,
     nelect: float|None = None,
-    user_corrections: Optional[dict] = None,
+    user_corrections: dict[str, Any]|None = None,
 ) -> VaspInput:
     """
     Setup VASP inputs for a given structure using one of the pymatgen static presets.
@@ -487,7 +487,7 @@ def _check_summary_data(
             f"Structure path '{struct_dir}' was not found in the summary file.\n"
             "You may want to pass it to the previous screening step before this one.\n"
             "This structure is assumed not viable and is ignored for this step.",
-            stack_level=2
+            stacklevel=2
         )
         return False
 
@@ -559,11 +559,14 @@ def _check_vasp_data(
     Returns: Vasprun object if it is eligible and normally converged, None otherwise.
     """
     check_file_or_dir(struct_dir, "dir")
-    struct_dir: str = str(struct_dir)
+    struct_dir = str(struct_dir)
+
+    if path_to_summary is not None and key_to_check is None:
+        raise ValueError("If path_to_summary is given, key_to_check must be given too.")
 
     if (
         path_to_summary is not None
-        and not _check_summary_data(struct_dir, path_to_summary, key_to_check)
+        and not _check_summary_data(struct_dir, path_to_summary, key_to_check) # type: ignore
     ):
         return None
 
@@ -604,7 +607,7 @@ def extract_vasp_data_for_convex_hull(
     vasprun = _check_vasp_data(struct_dir, path_to_summary, key_to_check)
 
     if vasprun is None:
-        return {}
+        return "", {}
 
     # We want data of the generated structure for convex hulls, not the relaxed one
     struct_name  = os.path.basename(str(struct_dir))
@@ -653,7 +656,7 @@ def extract_vasp_data_for_delta_sol_init(
     vasprun = _check_vasp_data(struct_dir, path_to_summary, key_to_check)
 
     if vasprun is None:
-        return {}
+        return "", {}
 
     struct_name = os.path.basename(str(struct_dir))
     structure = vasprun.final_structure
@@ -703,9 +706,9 @@ def extract_vasp_data_for_delta_sol_calc(
     for calc_dir in calc_dirs:
         if (
             path_to_summary is not None
-            and not _check_summary_data(struct_dir, path_to_summary, key_to_check)
+            and not _check_summary_data(struct_dir, path_to_summary, key_to_check) # type: ignore
         ):
-            return {}
+            return "", {}
 
         calc_data = extract_vasp_data_for_delta_sol_init(
             calc_dir, path_to_summary, key_to_check
@@ -737,7 +740,7 @@ def batch_extract_vasp_data(
         structs_names: Optional[Sequence[str]] = None,
         path_to_summary: Optional[PathLike] = None,
         key_to_check: Optional[str] = None,
-        workers: int = 1
+        workers: int | None = None
 ) -> Dict[str, Dict[str, Any]]:
     """
     Extracts VASP data from a previous run for each structure directory in given directory.
@@ -762,7 +765,8 @@ def batch_extract_vasp_data(
         key_to_check (str):     The dict key associated to the bool used to verify eligibility.
                                 If path_to_summary is given, it must be given too.
 
-        workers (int):          Number of parallel processes to spawn.
+        workers (int):          Number of parallel processes to spawn. If not given,
+                                tqdm.contrib.concurrent.process_map default is used.
 
     Returns:
         Dict[str, Dict]:        Dict with structure directory names as keys,
@@ -783,8 +787,9 @@ def batch_extract_vasp_data(
     )
     if path_to_summary is not None:
         check_type(path_to_summary, "path_to_summary", (Path, str))
-    check_type(workers, "workers", (int,))
-    check_num_value(workers, "workers", ">", 0)
+    if workers is not None:
+        check_type(workers, "workers", (int,))
+        check_num_value(workers, "workers", ">", 0)
 
     match method:
         case "convex_hull":
@@ -873,20 +878,24 @@ def vasp_output_structure(struct_dir: str) -> Tuple[Structure,Structure]|Tuple[N
 
 
 def batch_extract_vasp_structures(
-    calc_dirs: List[str], workers: int = 1
+    calc_dirs: List[str], workers: int | None = None
 ) -> List[Tuple[Structure, Structure]]:
     """
     Get a list of structures from a list of path to VASP calculations.
 
     Parameters:
         calc_dirs (List[str]):  List of path to calculations.
-        workers (int):  number of workers.
+
+        workers (int):          Number of parallel processes to spawn.
+                                If not given, tqdm.contrib.concurrent.process_map
+                                default is used.
 
     Returns: (List[Tuple[Structure, Structure]])
         List of loaded structures.
     """
-    check_type(workers, "workers", (int,))
-    check_num_value(workers, "workers", ">", 0)
+    if workers is not None:
+        check_type(workers, "workers", (int,))
+        check_num_value(workers, "workers", ">", 0)
 
     return list(filter(
         lambda tup: tup != (None, None),
@@ -905,7 +914,7 @@ def batch_extract_vasp_structures(
 def dsol_calc_init(
         structure: Structure,
         calc_index: int,
-        preset: Union[PMGStaticSet, Literal["DsolStaticSet"]] = "DSolStaticSet",
+        preset: Union[PMGStaticSet, Literal["DSolStaticSet"]] = "DSolStaticSet",
         user_corrections: Optional[Dict[str, Any]] = None,
     ) -> VaspInput:
     """
@@ -941,14 +950,14 @@ def dsol_calc_init(
         raise ValueError(
             "'preset' argument value is not a supported preset. "
             "Supported presets are:\n"
-            f"{PMGStaticSet + set(('DSolStaticSet',))}\n"
+            f"{PMGStaticSet.values + list(('DSolStaticSet',))}\n" # type: ignore
             f"'preset' got value '{preset}' instead."
         )
     if user_corrections is not None:
         check_type(user_corrections, "user_corrections", (Dict,))
 
     nb_val_elec = get_all_valence_electrons(structure)
-    run_set = vasp_static_settings(structure, preset, user_corrections)
+    run_set = vasp_static_settings(structure, preset, user_corrections=user_corrections)
 
     # Search for the right N* parameter to use with respect to the functional
     pot_func = run_set.get("POTCAR_FUNCTIONAL", "PBE")
