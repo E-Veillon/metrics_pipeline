@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "metrics-pipeline"
-version = "1.2.1"
+version = "1.2.2"
 description = "Screening pipeline for metrics evaluation in Generative AI for materials"
 authors = []
 readme = "README.md"
@@ -19,6 +19,7 @@ mp-api = "^0.41.2"
 
 [tool.poetry.scripts]
 cif_counter = 'metrics_pipeline.cif_counter:main'
+cif_to_poscar = 'metrics_pipeline.cif_to_poscar:main'
 dataset_loader = 'metrics_pipeline.dataset_loader:main'
 preprocess = 'metrics_pipeline.preprocess:main'
 vasp_static_sun = 'metrics_pipeline.vasp_static_sun:main'

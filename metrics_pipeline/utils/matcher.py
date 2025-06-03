@@ -49,10 +49,16 @@ def check_interatomic_distances(
         check_type(struct, f"structures[{idx}]", (Structure,))
     check_type(valid_tol, "valid_tol", (float,))
 
-    def _is_valid(structure: SiteCollection) -> bool:
+    def _is_valid(structure: SiteCollection, valid_tol: float = 0.5) -> bool:
         return structure.is_valid(tol=valid_tol)
 
-    valid_structs = list(filter(_is_valid, structures))
+    is_valid = partial(_is_valid, valid_tol=valid_tol)
+    valid_structs = list(
+        filter(
+            is_valid,
+            VisualIterator(structures, desc="Checking interatomic distances")
+        )
+    )
     nbr_discarded = len(structures) - len(valid_structs)
 
     return valid_structs, nbr_discarded
