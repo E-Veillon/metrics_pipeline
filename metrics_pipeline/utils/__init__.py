@@ -69,7 +69,7 @@ from .rmsd import rmsd_from_structures
 from .common_asserts import check_type, check_num_value
 from .custom_types import (
     PathLike, FormulaLike,
-    PMGRelaxSet, PMGStaticSet
+    PMGRelaxSet, PMGStaticSet, VisualIterator
 )
 from .flattener import flatten
 from .redirect import redirect_c_stdout, redirect_c_stderr
@@ -123,6 +123,7 @@ __all__ = [
     "check_type", "check_num_value",    # common_asserts
     "PathLike", "FormulaLike",              # custom_types
     "PMGRelaxSet", "PMGStaticSet",          #
+    "VisualIterator",                       #
     "flatten",  # flattener
     "redirect_c_stdout", "redirect_c_stderr",   # redirect
 ]

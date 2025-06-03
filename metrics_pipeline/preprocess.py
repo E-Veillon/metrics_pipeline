@@ -177,6 +177,9 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     check_num_value(args_dict.get("angleprec"), "angleprec", ">=", 0.0)
     check_num_value(args_dict.get("angleprec"), "angleprec", "<=", 90.0)
 
+    args_dict["input_file"] = os.path.abspath(os.path.realpath(args_dict["input_file"]))
+    args_dict["output"] = os.path.abspath(os.path.realpath(args_dict["output"]))
+
     if args_dict.get("special_keys") is not None:
         check_type(args_dict.get("special_keys"), "special_keys", (list,))
         for idx, elt in enumerate(args_dict["special_keys"]):

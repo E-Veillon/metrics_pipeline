@@ -303,8 +303,8 @@ def read_cif(
             "Structure objects, they will be removed from processing and "
             "written as-is in a 'pmg_unparsed.cif' file."
         )
-    with open("pmg_unparsed.cif","wt") as fp:
-        fp.write("\n".join(unparsed_cifs))
+        with open("pmg_unparsed.cif","wt") as fp:
+            fp.write("\n".join(unparsed_cifs))
 
     return structs_list, nbr_rare_gas_structs, nbr_rare_earth_structs
 

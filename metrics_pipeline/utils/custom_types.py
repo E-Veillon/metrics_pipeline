@@ -59,7 +59,7 @@ class VisualIterator:
     """
     def __init__(
         self: tpe.Self,
-        iterable: tp.Sequence,
+        iterable: tp.Sequence[tp.Any],
         desc: str | None = None,
         end_desc: str | None = None
     ) -> None:
