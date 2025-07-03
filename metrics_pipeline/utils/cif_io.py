@@ -22,7 +22,8 @@ from .periodic_table import (
     discard_rare_gas_structures, discard_rare_earth_structures
 )
 from .redirect import redirect_c_stdout, redirect_c_stderr
-from .custom_types import PathLike, VisualIterator
+from .custom_types import PathLike
+from .visual_iterator import VisualIterator
 
 
 ##################################################

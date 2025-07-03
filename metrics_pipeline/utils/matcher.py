@@ -18,7 +18,8 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 
 # LOCAL IMPORTS
 from .common_asserts import check_type, check_num_value
-from .custom_types import PathLike, VisualIterator
+from .custom_types import PathLike
+from .visual_iterator import VisualIterator
 from .flattener import flatten
 
 
