@@ -38,7 +38,7 @@ def _get_command_line_args() -> argp.Namespace:
         )
     )
     parser.add_argument(
-        "--singificant-figures", "-sf",
+        "--significant-figures", "-sf",
         type=int,
         help="Number of significant digits to output all quantities. Defaults to 16."
     )
