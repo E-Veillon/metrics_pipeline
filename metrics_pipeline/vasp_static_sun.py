@@ -154,7 +154,6 @@ def main(standalone: bool = True, **kwargs):
     for phase diagrams computations.
     
     Args:
-<<<<<<< HEAD
         standalone (bool):          Whether parsed script is used directly through
                                     command-line (stand-alone script) or in an external
                                     pipeline script.
