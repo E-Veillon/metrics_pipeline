@@ -18,56 +18,69 @@ class VisualIterator:
         self: tpe.Self,
         iterable: tp.Iterable[tp.Any],
         desc: str | None = None,
+        unit: str | None = None,
         end_desc: str | None = None,
         percent: bool = False,
         significant_figures: int = 2,
         on_error: tp.Literal["raise", "warn", "ignore"] = "warn"
     ) -> None:
         """
-        Parameters:
-            iterable (Iterable):        An iterable object. If you need to wrap a lazy iterator
-                                        or generator, do not use the constructor directly but
-                                        appropriate classmethod instead.
+        A minimalist way to visualize progression while iterating through long sequences.
 
-            desc (str):                 Description to put before the counter that describes the
-                                        task. Defaults to "Iterating".
+        Parameters
+        ----------
 
-            end_desc (str):             Message to print when the task is finished.
-                                        Defaults to "Done.".
+        iterable: Iterable
+            An iterable object. If you need to wrap a lazy iterator or generator,
+            do not use the constructor directly but appropriate classmethod instead.
 
-            percent (bool):             Whether to print a percentage of progression next to the
-                                        counter. Defaults to False.
+        desc: str
+            Description to put before the counter that describes the task.
+            Defaults to "Iterating".
 
-            significant_figures (int):  Number of decimal places to show in the percentage
-                                        (if activated). Defaults to 2.
+        unit: str, optional
+            name of the iterated objects. Defaults to "iterations".
 
-            on_error (str):             What to do in case of an exception raising while trying
-                                        to wrap the iterable. Defaults to "warn".
+        end_desc: str, optional
+            Message to print when the task is finished. Defaults to "Done.".
+
+        percent: bool
+            Whether to print a percentage of progression next to the counter.
+            Defaults to False.
+
+        significant_figures: int
+            Number of decimal places to show in the percentage (if activated).
+            Defaults to 2.
+
+        on_error: str
+            What to do in case of an exception raising while trying to wrap the iterable.
+            Defaults to "warn".
         """
         self.iterable = iterable
-        self.desc = desc if desc is not None else "Iterating"
-        self.end_desc = end_desc if end_desc is not None else "Done."
+        self.desc = "Iterating" if desc is None else desc
+        self.unit = "iterations" if unit is None else unit
+        self.end_desc = "Done." if end_desc is None else end_desc
         self.percent = percent
         self.significant_figures = significant_figures
-        self.on_error = on_error
-        self._length = -1 # Default value
+        self.on_error: tp.Literal["raise", "warn", "ignore"] = on_error
+        self.default_length = -1
+        self._length = self.default_length
 
         try:
             self.length = len(iterable) # type: ignore
-        except TypeError as exc:
-            self.length = -1
-            self.percent = False
-            error_msg = (
+        except TypeError:
+            err_msg = (
                 "Could not access the length of given iterable object. "
                 "If you are trying to wrap a lazy iterator or generator object, "
                 "make sure to use the appropriate classmethod and not the "
-                f"constructor directly. Default length is set to {self.length}, "
-                "and percentage printing is deactivated as it will make no sense."
+                f"constructor directly."
             )
-            if self.on_error == "raise":
-                raise TypeError(error_msg) from exc
-            if self.on_error == "warn":
-                warnings.warn(error_msg)
+            warn_msg = err_msg + (
+                f" Length is now set back to its default value of {self.default_length}, "
+                "and percentage printing will be deactivated."
+            )
+            raise_or_warn(self.on_error, TypeError, err_msg, UserWarning, warn_msg)
+            self.length = self.default_length
 
     @property
     def length(self) -> int:
@@ -75,24 +88,50 @@ class VisualIterator:
     
     @length.setter
     def length(self, value: int) -> None:
-        if isinstance(value, int) and value >= -1:
-            self._length = value
+        match value:
+            case int() if value >= -1:
+                self._length = value
+
+            case int():
+                err_msg = (
+                    f"{self.__class__.__name__}: "
+                    f"Length cannot be inferior to default of {self.default_length}, "
+                    "used for undetermined length."
+                )
+                warn_msg = err_msg + (
+                    f" Setting length back to default value of {self.default_length}."
+                )
+                raise_or_warn(self.on_error, ValueError, err_msg, UserWarning, warn_msg)
+                self._length = -1
+
+            case _:
+                err_msg = (
+                    f"{self.__class__.__name__}: "
+                    "'length' expected a type 'int', "
+                    f"got '{type(value).__name__}' instead."
+                )
+                warn_msg = err_msg + (
+                    f" Setting length back to default value of {self.default_length}."
+                )
+                raise_or_warn(self.on_error, TypeError, err_msg, UserWarning, warn_msg)
+                self._length = -1
 
     @length.deleter
     def length(self) -> None:
-        self._length = -1
+        self._length = self.default_length
 
     def __len__(self: tpe.Self) -> int:
         return self.length
 
     def __iter__(self: tpe.Self) -> tp.Any:
         for idx, obj in enumerate(self.iterable, start=1):
-            counter = f"{self.desc}: {idx}/{self.length}"
+            maxlen = "Unknown" if self.length < 0 else self.length
+            counter = f"{self.desc}: {idx}/{maxlen} {self.unit}"
 
-            if self.percent:
+            if self.percent and isinstance(maxlen, int):
                 sf = self.significant_figures
                 fmt = f".{sf}f"
-                percent = f" ({round(idx / self.length * 100, sf):{fmt}}%)"
+                percent = f" ({round(idx / maxlen * 100, sf):{fmt}}%)"
                 print(counter + percent, end="\r", flush=True)
 
             else:
@@ -166,3 +205,92 @@ class VisualIterator:
             visual_iterator.length = n_elts
 
         return visual_iterator
+
+
+def raise_or_warn(
+    action: tp.Literal["raise", "warn", "ignore"],
+    exception: type[Exception] | None = None,
+    err_msg: str | None = None,
+    warn_type: type[Warning] | None = None,
+    warn_msg: str | None = None
+) -> None:
+    """
+    Flexibly raise an exception, print a warning or ignore
+    with a message that can be different in each case.
+
+    Parameters
+    ----------
+
+    action: "raise" | "warn" | "ignore"
+        What kind of action to do when going through this function.
+
+    exception: Exception
+        What class of exception to raise when `raise_or_warn` is set to "raise".
+        If not given and `raise_or_warn` is set to "raise", defaults to base
+        exception class `Exception`.
+
+    err_msg: str | None
+        The message to print when raising an exception.
+
+    warn_type: Warning
+        What class of warning to show when `raise_or_warn` is set to "warn".
+        If not given and `raise_or_warn` is set to "xarn", defaults to
+        warning class `UserWarning`.
+
+    warn_msg: str | None
+        The message to print when printing a warning.
+    
+    NOTE: if the message argument corresponding to given `raise_or_warn` action is not given,
+    the message set for the other action is used instead, so if the message is the same for
+    both actions it can be passed only once to one or the other message argument indifferently.
+    At least one message argument must be given.
+    """
+    match (err_msg, warn_msg):
+        case (str(), str()): pass
+        case (None, str()): err_msg = warn_msg
+        case (str(), None): warn_msg = err_msg
+        case (None, None):
+            raise ValueError(
+                f"{raise_or_warn.__name__}: at least one of either 'err_msg' or 'warn_msg' "
+                "arguments must be set."
+            )
+        case _:
+            raise TypeError(
+                f"{raise_or_warn.__name__}: At least one of either 'err_msg' or 'warn_msg' "
+                "arguments were given a wrong type:\n"
+                f"- 'err_msg' expected a type 'str', got {type(err_msg).__name__!r}.\n"
+                f"- 'warn_msg' expected a type 'str', got {type(warn_msg).__name__!r}.\n"
+            )
+
+    if action == "raise":
+        exception = exception if exception is not None else Exception
+        err_msg = err_msg if err_msg is not None else warn_msg
+        raise exception(err_msg)
+
+    if action == "warn":
+        warn_msg = warn_msg if warn_msg is not None else err_msg
+        warnings.warn(warn_msg, warn_type, stacklevel = 2)
+
+
+def test_visual_iterator() -> None:
+    visual_construct = VisualIterator(list(range(5)), percent=True)
+    visual_from_iter = VisualIterator.from_iterator(iter(range(5)), percent=True)
+    visual_from_big_iter = VisualIterator.from_big_iterator(iter(range(100)), n_elts=100, percent=True)
+
+    for vit in (visual_construct, visual_from_iter, visual_from_big_iter):
+        if vit is visual_construct or vit is visual_from_iter:
+            assert vit.iterable == [0, 1, 2, 3, 4]
+            assert vit.length == 5
+
+        if vit is visual_from_big_iter:
+            assert vit.iterable == iter(range(100))
+            assert vit.length == 100
+
+        assert len(vit) == vit.length
+        assert vit.default_length == -1
+        assert vit.desc == "Iterating"
+        assert vit.end_desc == "Done."
+        assert vit.percent == True
+        assert vit.significant_figures == 2
+        assert vit.on_error == "warn"
+
