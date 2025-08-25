@@ -63,8 +63,8 @@ SumArrayValues () {
 
 CountSpgs () {
     for i in {1..230}; do
-        Spgs[$i]=$(grep -c "^_symmetry_Int_Tables_number[_]?\s+$i$" "$1")
-        Spgs[$i]=$((${Spgs[$i]} + $(grep -c "^_space_group_IT_number[_]?\s+$i$" "$1")))
+        Spgs[$i]=$(grep -cE "^_symmetry_Int_Tables_number_?\s+$i$" "$1")
+        Spgs[$i]=$((${Spgs[$i]} + $(grep -cE "^_space_group_IT_number_?\s+$i$" "$1")))
     done
 }
 
