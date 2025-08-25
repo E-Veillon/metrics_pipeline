@@ -120,6 +120,17 @@ class VisualIterator:
     def length(self) -> None:
         self._length = self.default_length
 
+    def __getattr__(self, attr: str) -> tp.Any:
+        try:
+            val = getattr(self.iterable, attr)
+        except AttributeError as exc:
+            raise AttributeError(
+                f"Attribute {attr!r} is not defined, neither for the "
+                f"{self.__class__.__name__!r} object nor for the iterable inside it."
+            ) from exc
+        else:
+            return val
+
     def __len__(self: tpe.Self) -> int:
         return self.length
 
