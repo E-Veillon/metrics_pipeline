@@ -1,7 +1,7 @@
 """Screening pipeline utils subpackage."""
 
 # I/O modules
-from .cif_io import read_cif, write_cif, symmetrize_and_write_cif
+from .cif_io import read_cif, write_cif, struct_to_sym_cif_str, symmetrize_and_write_cif
 from .file_io import (
     MAINDIRPATH, SCRIPTSPATH, UTILSPATH, CONFIGPATH,
     check_file_format, check_file_or_dir, add_new_dir, yaml_loader
@@ -17,7 +17,7 @@ from .vasp_io import (
 
 # Chemistry related modules
 from .fitted_values import U_VALUES, EL_PER_XC_VOL
-from .spacegroup import structure_symmetrizer, batch_symmetrizer
+from .spacegroup import structure_symmetrizer, batch_symmetrizer, SPG_NUM_TO_PG, PG_TO_SYSTEM
 from .periodic_table import (
     has_rare_gas, discard_rare_gas_structures,
     has_rare_earth, discard_rare_earth_structures,

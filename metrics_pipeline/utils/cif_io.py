@@ -285,7 +285,9 @@ def read_cif(
     if sequential:
         data_list = [
             partial_fn(struct_string)
-            for struct_string in VisualIterator(struct_strings, desc="Read and load data")
+            for struct_string in VisualIterator(
+                struct_strings, desc="Read and load data", unit="structures", percent=True
+            )
         ]
     
     else:
