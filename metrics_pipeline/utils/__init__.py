@@ -7,6 +7,7 @@ from .file_io import (
     check_file_format, check_file_or_dir, add_new_dir, yaml_loader
 
 )
+from .poscar_io import PoscarBlock, PoscarFile
 from .vasp_io import (
     write_and_run_vasp,
     vasp_relaxation_settings, vasp_static_settings,
