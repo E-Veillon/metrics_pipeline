@@ -17,6 +17,26 @@ from .common_asserts import check_type
 from .custom_types import FormulaLike
 
 
+class PeriodicTable:
+    def __init__(self) -> None:
+        pass
+
+    @staticmethod
+    def get_all_symbols() -> list[str]:
+        """Get a list of all element symbols in the periodic table."""
+        return list(Element.__members__)
+
+    @staticmethod
+    def get_atomic_number(symbol: str) -> int:
+        """Get atomic number Z corresponding to given symbol."""
+        return Element(symbol).Z
+
+    @staticmethod
+    def get_symbol(atomic_number: int) -> str:
+        """Get symbol corresponding to given atomic number."""
+        return Element.from_Z(atomic_number).symbol
+
+
 ########################################
 
 
