@@ -58,6 +58,7 @@ from .distribution import (
     recall, precision, frechet_distance, get_emd
 )
 from .matcher import (
+    check_viability,
     check_interatomic_distances, group_by_composition,
     batch_group_by_equivalence, remove_equivalent,
     batch_get_novel_structures,
@@ -115,10 +116,10 @@ __all__ = [
     "mp_api_download", "process_oqmd_json_file",    #
     "get_densities",    # density
     "recall", "precision", "frechet_distance", "get_emd",  # distribution
-    "check_interatomic_distances", "group_by_composition",  # matcher
-    "batch_group_by_equivalence", "remove_equivalent",      #
-    "batch_get_novel_structures",                           #
-    "is_struct_dir", "match_struct_dirs",                   #
+    "check_viability", "check_interatomic_distances", "group_by_composition",   # matcher
+    "batch_group_by_equivalence", "remove_equivalent",                          #
+    "batch_get_novel_structures",                                               #
+    "is_struct_dir", "match_struct_dirs",                                       #
     "vectors_from_alignn",  # ml_vectors
     "rmsd_from_structures", # rmsd
     # Other

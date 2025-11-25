@@ -29,13 +29,77 @@ from .fitted_values import get_clementi_radius
 
 
 def get_min_dist(radii_pair: tuple[float, float], valid_tol: float = 0.5) -> float:
-            min_radii_dist = sum(radii_pair) * 0.9 # 10% uncertainty tolerance
-            return max(valid_tol, round(min_radii_dist, 3)) # Conversion to Angströms
+    """
+    Get minimal viable distance between two atoms of given radii.
+    A 10% uncertainty tolerance is applied because used atomic radii were calculated
+    for free atoms, and it is known that atoms in crystals tend to be closer.
+
+    Parameters
+    ----------
+    radii_pair: tuple[float, float]
+        A pair of atomic radii in angströms.
+
+    valid_tol: float
+        Absolute minimal distance that the atoms must have if computed radii are too small.
+        Defaults to 0.5 angströms.
+
+    Returns
+    -------
+    float
+        Minimal viable distance between the two atoms.
+    """
+    min_radii_dist = sum(radii_pair) * 0.9 # 10% uncertainty tolerance
+    return max(valid_tol, round(min_radii_dist, 3)) # round result to 0.1 pm scale
+
+
+def check_viability(structures: list[Structure]) -> tuple[list[Structure], int]:
+    """
+    Check viability of structures. Viability uses a table of calculated atomic radii
+    to compare structures distance matrices against, and checks basic physicality in
+    the lattice definition.
+
+    Parameters
+    ----------
+    structures: list[Structure]
+        Structures to check.
+
+    Returns
+    -------
+    (list[Structure], int)
+        The list of viable structures, and the number of structures that were discarded.
+    """
+    check_type(structures, "structures", (list,))
+    for idx, struct in enumerate(structures):
+        check_type(struct, f"structures[{idx}]", (Structure,))
+
+    def _is_viable(structure: Structure) -> bool:
+        if any(not (10 <= angle <= 170) for angle in structure.lattice.angles):
+            return False
+
+        radii = [get_clementi_radius(elt.symbol) for elt in struct.species]
+
+        if any(length < 2 * max(radii) for length in structure.lattice.lengths):
+            return False
+
+        min_dists = np.array(list(map(get_min_dist, itt.combinations(radii, r=2))))
+        true_dists = struct.distance_matrix[np.triu_indices(len(struct), 1)]
+        return np.all(np.subtract(true_dists, min_dists) >= 0.0).item()
+
+    viable_structs = list(
+        filter(
+            _is_viable,
+            VisualIterator(
+                structures, desc="Checking interatomic distances", percent=True, unit="structures"
+            )
+        )
+    )
+    nbr_discarded = len(structures) - len(viable_structs)
+    return viable_structs, nbr_discarded
 
 
 def check_interatomic_distances(
     structures: tp.Sequence[Structure],
-    valid_tol: tp.Literal["radii"] | float = 0.5
+    valid_tol: float = 0.5
 ) -> tuple[list[Structure], int]:
     '''
     Checks interatomic distances with respect to a tolerance in angstroms 
@@ -46,10 +110,7 @@ def check_interatomic_distances(
 
         valid_tol ("radii" | float):    Tolerance below which a distance between 2 sites 
                                         is considered invalid and is eliminatory for the
-                                        structure. Defaults to 0.5 angstroms. If "radii"
-                                        is passed, a more sophisticated scheme using pairwise
-                                        atomic radii as calculated by Clementi et al. will
-                                        be used to check valid distances.
+                                        structure. Defaults to 0.5 angstroms.
 
     Returns:
         List[SiteCollection]: list of valid structures.
@@ -60,12 +121,7 @@ def check_interatomic_distances(
         check_type(struct, f"structures[{idx}]", (Structure,))
     check_type(valid_tol, "valid_tol", (float,))
 
-    def _is_valid(structure: SiteCollection, valid_tol: tp.Literal["radii"] | float) -> bool:
-        if valid_tol == "radii":
-            radii = [get_clementi_radius(elt.symbol) for elt in struct.species]
-            min_dists = np.array(list(map(get_min_dist, itt.combinations(radii, r=2))))
-            true_dists = struct.distance_matrix[np.triu_indices(len(struct), 1)]
-            return np.all(np.subtract(true_dists, min_dists) >= 0.0).item()
+    def _is_valid(structure: SiteCollection, valid_tol: float) -> bool:
         return structure.is_valid(tol=valid_tol)
 
     is_valid = partial(_is_valid, valid_tol=valid_tol)

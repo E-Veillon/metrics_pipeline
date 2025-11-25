@@ -15,7 +15,7 @@ from . import _parse_input_args
 from utils import (
     check_type, check_num_value,
     check_file_format, check_file_or_dir,
-    read_cif, write_cif, check_interatomic_distances,
+    read_cif, write_cif, check_viability, check_interatomic_distances,
     batch_symmetrizer, remove_equivalent, symmetrize_and_write_cif
 )
 
@@ -353,11 +353,15 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     # Vérification des distances interatomiques
 
-    if not args["no_dist_check"]:
+    if not args["no_dist_check"] and isinstance(args["dist_tolerance"], float):
         structures, nbr_not_valid = check_interatomic_distances(
             structures, valid_tol=args["dist_tolerance"]
         )
         print(f"{nbr_not_valid} structures having too close atoms were discarded")
+
+    elif not args["no_dist_check"]:
+        structures, nbr_not_viable = check_viability(structures)
+        print(f"{nbr_not_viable} not viable structures were discarded")
 
     # Calcul de la symétrie d'espace des structures
 
