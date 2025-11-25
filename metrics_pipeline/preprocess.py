@@ -12,7 +12,7 @@ import argparse as argp
 
 # LOCAL IMPORTS
 from . import _parse_input_args
-from .utils import (
+from utils import (
     check_type, check_num_value,
     check_file_format, check_file_or_dir,
     read_cif, write_cif, check_interatomic_distances,
@@ -41,7 +41,8 @@ def _get_command_line_args() -> argp.Namespace:
         "The Journal of Chemical Physics, vol. 47, no 4, 1967, p. 1300–1307."
     )
     parser = argp.ArgumentParser(
-        prog=os.path.basename(__file__), description=__doc__, epilog=epilog
+        prog=os.path.basename(__file__), description=__doc__, epilog=epilog,
+        formatter_class=argp.RawDescriptionHelpFormatter
     )
     parser.add_argument(
         "input_file",

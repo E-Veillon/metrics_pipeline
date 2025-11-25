@@ -22,7 +22,7 @@ from .common_asserts import check_type, check_num_value
 from .custom_types import PathLike
 from .visual_iterator import VisualIterator
 from .flattener import flatten
-from fitted_values import get_clementi_radius
+from .fitted_values import get_clementi_radius
 
 
 ########################################

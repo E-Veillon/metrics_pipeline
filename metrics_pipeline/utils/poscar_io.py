@@ -14,7 +14,7 @@ import itertools as itt
 import numpy as np
 import numpy.typing as npt
 
-from periodic_table import PeriodicTable
+from .periodic_table import PeriodicTable
 
 
 @dataclass
