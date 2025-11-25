@@ -4,12 +4,13 @@ Functions to check structures validity, compare them, and discard duplicates.
 """
 
 import re
-import itertools as itools
+import itertools as itt
 from functools import partial
-from typing import Tuple, List, Union, Sequence, Optional
+import typing as tp
 from pathlib import Path
 from tqdm import tqdm
 from tqdm.contrib.concurrent import process_map
+import numpy as np
 
 # PYTHON MATERIAL GENOMICS
 from pymatgen.core import Structure, SiteCollection, Composition
@@ -21,15 +22,21 @@ from .common_asserts import check_type, check_num_value
 from .custom_types import PathLike
 from .visual_iterator import VisualIterator
 from .flattener import flatten
+from fitted_values import get_clementi_radius
 
 
 ########################################
 
 
+def get_min_dist(radii_pair: tuple[float, float], valid_tol: float = 0.5) -> float:
+            min_radii_dist = sum(radii_pair) * 0.9 # 10% uncertainty tolerance
+            return max(valid_tol, round(min_radii_dist, 3)) # Conversion to Angströms
+
+
 def check_interatomic_distances(
-    structures: Sequence[Structure],
-    valid_tol: float = 0.5
-) -> Tuple[List[Structure], int]:
+    structures: tp.Sequence[Structure],
+    valid_tol: tp.Literal["radii"] | float = 0.5
+) -> tuple[list[Structure], int]:
     '''
     Checks interatomic distances with respect to a tolerance in angstroms 
     for all given structures, then returns the valid ones in a list.
@@ -37,20 +44,28 @@ def check_interatomic_distances(
     Parameters:
         structures ([SiteCollection]):  The structures to check.
 
-        valid_tol (float):              Tolerance below which a distance between 2 sites 
+        valid_tol ("radii" | float):    Tolerance below which a distance between 2 sites 
                                         is considered invalid and is eliminatory for the
-                                        structure. Defaults to 0.5 angstroms.
+                                        structure. Defaults to 0.5 angstroms. If "radii"
+                                        is passed, a more sophisticated scheme using pairwise
+                                        atomic radii as calculated by Clementi et al. will
+                                        be used to check valid distances.
 
     Returns:
         List[SiteCollection]: list of valid structures.
         int: Number of invalid structures discarded.
     '''
-    check_type(structures, "structures", (Sequence,))
+    check_type(structures, "structures", (tp.Sequence,))
     for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
     check_type(valid_tol, "valid_tol", (float,))
 
-    def _is_valid(structure: SiteCollection, valid_tol: float = 0.5) -> bool:
+    def _is_valid(structure: SiteCollection, valid_tol: tp.Literal["radii"] | float) -> bool:
+        if valid_tol == "radii":
+            radii = [get_clementi_radius(elt.symbol) for elt in struct.species]
+            min_dists = np.array(list(map(get_min_dist, itt.combinations(radii, r=2))))
+            true_dists = struct.distance_matrix[np.triu_indices(len(struct), 1)]
+            return np.all(np.subtract(true_dists, min_dists) >= 0.0).item()
         return structure.is_valid(tol=valid_tol)
 
     is_valid = partial(_is_valid, valid_tol=valid_tol)
@@ -68,7 +83,7 @@ def check_interatomic_distances(
 ########################################
 
 
-def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
+def hash_stoichiometry(comp: tp.Union[Composition, Entry, SiteCollection]) -> int:
     """
     Generate a hash from the fractional composition of a compatible pymatgen object, 
     ie. a Composition object or an object having a .composition attribute returning a
@@ -91,8 +106,8 @@ def hash_stoichiometry(comp: Union[Composition, Entry, SiteCollection]) -> int:
 ########################################
 
 def group_by_stoichiometry(
-    comps: Sequence[Union[Composition, Entry, SiteCollection]]
-) -> List[List[Union[Composition, Entry, SiteCollection]]]:
+    comps: tp.Sequence[tp.Union[Composition, Entry, SiteCollection]]
+) -> list[list[tp.Union[Composition, Entry, SiteCollection]]]:
     """
     Group Composition objects or objects having a .composition attribute by fractional
     composition using the `hash_stoichiometry` hash function. Note that objects from
@@ -106,7 +121,7 @@ def group_by_stoichiometry(
     Returns:
         A list containing lists of objects with the same fractionnal composition.
     """
-    check_type(comps, "comps", (Sequence,))
+    check_type(comps, "comps", (tp.Sequence,))
     if not comps:
         return []
     for idx, comp in enumerate(comps):
@@ -116,12 +131,12 @@ def group_by_stoichiometry(
 
     return [
         list(grouped)
-        for _, grouped in itools.groupby(sorted_comps, hash_stoichiometry)
+        for _, grouped in itt.groupby(sorted_comps, hash_stoichiometry)
     ]
 
 ########################################
 
-def hash_composition(comp: Union[Composition, Entry, SiteCollection]) -> int:
+def hash_composition(comp: tp.Union[Composition, Entry, SiteCollection]) -> int:
     """
     Generate a hash from the fractional composition of a compatible pymatgen object, 
     ie. a Composition object or an object having a .composition attribute returning a
@@ -146,8 +161,8 @@ def hash_composition(comp: Union[Composition, Entry, SiteCollection]) -> int:
 
 
 def group_by_composition(
-    comps: Sequence[Union[Composition, Entry, SiteCollection]]
-) -> List[List[Union[Composition, Entry, SiteCollection]]]:
+    comps: tp.Sequence[tp.Union[Composition, Entry, SiteCollection]]
+) -> list[list[tp.Union[Composition, Entry, SiteCollection]]]:
     """
     Group Composition objects or objects having a .composition attribute by
     their contained element types. Note that objects from different classes
@@ -161,7 +176,7 @@ def group_by_composition(
     Returns:
         A list of lists of objects containing the same elements.
     """
-    check_type(comps, "comps", (Sequence,))
+    check_type(comps, "comps", (tp.Sequence,))
     if not comps:
         return []
     for idx, comp in enumerate(comps):
@@ -171,7 +186,7 @@ def group_by_composition(
 
     return [
         list(grouped)
-        for _, grouped in itools.groupby(sorted_comps, hash_composition)
+        for _, grouped in itt.groupby(sorted_comps, hash_composition)
     ]
 
 
@@ -179,8 +194,8 @@ def group_by_composition(
 
 
 def _group_by_equivalence(
-    structures: List[Structure], test_volume: bool = False
-) -> Tuple[List[List[Structure]], int]:
+    structures: list[Structure], test_volume: bool = False
+) -> tuple[list[list[Structure]], int]:
     """
     Group structures by equivalence using the StructureMatcher object.
 
@@ -222,12 +237,12 @@ def _group_by_equivalence(
 
 
 def batch_group_by_equivalence(
-    structures: Sequence[Structure],
+    structures: tp.Sequence[Structure],
     test_volume: bool = False,
     workers: int | None = None,
-    comment: Optional[str] = None,
+    comment: str | None = None,
     sequential: bool = False
-) -> Tuple[List[List[List[Structure]]], int]:
+) -> tuple[list[list[list[Structure]]], int]:
     """
     Group structures by equivalence in two steps:
     First, groups by stoichiometry, then pass each sub-group in
@@ -262,7 +277,7 @@ def batch_group_by_equivalence(
         A list containing lists of same composition containing lists of equivalent structures,
         and total count of unmatched structures (equal to zero if test_volume is set to False).
     """
-    check_type(structures, "structures", (Sequence,))
+    check_type(structures, "structures", (tp.Sequence,))
     for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
     check_type(test_volume, "test_volume", (bool,))
@@ -292,7 +307,7 @@ def batch_group_by_equivalence(
             desc=comment
         )
 
-    equivalent_structs = [t[0] for t in match_results] #type: List[List[List[Structure]]]
+    equivalent_structs = [t[0] for t in match_results] #type: list[list[list[Structure]]]
     total_unmatch_count = sum(t[1] for t in match_results)
 
     return (equivalent_structs, total_unmatch_count)
@@ -302,12 +317,12 @@ def batch_group_by_equivalence(
 
 
 def remove_equivalent(
-    structures: List[Structure],
+    structures: list[Structure],
     workers: int|None = None,
     test_volume: bool = False,
     keep_equivalent: bool = False,
     sequential: bool = False
-) -> Tuple[List[Structure], int, int]:
+) -> tuple[list[Structure], int, int]:
     """
     Group structures by equivalence using multiple processes, then discards the duplicates.
 
@@ -341,7 +356,7 @@ def remove_equivalent(
         Int: The number of discarded structures.
         Int: The number of unmatched structures (zero if test_volume = False).
     """
-    check_type(structures, "structures", (Sequence,))
+    check_type(structures, "structures", (tp.Sequence,))
     for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
     check_type(test_volume, "test_volume", (bool,))
@@ -379,8 +394,8 @@ def remove_equivalent(
 
 
 def _get_novel_structures(
-    structures: List[List[Structure]],
-    dataset: List[Structure]
+    structures: list[list[Structure]],
+    dataset: list[Structure]
 ):
     """
     Filter out structures that are neither coming from the given dataset nor 
@@ -403,17 +418,17 @@ def _get_novel_structures(
         list(
             filter(
                 lambda grp: all(
-                    struct != ref for struct, ref in itools.product(grp, dataset)
+                    struct != ref for struct, ref in itt.product(grp, dataset)
                 ), structures
             )
         )
     )
 #----------------------------------------
 def batch_get_novel_structures(
-    structures: List[List[List[Structure]]],
-    dataset: List[Structure],
+    structures: list[list[list[Structure]]],
+    dataset: list[Structure],
     workers: int | None = None
-) -> List[Structure]:
+) -> list[Structure]:
     """
     Filter out structures that are neither coming from the given dataset nor 
     equivalent to one of them. Can be parallelized over compositional lists.
@@ -470,11 +485,11 @@ def is_struct_dir(path: PathLike) -> bool:
 
 def match_struct_dirs(
     path: PathLike,
-    indices: Optional[List[int]] = None,
+    indices: list[int] | None = None,
     match_all: bool = True,
     unique: bool = True,
     no_return: bool = False
-) -> List[str]:
+) -> list[str]:
     """
     Match structure directories at given path.
     

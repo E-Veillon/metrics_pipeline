@@ -426,9 +426,6 @@ The Journal of Chemical Physics, vol. 41, no 10, 1964, p. 3199–3204
 # Unknown radii are equal to Bohr radius by default
 CALC_UNKNOWN = 53
 
-# Uncertainty tolerance applied to get viable interatomic distances
-CALC_STD = 0.1
-
 clementi_et_al_radii_table_pm = {
     # 1s
     "H": 53*NOREF, "He": 31,
@@ -485,167 +482,23 @@ The Journal of Chemical Physics, vol. 38, no. 11, 1963, p. 2686-2689.
 
 - E. Clementi, D. L. Raimondi and W. P. Reinhardt,
 « Atomic Screening Constants from SCF Functions. II. Atoms with 37 to 86 Electrons »,
-The Journal of Chemical Physics, vol. 47, no 4, 1967, p. 1300–1307
+The Journal of Chemical Physics, vol. 47, no 4, 1967, p. 1300–1307.
 """
 
-# Label for values were all bond lengths in unit cell are equal
-ALLEQUAL = 1
-# Label for values where the shortest among several bond lengths was considered
-SHORTEST = 1
-# Label for values estimated from conventional unit cell parameters
-# when bond lengths were not given
-NOBONDLEN = 1
+def get_clementi_radius(symbol: str) -> float:
+    """
+    Get atomic radius as calculated by Clementi et al., in angströms.
+    Elements of the 7th period that were not calculated in these works
+    have a default radius of one rounded Bohr Radius (a0 = 0.53A).
 
-mp_atomic_radii_pm = {
-    # 1s
-    "H (mp-730101)": 37*ALLEQUAL, "He (mp-23158)": 141*NOBONDLEN,
-    # 2s
-    "Li (mp-1018134)": 152*SHORTEST, "Be (mp-87)": 111*SHORTEST,
-    # 2p
-    "B (mp-160)": 84*SHORTEST, "C (mp-3347313)": 71*ALLEQUAL,
-    "N (mp-154)": 66*ALLEQUAL, "O (mp-12957)": 62*ALLEQUAL,
-    "F (mp-1525632)": 71*ALLEQUAL, "Ne (mp-111)": 148*NOBONDLEN,
-    # 3s
-    "Na (mp-10172)": 185*SHORTEST, "Mg (mp-153)": 158*SHORTEST,
-    # 3p
-    "Al (mp-134)": 143*ALLEQUAL, "Si (mp-149)": 118*ALLEQUAL,
-    "P (mp-568348)": 110*SHORTEST, "S (mp-77)": 103*ALLEQUAL,
-    "Cl (mp-22848)": 100*ALLEQUAL, "Ar (mp-23155)": 190*NOBONDLEN,
-    # 4s
-    "K (mp-1184804)": 231*SHORTEST, "Ca (mp-45)": 197*ALLEQUAL,
-    # 3d
-    "Sc (mp-67)": 164*SHORTEST, "Ti (mp-72)": 132*SHORTEST,
-    "V (mp-146)": 129*ALLEQUAL, "Cr (mp-90)": 128*ALLEQUAL,
-    "Mn (mp-35)": 120*SHORTEST, "Fe (mp-13)": 124*ALLEQUAL,
-    "Co (mp-102)": 124*ALLEQUAL, "Ni (mp-23)": 123*ALLEQUAL,
-    "Cu (mp-30)": 127*ALLEQUAL, "Zn (mp-79)": 131*SHORTEST,
-    # 4p
-    "Ga (mp-142)": 125*SHORTEST, "Ge (mp-32)": 123*ALLEQUAL,
-    "As (mp-158)": 124*ALLEQUAL, "Se (mp-570481)": 117*SHORTEST,
-    "Br (mp-1525121)": 117*ALLEQUAL, "Kr (mp-975590)": 247*NOBONDLEN,
-    # 5s
-    "Rb (mp-1179656)": 237*SHORTEST, "Sr (mp-139)": 215*SHORTEST,
-    # 4d
-    "Y (mp-112)": 156*SHORTEST, "Zr (mp-131)": 160*SHORTEST,
-    "Nb (mp-75)": 144*ALLEQUAL, "Mo (mp-129)": 137*ALLEQUAL,
-    "Tc (mp-113)": 136*SHORTEST, "Ru (mp-33)": 133*SHORTEST,
-    "Rh (mp-74)": 135*ALLEQUAL, "Pd (mp-2)": 139*ALLEQUAL,
-    "Ag (mp-8566)": 145*SHORTEST, "Cd (mp-94)": 148*SHORTEST,
-    # 5p
-    "In": CALC_UNKNOWN, "Sn": CALC_UNKNOWN,
-    "Sb": CALC_UNKNOWN, "Te": CALC_UNKNOWN,
-    "I": CALC_UNKNOWN, "Xe": CALC_UNKNOWN,
-    # 6s
-    "Cs": CALC_UNKNOWN, "Ba": CALC_UNKNOWN,
-    # 4f
-    "La": CALC_UNKNOWN, "Ce": CALC_UNKNOWN,
-    "Pr": CALC_UNKNOWN, "Nd": CALC_UNKNOWN,
-    "Pm": CALC_UNKNOWN, "Sm": CALC_UNKNOWN,
-    "Eu": CALC_UNKNOWN, "Gd": CALC_UNKNOWN,
-    "Tb": CALC_UNKNOWN, "Dy": CALC_UNKNOWN,
-    "Ho": CALC_UNKNOWN, "Er": CALC_UNKNOWN,
-    "Tm": CALC_UNKNOWN, "Yb": CALC_UNKNOWN,
-    # 5d
-    "Lu": CALC_UNKNOWN, "Hf": CALC_UNKNOWN,
-    "Ta": CALC_UNKNOWN, "W": CALC_UNKNOWN,
-    "Re": CALC_UNKNOWN, "Os": CALC_UNKNOWN,
-    "Ir": CALC_UNKNOWN, "Pt": CALC_UNKNOWN,
-    "Au": CALC_UNKNOWN, "Hg": CALC_UNKNOWN,
-    # 6p
-    "Tl": CALC_UNKNOWN, "Pb": CALC_UNKNOWN,
-    "Bi": CALC_UNKNOWN, "Po": CALC_UNKNOWN,
-    "At": CALC_UNKNOWN, "Rn": CALC_UNKNOWN,
-    # 7s
-    "Fr": CALC_UNKNOWN, "Ra": CALC_UNKNOWN,
-    # 5f
-    "Ac": CALC_UNKNOWN, "Th": CALC_UNKNOWN,
-    "Pa": CALC_UNKNOWN, "U": CALC_UNKNOWN,
-    "Np": CALC_UNKNOWN, "Pu": CALC_UNKNOWN,
-    "Am": CALC_UNKNOWN, "Cm": CALC_UNKNOWN,
-    "Bk": CALC_UNKNOWN, "Cf": CALC_UNKNOWN,
-    "Es": CALC_UNKNOWN, "Fm": CALC_UNKNOWN,
-    "Md": CALC_UNKNOWN, "No": CALC_UNKNOWN,
-    # 6d
-    "Lr": CALC_UNKNOWN, "Rf": CALC_UNKNOWN,
-    "Db": CALC_UNKNOWN, "Sg": CALC_UNKNOWN,
-    "Bh": CALC_UNKNOWN, "Hs": CALC_UNKNOWN,
-    "Mt": CALC_UNKNOWN, "Ds": CALC_UNKNOWN,
-    "Rg": CALC_UNKNOWN, "Cn": CALC_UNKNOWN,
-    # 7p
-    "Nh": CALC_UNKNOWN, "Fl": CALC_UNKNOWN,
-    "Mc": CALC_UNKNOWN, "Lv": CALC_UNKNOWN,
-    "Ts": CALC_UNKNOWN, "Og": CALC_UNKNOWN
-}
-"""
-Atomic radii calculated from most stable unary bulk crystal in the Materials Project (MP) for each element.
-The value is defined as half the bond length between two nearest neighbors of same specie, in picometers.
+    References :
+    - E. Clementi and D. L. Raimondi,
+    "Atomic screening constants from SCF functions.",
+    The Journal of Chemical Physics, vol. 38, no. 11, 1963, p. 2686-2689.
 
-References of MP:
-
-"""
-
-oqmd_atomic_radii_pm = {
-    # 1s
-    "H": CALC_UNKNOWN, "He": CALC_UNKNOWN,
-    # 2s
-    "Li": CALC_UNKNOWN, "Be": CALC_UNKNOWN,
-    # 2p
-    "B": CALC_UNKNOWN, "C": CALC_UNKNOWN, "N": CALC_UNKNOWN, "O": CALC_UNKNOWN, "F": CALC_UNKNOWN, "Ne": CALC_UNKNOWN,
-    # 3s
-    "Na": CALC_UNKNOWN, "Mg": CALC_UNKNOWN,
-    # 3p
-    "Al": CALC_UNKNOWN, "Si": CALC_UNKNOWN, "P": CALC_UNKNOWN, "S": CALC_UNKNOWN, "Cl": CALC_UNKNOWN, "Ar": CALC_UNKNOWN,
-    # 4s
-    "K": CALC_UNKNOWN, "Ca": CALC_UNKNOWN,
-    # 3d
-    "Sc": CALC_UNKNOWN, "Ti": CALC_UNKNOWN, "V": CALC_UNKNOWN, "Cr": CALC_UNKNOWN, "Mn": CALC_UNKNOWN,
-    "Fe": CALC_UNKNOWN, "Co": CALC_UNKNOWN, "Ni": CALC_UNKNOWN, "Cu": CALC_UNKNOWN, "Zn": CALC_UNKNOWN,
-    # 4p
-    "Ga": CALC_UNKNOWN, "Ge": CALC_UNKNOWN, "As": CALC_UNKNOWN, "Se": CALC_UNKNOWN, "Br": CALC_UNKNOWN, "Kr": CALC_UNKNOWN,
-    # 5s
-    "Rb": CALC_UNKNOWN, "Sr": CALC_UNKNOWN,
-    # 4d
-    "Y": CALC_UNKNOWN, "Zr": CALC_UNKNOWN, "Nb": CALC_UNKNOWN, "Mo": CALC_UNKNOWN, "Tc": CALC_UNKNOWN,
-    "Ru": CALC_UNKNOWN, "Rh": CALC_UNKNOWN, "Pd": CALC_UNKNOWN, "Ag": CALC_UNKNOWN, "Cd": CALC_UNKNOWN,
-    # 5p
-    "In": CALC_UNKNOWN, "Sn": CALC_UNKNOWN, "Sb": CALC_UNKNOWN, "Te": CALC_UNKNOWN, "I": CALC_UNKNOWN, "Xe": CALC_UNKNOWN,
-    # 6s
-    "Cs": CALC_UNKNOWN, "Ba": CALC_UNKNOWN,
-    # 4f
-    "La": CALC_UNKNOWN, "Ce": CALC_UNKNOWN, "Pr": CALC_UNKNOWN, "Nd": CALC_UNKNOWN, "Pm": CALC_UNKNOWN, "Sm": CALC_UNKNOWN, "Eu": CALC_UNKNOWN,
-    "Gd": CALC_UNKNOWN, "Tb": CALC_UNKNOWN, "Dy": CALC_UNKNOWN, "Ho": CALC_UNKNOWN, "Er": CALC_UNKNOWN, "Tm": CALC_UNKNOWN, "Yb": CALC_UNKNOWN,
-    # 5d
-    "Lu": CALC_UNKNOWN, "Hf": CALC_UNKNOWN, "Ta": CALC_UNKNOWN, "W": CALC_UNKNOWN, "Re": CALC_UNKNOWN,
-    "Os": CALC_UNKNOWN, "Ir": CALC_UNKNOWN, "Pt": CALC_UNKNOWN, "Au": CALC_UNKNOWN, "Hg": CALC_UNKNOWN,
-    # 6p
-    "Tl": CALC_UNKNOWN, "Pb": CALC_UNKNOWN, "Bi": CALC_UNKNOWN, "Po": CALC_UNKNOWN, "At": CALC_UNKNOWN, "Rn": CALC_UNKNOWN,
-    # 7s
-    "Fr": CALC_UNKNOWN, "Ra": CALC_UNKNOWN,
-    # 5f
-    "Ac": CALC_UNKNOWN, "Th": CALC_UNKNOWN, "Pa": CALC_UNKNOWN, "U": CALC_UNKNOWN, "Np": CALC_UNKNOWN, "Pu": CALC_UNKNOWN, "Am": CALC_UNKNOWN,
-    "Cm": CALC_UNKNOWN, "Bk": CALC_UNKNOWN, "Cf": CALC_UNKNOWN, "Es": CALC_UNKNOWN, "Fm": CALC_UNKNOWN, "Md": CALC_UNKNOWN, "No": CALC_UNKNOWN,
-    # 6d
-    "Lr": CALC_UNKNOWN, "Rf": CALC_UNKNOWN, "Db": CALC_UNKNOWN, "Sg": CALC_UNKNOWN, "Bh": CALC_UNKNOWN,
-    "Hs": CALC_UNKNOWN, "Mt": CALC_UNKNOWN, "Ds": CALC_UNKNOWN, "Rg": CALC_UNKNOWN, "Cn": CALC_UNKNOWN,
-    # 7p
-    "Nh": CALC_UNKNOWN, "Fl": CALC_UNKNOWN, "Mc": CALC_UNKNOWN, "Lv": CALC_UNKNOWN, "Ts": CALC_UNKNOWN, "Og": CALC_UNKNOWN
-}
-"""
-Atomic radii calculated from most stable unary bulk crystal in the Open Quantum Material Database (OQMD) for each element.
-The value is defined as half the bond length between two nearest neighbors of same specie.
-
-References of OQMD:
-  - Saal, J. E., Kirklin, S., Aykol, M., Meredig, B., and Wolverton, C. 
-    "Materials Design and Discovery with High-Throughput Density Functional Theory: 
-    The Open Quantum Materials Database (OQMD)", JOM 65, 1501-1509 (2013). 
-    doi:10.1007/s11837-013-0755-4
-
-  - Kirklin, S., Saal, J.E., Meredig, B., Thompson, A., 
-    Doak, J.W., Aykol, M., Rühl, S. and Wolverton, C. 
-    "The Open Quantum Materials Database (OQMD): 
-    assessing the accuracy of DFT formation energies", 
-    npj Computational Materials 1, 15010 (2015). 
-    doi:10.1038/npjcompumats.2015.10
-
-OQMD Website: https://www.oqmd.org/
-"""
+    - E. Clementi, D. L. Raimondi and W. P. Reinhardt,
+    « Atomic Screening Constants from SCF Functions. II. Atoms with 37 to 86 Electrons »,
+    The Journal of Chemical Physics, vol. 47, no 4, 1967, p. 1300–1307.
+    """
+    assert clementi_et_al_radii_table_pm.get(symbol) is not None, f"Element {symbol!r} not recognized."
+    return clementi_et_al_radii_table_pm[symbol] / 100

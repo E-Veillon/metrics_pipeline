@@ -25,7 +25,24 @@ from .utils import (
 
 def _get_command_line_args() -> argp.Namespace:
     """Command Line Interface (CLI)."""
-    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
+    epilog = (
+        "--dist-tolerance default behavior uses atomic radii calculated by Clementi et al. "
+        "with an uncertainty tolerance of 10% as minimal interatomic distance. This uncertainty "
+        "mainly comes from the fact that interatomic distances in crystals are usually shorter "
+        "than in molecules, and the value of 10% comes from computations on the solid state "
+        "monoatomic hydrogen crystals, which give a consistent H-H bond length of ~0.98 angströms "
+        "while H-H bond length calculated with theoric H radius of 0.53 angströms should be 1.06 "
+        "angströms.\n"
+        "References :\n"
+        "- E. Clementi and D. L. Raimondi, Atomic screening constants from SCF functions. "
+        "The Journal of Chemical Physics, vol. 38, no. 11, 1963, p. 2686-2689.\n"
+        "- E. Clementi, D. L. Raimondi and W. P. Reinhardt, "
+        "« Atomic Screening Constants from SCF Functions. II. Atoms with 37 to 86 Electrons », "
+        "The Journal of Chemical Physics, vol. 47, no 4, 1967, p. 1300–1307."
+    )
+    parser = argp.ArgumentParser(
+        prog=os.path.basename(__file__), description=__doc__, epilog=epilog
+    )
     parser.add_argument(
         "input_file",
         help="Path to the CIF file containing structure data to process.",
@@ -61,11 +78,12 @@ def _get_command_line_args() -> argp.Namespace:
         "-d",
         "--dist-tolerance",
         type=float,
-        default=0.5,
+        default="radii",
         help=(
             "Tolerance for checking interatomic distances in Angstroms. "
-            "Structures containing atoms that are closer than this value will be discarded "
-            "(Default: %(default)s Angstroms)."
+            "Structures containing atoms that are closer than this value will be discarded. "
+            "Defaults to using tabulated atomic radii instead of an arbitrary tolerance "
+            "(more details below)."
         ),
         metavar="float",
         dest="dist_tolerance"
@@ -157,7 +175,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     args_dict.setdefault("no_rare_gas_check", False)
     args_dict.setdefault("no_rare_earth_check", False)
     args_dict.setdefault("no_dist_check", False)
-    args_dict.setdefault("dist_tolerance", 0.5)
+    args_dict.setdefault("dist_tolerance", "radii")
     args_dict.setdefault("no_symmetrization", False)
     args_dict.setdefault("symprec", 0.01)
     args_dict.setdefault("angleprec", 5.0)
@@ -168,8 +186,9 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="cif")
     check_file_format(args_dict.get("output"), allowed_formats="cif")
-    check_type(args_dict.get("dist_tolerance"), "dist_tolerance", (float,))
-    check_num_value(args_dict.get("dist_tolerance"), "dist_tolerance", ">", 0.0)
+    if args_dict.get("dist_tolerance") != "radii":
+        check_type(args_dict.get("dist_tolerance"), "dist_tolerance", (float,))
+        check_num_value(args_dict.get("dist_tolerance"), "dist_tolerance", ">", 0.0)
     check_type(args_dict.get("symprec"), "symprec", (float,))
     check_num_value(args_dict.get("symprec"), "symprec", ">=", 0.0)
     check_num_value(args_dict.get("symprec"), "symprec", "<=", 1.0)
@@ -207,8 +226,13 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     print(f"CHECK RARE GASES: {not args_dict.get('no_rare_gas_check')}")
     print(f"CHECK RARE EARTHS: {not args_dict.get('no_rare_earth_check')}")
     print(f"CHECK INTERATOMIC DISTANCES: {not args_dict.get('no_dist_check')}")
+    dist_tol = (
+        f"{args_dict.get('dist_tolerance')} Angstroms"
+        if isinstance(args_dict.get("dist_tolerance"), float)
+        else f"{args_dict.get('dist_tolerance')!r}"
+    )
     print(
-        f"* Distance tolerance: {args_dict.get('dist_tolerance')} Angstroms "
+        f"* Distance tolerance: {dist_tol} "
         f"{'(ignored)' if args_dict.get('no_dist_check') else ''}"
     )
     print(f"SYMMETRIZATION: {not args_dict.get('no_symmetrization')}")
@@ -264,7 +288,8 @@ def main(standalone: bool = True, **kwargs) -> None:
 
         dist_tolerance (float):     Tolerance for checking interatomic distances in Angstroms.
                                     Structures containing atoms that are closer than this value
-                                    will be discarded from output. Defaults to 0.5 Angstroms.
+                                    will be discarded from output. Defaults to using tabulated
+                                    atomic radii instead of an arbitrary tolerance.
 
         no_symmetrization (bool):   Whether to disable search of structures symmetry space groups.
                                     Defaults to False.
