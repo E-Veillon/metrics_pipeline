@@ -197,7 +197,7 @@ def batch_symmetrizer(
             sym_structs.append(set_structure_symmetrizer(struct))
 
     else:
-        sym_structs = list(filter(
+        sym_structs: list[SymmetrizedStructure] = list(filter(
             None,
             process_map(
                 set_structure_symmetrizer,

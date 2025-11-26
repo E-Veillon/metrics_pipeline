@@ -14,6 +14,7 @@ import numpy as np
 
 # PYTHON MATERIAL GENOMICS
 from pymatgen.core import Structure, SiteCollection, Composition
+from pymatgen.symmetry.structure import SymmetrizedStructure
 from pymatgen.analysis.phase_diagram import Entry
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
@@ -373,7 +374,7 @@ def batch_group_by_equivalence(
 
 
 def remove_equivalent(
-    structures: list[Structure],
+    structures: list[Structure] | list[SymmetrizedStructure],
     workers: int|None = None,
     test_volume: bool = False,
     keep_equivalent: bool = False,

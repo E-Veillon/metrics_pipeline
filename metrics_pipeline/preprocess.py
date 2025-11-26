@@ -112,6 +112,13 @@ def _get_command_line_args() -> argp.Namespace:
         metavar="float",
     )
     parser.add_argument(
+        "--discard-asymmetrics", action="store_true",
+        help=(
+            "Whether to filter structures that are detected to be of triclinic system. "
+            "Only used if symmetrization is activated."
+        )
+    )
+    parser.add_argument(
         "--no-equiv-match",
         action="store_true",
         help="A flag to disable structure matching and elimination of duplicates.",
@@ -180,6 +187,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     args_dict.setdefault("no_symmetrization", False)
     args_dict.setdefault("symprec", 0.01)
     args_dict.setdefault("angleprec", 5.0)
+    args_dict.setdefault("discard_asymmetrics", False)
     args_dict.setdefault("no_equiv_match", False)
     args_dict.setdefault("test_min_vol", False)
     args_dict.setdefault("sequential", False)
@@ -245,6 +253,10 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
         f"* Angles tolerance: {args_dict.get('angleprec')} degrees "
         f"{'(ignored)' if args_dict.get('no_symmetrization') else ''}"
     )
+    print(
+        f"Discard asymmetrics: {args_dict.get('discard_asymmetrics')} "
+        f"{'(ignored)' if args_dict.get('no_symmetrization') else ''}"
+    )
     print(f"STRUCTURE MATCHING: {not args_dict.get('no_equiv_match')}")
     print(f"IS SEQUENTIAL: {args_dict.get('sequential')}")
     print(
@@ -300,6 +312,10 @@ def main(standalone: bool = True, **kwargs) -> None:
 
         angleprec (float):          Angle tolerance for symmetry finding in degrees.
                                     Defaults to 5.0 degrees.
+
+        discard_asymmetrics (bool): Whether to filter structures that are detected to be of
+                                    triclinic system. Only used if symmetrization is activated.
+                                    Defaults to False.
 
         no_equiv_match (bool):      Whether to disable structure matching and elimination of
                                     duplicates. Defaults to False.
@@ -363,11 +379,8 @@ def main(standalone: bool = True, **kwargs) -> None:
         structures, nbr_not_viable = check_viability(structures)
         print(f"{nbr_not_viable} not viable structures were discarded")
 
-    # Calcul de la symétrie d'espace des structures
-
-    """if args["no_symmetrization"]:
-        symmetrized_structs = structures
-    else:
+    # Détection et élimination des structures tricliniques
+    if not args["no_symmetrization"] and args["discard_asymmetrics"]:
         symmetrized_structs = list(filter(
             None,
             batch_symmetrizer(
@@ -378,11 +391,12 @@ def main(standalone: bool = True, **kwargs) -> None:
                 sequential=args["sequential"]
             )
         ))
-
-        print(f"{len(symmetrized_structs)} structures were symmetrized")"""
+        symmetric_structs = list(filter(lambda s: s.spacegroup.int_number > 2, symmetrized_structs))
+        nbr_asymmetric = len(symmetrized_structs) - len(symmetric_structs)
+        print(f"{nbr_asymmetric} triclinic structures discarded")
+        structures = symmetric_structs
 
     # Comparaison des structures pour éliminer les doublons
-
     kept_structs, nbr_equivalent, nbr_unmatched = remove_equivalent(
             structures=structures,
             workers=args.get("workers"),
@@ -419,7 +433,6 @@ def main(standalone: bool = True, **kwargs) -> None:
     )
 
     # Calcul du temps total pris par la procédure
-
     stop = datetime.now()
 
     print("\n------------------------------")
