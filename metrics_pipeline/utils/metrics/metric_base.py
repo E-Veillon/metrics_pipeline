@@ -1,6 +1,8 @@
 """Base class for implementing metrics classes."""
 
+from collections import OrderedDict
 from abc import ABC, abstractmethod
+
 from pymatgen.core import Structure
 
 
@@ -33,44 +35,34 @@ class Metric(ABC):
         raise NotImplementedError
 
     def _write_filter_metric_result(
-        self,
-        attr_ok: list[Structure], attr_not_ok: list[Structure],
-        filename: str, verbose: bool = False
+        self, filename: str, subsets: OrderedDict[str, list[Structure]], verbose: bool = False
     ) -> None:
         """
         Write formatted results for filter metrics.
-        
+
         Parameters
         ----------
-        attr_ok: list[Structure]
-            Attribute containing structures that passed the filter.
-
-        attr_not_ok: list[Structure]
-            Attribute containing structures that did not pass the filter.
-
         filename: str
             Path to write the result.
+ 
+        subsets: OrderedDict[str, list[Structure]]
+            Ordered dictionary of each subset of structures to show in the report.
+            The keys will be used to name each category. Should contain at least
+            2 subsets of structures with respect to whether they passed or failed the filter.
 
         verbose: bool
-            Whether to write the lists of all structures that passed or failed the filter.
-            Defaults to False.
+            Whether to list the structures in each subset. Defaults to False.
         """
-        text = f"===== {self.__class__.__name__} Result ====="
-        text += f"Total structures:  {len(self.structures)}"
-        text += f"Passed structures: {len(attr_ok)}"
-        text += f"Failed structures: {len(attr_not_ok)}"
+        text = f"===== {self.__class__.__name__} Results ====="
+        text += f"Total structures:  {len(self)}"
+
+        for name, subset in subsets.items():
+            text += f"{name} structures: {len(subset)}"
 
         if verbose:
-            passed_list = "\n".join(list(map(str, attr_ok)))
-            text += f"List of structures that passed:\n{passed_list}\n"
-            failed_list = "\n".join(list(map(str, attr_not_ok)))
-            text += f"List of structures that failed:\n{failed_list}"
+            for name, subset in subsets.items():
+                str_list = "\n".join(list(map(str, subset)))
+                text += f"List of {name} structures:\n{str_list}\n"
 
         with open(filename, "wt", encoding="utf-8") as fp:
             fp.write("\n".join(text))
-
-    def _write_similarity_metric_result(self) -> None:
-        """
-        Write formatted results for similarity metrics.
-        """
-        raise NotImplementedError

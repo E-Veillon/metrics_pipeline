@@ -1,5 +1,7 @@
 """Compute Structural Validity metric."""
 
+from collections import OrderedDict
+
 from pymatgen.core import Structure
 
 from .metric_base import Metric
@@ -55,6 +57,10 @@ class StructValidity(Metric):
         return self._invalid_structs
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
-        self._write_filter_metric_result(
-            self._valid_structs, self._invalid_structs, filename, verbose
+        subsets: OrderedDict[str, list[Structure]] = OrderedDict(
+            [
+                ("Valid", self._valid_structs),
+                ("Invalid", self._invalid_structs)
+            ]
         )
+        self._write_filter_metric_result(filename, subsets, verbose)

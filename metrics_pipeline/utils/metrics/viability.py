@@ -3,6 +3,7 @@
 import os
 import json
 import itertools as itt
+from collections import OrderedDict
 
 import numpy as np
 from pymatgen.core import Structure, Element
@@ -119,6 +120,10 @@ class Viability(Metric):
         return self._non_viable_structs
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
-        self._write_filter_metric_result(
-            self._viable_structs, self._non_viable_structs, filename, verbose
+        subsets: OrderedDict[str, list[Structure]] = OrderedDict(
+            [
+                ("Viable", self._viable_structs),
+                ("Non viable", self._non_viable_structs)
+            ]
         )
+        self._write_filter_metric_result(filename, subsets, verbose)

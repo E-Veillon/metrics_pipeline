@@ -1,6 +1,7 @@
 """Compute Symmetry metric."""
 
 import functools as ft
+from collections import OrderedDict
 
 from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
@@ -68,6 +69,10 @@ class Symmetry(Metric):
         return self._triclinic_structs
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
-        self._write_filter_metric_result(
-            self._symmetric_structs, self._triclinic_structs, filename, verbose
+        subsets: OrderedDict[str, list[Structure]] = OrderedDict(
+            [
+                ("Symmetric", self._symmetric_structs),
+                ("Triclinic", self._triclinic_structs)
+            ]
         )
+        self._write_filter_metric_result(filename, subsets, verbose)

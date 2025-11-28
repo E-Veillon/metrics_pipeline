@@ -1,7 +1,7 @@
 """Compute Stability metric."""
 
 import itertools as itt
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from pymatgen.core import Structure
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
@@ -110,6 +110,10 @@ class Stability(Metric):
         return self._unstable_structs
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
-        return self._write_filter_metric_result(
-            self._stable_structs, self._unstable_structs, filename, verbose
+        subsets: OrderedDict[str, list[Structure]] = OrderedDict(
+            [
+                ("Stable", self._stable_structs),
+                ("Unstable", self._unstable_structs)
+            ]
         )
+        self._write_filter_metric_result(filename, subsets, verbose)

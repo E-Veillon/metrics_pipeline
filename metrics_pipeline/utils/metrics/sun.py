@@ -137,34 +137,15 @@ class SUN(Metric):
         )
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
-        stable_only = self.get_computed_subset(unique=None, novel=None)
-        unique_only = self.get_computed_subset(stable=None, novel=None)
-        novel_only = self.get_computed_subset(stable=None, unique=None)
-        stable_unique = self.get_computed_subset(novel=None)
-        stable_novel = self.get_computed_subset(unique=None)
-        unique_novel = self.get_computed_subset(stable=None)
-        sun = self.get_computed_subset()
-        all_subsets = OrderedDict(
+        subsets: OrderedDict[str, list[Structure]] = OrderedDict(
             [
-                ("Stable", stable_only),
-                ("Unique", unique_only),
-                ("Novel",  novel_only),
-                ("Stable Unique", stable_unique),
-                ("Stable Novel", stable_novel),
-                ("Unique Novel", unique_novel),
-                ("S.U.N.", sun)
+                ("Stable", self.get_computed_subset(unique=None, novel=None)),
+                ("Unique", self.get_computed_subset(stable=None, novel=None)),
+                ("Novel",  self.get_computed_subset(stable=None, unique=None)),
+                ("Stable Unique", self.get_computed_subset(novel=None)),
+                ("Stable Novel", self.get_computed_subset(unique=None)),
+                ("Unique Novel", self.get_computed_subset(stable=None)),
+                ("S.U.N.", self.get_computed_subset())
             ]
         )
-
-        text = f"===== S.U.N. Results ====="
-        text += f"Total structures:  {len(self._computed_structs)}"
-        for name, subset in all_subsets.items():
-            text += f"{name} structures: {len(subset)}"
-
-        if verbose:
-            for name, subset in all_subsets.items():
-                str_list = "\n".join(list(map(str, subset)))
-                text += f"List of {name} structures:\n{str_list}\n"
-
-        with open(filename, "wt", encoding="utf-8") as fp:
-            fp.write("\n".join(text))
+        self._write_filter_metric_result(filename, subsets, verbose)

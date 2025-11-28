@@ -1,6 +1,7 @@
 """Compute Novelty metric."""
 
 import itertools as itt
+from collections import OrderedDict
 
 from pymatgen.core import Structure
 from pymatgen.analysis.structure_matcher import StructureMatcher
@@ -104,6 +105,10 @@ class Novelty(Metric):
         return self._known_structs
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
-        return self._write_filter_metric_result(
-            self._novel_structs, self._known_structs, filename, verbose
+        subsets: OrderedDict[str, list[Structure]] = OrderedDict(
+            [
+                ("Novel", self._novel_structs),
+                ("Known", self._known_structs)
+            ]
         )
+        self._write_filter_metric_result(filename, subsets, verbose)

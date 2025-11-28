@@ -1,6 +1,7 @@
 """Compute Unicity metric."""
 
 import itertools as itt
+from collections import OrderedDict
 
 from pymatgen.core import Structure
 from pymatgen.analysis.structure_matcher import StructureMatcher
@@ -67,7 +68,11 @@ class Unicity(Metric):
         return self._duplicate_structs
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
-        return self._write_filter_metric_result(
-            self._unique_structs, self._duplicate_structs, filename, verbose
+        subsets: OrderedDict[str, list[Structure]] = OrderedDict(
+            [
+                ("Unique", self._unique_structs),
+                ("Duplicate", self._duplicate_structs)
+            ]
         )
+        self._write_filter_metric_result(filename, subsets, verbose)
         
