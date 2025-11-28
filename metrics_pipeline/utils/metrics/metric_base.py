@@ -30,7 +30,7 @@ class Metric(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def write_result(self, filename: str, verbose: bool = False) -> None:
+    def write_result(self, filename: str) -> None:
         """Write a file with results of the metric computation."""
         raise NotImplementedError
 
