@@ -11,10 +11,20 @@ class Coverage(Metric):
     
     Definition
     ----------
-    TODO.
+    This metric converts structures into fingerprints using the CrystalNN model, then compares
+    distributions between the fingerprints of reference and computed structures.
 
-    For more details, see the original paper defining it:
-    - Xie, T., Fu, X., Ganea, O., Barzilay, R., & Jaakkola, T. (2022).
+    - Precision (COV-P) measures the proportion of computed structures being inside
+    the reference structures distribution. In other words, the number of computed structures
+    that are similar to reference structures with respect to their CrystalNN fingerprints.
+
+    - Recall (COV-R) measures the proportion of reference structures being inside
+    the computed structures distribution. In other words, the number of reference structures
+    that are similar to computed structures with respect to their CrystalNN fingerprints.
+
+    Reference
+    ---------
+    Xie, T., Fu, X., Ganea, O., Barzilay, R., & Jaakkola, T. (2022).
     Crystal Diffusion Variational Autoencoder for Periodic Material Generation.
     Bulletin of the American Physical Society, 67.
     """

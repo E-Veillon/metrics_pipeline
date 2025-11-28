@@ -1,29 +1,35 @@
-"""Compute Validity metric."""
+"""Compute Structural Validity metric."""
 
 from pymatgen.core import Structure
 
 from .metric_base import Metric
 
-class Validity(Metric):
+class StructValidity(Metric):
     """
-    Compute Validity metric.
+    Compute Structural Validity metric.
     
     Definition
     ----------
-    A structure is valid if none of its atoms are closer than a threshold,
-    generally 0.5 angstroms.
+    A structure is valid if none of its atoms are closer than a threshold, generally 0.5 angstroms.
+
+    Reference
+    ---------
+    Court, C. J., Yildirim, B., Jain, A., & Cole, J. M. (2020).
+    3-D inorganic crystal structure generation and property prediction via representation learning.
+    Journal of Chemical Information and Modeling, 60(10), 4518-4535.
     """
     def __init__(self, structures: list[Structure], valid_tol: float = 0.5) -> None:
         """
-        Compute Validity metric.
+        Compute Structural Validity metric.
 
         Parameters
         ----------
         structures: list[Structure]
-            Structures to calculate Validity on.
+            Structures to calculate Structural Validity on.
 
         valid_tol: float
-            Validity threshold for atoms distance.
+           Structural Validity threshold for atoms distance.
+           Defaults to 0.5 angstroms.
         """
         super().__init__(structures)
         self.valid_tol = valid_tol

@@ -94,10 +94,10 @@ For information, several percentages are also measured for sub-combinations of t
 
     - *Recall (COV-R):* Proportion of the ground truth materials getting in the generated materials distribution. In other words, how many ground truth materials are correctly predicted.
 
-More details about Coverage metrics in the work of Ganea et al:
-Octavian-Eugen Ganea, Lagnajit Pattanaik, Connor W Coley, Regina Barzilay, Klavs F Jensen,
-William H Green, and Tommi S Jaakkola. Geomol: Torsional geometric generation of molecular
-3d conformer ensembles. arXiv preprint arXiv:2106.07802, 2021. 8, 18
+More details about Coverage metrics in the work of Xie et al:
+Xie, T., Fu, X., Ganea, O., Barzilay, R., & Jaakkola, T. (2022).
+Crystal Diffusion Variational Autoencoder for Periodic Material Generation.
+Bulletin of the American Physical Society, 67.
 
 - **Fréchet ALIGNN Distance (FAD):**
 Compare probability distributions of ground truth and generated materials using ALIGNN model's predictions.

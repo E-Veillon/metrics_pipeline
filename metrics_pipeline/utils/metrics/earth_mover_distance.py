@@ -1,4 +1,4 @@
-"""Compute Earth Mover's Distance (or Wassertstein-1 Distance) metric."""
+"""Compute Earth Mover's Distance (or Wasserstein-1 Distance) metric."""
 
 from pymatgen.core import Structure
 
@@ -7,21 +7,23 @@ from .metric_base import Metric
 
 class EMD(Metric):
     """
-    Compute Earth Mover's Distance (or Wassertstein-1 Distance) metric.
-    
+    Compute Earth Mover's Distance (or Wasserstein-1 Distance) metric.
+
     Definition
     ----------
-    TODO.
+    Measure similarity between 1D distributions of one of the properties of
+    reference and computed structures.
 
-    For more details, see the original paper defining it:
-    - Xie, T., Fu, X., Ganea, O., Barzilay, R., & Jaakkola, T. (2022).
+    Reference
+    ---------
+    Xie, T., Fu, X., Ganea, O., Barzilay, R., & Jaakkola, T. (2022).
     Crystal Diffusion Variational Autoencoder for Periodic Material Generation.
     Bulletin of the American Physical Society, 67.
     """
     def __init__(self, structures: list[Structure], ref_structs: list[Structure], property: str) -> None:
         """
-        Compute Earth Mover's Distance (or Wassertstein-1 Distance) metric.
-        
+        Compute Earth Mover's Distance (or Wasserstein-1 Distance) metric.
+
         Parameters
         ----------
         structures: list[Structure]

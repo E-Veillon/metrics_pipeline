@@ -13,8 +13,9 @@ class FAD(Metric):
     ----------
     TODO.
 
-    For more details, see the original paper defining it:
-    - Klipfel, A., Fregier, Y., Sayede, A., & Bouraoui, Z. (2024, March).
+    Reference
+    ---------
+    Klipfel, A., Fregier, Y., Sayede, A., & Bouraoui, Z. (2024, March).
     Vector Field Oriented Diffusion Model for Crystal Material Generation.
     In Proceedings of the AAAI Conference on Artificial Intelligence (Vol. 38, No. 20, pp. 22193-22201).
     """

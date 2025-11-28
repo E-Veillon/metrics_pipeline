@@ -22,8 +22,15 @@ class SUN(Metric):
 
     NOTE: Given structures (both computed and references) must have their total energy
     in eV stored in their properties under the 'energy' key for Stability computation.
+
+    Reference
+    ---------
+    Claudio Zeni et al. “A generative model for inorganic materials design”.
+    In: Nature 639.8055 (2025), pp. 624–632.
     """
-    def __init__(self, structures: list[Structure], ref_structs: list[Structure], **kwargs) -> None:
+    def __init__(
+        self, structures: list[Structure], ref_structs: list[Structure], **kwargs
+    ) -> None:
         """
         Compute the Stability, Unicity, Novelty compound metric (S.U.N.).
         
