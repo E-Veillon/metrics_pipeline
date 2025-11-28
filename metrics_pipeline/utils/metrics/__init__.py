@@ -13,10 +13,11 @@ from .sun import SUN
 # Similarity metrics
 from .coverage import Coverage
 from .earth_mover_distance import EMD
-from .frechet_alignn_distance import FAD
+from .frechet_distance import FrechetDistance
+from .rmsd import RMSD
 
 __all__ = [
     "StructValidity", "Viability", "Symmetry", "ElementaryMetastability",
     "Stability", "Unicity", "Novelty", "SUN",
-    "Coverage", "EMD", "FAD"
+    "Coverage", "EMD", "FrechetDistance", "RMSD"
 ]
