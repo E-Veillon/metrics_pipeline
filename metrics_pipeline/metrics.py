@@ -1,13 +1,13 @@
 #!/usr/bin/python
 """
 Compute various metrics based on previously done computations.
-Computable metrics are:\n
+Computable metrics are:
 - Validity,
-- Stability, Unicity, Novelty (S.U.N),\n
-- Average Root Mean Square Displacement (RMSD),\n
-- Coverage - Precision (COV-P) and Coverage - Recall (COV-R),\n
-- Fréchet ALIGNN Distance (FAD),\n
-- Earth Mover's Distance (EMD) on energy and density distributions.\n
+- Stability, Unicity, Novelty (S.U.N),
+- Average Root Mean Square Displacement (RMSD),
+- Coverage - Precision (COV-P) and Coverage - Recall (COV-R),
+- Fréchet ALIGNN Distance (FAD),
+- Earth Mover's Distance (EMD) on energy and density distributions.
 """
 
 import os
@@ -35,7 +35,9 @@ from .utils import (
 
 def _get_command_line_args() -> argp.Namespace:
     """Command Line Interface (CLI)."""
-    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
+    parser = argp.ArgumentParser(
+        prog=os.path.basename(__file__), description=__doc__, formatter_class=argp.RawDescriptionHelpFormatter
+    )
     parser.add_argument(
         "generated",
         help="Cif file containing all generated structures."
