@@ -35,8 +35,8 @@ class FrechetDistance(Metric):
             Known structures to use as reference distribution.
 
         transform: Callable[[list[Structure]], ndarray]
-            A function that takes in a list of Structures object and transform it into
-            a numpy N-D array representation.
+            Any callable that takes in a list of Structures object and transforms it into
+            a numpy N-D array representation to measure Fréchet Distance from.
         """
         super().__init__(structures)
         self.ref_structs = ref_structs
@@ -73,14 +73,14 @@ class FrechetDistance(Metric):
 
     @property
     def computed_distance(self) -> float:
-        """Get computed EMD value."""
+        """Get computed Fréchet Distance value."""
         return self._distance
 
-    def write_result(self, filename: str, verbose: bool = False) -> None:
+    def write_result(self, filename: str, decimals: int = 6) -> None:
         text = "===== Fréchet Distance Results ====="
         text += f"Total computed structures:  {len(self)}"
         text += f"Total reference structures: {len(self.ref_structs)}"
-        text += f"Fréchet Distance: {self._distance}"
+        text += f"Fréchet Distance: {self.computed_distance:.{decimals}f}"
 
         with open(filename, "wt", encoding="utf-8") as fp:
             fp.write("\n".join(text))

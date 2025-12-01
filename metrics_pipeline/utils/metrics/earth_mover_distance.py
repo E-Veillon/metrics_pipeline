@@ -63,11 +63,11 @@ class EMD(Metric):
         """Get computed EMD value."""
         return self._distance
 
-    def write_result(self, filename: str, decimals: int = 2) -> None:
+    def write_result(self, filename: str, decimals: int = 6) -> None:
         text = "===== Earth Mover's Distance Results ====="
         text += f"Total computed structures:  {len(self)}"
         text += f"Total reference structures: {len(self.ref_structs)}"
-        text += f"EMD ({self.computed_property}): {self._distance}"
+        text += f"EMD ({self.computed_property}): {self.computed_distance:.{decimals}f}"
 
         with open(filename, "wt", encoding="utf-8") as fp:
             fp.write("\n".join(text))

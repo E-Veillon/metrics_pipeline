@@ -165,24 +165,24 @@ class Coverage(Metric):
 
     @property
     def precision(self) -> float | None:
-        """Get computed Precision (COV-P) metric."""
-        return self._precision
+        """Get computed Precision (COV-P) metric as a percentage."""
+        return self._precision if self._precision is None else self._precision * 100
 
     @property
     def recall(self) -> float | None:
-        """Get computed Recall (COV-R) metric."""
-        return self._recall
+        """Get computed Recall (COV-R) metric as a percentage."""
+        return self._recall if self._recall is None else self._recall * 100
 
-    def write_result(self, filename: str, decimals: int = 2) -> None:
+    def write_result(self, filename: str, decimals: int = 6) -> None:
         if self._precision is None:
             precision_value = "Not computed"
         else:
-            precision_value = f"{self._precision:.{decimals}f}%"
+            precision_value = f"{self.precision:.{decimals}f}%"
 
         if self._recall is None:
             recall_value = "Not computed"
         else:
-            recall_value = f"{self._recall:.{decimals}f}%"
+            recall_value = f"{self.recall:.{decimals}f}%"
 
         text = "===== Coverage Results ====="
         text += f"Total computed structures:  {len(self)}"

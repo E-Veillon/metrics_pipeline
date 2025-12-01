@@ -43,20 +43,47 @@ class RMSD(Metric):
             f"'structures' ({len(self.structures)}) and 'relaxed_structs' "
             f"({len(relaxed_structs)}) must have same length."
         )
+        num_atoms = torch.tensor([len(struct) for struct in self.structures], dtype=torch.long)
+        num_relaxed_atoms = torch.tensor(
+                [len(struct) for struct in relaxed_structs], dtype=torch.long
+            )
+        assert (num_atoms == num_relaxed_atoms).all(), (
+            "Some structures do not have matching number of atoms before and after relaxation, "
+            "check that each matching index contain the same structure before and after relaxation."
+        )
+        self.num_atoms = num_atoms
         self.relaxed_structs = relaxed_structs
 
         self._compute()
 
     def _get_shortest_paths(
         self,
-        x_src: torch.FloatTensor,
-        cell_src: torch.FloatTensor,
-        x_dst: torch.FloatTensor,
-        num_atoms: torch.LongTensor,
+        x_src: Tensor,
+        cell_src: Tensor,
+        x_dst: Tensor,
     ) -> Tensor:
+        """
+        Compute shortest path between positions before and after optimization,
+        taking account of periodic boundary conditions.
+        
+        Parameters
+        ----------
+        x_src: Tensor
+            Positions before optimization.
 
-        idx = torch.arange(num_atoms.shape[0], dtype=torch.long, device=num_atoms.device)
-        batch = idx.repeat_interleave(num_atoms)
+        cell_src: Tensor
+            Lattice vectors matrix of the structure before optimization.
+
+        x_dst: Tensor
+            Positions after optimization.
+
+        Returns
+        -------
+        Tensor
+            Shortest atoms trajectories between initial and optimized positions.
+        """
+        idx = torch.arange(self.num_atoms.shape[0], dtype=torch.long, device=self.num_atoms.device)
+        batch = idx.repeat_interleave(self.num_atoms)
 
         offset = self._offsets.clone().to(x_src.device)
         offset_euc = torch.einsum("ij,ljk->lik", offset, cell_src)
@@ -72,94 +99,109 @@ class RMSD(Metric):
         return shortest_path
 
     @staticmethod
-    def _to_euc(x: torch.FloatTensor, cell: torch.FloatTensor, batch: torch.LongTensor):
+    def _to_euc(x: Tensor, cell: Tensor, batch: Tensor):
         return torch.einsum("ij,ijk->ik", x, cell[batch])
 
     @staticmethod
-    def _to_inner(x: torch.FloatTensor, cell: torch.FloatTensor, batch: torch.LongTensor):
-        return torch.einsum("ij,ijk->ik", x, cell[batch].inverse())
+    def _center_around_zero(x: Tensor) -> Tensor:
+        return (x + 0.5) % 1.0 + 0.5
 
     @staticmethod
-    def _center_around_zero(x: torch.FloatTensor) -> torch.FloatTensor:
-        return (x + 0.5) % 1.0 + 0.5 # type: ignore
-
-    @staticmethod
-    def _polar(a: torch.FloatTensor) -> tuple[torch.FloatTensor, torch.FloatTensor]:
+    def _polar(a: Tensor) -> tuple[Tensor, Tensor]:
         w, s, vh = torch.linalg.svd(a)
         u = w @ vh
         return u, (vh.mT.conj() * s[:, None, :]) @ vh
 
-    def rmsd(
+    def compute_rmsd(
         self,
-        cell_src: torch.FloatTensor,
-        x_src: torch.FloatTensor,
-        cell_dst: torch.FloatTensor,
-        x_dst: torch.FloatTensor,
-        num_atoms: torch.LongTensor,
-    ) -> torch.FloatTensor:
-        """Compute RMSD between two structures."""
-        batch_atoms = torch.arange(cell_src.shape[0], dtype=torch.long).repeat_interleave(
-            num_atoms
-        )
+        x_src: Tensor,
+        cell_src: Tensor,
+        x_dst: Tensor,
+        cell_dst: Tensor,
+    ) -> Tensor:
+        """
+        Compute RMSD between two structures represented as Tensors.
+        
+        Parameters
+        ----------
+        x_src: Tensor
+            Positions before optimization.
 
+        cell_src: Tensor
+            Lattice vectors matrix of the non-optimized structure.
+
+        x_dst: Tensor
+            Positions after optimization.
+
+        cell_dst: Tensor
+            Lattice vectors matrix of the optimized structure.
+        """
+        batch_atoms = torch.arange(cell_src.shape[0], dtype=torch.long).repeat_interleave(
+            self.num_atoms
+        )
         _, cell_src = self._polar(cell_src)
         _, cell_dst = self._polar(cell_dst)
         x_src = self._center_around_zero(x_src)
         x_dst = self._center_around_zero(x_dst)
 
-        x_src_euc = self._to_euc(x_src, cell_src, batch_atoms) # type: ignore
-        x_dst_euc = self._to_euc(x_dst, cell_dst, batch_atoms) # type: ignore
+        x_src_euc = self._to_euc(x_src, cell_src, batch_atoms)
+        x_dst_euc = self._to_euc(x_dst, cell_dst, batch_atoms)
 
-        paths = _get_shortest_paths(x_src_euc, cell_src, x_dst_euc, num_atoms) # type: ignore
+        paths = self._get_shortest_paths(x_src_euc, cell_src, x_dst_euc)
 
-        avg_path = scatter_mean(paths, batch_atoms, dim=0, dim_size=num_atoms.shape[0])
+        avg_path = scatter_mean(paths, batch_atoms, dim=0, dim_size=self.num_atoms.shape[0])
 
         distance = (paths - avg_path[batch_atoms]).pow(2).sum(dim=1)
 
-        return scatter_mean( # type: ignore
-            distance, batch_atoms, dim=0, dim_size=num_atoms.shape[0]
+        return scatter_mean(
+            distance, batch_atoms, dim=0, dim_size=self.num_atoms.shape[0]
         ).sqrt()
-    # TODO: probablement le contenu de _compute()
-    def rmsd_from_structures(
-        self, struct1: list[Structure], struct2: list[Structure]
-    ) -> np.ndarray:
-        """
-        Computes RMSD of each given pair of structure (pairing by index matching),
-        and returns all results in a single array.
-        """
-        num_atoms = torch.tensor([len(s) for s in struct1], dtype=torch.long)
-
-        assert (
-            num_atoms == torch.tensor([len(s) for s in struct2], dtype=torch.long)
-        ).all()
-
-        x_src = torch.cat(
-            [torch.tensor(s.frac_coords, dtype=torch.float32) for s in struct1], dim=0
-        )
-        cell_src = torch.tensor([s.lattice.matrix for s in struct1], dtype=torch.float32)
-
-        x_dst = torch.cat(
-            [torch.tensor(s.frac_coords, dtype=torch.float32) for s in struct2], dim=0
-        )
-        cell_dst = torch.tensor([s.lattice.matrix for s in struct2], dtype=torch.float32)
-
-        return self.rmsd(cell_src, x_src, cell_dst, x_dst, num_atoms).numpy() # type: ignore
 
     def _compute(self) -> None:
-        self._distance: float
+        x_src = torch.cat(
+            [torch.tensor(struct.frac_coords, dtype=torch.float32) for struct in self.structures],
+            dim=0
+        )
+        cell_src = torch.tensor(
+            [struct.lattice.matrix for struct in self.structures], dtype=torch.float32
+        )
+        x_dst = torch.cat(
+            [torch.tensor(struct.frac_coords, dtype=torch.float32) for struct in self.relaxed_structs],
+            dim=0
+        )
+        cell_dst = torch.tensor(
+            [struct.lattice.matrix for struct in self.relaxed_structs], dtype=torch.float32
+        )
+        self._distances = self.compute_rmsd(x_src, cell_src, x_dst, cell_dst).numpy()
 
     @property
-    def get_rmsd(self) -> float:
-        """Get computed RMSD value."""
-        return self._distance
+    def average_rmsd(self) -> float:
+        """Get computed average RMSD value over all structures."""
+        return float(np.mean(self._distances).item())
 
-    def write_result(self, filename: str, decimals: int = 2, verbose: bool = False) -> None:
+    @property
+    def all_rmsd(self) -> np.ndarray:
+        """Get 1D array of computed RMSD values for all structures."""
+        return self._distances
+
+    def get_rmsd_from_index(self, idx: int) -> float:
+        """Get computed RMSD value of a specific structure from its index."""
+        return float(self._distances[idx])
+
+    def write_result(self, filename: str, decimals: int = 6, verbose: bool = False) -> None:
         text = "===== Root Mean Squared Displacement Results ====="
         text += f"Total structures:  {len(self)}"
-        text += f"Average RMSD: {self._distance:.{decimals}f}"
+        text += f"Average RMSD: {self.average_rmsd:.{decimals}f}"
 
         if verbose:
-            text += "[Insert list of individual RMSD for all structures]" # TODO
+            max_digits = len(str(len(self.all_rmsd)))
+            rmsd_text = "\n".join(
+                [
+                    f"{idx:0>{max_digits}} - {rmsd:.{decimals}f}"
+                    for idx, rmsd in enumerate(self.all_rmsd)
+                ]
+            )
+            text += f"List of RMSD for each structure:\n{rmsd_text}\n"
 
         with open(filename, "wt", encoding="utf-8") as fp:
             fp.write("\n".join(text))
