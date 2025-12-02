@@ -3,10 +3,13 @@
 import itertools as itt
 from collections import OrderedDict
 
+from tqdm.contrib.concurrent import process_map
+
 from pymatgen.core import Structure
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 from .metric_base import Metric
+from .hash_matcher import group_compositions
 
 
 class Novelty(Metric):
@@ -24,6 +27,7 @@ class Novelty(Metric):
         ltol: float = 0.2,
         stol: float = 0.3,
         angle_tol: float = 5.0,
+        workers: int | None = None,
         database_mode: bool = False
     ) -> None:
         """
@@ -47,6 +51,12 @@ class Novelty(Metric):
         angle_tol: float
             Angle tolerance for structures matching in degrees. Default is 5.0 degrees.
 
+        workers: int, optional
+            Number of parallel processes to spawn for high throughput structure matching.
+            If not given, will use default of `tqdm.contrib.concurrent.process_map()`.
+            pass 0 to disable `process_map()` and do it sequentially. Unused if
+            `database_mode` is set to True.
+
         database_mode: bool
             If set to True, automatic metric computation on given data is disabled,
             so you can provide an empty list to `structures` argument without error and a
@@ -62,6 +72,14 @@ class Novelty(Metric):
         )
 
         if not database_mode:
+            if workers is not None:
+                assert isinstance(workers, int), TypeError(
+                    f"'workers' expected a type 'int', got  {type(workers).__name__}."
+                )
+                assert workers >= 0, ValueError(
+                    f"'workers' must be positive or zero, got {workers}."
+                )
+            self.workers = workers
             self._compute()
 
     def is_novel(self, structure: Structure) -> bool:
@@ -75,12 +93,29 @@ class Novelty(Metric):
         for struct in self.ref_structs:
             struct.properties["tmp_category"] = "reference"
 
-        groups: list[list[Structure]] = self.matcher.group_structures(
-            self.structures + self.ref_structs
+        # Group by stoichiometry
+        formula_groups: list[list[Structure]] = group_compositions(
+            self.structures + self.ref_structs, by="formula" # type: ignore
         )
+        # Group by matching equivalence
+        if self.workers is not None and self.workers == 0:
+            groups: list[list[list[Structure]]] = [
+                self.matcher.group_structures(
+                    formula_grp
+                ) for formula_grp in formula_groups
+            ]
+        else:
+            groups: list[list[list[Structure]]] = process_map(
+                self.matcher.group_structures,
+                formula_groups,
+                max_workers=self.workers,
+                chunksize=min(10, len(formula_groups) // 100 + 1),
+                desc="Searching for novel structures"
+            )
+        flattened_groups = list(itt.chain.from_iterable(groups))
         self._novel_structs = list(itt.chain.from_iterable(
             [
-                group for group in groups
+                group for group in flattened_groups
                 if all(struct.properties["tmp_category"] == "computed" for struct in group)
             ]
         ))
@@ -88,7 +123,7 @@ class Novelty(Metric):
             lambda s: s.properties["tmp_category"] == "computed",
             itt.chain.from_iterable(
                 [
-                    group for group in groups
+                    group for group in flattened_groups
                     if any(struct.properties["tmp_category"] == "reference" for struct in group)
                 ]
             )
