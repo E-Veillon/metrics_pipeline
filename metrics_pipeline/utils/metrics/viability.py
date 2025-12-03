@@ -33,6 +33,8 @@ class Viability(Metric):
         """
         Compute Viability metric.
 
+        Parameters
+        ----------
         structures: list[Structure]
             Structures to calculate Viability on.
 
@@ -40,9 +42,9 @@ class Viability(Metric):
             Name of the atomic radii table to use as reference.
             Supports:
             - 'slater' for experimental radii measured by J. C. Slater (1964).
-            - 'clementi' for simulated radii calculated by Clementi et al. (1963 and 1967).
+            - 'clementi' (default) for simulated radii calculated by Clementi et al. (1963 and 1967).
             - Any file path to provide your own JSON file containing a dict of {'symbol': radius}
-            with all 118 elements radii as integers in picometers. Defaults to 'clementi'.
+            with all 118 elements radii as integers in picometers.
 
         min_dist: float
             Absolute minimal distance in angstroms to consider two atoms as too close,

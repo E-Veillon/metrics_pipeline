@@ -71,9 +71,13 @@ class Unicity(Metric):
         return any(self.matcher.fit(structure, struct) for struct in self.unique_structs)
 
     def _compute(self) -> None:
+        # Remove eventual unphysical structures that could make the matcher throw an error
+        unmatchables = list(filter(lambda struct: struct.volume < 1, self.structures))
+        matchable_structs = list(filter(lambda struct: struct.volume >= 1, self.structures))
+
         # Group by stoichiometry
         formula_groups: list[list[Structure]] = group_compositions(
-            self.structures, by="formula" # type: ignore
+            matchable_structs, by="formula" # type: ignore
         )
         # Group by matching equivalence
         if self.workers is not None and self.workers == 0:
@@ -96,20 +100,29 @@ class Unicity(Metric):
         self._duplicate_structs = list(itt.chain.from_iterable(
             [group[1:] for group in flattened_groups]
         ))
+        self._unmatchable_structs = unmatchables
 
     @property
     def unique_structs(self) -> list[Structure]:
+        """List of unique structures."""
         return self._unique_structs
 
     @property
     def duplicate_structs(self) -> list[Structure]:
+        """List of duplicate structures."""
         return self._duplicate_structs
+
+    @property
+    def unmatchable_structs(self) -> list[Structure]:
+        """List of structures that cannot be matched due to their unphysical volume."""
+        return self._unmatchable_structs
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
         subsets: OrderedDict[str, list[Structure]] = OrderedDict(
             [
                 ("Unique", self._unique_structs),
-                ("Duplicate", self._duplicate_structs)
+                ("Duplicate", self._duplicate_structs),
+                ("Unmatchable", self._unmatchable_structs)
             ]
         )
         self._write_filter_metric_result(filename, subsets, verbose)

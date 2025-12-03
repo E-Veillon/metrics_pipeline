@@ -93,9 +93,13 @@ class Novelty(Metric):
         for struct in self.ref_structs:
             struct.properties["tmp_category"] = "reference"
 
+        # Remove eventual unphysical structures that could make the matcher throw an error
+        unmatchables = list(filter(lambda struct: struct.volume < 1, self.structures))
+        matchable_structs = list(filter(lambda struct: struct.volume >= 1, self.structures))
+
         # Group by stoichiometry
         formula_groups: list[list[Structure]] = group_compositions(
-            self.structures + self.ref_structs, by="formula" # type: ignore
+            matchable_structs + self.ref_structs, by="formula" # type: ignore
         )
         # Group by matching equivalence
         if self.workers is not None and self.workers == 0:
@@ -128,22 +132,31 @@ class Novelty(Metric):
                 ]
             )
         ))
-        for struct in (self._novel_structs + self._known_structs):
+        self._unmatchable_structs = unmatchables
+        for struct in (self._novel_structs + self._known_structs + self._unmatchable_structs):
             struct.properties.pop("tmp_category")
 
     @property
     def novel_structs(self) -> list[Structure]:
+        """List of novel structures."""
         return self._novel_structs
 
     @property
     def known_structs(self) -> list[Structure]:
+        """List of structures equivalent to one in the reference dataset."""
         return self._known_structs
+
+    @property
+    def unmatchable_structs(self) -> list[Structure]:
+        """List of structures that cannot be matched due to their unphysical volume."""
+        return self._unmatchable_structs
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
         subsets: OrderedDict[str, list[Structure]] = OrderedDict(
             [
                 ("Novel", self._novel_structs),
-                ("Known", self._known_structs)
+                ("Known", self._known_structs),
+                ("Unmatchable", self._unmatchable_structs)
             ]
         )
         self._write_filter_metric_result(filename, subsets, verbose)
