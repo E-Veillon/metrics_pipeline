@@ -2,8 +2,6 @@
 Read and parse concatenated minimal POSCAR formatted structures from a file.
 """
 
-__author__ = "Elohan Veillon, Université d'Artois, Lens, France"
-
 import os
 import re
 import typing as tp
@@ -14,7 +12,10 @@ import itertools as itt
 import numpy as np
 import numpy.typing as npt
 
-from .periodic_table import PeriodicTable
+from pymatgen.core import Element
+
+
+ALL_ELT_SYMBOLS = list(Element.__members__)
 
 
 @dataclass
@@ -85,7 +86,7 @@ class PoscarBlock:
             assert len(coeffs) == 3 and all_floats, ValueError(
                 f"Lattice vector line {idx} must be 3 floating point numbers, got {line!r}."
             )
-        valid_elements = set(PeriodicTable.get_all_symbols())
+        valid_elements = set(ALL_ELT_SYMBOLS)
         assert all(elt in valid_elements for elt in lines[5].split()), ValueError(
             "6th line contains data that is not a valid element symbol."
         )
