@@ -1,12 +1,12 @@
 """Compute Fréchet Distance metric."""
 
-from collections.abc import Callable
+import functools as ft
 
 import numpy as np
 
 from pymatgen.core import Structure
 
-from .metric_base import Metric
+from .metric_base import Metric, StructureDistribution
 
 
 class FrechetDistance(Metric):
@@ -21,7 +21,8 @@ class FrechetDistance(Metric):
         self,
         structures: list[Structure],
         ref_structs: list[Structure],
-        transform: Callable[[list[Structure]], np.ndarray]
+        transform: StructureDistribution,
+        **kwargs
     ) -> None:
         """
         Compute Fréchet Distance metric.
@@ -34,13 +35,16 @@ class FrechetDistance(Metric):
         ref_structs: list[Structure]
             Known structures to use as reference distribution.
 
-        transform: Callable[[list[Structure]], ndarray]
-            Any callable that takes in a list of Structures object and transforms it into
-            a numpy N-D array representation to measure Fréchet Distance from.
+        transform: StructureDistribution
+            Any callable taking a list of Structure objects and eventual keyword arguments
+            and returning a numpy array representation of the structures distribution.
+    
+        kwargs: Any
+            Any additional keyword arguments to pass to the `transform` callable.
         """
         super().__init__(structures)
         self.ref_structs = ref_structs
-        self.transform = transform
+        self.transform = ft.partial(transform, **kwargs)
 
         self._compute()
 

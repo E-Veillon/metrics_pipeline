@@ -1,5 +1,7 @@
 """Compute Coverage (Precision) and Coverage (Recall) metrics."""
 
+import functools as ft
+
 import numpy as np
 from tqdm.contrib.concurrent import process_map
 from matminer.featurizers.site.fingerprint import CrystalNNFingerprint
@@ -9,42 +11,70 @@ from torch_cluster import knn
 
 from pymatgen.core import Structure
 
-from .metric_base import Metric
+from .metric_base import Metric, StructureFingerprint
 
+# TODO: export to 'computations/models/crystalnn_fingerprints.py' when package is ready
+def crystalnn_fingerprints(structures: list[Structure], workers: int | None = None):
+    CrystalNNFP = CrystalNNFingerprint.from_preset("ops")
+    def _get_fingerprint(structure: Structure) -> np.ndarray | None:
+        try:
+            atom_fingerprints = [
+                CrystalNNFP.featurize(structure, i) for i, _ in enumerate(structure)
+            ]
+        except Exception:
+            return None
+
+        return np.mean(atom_fingerprints, axis=0)
+
+    if workers is not None and workers == 0:
+        fingerprints = [_get_fingerprint(struct) for struct in structures]
+    else:
+        nb_structs = len(structures)
+        chunksize = (min(nb_structs // 100, 10) if nb_structs >= 200 else 1)
+
+        fingerprints = process_map(
+            _get_fingerprint,
+            structures,
+            max_workers=workers,
+            chunksize=chunksize,
+            desc="Convert structures to CrystalNN fingerprints"
+        )
+
+    return fingerprints
 
 class Coverage(Metric):
     """
     Compute Coverage (Precision) and Coverage (Recall) metrics.
-    
+
     Definition
     ----------
-    This metric converts structures into fingerprints using the CrystalNN model, then compares
-    distributions between the fingerprints of reference and computed structures.
+    This metric measures precision and recall on fingerprints distributions between
+    reference and computed structures.
 
-    - Precision (COV-P) measures the proportion of computed structures being inside
+    - Precision (COV-P) measures the percentage of computed structures being close enough to
     the reference structures distribution. In other words, the number of computed structures
-    that are similar to reference structures with respect to their CrystalNN fingerprints.
+    that are similar to reference structures with respect to their fingerprints.
 
-    - Recall (COV-R) measures the proportion of reference structures being inside
+    - Recall (COV-R) measures the percentage of reference structures being close enough to
     the computed structures distribution. In other words, the number of reference structures
-    that are similar to computed structures with respect to their CrystalNN fingerprints.
+    that are similar to computed structures with respect to their fingerprints.
 
     Reference
     ---------
-    Xie, T., Fu, X., Ganea, O., Barzilay, R., & Jaakkola, T. (2022).
+    Definition of Coverage metrics for crystals, using CrystalNN generated fingerprints:
+    - Xie, T., Fu, X., Ganea, O., Barzilay, R., & Jaakkola, T. (2022).
     Crystal Diffusion Variational Autoencoder for Periodic Material Generation.
     Bulletin of the American Physical Society, 67.
     """
-    _CrystalNNFP = CrystalNNFingerprint.from_preset("ops")
-
     def __init__(
         self,
         structures: list[Structure],
         ref_structs: list[Structure],
-        threshold: float = 0.4,
+        transform: StructureFingerprint,
         compute_precision: bool = True,
         compute_recall: bool = True,
-        workers: int | None = None,
+        threshold: float = 0.4,
+        **kwargs
     ) -> None:
         """
         Compute Coverage (Precision) and Coverage (Recall) metrics.
@@ -57,69 +87,60 @@ class Coverage(Metric):
         ref_structs: list[Structure]
             Known structures to use as reference distribution.
 
-        threshold: float
-            TODO. Defaults to 0.4.
+        transform: StructureFingerprint
+            A callable taking a list of Structure objects and eventual keyword arguments and
+            returning a list of numpy arrays representing structures fingerprints. Can return
+            `None` for structures that could not be converted (e.g. weird unphysical structures).
 
         compute_precision: bool
             Whether to compute the Precision metric. Defaults to True.
 
         compute_recall: bool
-            Whether to compute the Recall metric. Defaultsto True.
+            Whether to compute the Recall metric. Defaults to True.
 
-        workers: int, optional
-            Number of parallel processes to spawn when computing fingerprints.
-            If not given, `tqdm.contrib.concurrent.process_map()` default is used.
+        threshold: float
+            Max distance to consider a data point as close enough to compared distribution.
+            Defaults to 0.4.
+
+        kwargs: Any
+            Any additional keyword arguments to pass to the `transform` callable.
         """
         super().__init__(structures)
         self.ref_structs = ref_structs
-        self.threshold = threshold
+        self.transform = ft.partial(transform, **kwargs)
         self.compute_precision = compute_precision
         self.compute_recall = compute_recall
-        self.workers = workers
+        self.threshold = threshold
 
         self._compute()
 
-    def get_fingerprint(self, structure: Structure) -> np.ndarray | None:
-        """Get the CrystalNN fingerprint of a structure."""
-        try:
-            atom_fingerprints = [
-                self._CrystalNNFP.featurize(structure, i) for i, _ in enumerate(structure)
-            ]
-        except Exception:
-            return None
-
-        return np.mean(atom_fingerprints, axis=0)
-
-    def to_crystalnn_fingerprints(self, structures: list[Structure]) -> list[np.ndarray | None]:
+    @staticmethod
+    def _sanitize_fingerprints(
+        computed_fp_list: list[np.ndarray | None], ref_fp_list: list[np.ndarray | None]
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Convert given structures to their CrystalNN fingerprints.
-        Can be parallelized over structures.
-
-        Parameters
-        ----------
-        structures: list[Structure]
-            Structures whoes fingerprint isneeded.
-
-        Returns
-        -------
-        list[ndarray]
-            List of CrystalNN fingerprints corresponding to given structures.
+        Eliminate pairs of matching indices when at least one is `None` and convert
+        valid data into single numpy arrays.
         """
-        nb_structs = len(structures)
-        chunksize = (min(nb_structs // 100, 10) if nb_structs >= 200 else 1)
-
-        fingerprints = process_map(
-            self.get_fingerprint,
-            structures,
-            max_workers=self.workers,
-            chunksize=chunksize,
-            desc="Convert structures to CrystalNN fingerprints"
+        # TODO: explain why we should eliminate a pair each time
+        # instead of simply eliminating None values in each list.
+        computed_fp, ref_fp = map(
+            np.array,
+            zip(
+                *filter(
+                    lambda x: x[0] is not None and x[1] is not None,
+                    zip(computed_fp_list, ref_fp_list),
+                )
+            )
         )
-        return fingerprints
+        return computed_fp, ref_fp
 
     @staticmethod
     def _get_distance_closest(source: np.ndarray, target: np.ndarray) -> np.ndarray:
-        """Computes the smallest distance between two structures as coordinate arrays."""
+        """
+        Computes the smallest distance between two structures distributions
+        represented as numpy arrays.
+        """
         src = torch.from_numpy(source)
         tgt = torch.from_numpy(target)
 
@@ -128,31 +149,29 @@ class Coverage(Metric):
         return closest_distance.numpy()
 
     def get_precision(self, source: np.ndarray, target: np.ndarray, threshold: float) -> float:
-        """Get Precision metric value."""
+        """
+        Get Precision metric value between two structures distributions
+        represented as numpy arrays using initialized distance threshold.
+        """
         distance = self._get_distance_closest(source=source, target=target)
         mask = distance < threshold
         return mask.astype(np.float32).mean().item()
 
     def get_recall(self, source: np.ndarray, target: np.ndarray, threshold: float) -> float:
-        """Get Recall metric value."""
+        """
+        Get Recall metric value between two structures distributions
+        represented as numpy arrays using initialized distance threshold.
+        """
         distance = self._get_distance_closest(source=target, target=source)
         mask = distance < threshold
         return mask.astype(np.float32).mean().item()
 
     def _compute(self) -> None:
-        computed_fp = self.to_crystalnn_fingerprints(self.structures)
-        ref_fp = self.to_crystalnn_fingerprints(self.ref_structs)
+        computed_fp_list = self.transform(self.structures)
+        ref_fp_list = self.transform(self.ref_structs)
 
-        # TODO: explain why we eliminate a pair each time
-        ref_fp, computed_fp = map(
-            np.array,
-            zip(
-                *filter(
-                    lambda x: x[0] is not None and x[1] is not None,
-                    zip(ref_fp, computed_fp),
-                )
-            )
-        )
+        computed_fp, ref_fp = self._sanitize_fingerprints(computed_fp_list, ref_fp_list)
+
         if self.compute_precision:
             self._precision = self.get_precision(computed_fp, ref_fp, self.threshold)
         else:

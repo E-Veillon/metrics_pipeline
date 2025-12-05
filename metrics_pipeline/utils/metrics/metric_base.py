@@ -1,9 +1,32 @@
 """Base class for implementing metrics classes."""
 
+import typing as tp
 from collections import OrderedDict
 from abc import ABC, abstractmethod
 
+import numpy as np
+
 from pymatgen.core import Structure
+
+
+class StructureDistribution(tp.Protocol):
+    """
+    Any callable taking a list of Structure objects and eventual keyword arguments
+    and returning a numpy array representation of the structures distribution.
+    """
+    def __call__(self, structures: list[Structure], **kwargs) -> np.ndarray:
+        ...
+
+
+class StructureFingerprint(tp.Protocol):
+    """
+    A callable taking a list of Structure objects and eventual keyword arguments
+    and returning a list of numpy arrays representing structures fingerprints.
+    Can return None for structures that could not be converted.
+    (e.g. too weird unphysical structures).
+    """
+    def __call__(self, structures: list[Structure], **kwargs) -> list[np.ndarray | None]:
+        ...
 
 
 class Metric(ABC):
