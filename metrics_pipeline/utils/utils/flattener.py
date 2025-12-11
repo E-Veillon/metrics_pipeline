@@ -1,14 +1,10 @@
 #!/usr/bin/python
 """
-Module implementing general utilitary functions.
+Convenience function to flatten a nested sequence.
 """
-
 
 import itertools as it
 import typing as tp
-
-
-########################################
 
 
 def flatten(
