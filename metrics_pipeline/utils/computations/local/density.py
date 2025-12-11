@@ -1,34 +1,26 @@
 #!/usr/bin/python
-"""Functions to compute the density of Structure objects."""
+"""Compute the density of Structure objects in g / cm³."""
 
-
-from typing import List
 import numpy as np
 
-# PYTHON MATERIALS GENOMICS
 from pymatgen.core import Structure
 
-# LOCAL IMPORTS
-from .common_asserts import check_type
-
-
-########################################
+from metrics_pipeline.utils.utils import check_type
 
 
 def _volume_cm3(s: Structure) -> float:
-    """Get the structure volume in cm^3."""
+    """Get the structure volume in cm³."""
     return s.volume*1e-24
+
 
 def _mass_g(s: Structure) -> float:
     """Get the structure mass in grams."""
     return sum(s.atomic_mass.to("g") for s in s.species)
 
-def get_densities(structures: List[Structure]) -> np.ndarray:
-    """Computes structure volumic mass in g / cm^3."""
+
+def get_densities(structures: list[Structure]) -> np.ndarray:
+    """Computes structure volumic mass in g / cm³."""
     for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
 
     return np.array([_mass_g(s)/_volume_cm3(s) for s in structures])
-
-
-########################################
