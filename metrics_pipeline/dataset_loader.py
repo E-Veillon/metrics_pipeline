@@ -8,7 +8,7 @@ import typing as typ
 # LOCAL IMPORTS
 from . import _parse_input_args
 from .utils import (
-    check_type, check_file_or_dir, mp_api_download, process_oqmd_json_file
+    check_type, check_file_or_dir, MPDatasetDownloader, process_oqmd_json_file
 )
 
 
@@ -106,7 +106,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     if args.get("from_mp_api") is not None:
         dir_path = os.path.dirname(args["from_mp_api"])
         check_file_or_dir(dir_path, "dir")
-        mp_api_download(args["from_mp_api"], api_key=args.get("mp_api_key"))
+        MPDatasetDownloader(args["from_mp_api"], api_key=args.get("mp_api_key"))
 
     if args.get("process_oqmd") is not None:
         check_file_or_dir(args.get("process_oqmd"), "file", allowed_formats="json")
