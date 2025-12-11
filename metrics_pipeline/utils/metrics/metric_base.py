@@ -18,17 +18,6 @@ class StructureDistribution(tp.Protocol):
         ...
 
 
-class StructureFingerprint(tp.Protocol):
-    """
-    A callable taking a list of Structure objects and eventual keyword arguments
-    and returning a list of numpy arrays representing structures fingerprints.
-    Can return None for structures that could not be converted.
-    (e.g. too weird unphysical structures).
-    """
-    def __call__(self, structures: list[Structure], **kwargs) -> list[np.ndarray | None]:
-        ...
-
-
 class Metric(ABC):
     """Base class for implementing metrics classes. Do not call directly."""
     structures: list[Structure]

@@ -3,44 +3,14 @@
 import functools as ft
 
 import numpy as np
-from tqdm.contrib.concurrent import process_map
-from matminer.featurizers.site.fingerprint import CrystalNNFingerprint
 
 import torch
 from torch_cluster import knn
 
 from pymatgen.core import Structure
 
-from .metric_base import Metric, StructureFingerprint
+from .metric_base import Metric, StructureDistribution
 
-# TODO: export to 'computations/models/crystalnn_fingerprints.py' when package is ready
-def crystalnn_fingerprints(structures: list[Structure], workers: int | None = None):
-    CrystalNNFP = CrystalNNFingerprint.from_preset("ops")
-    def _get_fingerprint(structure: Structure) -> np.ndarray | None:
-        try:
-            atom_fingerprints = [
-                CrystalNNFP.featurize(structure, i) for i, _ in enumerate(structure)
-            ]
-        except Exception:
-            return None
-
-        return np.mean(atom_fingerprints, axis=0)
-
-    if workers is not None and workers == 0:
-        fingerprints = [_get_fingerprint(struct) for struct in structures]
-    else:
-        nb_structs = len(structures)
-        chunksize = (min(nb_structs // 100, 10) if nb_structs >= 200 else 1)
-
-        fingerprints = process_map(
-            _get_fingerprint,
-            structures,
-            max_workers=workers,
-            chunksize=chunksize,
-            desc="Convert structures to CrystalNN fingerprints"
-        )
-
-    return fingerprints
 
 class Coverage(Metric):
     """
@@ -70,7 +40,7 @@ class Coverage(Metric):
         self,
         structures: list[Structure],
         ref_structs: list[Structure],
-        transform: StructureFingerprint,
+        transform: StructureDistribution,
         compute_precision: bool = True,
         compute_recall: bool = True,
         threshold: float = 0.4,
@@ -115,27 +85,6 @@ class Coverage(Metric):
         self._compute()
 
     @staticmethod
-    def _sanitize_fingerprints(
-        computed_fp_list: list[np.ndarray | None], ref_fp_list: list[np.ndarray | None]
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """
-        Eliminate pairs of matching indices when at least one is `None` and convert
-        valid data into single numpy arrays.
-        """
-        # TODO: explain why we should eliminate a pair each time
-        # instead of simply eliminating None values in each list.
-        computed_fp, ref_fp = map(
-            np.array,
-            zip(
-                *filter(
-                    lambda x: x[0] is not None and x[1] is not None,
-                    zip(computed_fp_list, ref_fp_list),
-                )
-            )
-        )
-        return computed_fp, ref_fp
-
-    @staticmethod
     def _get_distance_closest(source: np.ndarray, target: np.ndarray) -> np.ndarray:
         """
         Computes the smallest distance between two structures distributions
@@ -167,10 +116,8 @@ class Coverage(Metric):
         return mask.astype(np.float32).mean().item()
 
     def _compute(self) -> None:
-        computed_fp_list = self.transform(self.structures)
-        ref_fp_list = self.transform(self.ref_structs)
-
-        computed_fp, ref_fp = self._sanitize_fingerprints(computed_fp_list, ref_fp_list)
+        computed_fp = self.transform(self.structures)
+        ref_fp = self.transform(self.ref_structs)
 
         if self.compute_precision:
             self._precision = self.get_precision(computed_fp, ref_fp, self.threshold)
