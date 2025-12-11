@@ -18,6 +18,9 @@ CONFIGPATH  = os.path.join(MAINDIRPATH, "config")
 """Absolute path to the pipeline config directory containing all VASP config YAML files."""
 
 
+class EmptyDirectoryError(FileNotFoundError):
+    """Directory is empty."""
+
 def check_file_format(
     filename: PathLike | None, *, allowed_formats: str | tuple[str, ...]
 ) -> None:
@@ -60,6 +63,7 @@ def check_file_or_dir(
     path: PathLike | None,
     file_or_dir: tp.Literal["file", "dir"] = "file",
     *,
+    check_empty: bool = False,
     allowed_formats: str| tuple[str, ...] | None = None
 ) -> None:
     """
@@ -73,6 +77,10 @@ def check_file_or_dir(
         file_or_dir: str
             Whether the path should lead to a file or a directory.
             If the path exists but is not the right data type, `FileNotFoundError` is raised.
+
+        check_empty: bool
+            Whether to check if the directory is empty. Raises `EmptyDirectoryError` if it is
+            the case. Ignored for file checking. Defaults to False.
 
         allowed_formats: str | tuple[str]
             If the path should lead to a file with a specific format extension, provide here
@@ -90,6 +98,10 @@ def check_file_or_dir(
     if file_or_dir == "dir" and not os.path.isdir(path):
         raise FileNotFoundError(
             f"{path}: No such directory found."
+        )
+    if file_or_dir == "dir" and check_empty and not os.listdir(path):
+        raise EmptyDirectoryError(
+            f"{path}: Directory exists but is empty."
         )
     if file_or_dir == "file" and not os.path.isfile(path):
         raise FileNotFoundError(
