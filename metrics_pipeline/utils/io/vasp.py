@@ -544,14 +544,13 @@ class VaspExtractor:
                         self.struct_dirs,
                         max_workers=workers,
                         chunksize=chunksize,
-                        desc="Extracting data from previous VASP output",
+                        desc="Extracting data from VASP output",
                     ),
                 )
             )
         self._data = dict(structs_data_list)
 
-    @property
-    def data(self) -> dict[str, tp.Any]:
+    def get_data(self) -> dict[str, tp.Any]:
         """Dict of extracted data for each parsed run directory."""
         return self._data
 
@@ -684,7 +683,7 @@ class VaspExtractor:
             - Final structure.
 
             For 'convex_hull' method the dict contains:
-            - Structure ID (directory name),
+            - Structure ID (struct_dir name),
             - Chemical composition as Composition object,
             - Initial energy (in eV).
 

@@ -27,7 +27,8 @@ class Stability(Metric):
     NOTE: Given structures (both computed and references) must have their total energy
     in eV stored in their properties under the 'energy' key.
     """
-    _init_from_entries: bool = False
+    _struct_attr = f"{__name__}_structure"
+    _delta_e_attr = f"{__name__}_e_above_hull"
     def __init__(
         self,
         structures: list[Structure],
@@ -83,13 +84,19 @@ class Stability(Metric):
             internal_entry = struct.properties.get("PDEntry")
             if internal_entry is None:
                 entry = PDEntry(struct.composition, struct.properties["energy"])
-                entry.attribute = struct
+                entry.attribute = {
+                    "orig_attribute": entry.attribute,
+                    self._struct_attr: struct
+                }
                 chemical_systems[struct.chemical_system].append(entry)
             else:
                 assert isinstance(internal_entry, PDEntry), RuntimeError(
                     "Type checker assertion."
                 )
-                internal_entry.attribute = struct
+                internal_entry.attribute = {
+                    "orig_attribute": internal_entry.attribute,
+                    self._struct_attr: struct
+                }
                 chemical_systems[struct.chemical_system].append(internal_entry)
 
         self.entries_dict = chemical_systems
@@ -101,11 +108,13 @@ class Stability(Metric):
 
         self._compute()
 
-        self._stable_structs: list[Structure] = [ # type: ignore
-            entry.attribute for entry in self._stable_entries
+        self._stable_structs: list[Structure] = [
+            entry.attribute[self._struct_attr] # type: ignore
+            for entry in self._stable_entries
         ]
-        self._unstable_structs: list[Structure] = [ # type: ignore
-            entry.attribute for entry in self._unstable_entries
+        self._unstable_structs: list[Structure] = [
+            entry.attribute[self._struct_attr] # type: ignore
+            for entry in self._stable_entries
         ]
 
     @classmethod
@@ -160,7 +169,6 @@ class Stability(Metric):
             ) for entry in ref_entries
         ]
         stability = cls(structures, ref_structs, **kwargs)
-        stability._init_from_entries = True
         return stability
 
     @staticmethod
@@ -175,6 +183,7 @@ class Stability(Metric):
     def is_stable(self, pd: PhaseDiagram, entry: PDEntry) -> bool:
         """Whether entry is stable compared to the convex hull, within initialized tolerance."""
         e_above_hull = pd.get_e_above_hull(entry, allow_negative=True, check_stable=False)
+        entry.attribute[self._delta_e_attr] = e_above_hull # type: ignore
         if e_above_hull is None:
             return False
         return e_above_hull <= self.stable_tol

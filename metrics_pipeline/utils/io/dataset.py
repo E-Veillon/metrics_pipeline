@@ -18,12 +18,13 @@ from pymatgen.analysis.phase_diagram import PDEntry
 from .io_base import PathLike
 from .json import JsonLoader, JsonWriter
 
+from metrics_pipeline.utils.utils import ALL_ELT_SYMBOL_TO_Z
 
 @dataclass
 class PDEntryParser:
     """Parse structure data to get corresponding PDEntry object."""
     id: str
-    composition: Composition | dict[str, float] | None = None
+    composition: Composition | None = None
     formula: str | None = None
     natoms: int | None = None
     energy: float | None = None
@@ -61,6 +62,11 @@ class PDEntryParser:
             assert self.composition is not None, "Type checker assertion."
             self.energy = self.energy_per_atom * self.composition.num_atoms
 
+    @classmethod
+    def from_composition_dict(cls, id: str, composition: dict[str, float], **kwargs) -> tpe.Self:
+        """Build PDEntryParser with a composition dict instead of Composition object."""
+        return cls(id, Composition(composition), **kwargs)
+
     def get_entry(self) -> PDEntry:
         """Build PDEntry from data."""
         assert isinstance(self.composition, Composition), "Type checker assertion."
@@ -80,6 +86,7 @@ class PDDataset:
         natoms_key: str | None = None,
         energy_key: str | None = None,
         energy_per_atom_key: str | None = None,
+        attribute: str | None = None,
         compact: bool = False
     ) -> None:
         """
@@ -115,6 +122,9 @@ class PDDataset:
             Key used to store structure energy per atom in eV/atom. If not given,
             `energy_key` must be given.
 
+        attribute: str, optional
+            Optional label to put on all entries in this dataset.
+
         compact: bool
             Whether loaded dataset is organized by data type instead of by structure.
             - If `False`, dataset is assumed to be organized by structure, i.e.
@@ -142,6 +152,8 @@ class PDDataset:
         )
 
         self._data: dict[str, PDEntry] = {}
+        self._elements: set[str] = set()
+        self._computable_elements: set[str] = set()
         self.key_dict = {
             "id": id_key,
             "composition": composition_key,
@@ -160,19 +172,148 @@ class PDDataset:
             # Iterate over already parsed structure data
             for struct_data in data_list:
                 entry_parser = PDEntryParser(**struct_data)
-                self._data[entry_parser.id] = entry_parser.get_entry()
+                entry = entry_parser.get_entry()
+                self._data[entry_parser.id] = entry
+                self._elements.update(
+                    set(entry.composition.get_el_amt_dict().keys())
+                )
+                if len(entry.composition) < 11:
+                    self._computable_elements.update(
+                        set(entry.composition.get_el_amt_dict().keys())
+                    )
 
         else:
             # parse each structure data dict
             for _, struct_data in data.items():
                 processed_data = {k: struct_data.get(v) for k, v in self.key_dict.items()}
                 entry_parser = PDEntryParser(**processed_data) # type: ignore
-                self._data[entry_parser.id] = entry_parser.get_entry()
+                entry = entry_parser.get_entry()
+                self._data[entry_parser.id] = entry
+                self._elements.update(
+                    set(entry.composition.get_el_amt_dict().keys())
+                )
+                if len(entry.composition) < 11:
+                    self._computable_elements.update(
+                        set(entry.composition.get_el_amt_dict().keys())
+                    )
+
+        if attribute is not None:
+            for entry in self._data.values():
+                entry.attribute = attribute
+
+    def get_all_entries(self) -> dict[str, PDEntry]:
+        """Get dataset dict of all phase diagram entries."""
+        return self._data
+
+    def get_computable_entries(self) -> dict[str, PDEntry]:
+        """
+        Get dataset dict of entries with element dimension at most 10, which is the maximum
+        supported by the phase diagram constructor.
+        """
+        return {name: entry for name, entry in self._data.items() if len(entry.composition) < 11}
+
+    def get_uncomputable_entries(self) -> dict[str, PDEntry]:
+        """
+        Get dataset dict of entries with element dimension greater than 10, which is the maximum
+        supported by the phase diagram constructor.
+        """
+        return {name: entry for name, entry in self._data.items() if len(entry.composition) > 10}
+
+    def get_filtered_entries(
+        self, elts: set[str] | None = None, dims: set[int] | None = None
+    ) -> dict[str, PDEntry]:
+        """
+        Flexible query method to get filtered dataset dict of entries.
+
+        Parameters
+        ----------
+        elts: list[str], optional
+            List of elements the entries compositions must fit in.
+            Only entries containing only elements in the list are returned.
+            If not given, no restriction is applied.
+
+        dims: list[int], optional
+            List of accepted element dimensions.
+            Only entries having a composition of these dimensions will be returned.
+            If not given, no restriction is applied.
+
+        Returns
+        -------
+        dict[str, PDEntry]
+            Dataset dict of entries corresponding to given conditions.
+        """
+        if elts is None and dims is None:
+            return self.get_all_entries()
+
+        data_tuples = list(self._data.items())
+
+        if elts is not None:
+            data_tuples = list(
+                filter(
+                    lambda data_tup: all(elt in elts for elt in data_tup[1].elements),
+                    data_tuples
+                )
+            )
+        if dims is not None:
+            data_tuples = list(
+                filter(
+                    lambda data_tup: len(data_tup[1].composition) in dims,
+                    data_tuples
+                )
+            )
+        return dict(data_tuples)
 
     @property
-    def data(self) -> dict[str, PDEntry]:
-        """Get dataset dict of phase diagram entries."""
-        return self._data
+    def max_dim(self) -> int:
+        """Max number of distinct elements in all entries."""
+        return max(len(entry.elements) for entry in self.get_all_entries().values())
+
+    @property
+    def max_computable_dim(self) -> int:
+        """Max number of distinct elements in computable entries."""
+        return max(len(entry.elements) for entry in self.get_computable_entries().values())
+
+    @property
+    def elements(self) -> set[str]:
+        """Set of elements symbols for all elements used in the dataset."""
+        return self._elements
+
+    @property
+    def elements_alphabetic(self) -> list[str]:
+        """
+        List of unique elements symbols for all elements used in the dataset.
+        Sorted alphabetically.
+        """
+        return sorted(self._elements)
+
+    @property
+    def elements_periodic(self) -> list[str]:
+        """
+        List of unique elements symbols for all elements used in the dataset.
+        Sorted by atomic number.
+        """
+        return sorted(self._elements, key=lambda symbol: ALL_ELT_SYMBOL_TO_Z[symbol])
+
+    @property
+    def computable_elements(self) -> set[str]:
+        """Set of element symbols for elements used in computable entries."""
+        return self._computable_elements
+
+    @property
+    def computable_elements_alphabetic(self) -> list[str]:
+        """
+        List of unique elements symbols for elements used in computable entries.
+        Sorted alphabetically.
+        """
+        return sorted(self._computable_elements)
+
+    @property
+    def computable_elements_periodic(self) -> list[str]:
+        """
+        List of unique elements symbols for elements used in computable entries.
+        Sorted by atomic number.
+        """
+        return sorted(self._computable_elements, key=lambda symbol: ALL_ELT_SYMBOL_TO_Z[symbol])
 
     @classmethod
     def from_file(cls, filepath: PathLike, **kwargs) -> tpe.Self:
@@ -212,7 +353,7 @@ class PDDataset:
         """
         if compact:
             # Ensure data ordering with a list
-            data_list = list(self.data.items())
+            data_list = list(self._data.items())
             data = {
                 "entry_id": [entry_id for entry_id, _ in data_list],
                 "composition": [entry.composition.get_el_amt_dict() for _, entry in data_list],
@@ -224,7 +365,7 @@ class PDDataset:
                     "entry_id": entry_id,
                     "composition": entry.composition.get_el_amt_dict(),
                     "final_energy": entry.energy
-                } for entry_id, entry in self.data.items()
+                } for entry_id, entry in self._data.items()
             }
         JsonWriter(filepath, data).write_as_dict()
 

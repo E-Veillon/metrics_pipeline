@@ -14,8 +14,7 @@ import numpy.typing as npt
 
 from pymatgen.core import Element
 
-
-ALL_ELT_SYMBOLS = list(Element.__members__)
+from metrics_pipeline.utils.utils import ALL_ELT_SYMBOL_TO_Z
 
 
 @dataclass
@@ -86,7 +85,7 @@ class PoscarBlock:
             assert len(coeffs) == 3 and all_floats, ValueError(
                 f"Lattice vector line {idx} must be 3 floating point numbers, got {line!r}."
             )
-        valid_elements = set(ALL_ELT_SYMBOLS)
+        valid_elements = set(ALL_ELT_SYMBOL_TO_Z)
         assert all(elt in valid_elements for elt in lines[5].split()), ValueError(
             "6th line contains data that is not a valid element symbol."
         )

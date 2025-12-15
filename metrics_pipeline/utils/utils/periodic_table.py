@@ -18,6 +18,11 @@ from .common_asserts import check_type
 
 FormulaLike = str | Sequence[str | int | Element]
 
+ALL_ELT_Z_TO_SYMBOL = dict(enumerate(Element.__members__, start=1))
+"""Dict of {Z: symbol} of all 118 elements of the periodic table."""
+
+ALL_ELT_SYMBOL_TO_Z = dict([(symbol, z) for z, symbol in enumerate(Element.__members__, start=1)])
+"""Dict of {symbol: Z} of all 118 elements of the periodic table."""
 
 def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
     """
