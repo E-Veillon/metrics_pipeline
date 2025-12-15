@@ -3,14 +3,230 @@
 
 import os
 import json
-from typing import Dict, Any
+import typing as tp
+import typing_extensions as tpe
+from dataclasses import dataclass
+import itertools as itt
+
 from mp_api.client import MPRester
 from emmet.core.types.enums import ThermoType
 from emmet.core.thermo import ThermoDoc
 
 from pymatgen.core import SETTINGS, Composition
+from pymatgen.analysis.phase_diagram import PDEntry
 
-from .io_base import check_file_format, check_file_or_dir, PathLike
+from .io_base import PathLike
+from .json import JsonLoader, JsonWriter
+
+
+@dataclass
+class PDEntryParser:
+    """Parse structure data to get corresponding PDEntry object."""
+    id: str
+    composition: Composition | dict[str, float] | None = None
+    formula: str | None = None
+    natoms: int | None = None
+    energy: float | None = None
+    energy_per_atom: float | None = None
+
+    def __post_init__(self) -> None:
+        assert isinstance(self.id, str), TypeError(
+            f"'id' expected a type 'str', got {type(self.id).__name__}."
+        )
+
+        # Get composition from formula and natoms
+        if self.composition is None:
+            assert self.formula is not None and self.natoms is not None, ValueError(
+                f"Either 'composition' or 'formula' and 'natoms' must be given."
+            )
+            formula_unit = Composition(self.formula, strict=True)
+            if formula_unit.num_atoms != self.natoms:
+                mult_factor = self.natoms / formula_unit.num_atoms
+                self.composition = formula_unit * mult_factor
+
+        elif isinstance(self.composition, dict):
+            self.composition = Composition(self.composition, strict=True)
+
+        else:
+            assert isinstance(self.composition, Composition), TypeError(
+                "'composition' expected a type 'Composition', "
+                f"got {type(self.composition).__name__}."
+            )
+
+        # Get total energy from energy per atom and composition atoms
+        if self.energy is None:
+            assert self.energy_per_atom is not None, ValueError(
+                f"Either 'energy' or 'energy_per_atom' must be given."
+            )
+            assert self.composition is not None, "Type checker assertion."
+            self.energy = self.energy_per_atom * self.composition.num_atoms
+
+    def get_entry(self) -> PDEntry:
+        """Build PDEntry from data."""
+        assert isinstance(self.composition, Composition), "Type checker assertion."
+        assert self.energy is not None, "Type checker assertion."
+
+        return PDEntry(self.composition, self.energy, self.id)
+
+
+class PDDataset:
+    """Process structure database for phase diagram computations compatibility."""
+    def __init__(
+        self,
+        data: dict,
+        id_key: str = "entry_id",
+        composition_key: str | None = None,
+        formula_key: str | None = None,
+        natoms_key: str | None = None,
+        energy_key: str | None = None,
+        energy_per_atom_key: str | None = None,
+        compact: bool = False
+    ) -> None:
+        """
+        Process structure database for phase diagram computations compatibility.
+
+        Parameters
+        ----------
+        data: dict
+            Database dict containing dicts of structures data to process.
+
+        id_key: str, optional
+            Mandatory key used to identify uniquely the structures in the database.
+            Defaults to the key already compatible with phase diagrams, i.e. 'entry_id'.
+            WARNING: If IDs are not unique, structures will override each other !
+
+        composition_key: str, optional
+            Key used to store structure composition as a dict of {"element": amount}.
+            If not given, `formula_key` and `natoms_key` must be given.
+
+        formula_key: str, optional
+            Key used to store structure formula as a string. If not given,
+            `composition_key` must be given.
+
+        natoms_key: str, optional
+            Key used to store the total number of atoms in unit cell. If not given,
+            `composition_key` must be given.
+
+        energy_key: str, optional
+            Key used to store structure total energy in eV. If not given, `energy_per_atom_key`
+            must be given.
+
+        energy_per_atom: str, optional
+            Key used to store structure energy per atom in eV/atom. If not given,
+            `energy_key` must be given.
+
+        compact: bool
+            Whether loaded dataset is organized by data type instead of by structure.
+            - If `False`, dataset is assumed to be organized by structure, i.e.
+            {"s1": {s1_data}, "s2": {s2_data}, ...}.
+            - If `True`, dataset is assumed to be organized by data type, i.e.
+            {"entry_id": [s1, s2, ...], "composition": [s1, s2, ...], ...}.
+
+            Defaults to `False`.
+        """
+        assert isinstance(data, dict), TypeError(
+            f"'data' expected a type 'dict', got {type(data).__name__}."
+        )
+        val_types = ", ".join(sorted(set(type(val).__name__ for val in data.values())))
+        assert all(isinstance(val, dict) for val in data.values()), TypeError(
+            f"'data' values must contain only dict, got following types: {val_types}."
+        )
+        assert all(isinstance(val.get(id_key), str) for val in data.values()), TypeError(
+            f"Given 'id_key' ({id_key}) does not always match a string ID in the data."
+        )
+        assert composition_key or (formula_key and natoms_key), ValueError(
+            f"Either 'composition_key' or 'formula_key' and 'natoms_key' must be given."
+        )
+        assert energy_key or energy_per_atom_key, ValueError(
+            f"Either 'energy_key' or 'energy_per_atom_key' must be given."
+        )
+
+        self._data: dict[str, PDEntry] = {}
+        self.key_dict = {
+            "id": id_key,
+            "composition": composition_key,
+            "formula": formula_key,
+            "natoms": natoms_key,
+            "energy": energy_key,
+            "energy_per_atom": energy_per_atom_key,
+        }
+
+        if compact:
+            # Regenerate parsed structures data dicts
+            parsed_data = {k: data.get(v, itt.repeat(None)) for k, v in self.key_dict.items()}
+            keys = sorted(parsed_data.keys())
+            data_list = [dict(zip(keys, values)) for values in zip(*(parsed_data[k] for k in keys))]
+
+            # Iterate over already parsed structure data
+            for struct_data in data_list:
+                entry_parser = PDEntryParser(**struct_data)
+                self._data[entry_parser.id] = entry_parser.get_entry()
+
+        else:
+            # parse each structure data dict
+            for _, struct_data in data.items():
+                processed_data = {k: struct_data.get(v) for k, v in self.key_dict.items()}
+                entry_parser = PDEntryParser(**processed_data) # type: ignore
+                self._data[entry_parser.id] = entry_parser.get_entry()
+
+    @property
+    def data(self) -> dict[str, PDEntry]:
+        """Get dataset dict of phase diagram entries."""
+        return self._data
+
+    @classmethod
+    def from_file(cls, filepath: PathLike, **kwargs) -> tpe.Self:
+        """
+        Load the dataset from a JSON file instead of initializing with a dict.
+
+        Parameters
+        ----------
+        filepath: str | Path
+            Path to the JSON dataset file.
+
+        kwargs: Any
+            Any keyword argument to pass to the constructor.
+        """
+        loaded_data = JsonLoader(filepath).load_as_dict()
+        return cls(loaded_data, **kwargs)
+
+    def write_dataset(self, filepath: PathLike, compact: bool = False) -> None:
+        """
+        Write processed dataset to a JSON file.
+
+        Parameters
+        ----------
+        filepath: str | Path
+            Path to the JSON file to write.
+
+        compact: bool
+            Whether to reduce overhead by organizing by data type instead of by structure.
+
+            - If `False`, data is organized by structure, i.e.
+            {"s1": {s1_data}, "s2": {s2_data}, ...}.
+            - If `True`, data is organized by data type, i.e.
+            {"entry_id": [s1, s2, ...], "composition": [s1, s2, ...], ...}.
+
+            This method is more memory efficient as soon as the file contains more structures than
+            data types. Defaults to False.
+        """
+        if compact:
+            # Ensure data ordering with a list
+            data_list = list(self.data.items())
+            data = {
+                "entry_id": [entry_id for entry_id, _ in data_list],
+                "composition": [entry.composition.get_el_amt_dict() for _, entry in data_list],
+                "final_energy": [entry.energy for _, entry in data_list]
+            }
+        else:
+            data = {
+                entry_id: {
+                    "entry_id": entry_id,
+                    "composition": entry.composition.get_el_amt_dict(),
+                    "final_energy": entry.energy
+                } for entry_id, entry in self.data.items()
+            }
+        JsonWriter(filepath, data).write_as_dict()
 
 
 class APIKeyNotFoundError(Exception):
@@ -21,7 +237,8 @@ class APIKeyNotFoundError(Exception):
 
 class MPDatasetDownloader:
     """
-    Download Materials Project dataset and format the data for compatibility with GenMat.
+    Download the Materials Project phase diagram dataset and format the data
+    for compatibility with local phase diagram computations.
     """
     def __init__(
         self, save_file: PathLike, api_key: str | None = None, download: bool = True
@@ -42,9 +259,8 @@ class MPDatasetDownloader:
             Whether to download the dataset at initialization. Set it to False if you just need
             to get MP API infos needing an API key without actual download. Defaults to True.
         """
-        check_file_format(save_file, allowed_formats="json")
-        os.makedirs(os.path.dirname(save_file), exist_ok=True)
-        self.save_file = save_file
+        # Used for file assertions
+        self.writer = JsonWriter(save_file)
         self.api_key = self._get_api_key(api_key)
 
         if download:
@@ -82,122 +298,24 @@ class MPDatasetDownloader:
                 all_fields=False, fields=["material_id","composition","energy_per_atom"]
             )
             print(f"Number of Materials Project entries downloaded: {len(data)}")
-
-            final_data = {}
-            for entry in data:
-                assert isinstance(entry, dict), RuntimeError(
-                    "Should never trigger, but satisfies type checker."
-                )
-                nb_atoms = Composition(entry["composition"]).num_atoms
-                final_data.update(
-                    {
-                        entry["material_id"]: {
-                            "entry_id": entry["material_id"],
-                            "composition": entry["composition"],
-                            "final_energy": entry["energy_per_atom"] * nb_atoms
-                        }
-                    }
-                )
-
-        with open(self.save_file, "wt", encoding="utf-8") as fp:
-            json.dump(final_data, fp)
+            data = tp.cast(list[dict], data)
+            dataset = PDDataset(
+                {entry["material_id"]: entry for entry in data},
+                id_key="material_id",
+                composition_key="composition",
+                energy_per_atom_key="energy_per_atom"
+            )
+            dataset.write_dataset(self.writer.filepath)
 
     def print_avail_fields(self, endpoint: str) -> None:
         """Print the list of available fields corresponding to given MPRester endpoint."""
         with MPRester(self.api_key) as mpr:
-            if endpoint == "materials":
-                print(mpr.materials.available_fields)
-            elif endpoint == "thermo":
-                print(mpr.materials.thermo.available_fields)
-            else:
-                raise NotImplementedError(
-                    "Given 'endpoint' arg does not match any implemented doc."
-                )
-
-
-def process_oqmd_json_file(path: str) -> None:
-    """
-    Process OQMD json data file to get needed data format in a new JSON file.
-    Expected OQMD JSON key formatting is the one got with OQMD RESTful API.
-    The processed file have a '_proc' suffix added to its name.
-
-    Parameters:
-        path (str): Path to the OQMD JSON file to process.
-    """
-    check_file_or_dir(path, "file", allowed_formats="json")
-
-    with open(path, "rt", encoding="utf-8") as fp:
-        data = json.load(fp)
-
-    processed_prefix = "proc-oqmd-"
-    processed_data = {}
-
-    for name, struct in data.items():
-        struct: Dict[str, Any]
-
-        if (
-            struct.get("entry_id") is None
-            or struct.get("composition") is None
-            or struct.get("natoms") is None
-            or struct.get("delta_e") is None
-        ):
-            if name.startswith(processed_prefix):
-                raise ValueError(
-                    f"structure '{name}' was already processed (begins with '{processed_prefix}'). "
-                    "Please verify that you are not processing the same data more than "
-                    "once, as it may cause wrong total energy computations."
-                )
-            raise ValueError(
-                f"At least one of needed data keys is missing in structure '{name}'. "
-                "Please verify that the following keys are present: "
-                "'entry_id', 'composition', 'natoms', 'delta_e'."
-            )
-
-        entry_id: str = str(struct.get("entry_id"))
-
-        if isinstance(struct.get("composition"), Dict):
-            comp_dict: Dict[str, int|float] = struct["composition"]
-
-        elif isinstance(struct["composition"], str):
-            old_comp = Composition("".join(struct["composition"].split()), strict=True)
-
-            if old_comp.num_atoms == struct["natoms"]:
-                composition: Composition = old_comp.copy()
-
-            else: # The composition is a reduced form
-                mult_factor: int = struct["natoms"] // old_comp.num_atoms
-                composition: Composition = old_comp * mult_factor
-
-            comp_dict: Dict[str, int|float] = composition.get_el_amt_dict()
-
-        total_energy: float = struct["delta_e"] * struct.get("natoms")
-        new_name: str = processed_prefix + entry_id
-
-        processed_data.update(
-            {
-                new_name: {
-                    "entry_id": entry_id,
-                    "composition": comp_dict,
-                    "final_energy": total_energy
-                }
-            }
-        )
-    new_filename = os.path.basename(path).replace(".json", "_proc.json")
-    new_path = os.path.join(os.path.dirname(path), new_filename)
-
-    with open(new_path, "wt", encoding="utf-8") as fp:
-        json.dump(processed_data, fp)
-
-
-def load_phase_diagram_entries(filename: str) -> dict:
-    """Load entries data from a JSON file."""
-    check_file_or_dir(filename, "file", allowed_formats="json")
-
-    print(f"Loading {filename}...")
-    with open(filename, "rt", encoding="utf-8") as fp:
-        entries = json.load(fp)
-
-    for entry in entries.values():
-        entry["composition"] = Composition.from_dict(entry["composition"])
-    print(f"Loading finished, {len(entries)} entries found.")
-    return entries
+            match endpoint:
+                case "materials":
+                    print(mpr.materials.available_fields)
+                case "thermo":
+                    print(mpr.materials.thermo.available_fields)
+                case _:
+                    raise NotImplementedError(
+                        f"Given 'endpoint' ({endpoint}) does not match any implemented doc."
+                    )
