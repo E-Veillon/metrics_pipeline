@@ -9,14 +9,11 @@ from pymatgen.core import Structure
 from pymatgen.io.cif import CifParser, CifWriter
 
 from .io_base import PathLike, check_file_or_dir, check_file_format
-
-# TODO: Decide once and for all if check_type and check_num_value are useful inside packages
-# or only in surface-level scripts.
-from metrics_pipeline.utils.utils import VisualIterator, check_type, check_num_value
+from metrics_pipeline.utils.utils import VisualIterator
 
 # TODO: Split responsibilities better, e.g. define compound convenience functions
 # outside the package.
-from metrics_pipeline.utils.periodic_table import (
+from metrics_pipeline.utils.utils.periodic_table import (
     discard_rare_gas_structures, discard_rare_earth_structures
 )
 
@@ -29,7 +26,7 @@ def extract_cif_from_file(filename: PathLike) -> list[str]:
     ----------
     filename: str
         Path to a cif file.
-    
+
     Returns
     -------
     list[str]
@@ -69,15 +66,6 @@ def cif_str_to_struct(
     Structure
         A Pymatgen Structure object.
     """
-    assert isinstance(cif_str, str), TypeError(
-        f"'cif_str' expected a type 'str', got {type(cif_str).__name__!r}."
-    )
-    if special_keys is not None:
-        types = ', '.join(set([type(key).__name__ for key in special_keys]))
-        assert all(isinstance(key, str) for key in special_keys), TypeError(
-            f"'special_keys' expected only 'str' types, got {types}."
-        )
-
     parser = CifParser.from_str(cif_string=cif_str)
     structure = parser.parse_structures(primitive=False)[0]
 
@@ -123,19 +111,6 @@ def struct_to_sym_cif_str(
     Returns:
         str: CIF formatted string.
     """
-    check_type(structure, "structure", (Structure,))
-    check_type(significant_figures, "significant_figures", (int,))
-    check_num_value(significant_figures, "significant_figures", ">=", 0)
-    if symprec is not None:
-        check_type(symprec, "symprec", (float,))
-        check_num_value(symprec, "symprec", ">=", 0.0)
-        check_type(angleprec, "angleprec", (float,))
-        check_num_value(angleprec, "angleprec", ">=", 0.0)
-    if special_keys is not None:
-        check_type(special_keys, "special_keys", (list,))
-        for idx, elt in enumerate(special_keys):
-            check_type(elt, f"special_keys[{idx}]", (str,))
-
     writer = CifWriter(
             struct=structure,
             symprec=symprec,
@@ -212,13 +187,6 @@ def read_cif(
         Number of structures containing rare earth elements discarded.
     """
     check_file_or_dir(filename, "file", allowed_formats="cif")
-    if workers is not None:
-        assert isinstance(workers, int), TypeError(
-            f"'workers' expected a type 'int', got {type(workers).__name__}."
-        )
-        assert workers >= 0, ValueError(
-            f"'workers' must be positive or zero, got {workers}."
-        )
 
     struct_strings = extract_cif_from_file(filename)
     nbr_rare_gas_structs, nbr_rare_earth_structs = 0, 0
@@ -314,16 +282,6 @@ def symmetrize_and_write_cif(
                                         'workers' arg is ignored. Defaults to False.
     """
     check_file_format(filename, allowed_formats="cif")
-    for idx, struct in enumerate(structures):
-        check_type(struct, f"structures[{idx}]", (Structure,))
-    if symmetrize:
-        check_type(symprec, "symprec", (float,))
-        check_num_value(symprec, "symprec", ">=", 0)
-        check_type(angleprec, "angleprec", (float,))
-        check_num_value(angleprec, "angleprec", ">=", 0)
-    if workers is not None:
-        check_type(workers, "workers", (int,))
-        check_num_value(workers, "workers", ">", 0)
 
     nbr_struct = len(structures)
     chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
