@@ -15,7 +15,7 @@ from pymatgen.io.vasp.sets import (
 from metrics_pipeline.utils.io import load_yaml_as_dict
 
 # TODO: temporary importation fix, to modify once new packages are built
-from metrics_pipeline.utils.periodic_table import get_all_valence_electrons
+from metrics_pipeline.utils.utils.periodic_table import get_all_valence_electrons
 
 
 LOCAL_PRESETS_PATH = os.path.join(os.path.dirname(__file__), "presets_data")

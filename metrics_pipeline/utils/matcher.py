@@ -19,10 +19,8 @@ from pymatgen.analysis.phase_diagram import Entry
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 # LOCAL IMPORTS
-from .common_asserts import check_type, check_num_value
-from .custom_types import PathLike
-from .visual_iterator import VisualIterator
-from .flattener import flatten
+from .utils import check_type, check_num_value, flatten, VisualIterator
+from .io import PathLike
 from .fitted_values import get_clementi_radius
 
 

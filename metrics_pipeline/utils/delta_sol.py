@@ -15,18 +15,10 @@ from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp.sets import MPRelaxSet
 
 # LOCAL IMPORTS
-try:
-    from .common_asserts import check_type, check_num_value
-    from .custom_types import PathLike
-    from .file_io import CONFIGPATH, check_file_or_dir, yaml_loader
-    from .fitted_values import EL_PER_XC_VOL
-    from .periodic_table import get_all_valence_electrons
-except ImportError as exc:
-    from common_asserts import check_type, check_num_value
-    from custom_types import PathLike
-    from file_io import CONFIGPATH, check_file_or_dir, yaml_loader
-    from fitted_values import EL_PER_XC_VOL
-    from periodic_table import get_all_valence_electrons
+from .utils import check_type, check_num_value
+from .io import PathLike, CONFIGPATH, check_file_or_dir, load_yaml_as_dict
+from .fitted_values import EL_PER_XC_VOL
+from .utils import get_all_valence_electrons
 
 
 ########################################
@@ -61,7 +53,7 @@ class DSolStaticSet(MPRelaxSet):
     
     Raises: ValueError if neither structure nor nelect are given at instanciation time.
     """
-    CONFIG = yaml_loader(os.path.join(CONFIGPATH, "DSolStaticSet.yaml"), on_error="raise")
+    CONFIG = load_yaml_as_dict(os.path.join(CONFIGPATH, "DSolStaticSet.yaml"), on_error="raise")
 
     def __init__(
             self,
