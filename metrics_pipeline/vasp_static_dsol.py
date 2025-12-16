@@ -1,38 +1,30 @@
 #!/usr/bin/python
 """
-Parses previous VASP data and launches Δ-Sol static calculations 
+Parses previous VASP data and writes run directories for Δ-Sol static calculations
 for structures not already rejected.
 """
 
 import os
 import typing as tp
 from datetime import datetime
-import argparse as argp
+import argparse as ap
+import warnings
 
 from pymatgen.core import Structure
 
-# LOCAL IMPORTS
 from . import CONFIGPATH, _parse_input_args
-from .utils import (
-    check_type, check_num_value, check_file_or_dir, add_new_dir, yaml_loader,
-    PMGStaticSet, extract_vasp_data_for_delta_sol_init,
-    get_dsol_struct_dir, calc_idx_to_dir_name, dsol_calc_init,
-    write_and_run_vasp
-)
+from utils.utils import check_type, check_num_value
+from utils.io import check_file_or_dir, load_yaml_as_dict, VaspWriter, VaspParser, VaspExtractor
+from utils.computations.vasp import PMGStaticSet, DSolStaticSet
+# TODO: Legacy imports to replace
+from .utils import get_dsol_struct_dir, calc_idx_to_dir_name, dsol_calc_init
+from utils.vasp_io import extract_vasp_data_for_delta_sol_init
 
-
-########################################
-# ARGUMENTS HANDLING
-
-def _get_command_line_args() -> argp.Namespace:
-    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
+def _get_command_line_args() -> ap.Namespace:
+    parser = ap.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument(
         "input_dir",
         help="Base directory containing structure directories.",
-    )
-    parser.add_argument(
-        "executable_path",
-        help="Path to the VASP executable.",
     )
     parser.add_argument(
         "task_id",
@@ -102,7 +94,7 @@ def _get_command_line_args() -> argp.Namespace:
         )
     )
 
-    args: argp.Namespace = parser.parse_args()
+    args: ap.Namespace = parser.parse_args()
     return args
 
 
@@ -115,10 +107,6 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     # Set default values for unset optional arguments
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
-    args_dict.setdefault("executable_path", "vasp")
-    # WARNING:
-    # Usual VASP shortcut, but may activate wrong VASP version if several are installed.
-    # Prefer giving a true VASP executable path for unambiguous computation.
     default_output = os.path.join(os.path.dirname(args_dict.get("input_dir", "")), "Band_gaps")
     args_dict.setdefault("output", default_output)
     args_dict.setdefault("preset", PMGStaticSet.MPSTATICSET.value)
@@ -127,10 +115,6 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_dir"), "dir")
-
-    if not str(args_dict.get("executable_path")).startswith("vasp"):
-        check_file_or_dir(args_dict.get("executable_path"), "file")
-    
     check_type(args_dict.get("task_id"), "task_id", (int,))
     check_num_value(args_dict.get("task_id"), "task_id", ">=", 0)
     check_file_or_dir(args_dict.get("output"), "dir")
@@ -161,7 +145,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     if args_dict.get("preset") != "DsolStaticSet":
         args_dict["preset"] = PMGStaticSet(args_dict.get("preset"))
 
-    args_dict["settings"] = yaml_loader(config_path)
+    args_dict["settings"] = load_yaml_as_dict(config_path)
 
     return args_dict
 
@@ -171,8 +155,8 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
 def main(standalone: bool = True, **kwargs) -> None:
     """
-    Parses previous VASP data and launches Δ-Sol static calculations for structures not
-    already rejected.
+    Parses previous VASP data and writes run directories for Δ-Sol static calculations
+    for structures not already rejected.
 
     Args:
         standalone (bool):          Whether parsed script is used directly through
@@ -180,8 +164,6 @@ def main(standalone: bool = True, **kwargs) -> None:
                                     pipeline script.
 
         input_dir (str|Path):       Base directory containing structure directories.
-
-        executable_path (str|Path): Path to the VASP executable.
 
         task_id (int):              Provide here the job array task ID that will treat one
                                     calculation for one structure. The total number of jobs
@@ -218,6 +200,10 @@ def main(standalone: bool = True, **kwargs) -> None:
                                     band gaps. This will need two more VASP static total energy
                                     computation for each limit.
     """
+    warnings.warn(
+        "The use of this script is deprecated. This script will be heavily modified soon.",
+        DeprecationWarning
+    )
     start = datetime.now()
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
@@ -250,9 +236,10 @@ def main(standalone: bool = True, **kwargs) -> None:
     structure: Structure = struct_data[1]["structure"]
     dir_name   = f"{struct_idx}_{structure.composition.reduced_formula}" # type: ignore
     calc_name  = calc_idx_to_dir_name(dir_name, calc_idx)
-    calc_dir   = add_new_dir(args["output"], dir_name, calc_name)
+    calc_dir = os.path.join(args["output"], dir_name, calc_name)
 
-    write_and_run_vasp(input_data, calc_dir, args["executable_path"])
+    os.makedirs(calc_dir)
+    input_data.write_input(calc_dir)
 
     stop = datetime.now()
     print(f"elapsed time: {stop-start}")
