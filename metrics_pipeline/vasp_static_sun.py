@@ -1,8 +1,7 @@
 #!/usr/bin/python
 """
-A script that writes and performs VASP static run on structure data read from CIF files,
-using pymatgen as a setting interface between raw data and VASP.
-Energy results may be used for phase diagrams computations.
+Write VASP static run directories for structure data read from CIF file
+or summary JSON file using pymatgen as a setting interface between raw data and VASP.
 """
 
 import os
@@ -10,34 +9,22 @@ import typing as typ
 from datetime import datetime
 import argparse as argp
 
-# PYTHON MATERIAL GENOMICS
 from pymatgen.core.structure import SiteCollection
 
-# LOCAL IMPORTS
 from . import CONFIGPATH, _parse_input_args
-from .utils import (
-    check_type, check_num_value, check_file_or_dir, add_new_dir, yaml_loader,
-    PMGStaticSet, read_cif, vasp_static_settings, write_and_run_vasp
+from utils.utils import check_type, check_num_value
+from utils.io import (
+    check_file_or_dir, read_cif, load_yaml_as_dict, VaspParser, VaspWriter, JsonLoader
 )
+from .utils.computations.vasp import vasp_static_settings, PMGStaticSet
 
-
-########################################
-# ARGUMENTS HANDLING
 
 def _get_command_line_args() -> argp.Namespace:
     """Command Line Interface (CLI)."""
     parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument(
-        "input_file",
-        type=str,
+        "input_file", type=str,
         help="Path to the CIF file containing structure data to read.",
-        metavar="input_file.cif"
-    )
-    parser.add_argument(
-        "executable_path",
-        type=str,
-        help="Path to the VASP executable.",
-        metavar="PATH"
     )
     parser.add_argument(
         "-o", "--output",
@@ -46,46 +33,34 @@ def _get_command_line_args() -> argp.Namespace:
             "A subdirectory will be created in output directory for each structure "
             "found in input_file. By default, it will create a 'Statics' directory "
             "in the input_file directory and write structures runs in it."
-        ),
-        metavar="outdir"
+        )
     )
     parser.add_argument(
-        "-p", "--preset",
-        type=PMGStaticSet,
-        default=PMGStaticSet.MPSTATICSET.value,
+        "-p", "--preset", type=PMGStaticSet, default=PMGStaticSet.MPSTATICSET.value,
         help=(
             "The pymatgen preset to use for VASP static run. "
             "More info on possible presets in pymatgen documentation:\n"
             "https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets."
-        ),
-        metavar="StaticSet"
+        )
     )
     parser.add_argument(
-        "-u",
-        "--user-settings",
-        type=str,
-        default="default_settings.yaml",
+        "-u", "--user-settings", type=str, default="default_settings.yaml",
         help=(
             "Name of the .yaml file containing tags overrides to put over the PMG preset.\n"
             "The file must be at location metrics_pipeline/config to be found."
         ),
-        metavar="FILENAME",
         dest="user_settings"
     )
     parser.add_argument(
-        "-w", "--workers",
-        type=int,
+        "--workers", "-w", type=int, metavar="int",
         help=(
-            "Number of parallel processes to spawn for parallelized steps. "
-            "If not given, default value is the 'max_workers' default value "
-            "from tqdm.contrib.concurrent.process_map function."
+            "Number of processes to use in parallel. If not given, will use default of "
+            "`tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()` "
+            "and execute sequentially."
         )
     )
     parser.add_argument(
-        "-t",
-        "--task_index",
-        type=int,
-        default=0,
+        "-t", "--task_index", type=int, default=0,
         help=(
             "If a job array is used, provide here the structure index "
             "to treat according to task IDs (e.g. if task ID 0 treats "
@@ -106,10 +81,6 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
 
     # Set default values for unset optional arguments
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
-    args_dict.setdefault("executable_path", "vasp")
-    # WARNING:
-    # Usual VASP shortcut, but may activate wrong VASP version if several are installed.
-    # Prefer giving a true VASP executable path for unambiguous computation.
     default_output = os.path.join(os.path.dirname(args_dict.get("input_file", "")), "Statics")
     args_dict.setdefault("output", default_output)
     args_dict.setdefault("preset", PMGStaticSet.MPSTATICSET.value)
@@ -118,9 +89,6 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
 
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="cif")
-
-    if not str(args_dict.get("executable_path")).startswith("vasp"):
-        check_file_or_dir(args_dict.get("executable_path"), "file")
 
     assert args_dict.get("preset",PMGStaticSet.MPSTATICSET.value) in PMGStaticSet.values, (
     "Provided static preset must be one of the following:\n"
@@ -139,82 +107,93 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     # Additional arguments processing
     os.makedirs(args_dict["output"], exist_ok=True)
     args_dict["preset"] = PMGStaticSet(args_dict.get("preset"))
-    args_dict["settings"] = yaml_loader(config_path)
+    args_dict["settings"] = load_yaml_as_dict(config_path)
 
     return args_dict
 
-
-########################################
-
-
+# TODO: simplify by asking an input CIF or base dir and output base dir more explicitly
 def main(standalone: bool = True, **kwargs):
     """
-    A script that writes and performs VASP static run on structure data read from CIF files,
-    using pymatgen as a setting interface between raw data and VASP. Energy results may be used
-    for phase diagrams computations.
+    Write VASP static run directories for structure data read from CIF file
+    or summary JSON file using pymatgen as a setting interface between raw data and VASP.
     
-    Args:
-        standalone (bool):          Whether parsed script is used directly through
-                                    command-line (stand-alone script) or in an external
-                                    pipeline script.
+    Parameters
+    ----------
+    standalone: bool
+        Whether parsed script is used directly through command-line (stand-alone script)
+        or in an external pipeline script.
 
-        input_file (str|Path):      Path to the CIF file containing structure data to read.
+    input_file: str | Path
+        Path to the file containing structure data to read. It can be a CIF file to read
+        structure data directly, or a JSON summary file from a previous pipeline step to
+        extract structure data from a previous VASP run.
 
-        executable_path (str|Path): Path to the VASP executable.
+    output: str | Path
+        Path to the output directory where VASP files will be written. A subdirectory will
+        be created in output directory for each structure found in input_file.
 
-        output (str|Path):          Path to the output directory where VASP files will be written.
-                                    A subdirectory will be created in output directory for each
-                                    structure found in input_file. By default, it will create a
-                                    'Statics' directory in the input_file directory and write
-                                    structures runs in it.
+    preset: str, optional
+        The pymatgen preset to use for VASP static run. More info on possible presets in
+        pymatgen documentation: https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets.
 
-        preset (str):               The pymatgen preset to use for VASP static calculations.
-                                    List of currently supported presets can be checked in command
-                                    line within the --help documentation of this argument for this
-                                    script. More info on possible presets in pymatgen documentation:
-                                    https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets.
+    user_settings: str, optional
+        Name of the YAML file containing tags to override the PMG preset. Given filename
+        must be located in 'metrics_pipeline/config' to be found.
 
-        user_settings (str):        Name of the .yaml file containing tags overrides to put over
-                                    the PMG preset. The file must be at location
-                                    'metrics_pipeline/config' to be found.
+    workers: int, optional
+        Number of processes to use in parallel. If not given, will use default of
+        `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
+        and execute sequentially.
 
-        workers (int):              Number of parallel processes to spawn for parallelized steps.
-                                    If not given, default value is the 'max_workers' default value
-                                    from tqdm.contrib.concurrent.process_map function.
-
-        task_index (int):           If a job array is used, provide here the structure index to
-                                    treat according to task IDs (e.g. if task ID 0 treats structure
-                                    0 and so on, just provide the task ID). If not given, it will
-                                    default to the first possible index, i.e. index 0.
-        
-        standalone (bool):      Whether parsed script is used directly through
-                                command-line (stand-alone script) or in an external
-                                pipeline script.
-
-        input_file (str|Path):  Path to the CIF file containing structure data to read.
+    task_index: int, optional
+        If a job array is used, provide here the structure index to treat according to task IDs
+        (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID). If not given,
+        it will default to the first possible index, i.e. index 0.
     """
     start = datetime.now()
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
-    # Convert CIF data into Structure objects
-    structures, *_ = read_cif(
-        filename=args["input_file"],
-        workers=args.get("workers"),
-        keep_rare_gases=True, # Avoid calling rare gaz screening function
-        keep_rare_earths=True # Avoid calling rare earth screening function
-    )
-    task_idx: int = args["task_index"]
-    structure: SiteCollection = structures[task_idx]
-    dir_name = f"{args.get('task_index')}_{structure.composition.reduced_formula}"
+    if str(args.get("input_file")).endswith(".cif"):
+        # Convert CIF data into Structure objects
+        structures, *_ = read_cif(
+            filename=args["input_file"],
+            workers=args.get("workers"),
+            keep_rare_gases=True, # Avoid calling rare gaz screening function
+            keep_rare_earths=True # Avoid calling rare earth screening function
+        )
+        task_idx: int = args["task_index"]
+        structure: SiteCollection = structures[task_idx]
+        dir_name = f"{args.get('task_index')}_{structure.composition.reduced_formula}"
+
+    elif str(args["input_file"]).endswith(".json"):
+        data = JsonLoader(args["input_file"]).load_as_list()
+        paths = [d["path"] for d in data]
+        task_idx: int = args["task_index"]
+
+        try:
+            struct_dir = next(filter(
+                lambda path: os.path.basename(path).startswith(f"{task_idx}_"),
+                paths
+            ))
+        except StopIteration as exc:
+            raise ValueError(
+                f"Given 'task_index' value ({task_idx}) do not match any data "
+                f"in file {args.get('input_file')}."
+            ) from exc
+
+        structure = VaspParser(
+            base_dir=os.path.dirname(args["input_file"]),
+            indices=[task_idx]
+        ).parse_structures()[struct_dir]
+
+        dir_name = os.path.basename(struct_dir)
 
     vasp_input = vasp_static_settings(
         structure=structure,
         preset=args["preset"],
         user_corrections=args.get("settings")
     )
-    run_dir = add_new_dir(args["output"], dir_name)
-
-    write_and_run_vasp(vasp_input, run_dir, args["executable_path"])
+    VaspWriter(args["output"], {dir_name: vasp_input})
 
     stop = datetime.now()
     print(f"Elapsed time: {stop-start}")

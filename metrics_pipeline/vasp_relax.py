@@ -33,18 +33,15 @@ def _get_command_line_args() -> ap.Namespace:
         )
     )
     parser.add_argument(
-        "-o", "--output",
+        "--output", "-o", metavar="outdir",
         help=(
             "Path to the output directory where VASP files will be written. "
             "A subdirectory will be created in output directory "
             "for each structure found in input_file."
-        ),
-        metavar="outdir"
+        )
     )
     parser.add_argument(
-        "-p", "--preset",
-        type=PMGRelaxSet,
-        default=PMGRelaxSet.MPRELAXSET.value,
+        "--preset", "-p", type=PMGRelaxSet, default=PMGRelaxSet.MPRELAXSET.value,
         help=(
             "The pymatgen preset to use for VASP relaxation. "
             "More info on possible presets in pymatgen documentation:\n"
@@ -53,9 +50,7 @@ def _get_command_line_args() -> ap.Namespace:
         metavar="RelaxSet"
     )
     parser.add_argument(
-        "-u",
-        "--user-settings",
-        default="default_settings.yaml",
+        "--user-settings", "-u", default="default_settings.yaml",
         help=(
             "Name of the YAML file containing tags to override the PMG preset. "
             f"Given filename must be located in {CONFIGPATH} to be found."
@@ -72,10 +67,7 @@ def _get_command_line_args() -> ap.Namespace:
         )
     )
     parser.add_argument(
-        "-t",
-        "--task_index",
-        type=int,
-        default=0,
+        "--task_index", "-t", type=int, default=0,
         help=(
             "If a job array is used, provide here the structure index "
             "to treat according to task IDs (e.g. if task ID 0 treats "
@@ -96,10 +88,6 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     # Set default values for unset optional arguments
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
-    args_dict.setdefault("executable_path", "vasp")
-    # WARNING:
-    # Usual VASP shortcut, but may activate wrong VASP version if several are installed.
-    # Prefer giving a true VASP executable path for unambiguous computation.
     default_output = os.path.join(os.path.dirname(args_dict.get("input_file", "")), "Relaxations")
     args_dict.setdefault("output", default_output)
     args_dict.setdefault("preset", PMGRelaxSet.MPRELAXSET.value)
@@ -108,9 +96,6 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats=("cif", "json"))
-
-    if not str(args_dict.get("executable_path")).startswith("vasp"):
-        check_file_or_dir(args_dict.get("executable_path"), "file")
 
     check_file_or_dir(args_dict.get("output"), "dir")
     assert args_dict.get("preset", "") in PMGRelaxSet.values, (
