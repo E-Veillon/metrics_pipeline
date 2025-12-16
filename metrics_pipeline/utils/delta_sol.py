@@ -14,72 +14,10 @@ from pymatgen.core import SiteCollection, Structure
 from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp.sets import MPRelaxSet
 
-# LOCAL IMPORTS
-from .utils import check_type, check_num_value
+from .utils import check_type, check_num_value, get_all_valence_electrons
 from .io import PathLike, CONFIGPATH, check_file_or_dir, load_yaml_as_dict
 from .fitted_values import EL_PER_XC_VOL
-from .utils import get_all_valence_electrons
-
-
-########################################
-
-
-@dataclass
-class DSolStaticSet(MPRelaxSet):
-    """
-    Initialize VASP input files for Δ-Sol method computations using
-    PBE_54_W_HASH pymatgen set of POTCAR files. Parameters are as 
-    described in Δ-Sol method original work by Chan et al. in 2010.
-    DFT+U corrections are used as proposed by Jain et al. in 2011.
-
-    References:
-        - M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010).
-
-        - A. Jain, G. Hautier, C.J. Moore, S.P. Ong, C.C. Fischer, T. Mueller, 
-        K.A. Persson, and G. Ceder, Computational Materials Science, 50, 2295-2310 (2011).
-
-    Args:
-        structure (Structure):  The Structure to create inputs for. If None, the input
-                                set is initialized without a Structure but one must be
-                                set separately before the inputs are generated.
-
-        incar_nelect (float):   The number of electrons to put in the NELECT INCAR tag.
-                                In Δ-Sol, several computations with distinct number of 
-                                electrons are done, this is a convenient arg to set that.
-                                If not given, infers the Δ-Sol N0 electrons calculation 
-                                from the given structure.
-
-        **kwargs:               kwargs supported by DictSet.
-    
-    Raises: ValueError if neither structure nor nelect are given at instanciation time.
-    """
-    CONFIG = load_yaml_as_dict(os.path.join(CONFIGPATH, "DSolStaticSet.yaml"), on_error="raise")
-
-    def __init__(
-            self,
-            structure: Structure|None = None,
-            incar_nelect: float|None = None,
-            **kwargs
-        ) -> None:
-        """DSolStaticSet init."""
-        super().__init__(structure, **kwargs) # type: ignore
-
-        if incar_nelect is None:
-            try:
-                incar_nelect = get_all_valence_electrons(structure)
-            except TypeError as e:
-                raise ValueError("Either structure or incar_nelect must be given.") from e
-
-        self.incar_nelect = incar_nelect
-
-    @property
-    def incar_updates(self) -> Dict:
-        """Get updates to the INCAR config for this calculation type."""
-        updates: Dict[str, Any] = {"MAGMOM": None, "NELECT": self.incar_nelect}
-        return updates
-
-
-########################################
+from .computations.vasp import DSolStaticSet
 
 
 class DSolCalc(Enum):
