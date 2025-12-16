@@ -2,30 +2,22 @@
 """Counts the number of structures in given CIF files."""
 
 import os
-import argparse as argp
-import typing as typ
+import argparse as ap
+import typing as tp
 
-# LOCAL IMPORTS
 from . import _parse_input_args
-from .utils import check_type
+from .utils.utils import check_type
 
 
-########################################
-# ARGUMENTS HANDLING
-
-def _get_command_line_args() -> argp.Namespace:
+def _get_command_line_args() -> ap.Namespace:
     """Command Line Interface (CLI)."""
-    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
-
+    parser = ap.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument(
-        "filenames", 
-        nargs="+",
+        "filenames",  nargs="+",
         help="files to count structures in."
     )
     parser.add_argument(
-        "--cut", "-c",
-        nargs="*",
-        type=int,
+        "--cut", "-c", nargs="*", type=int,
         help=(
             "Create a truncated copy of the tested file containing only some of the "
             "structures data from original file. Takes 1 or more integer values depending "
@@ -34,8 +26,7 @@ def _get_command_line_args() -> argp.Namespace:
         metavar="int"
     )
     parser.add_argument(
-        "--how-to-cut",
-        default="from_start",
+        "--how-to-cut", default="from_start",
         help=(
             "Which cutting algorithm to use. "
             "Supports 'from_start', keeping the first <cut value> data (default); "
@@ -49,7 +40,7 @@ def _get_command_line_args() -> argp.Namespace:
     return args
 
 
-def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     """Handle input arguments assertions and processing."""
     if args_dict is None:
         raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
@@ -86,9 +77,6 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     return args_dict
 
 
-########################################
-
-
 def write_cut_file(
         filename: str,
         file_lines: list[str],
@@ -99,17 +87,23 @@ def write_cut_file(
     """
     Create a truncated copy of given CIF file according to given algorithm.
 
-    Parameters:
-        filename (str):                     The name of the original file.
+    Parameters
+    ----------
+    filename: str
+        The name of the original file.
     
-        file_lines ([str]):                 The original file data as a list of its lines.
+    file_lines: list[str]
+        The original file data as a list of its lines.
 
-        data_breakpoints ([(int, str)]):    List of the lines starting with "data_" denoting
-                                            the beginning of the data of each structure.
+    data_breakpoints: list[(int, str)]
+        List of the lines starting with "data_" denoting the beginning of the data
+        of each structure.
 
-        cut_idx ([int]):                    Indices indicating which data to keep.
+    cut_idx: list[int]
+        Indices indicating which data to keep.
 
-        cut_algo (str):                     Cutting algorithm to use for the truncation.
+    cut_algo: str
+        Cutting algorithm to use for the truncation.
     """
     valid_cut_idx = list(filter(lambda idx: 0 <= idx < len(data_breakpoints), cut_idx))
     skipped_idx = list(filter(lambda idx: idx < 0 or idx >= len(data_breakpoints), cut_idx))
@@ -187,32 +181,33 @@ def write_cut_file(
     print(f"The file {cut_file} truncated from {filename} was successfully created.")
 
 
-########################################
-
-
 def main(standalone: bool = True, **kwargs) -> None:
     """
     Counts the number of structures in given CIF files.
     
-    Args:
-        standalone (bool):      Whether parsed script is used directly through
-                                command-line (stand-alone script) or in an external
-                                pipeline script.
+    Parameters
+    ----------
+    standalone (bool
+        Whether parsed script is used directly through command-line (stand-alone script)
+        or in an external pipeline script.
 
-        filenames ([str|Path]): Files to count structures in.
+    filenames ([str|Path]
+        Files to count structures in.
 
-        cut ([int]):            Create a truncated copy of the tested file containing only some
-                                of the structures data from original file. Takes 1 or more integer
-                                values depending on chosen cutting algorithm.
-                                See 'how-to-cut' for more infos.
+    cut ([int]
+        Create a truncated copy of the tested file containing only some of the structures
+        data from original file. Takes 1 or more integer values depending on chosen cutting
+        algorithm. See 'how-to-cut' for more infos.
 
-        how_to_cut (str):       Which cutting algorithm to use.
-                                Supports 'from_start', keeping the first <cut value> data (default);
-                                'from_end', keeping the last <cut value> data;
-                                'interval', keeping data between <cut value 1> and <cut value 2>
-                                indices (limits included);
-                                'select', keeping only data at given <list of cut values> indices.
-                                Indexation of data is zero-based, and in the file order.
+    how_to_cut (str
+        Which cutting algorithm to use. Supports:
+
+        - 'from_start', keep the first <cut value> data (default);
+        - 'from_end', keep the last <cut value> data;
+        - 'interval', keep data between <cut value 1> and <cut value 2> indices (included);
+        - 'select', keep only data at given <list of cut values> indices.
+
+        Indexation of data is zero-based, and in the file order.
     """
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
