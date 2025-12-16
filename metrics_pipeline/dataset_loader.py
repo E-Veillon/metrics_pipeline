@@ -8,11 +8,9 @@ import os
 import argparse as argp
 import typing as typ
 
-# LOCAL IMPORTS
 from . import _parse_input_args
-from .utils import (
-    check_type, check_file_or_dir, PDDataset, MPDatasetDownloader
-)
+from .utils.utils import check_type
+from utils.io import check_file_or_dir, PDDataset, MPDatasetDownloader
 
 
 def _get_command_line_args() -> argp.Namespace:
