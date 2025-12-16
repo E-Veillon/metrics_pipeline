@@ -18,7 +18,7 @@ from utils.io import check_file_or_dir, load_yaml_as_dict, VaspWriter, VaspParse
 from utils.computations.vasp import PMGStaticSet, DSolStaticSet
 # TODO: Legacy imports to replace
 from .utils import get_dsol_struct_dir, calc_idx_to_dir_name, dsol_calc_init
-from utils.vasp_io import extract_vasp_data_for_delta_sol_init
+from utils.legacy.vasp_io import extract_vasp_data_for_delta_sol_init
 
 def _get_command_line_args() -> ap.Namespace:
     parser = ap.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)

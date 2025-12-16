@@ -14,10 +14,10 @@ from pymatgen.core import SiteCollection, Structure
 from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp.sets import MPRelaxSet
 
-from .utils import check_type, check_num_value, get_all_valence_electrons
-from .io import PathLike, CONFIGPATH, check_file_or_dir, load_yaml_as_dict
+from metrics_pipeline.utils.utils import check_type, check_num_value, get_all_valence_electrons
+from metrics_pipeline.utils.io import PathLike, CONFIGPATH, check_file_or_dir, load_yaml_as_dict
+from metrics_pipeline.utils.computations.vasp import DSolStaticSet
 from .fitted_values import EL_PER_XC_VOL
-from .computations.vasp import DSolStaticSet
 
 
 class DSolCalc(Enum):
