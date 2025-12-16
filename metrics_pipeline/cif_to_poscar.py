@@ -129,7 +129,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     significant_figures: int
         Number of significant digits to output all quantities. Defaults to 16.
 
-    workers: int
+    workers: int, optional
         Number of processes to use in parallel. If not given, will use default of
         `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
         and execute sequentially.

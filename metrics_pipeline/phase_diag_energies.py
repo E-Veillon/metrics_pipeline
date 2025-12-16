@@ -254,9 +254,8 @@ def main(standalone: bool = True, **kwargs):
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Extract generated data
-    vparser = VaspParser(args["run_dir"])
     gen_data = VaspExtractor(
-        vasp_parser=vparser,
+        vasp_parser=VaspParser(args["run_dir"]),
         method="convex_hull",
         summary_name=args.get("prev_summary"),
         summary_key=args.get("key_to_check"),
@@ -340,7 +339,7 @@ def main(standalone: bool = True, **kwargs):
 
     sorted_results = dict(sorted(results.items(), key=lambda tup: tup[1]["path"]))
 
-    JsonWriter(args["summarypath"], data=sorted_results).write_as_dict()
+    JsonWriter(args["summarypath"], data=sorted_results, indent=4).write_as_dict()
 
     stop = datetime.now()
     print(f"elapsed time: {stop-start}")

@@ -10,18 +10,14 @@ import typing as typ
 from datetime import datetime
 import argparse as argp
 
-# LOCAL IMPORTS
+# TODO: reorganize behavior between metrics.py and this script
 from . import _parse_input_args
-from utils import (
-    check_type, check_num_value,
-    check_file_format, check_file_or_dir,
-    read_cif, write_cif, check_viability, check_interatomic_distances,
-    batch_symmetrizer, remove_equivalent, symmetrize_and_write_cif
+from utils.utils import check_type, check_num_value
+from utils.io import check_file_or_dir, check_file_format, read_cif, symmetrize_and_write_cif
+from utils.metrics import (
+    StructValidity, Viability, Symmetry, Unicity
 )
 
-
-########################################
-# ARGUMENTS HANDLING
 
 def _get_command_line_args() -> argp.Namespace:
     """Command Line Interface (CLI)."""
@@ -144,24 +140,11 @@ def _get_command_line_args() -> argp.Namespace:
         )
     )
     parser.add_argument(
-        "-w",
-        "--workers",
-        type=int,
+        "--workers", "-w", type=int, metavar="int",
         help=(
-            "Number of parallel processes to spawn for parallelized steps. "
-            "If not given, If not given, default value is the 'max_workers' "
-            "default value from tqdm.contrib.concurrent.process_map function."
-        ),
-        metavar="int",
-    )
-    parser.add_argument(
-        "-S", "--sequential",
-        action="store_true",
-        help=(
-            "Pass this flag to deactivate multiprocessing handling and switch to "
-            "sequential computation. Generally, multiprocess is faster, but sometimes "
-            "(e.g. when data is very big) it can softlock into resource distribution. "
-            "Switch to more stable sequential computing if such problem  were to arise."
+            "Number of processes to use in parallel. If not given, will use default of "
+            "`tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()` "
+            "and execute sequentially."
         )
     )
     args: argp.Namespace = parser.parse_args()
@@ -215,7 +198,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
 
     if args_dict.get("workers") is not None:
         check_type(args_dict.get("workers"), "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">", 0)
+        check_num_value(args_dict.get("workers"), "workers", ">=", 0)
 
     # Print final configuration
     print(" ")
@@ -262,7 +245,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     print(
         "NUMBER OF WORKERS: "
         f"{'auto' if args_dict.get('workers') is None else args_dict.get('workers')} "
-        f"{'(ignored)' if args_dict.get('sequential') else ''}"
+        f"{'(sequential)' if args_dict.get('workers') == 0 else ''}"
     )
     print(" ")
     print("------------------------------")
@@ -280,65 +263,67 @@ def main(standalone: bool = True, **kwargs) -> None:
     It filters out too bad and / or duplicated data, finds symmetry space group
     and format the valid data in a way that will be more readable for further calculations.
 
-    Args:
-        standalone (bool):          Whether parsed script is used directly through
-                                    command-line (stand-alone script) or in an external
-                                    pipeline script.
+    Parameters
+    ----------
+    standalone (bool
+        Whether parsed script is used directly through command-line (stand-alone script)
+        or in an external pipeline script.
 
-        input_file (str|Path):      Path to the CIF file containing structure data to process.
+    input_file (str|Path
+        Path to the CIF file containing structure data to process.
 
-        output (str|Path):          Path to wanted CIF output file where processed structures
-                                    will be stored. If not given, output file is written in input
-                                    file directory with the same name with a '_out' suffix added.
+    output (str|Path
+        Path to wanted CIF output file where processed structures will be stored. If not given,
+        output file is written in input file directory with the same name with a '_out' suffix
+        added.
 
-        no_rare_gas_check (bool):   Whether to disable elimination of structures containing rare
-                                    gas elements. Defaults to False.
+    no_rare_gas_check (bool
+        Whether to disable elimination of structures containing rare gas elements.
+        Defaults to False.
 
-        no_rare_earth_check (bool): Whether to disable elimination of structures containing f-block
-                                    elements. Defaults to False.
+    no_rare_earth_check (bool
+        Whether to disable elimination of structures containing f-block elements.
+        Defaults to False.
 
-        no_dist_check (bool):       Whether to disable structures interatomic distances checking.
+    no_dist_check (bool
+        Whether to disable structures interatomic distances checking.
 
-        dist_tolerance (float):     Tolerance for checking interatomic distances in Angstroms.
-                                    Structures containing atoms that are closer than this value
-                                    will be discarded from output. Defaults to using tabulated
-                                    atomic radii instead of an arbitrary tolerance.
+    dist_tolerance (float
+        Tolerance for checking interatomic distances in Angstroms. Structures containing atoms
+        that are closer than this value will be discarded from output. Defaults to using
+        tabulated atomic radii instead of an arbitrary tolerance.
 
-        no_symmetrization (bool):   Whether to disable search of structures symmetry space groups.
-                                    Defaults to False.
+    no_symmetrization (bool
+        Whether to disable search of structures symmetry space groups. Defaults to False.
 
-        symprec (float):            Fractional coordinates tolerance for symmetry finding.
-                                    Defaults to 0.01.
+    symprec (float
+        Fractional coordinates tolerance for symmetry finding. Defaults to 0.01.
 
-        angleprec (float):          Angle tolerance for symmetry finding in degrees.
-                                    Defaults to 5.0 degrees.
+    angleprec (float
+        Angle tolerance for symmetry finding in degrees. Defaults to 5.0 degrees.
 
-        discard_asymmetrics (bool): Whether to filter structures that are detected to be of
-                                    triclinic system. Only used if symmetrization is activated.
-                                    Defaults to False.
+    discard_asymmetrics (bool
+        Whether to filter structures that are detected to be of triclinic system.
+        Only used if symmetrization is activated. Defaults to False.
 
-        no_equiv_match (bool):      Whether to disable structure matching and elimination of
-                                    duplicates. Defaults to False.
+    no_equiv_match (bool
+        Whether to disable structure matching and elimination of duplicates.
+        Defaults to False.
 
-        special_keys ([str]):       CIF Labels to store into structure properties, e.g.
-                                    can be used to save structure identifiers attached to it
-                                    throughout its manipulation as a python object.
+    special_keys ([str]
+        CIF Labels to store into structure properties, e.g. can be used to save structure
+        identifiers attached to it throughout its manipulation as a python object.
 
-        test_min_vol (bool):        A debug arg to assume unicity of unlikely structures having
-                                    a volume under 1 Angström^3 without passing them into structure
-                                    matching, which could cause the program to be softlocked. Only
-                                    pass it if such problems were to arise when no_dist_check is
-                                    set to True and no_equiv_match is set to False.
+    test_min_vol (bool
+        A debug arg to assume unicity of unlikely structures having a volume under 1 Angström^3
+        without passing them into structure matching, which could cause the program to be
+        softlocked. Only pass it if such problems were to arise when no_dist_check is set to True
+        and no_equiv_match is set to False.
 
-        workers (int):              Number of parallel processes to spawn for parallelized steps.
-                                    If not given, If not given, default value is the 'max_workers'
-                                    default value from tqdm.contrib.concurrent.process_map function.
-
-        sequential (bool):          Pass this flag to deactivate multiprocessing handling and
-                                    switch to sequential computation. Generally, multiprocess
-                                    is faster, but sometimes (e.g. when data is very big) it
-                                    can softlock into resource distribution. Switch to more
-                                    stable sequential computing if such problem  were to arise.
+    workers: int, optional
+        Number of processes to use in parallel. If not given, will use default of
+        `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
+        and execute sequentially.
     """
     start = datetime.now()
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
@@ -349,8 +334,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         keep_rare_gases=args["no_rare_gas_check"],
         keep_rare_earths=args["no_rare_earth_check"],
         special_keys=args.get("special_keys"),
-        workers=args.get("workers"),
-        sequential=args["sequential"]
+        workers=args.get("workers")
     )
 
     nbr_loaded_structs = len(structures)
@@ -370,42 +354,34 @@ def main(standalone: bool = True, **kwargs) -> None:
     # Vérification des distances interatomiques
 
     if not args["no_dist_check"] and isinstance(args["dist_tolerance"], float):
-        structures, nbr_not_valid = check_interatomic_distances(
-            structures, valid_tol=args["dist_tolerance"]
-        )
+        validity = StructValidity(structures, valid_tol=args["dist_tolerance"])
+        structures, nbr_not_valid = validity.valid_structs, len(validity.invalid_structs)
         print(f"{nbr_not_valid} structures having too close atoms were discarded")
 
     elif not args["no_dist_check"]:
-        structures, nbr_not_viable = check_viability(structures)
+        viability = Viability(structures)
+        structures, nbr_not_viable = viability.viable_structs, len(viability.non_viable_structs)
         print(f"{nbr_not_viable} not viable structures were discarded")
 
     # Détection et élimination des structures tricliniques
     if not args["no_symmetrization"] and args["discard_asymmetrics"]:
-        symmetrized_structs = list(filter(
-            None,
-            batch_symmetrizer(
-                structures=structures,
-                symprec=args["symprec"],
-                angle_tolerance=args["angleprec"],
-                workers=args["workers"],
-                sequential=args["sequential"]
-            )
-        ))
-        symmetric_structs = list(filter(lambda s: s.spacegroup.int_number > 2, symmetrized_structs))
-        nbr_asymmetric = len(symmetrized_structs) - len(symmetric_structs)
+        symmetry = Symmetry(
+            structures,
+            symprec=args["symprec"],
+            angleprec=args["angleprec"],
+            workers=args["workers"]
+        )
+        symmetric_structs = symmetry.symmetric_structs
+        nbr_asymmetric = len(symmetry.triclinic_structs)
         print(f"{nbr_asymmetric} triclinic structures discarded")
         structures = symmetric_structs
 
     # Comparaison des structures pour éliminer les doublons
-    kept_structs, nbr_equivalent, nbr_unmatched = remove_equivalent(
-            structures=structures,
-            workers=args.get("workers"),
-            test_volume=args["test_min_vol"],
-            keep_equivalent=args["no_equiv_match"],
-            sequential=args["sequential"]
-    )
-
+    unicity = Unicity(structures, workers=args["workers"])
+    kept_structs = unicity.unique_structs
     nbr_unique_structs = len(kept_structs)
+    nbr_equivalent = len(unicity.duplicate_structs)
+    nbr_unmatched = len(unicity.unmatchable_structs)
 
     if not args["no_equiv_match"]:
         print(f"{nbr_unique_structs} unique structures detected")
@@ -428,8 +404,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         symprec=args["symprec"],
         angleprec=args["angleprec"],
         special_keys=args.get("special_keys"),
-        workers=args.get("workers"),
-        sequential=args["sequential"]
+        workers=args.get("workers")
     )
 
     # Calcul du temps total pris par la procédure

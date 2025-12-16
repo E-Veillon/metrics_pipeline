@@ -1,34 +1,31 @@
 #!/usr/bin/python
-"""Process CSV data according to its 'cif' column (TODO: WORK IN PROGRESS)."""
+"""Process CSV data according to its 'cif' column."""
 
 import os
 import typing as tp
-import argparse as argp
+import argparse as ap
 from tqdm import tqdm
 
 import pandas as pd
 
-from pymatgen.io.cif import CifParser
-
-# LOCAL IMPORTS
 from . import _parse_input_args
-from .utils import (
-    check_interatomic_distances,
-    remove_equivalent,
-    discard_rare_gas_structures,
-    discard_rare_earth_structures,
-    check_file_or_dir, check_file_format, check_type, check_num_value
-)
+from utils.utils import check_type, check_num_value, discard_rare_gas_structures, discard_rare_earth_structures
+from utils.io import cif_str_to_struct, check_file_or_dir, check_file_format
+from utils.metrics import StructValidity, Unicity
 
 
-########################################
-# ARGUMENTS HANDLING
-
-def _get_command_line_args() -> argp.Namespace:
+def _get_command_line_args() -> ap.Namespace:
     """Command Line Interface (CLI)."""
-    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
+    parser = ap.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument("infile",help="CSV file containing a 'cif' data column to process.")
     parser.add_argument("-o","--output",help="Path to write processed CSV file.")
+    parser.add_argument(
+        "--id-key", default="material_id",
+        help=(
+            "Name of the column containing structures unique identifier. "
+            "Defaults to %(default)s."
+        )
+    )
     parser.add_argument(
         "-w","--workers",
         type=int,
@@ -100,6 +97,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
     default_output = str(args_dict.get("infile")).replace(".csv","_parsed.csv")
     args_dict.setdefault("output", default_output)
+    args_dict.setdefault("id_key", "material_id")
     args_dict.setdefault("no_rare_gas_check", False)
     args_dict.setdefault("no_rare_earth_check", False)
     args_dict.setdefault("no_dist_check", False)
@@ -110,7 +108,8 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("infile"), "file", allowed_formats="csv")
     check_file_format(args_dict.get("output"), allowed_formats="csv")
-    
+    check_type(args_dict["id_key"], "id_key", (str,))
+
     if args_dict.get("workers") is not None:
         check_type(args_dict.get("workers"), "workers", (int,))
         check_num_value(args_dict.get("workers"), "workers", ">", 0)
@@ -126,50 +125,63 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
 def main(standalone: bool = True, **kwargs) -> None:
     """
-    Process CSV data according to its 'cif' column (TODO: WORK IN PROGRESS).
+    Process CSV data according to its 'cif' column.
     
-    Args:
-        standalone (bool):          Whether parsed script is used directly through
-                                    command-line (stand-alone script) or in an external
-                                    pipeline script.
+    Parameters
+    ----------
+    standalone: bool
+        Whether parsed script is used directly through command-line (stand-alone script)
+        or in an external pipeline script.
 
-        infile (str|Path):          CSV file containing a 'cif' data column to process.
+    infile: str | Path
+        CSV file containing a 'cif' data column to process.
 
-        output (str|Path):          Path to write processed CSV file.
+    output: str | Path
+        Path to write processed CSV file.
 
-        workers (int):              Number of parallel processes to spawn for parallelized steps.
-                                    If not given, If not given, default value is the 'max_workers'
-                                    default value from tqdm.contrib.concurrent.process_map function.
+    id_key: str, optional
+        Name of the column containing structures unique identifier.
+        Defaults to %(default)s.
 
-        no_rare_gas_check (bool):   Whether to disable elimination of structures containing rare
-                                    gas elements. Defaults to False.
+    workers: int, optional
+        Number of processes to use in parallel. If not given, will use default of
+        `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
+        and execute sequentially.
 
-        no_rare_earth_check (bool): Whether to disable elimination of structures containing f-block
-                                    elements. Defaults to False.
+    no_rare_gas_check: bool
+        Whether to disable elimination of structures containing rare gas elements.
+        Defaults to False.
 
-        no_dist_check (bool):       Whether to disable structures interatomic distances checking.
+    no_rare_earth_check: bool
+        Whether to disable elimination of structures containing f-block elements.
+        Defaults to False.
 
-        dist_tolerance (float):     Tolerance for checking interatomic distances in Angstroms.
-                                    Structures containing atoms that are closer than this value
-                                    will be discarded from output. Defaults to 0.5 Angstroms.
+    no_dist_check: bool
+        Whether to disable structures interatomic distances checking.
 
-        no_equiv_match (bool):      Whether to disable structure matching and elimination of
-                                    duplicates. Defaults to False.
+    dist_tolerance: float
+        Tolerance for checking interatomic distances in Angstroms. Structures containing
+        atoms that are closer than this value will be discarded from output.
+        Defaults to 0.5 Angstroms.
 
-        test_min_vol (bool):        A debug arg to assume unicity of unlikely structures having
-                                    a volume under 1 Angström^3 without passing them into structure
-                                    matching, which could cause the program to be softlocked. Only
-                                    pass it if such problems were to arise when no_dist_check is
-                                    set to True and no_equiv_match is set to False.
+    no_equiv_match: bool
+        Whether to disable structure matching and elimination of duplicates.
+        Defaults to False.
+
+    test_min_vol: bool
+        A debug arg to assume unicity of unlikely structures having a volume under 1 Angström^3
+        without passing them into structure matching, which could cause the program to be
+        softlocked. Only pass it if such problems were to arise when no_dist_check is set to
+        True and no_equiv_match is set to False.
     """
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     df = pd.read_csv(args["infile"])
-    ids: list[int] = df["material_id"].tolist()
+    ids: list[int] = df[args["id_key"]].tolist()
     cifs: list[str] = df["cif"].tolist()
     step_sep = "\n------------------------------\n"
 
-    # Rename CIFs headers with their 'material_id'
+    # Rename CIFs headers with their 'id_key'
     new_cifs = []
     for id, cif in tqdm(list(zip(ids, cifs)),desc="Renaming CIFs"):
         split_cif = cif.splitlines()
@@ -198,19 +210,21 @@ def main(standalone: bool = True, **kwargs) -> None:
         print(step_sep)
 
     # Structurize kept CIFs and save their id
-    structs = []
-    for cif in tqdm(new_data, desc="Structurize CIFs"):
-        id = int(cif.splitlines()[0][5:])
-        struct = CifParser.from_str(cif).parse_structures(primitive=False, on_error='ignore')[0]
-        struct.properties["id"] = id
-        structs.append(struct)
+    structs = [
+        cif_str_to_struct(cif, special_keys=["header"])
+        for cif in tqdm(new_data, desc="Structurize CIFs")
+    ]
     new_data = structs
     print(step_sep)
 
     if not args.get("no_dist_check"):
         # Process structures
-        print(f"Searching for non-valid structures (atom pairs closer than {args.get('dist_tolerance')}A)...")
-        valid_structs, nbr_no_valid = check_interatomic_distances(new_data, valid_tol=args["dist_tolerance"])
+        print(
+            "Searching for non-valid structures "
+            f"(atom pairs closer than {args.get('dist_tolerance')}A)..."
+        )
+        validity = StructValidity(new_data, valid_tol=args["dist_tolerance"])
+        valid_structs, nbr_no_valid = validity.valid_structs, len(validity.invalid_structs)
         new_data = valid_structs
         print(f"Number of not valid structures: {nbr_no_valid}")
         print(f"Structures left: {len(valid_structs)}")
@@ -218,22 +232,25 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     if not args.get("no_equiv_match"):
         print("Searching for duplicates...")
-        val_uniq_structs, nbr_dupl, _ = remove_equivalent(new_data, workers=args.get("workers"))
+        unicity = Unicity(new_data, workers=args.get("workers"))
+        val_uniq_structs, nbr_dupl = unicity.unique_structs, len(unicity.duplicate_structs)
         new_data = val_uniq_structs
         print(f"Number of duplicate structures: {nbr_dupl}")
         print(f"Structures left: {len(val_uniq_structs)}")
         print(step_sep)
 
     print("Build new DataFrame with parsed data...")
-    # Get 'material_id's of all kept data
-    kept_ids = set([struct.properties["id"] for struct in new_data])
+    # Get IDs of all kept data
+    kept_ids = set([struct.properties["header"] for struct in new_data])
     print(f"Number of kept ids: {len(kept_ids)}")
 
     # Build a new DataFrame with valid structures data only from the old DataFrame
     def by_Series_idx(row_tuple: tuple[int, pd.Series]) -> int:
         return row_tuple[0]
 
-    kept_rows = list(filter(lambda row: row[1].material_id in kept_ids, df.iterrows()))
+    kept_rows = list(
+        filter(lambda row: getattr(row[1], args["id_key"]) in kept_ids, df.iterrows())
+    )
     print(f"Number of kept data rows: {len(kept_rows)}")
     sorted_rows = [row[1] for row in sorted(kept_rows, key=by_Series_idx)] # type: ignore
     print(f"Number of kept data rows sorted: {len(sorted_rows)}")

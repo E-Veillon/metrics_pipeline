@@ -14,10 +14,12 @@ from tqdm.contrib.concurrent import process_map
 from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-from metrics_pipeline import _parse_input_args
-from metrics_pipeline.utils import check_type, check_file_or_dir, check_num_value
-from metrics_pipeline.utils import read_cif, write_cif
-from metrics_pipeline.utils import PG_TO_SYSTEM, VisualIterator
+from . import _parse_input_args
+from utils.utils import check_type, check_num_value, VisualIterator
+from utils.io import read_cif, symmetrize_and_write_cif, check_file_or_dir
+# TODO: legacy imports to replace.
+from utils import PG_TO_SYSTEM
+
 
 class SymmetryClass(Enum):
     FAMILY = "family"
@@ -58,24 +60,11 @@ def _get_command_line_args() -> argp.Namespace:
         )
     )
     parser.add_argument(
-        "-w",
-        "--workers",
-        type=int,
+        "--workers", "-w", type=int, metavar="int",
         help=(
-            "Number of parallel processes to spawn for parallelized steps. "
-            "If not given, If not given, default value is the 'max_workers' "
-            "default value from tqdm.contrib.concurrent.process_map function."
-        ),
-        metavar="int",
-    )
-    parser.add_argument(
-        "-S", "--sequential",
-        action="store_true",
-        help=(
-            "Pass this flag to deactivate multiprocessing handling and switch to "
-            "sequential computation. Generally, multiprocess is faster, but sometimes "
-            "(e.g. when data is very big) it can softlock into resource distribution. "
-            "Switch to more stable sequential computing if such problem  were to arise."
+            "Number of processes to use in parallel. If not given, will use default of "
+            "`tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()` "
+            "and execute sequentially."
         )
     )
     args = parser.parse_args()
@@ -172,7 +161,37 @@ def get_sym_and_refined_struct(
 
 
 def main(standalone: bool = True, **kwargs) -> None:
-    """"""
+    """
+    Find symmetry of CIF structures, refine positions according to symmetry
+    and store them in different files depending on their symmetry class.
+
+    Parameters
+    ----------
+    input_file: str | Path
+        CIF file to parse.
+
+    output: str | Path
+        Directory to output parsed files. Default: input file directory.
+
+    filter_by: 'family', 'system', 'pointgroup', 'spacegroup'
+        How to separate parsed structures. Supports following arguments:
+        - 'family' (default): parse into 6 crystal families
+        (triclinic, monoclinic, orthorhombic, tetragonal, hexagonal, cubic);
+        - 'system': parse into 7 crystal systems
+        (hexagonal family is separated between trigonal and hexagonal systems);
+        - 'pointgroup': parse into 32 crystallographic point groups;
+        - 'spacegroup': parse into 230 crystallographic space groups.
+
+    special_keys: list[str], optional
+        CIF Labels to store into structure properties, e.g. can be used to save
+        structure identifiers attached to it throughout its manipulation as a python
+        object.
+
+    workers: int, optional
+        Number of processes to use in parallel. If not given, will use default of
+        `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
+        and execute sequentially.
+    """
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
     _print_config(args)
 
@@ -181,8 +200,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         keep_rare_earths=True,
         keep_rare_gases=True,
         special_keys=args.get("special_keys"),
-        workers=args.get("workers"),
-        sequential=args["sequential"]
+        workers=args.get("workers")
     )
 
     partial_fn = ft.partial(get_sym_and_refined_struct, sym_class=args["filter_by"])
@@ -235,18 +253,19 @@ def main(standalone: bool = True, **kwargs) -> None:
             args["output"],
             str(path.basename(args["input_file"])).replace(".cif", f"_{sym_class}.cif")
         )
-        write_cif(
+        symmetrize_and_write_cif(
             outfile,
             [struct for _, struct in sym_structs],
-            workers=args.get("workers"),
-            sequential=args["sequential"]
+            symmetrize=False,
+            special_keys=args.get("special_keys"),
+            workers=args.get("workers")
         )
         structs_tups = list(filter(lambda t: t[0] != sym_class, structs_tups))
     
     assert len(structs_tups) == 0, (
         "Not all structures were parsed at the end, "
         "some symmetry classes may not have been accounted for in the code. "
-        f"Unparsed classes: {set([tup[0] for tup in structs_tups])}"
+        f"Unparsed classes: {', '.join(sorted(set(tup[0] for tup in structs_tups)))}."
     )
     print("All structures were properly parsed !")
 

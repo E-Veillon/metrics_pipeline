@@ -247,39 +247,41 @@ def symmetrize_and_write_cif(
     symprec: float = 0.01,
     angleprec: float = 5.0,
     special_keys: list[str]|None = None,
-    workers: int|None = None,
-    sequential: bool = False
+    workers: int|None = None
 ) -> None:
     """
     Symmetrize and encode multiple structures in CIF format and write them in a file
     using multiprocess.
 
-    Parameters:
-        filename (str):                 Name of the input file.
+    Parameters
+    ----------
+    filename (str
+        Name of the input file.
 
-        structures (List[Structure]):   The structures to encode.
+    structures (List[Structure]
+        The structures to encode.
 
-        significant_figures (int):      Number of decimal places to keep for atomic positions.
+    significant_figures (int
+        Number of decimal places to keep for atomic positions.
 
-        symmetrize (bool):              Whether to search for structures spacegroup symmetry
-                                        and refine their atomic positions according to found
-                                        symmetry before encoding them. Defaults to True.
+    symmetrize (bool
+        Whether to search for structures spacegroup symmetry and refine their atomic positions
+        according to found symmetry before encoding them. Defaults to True.
 
-        symprec (float):                Fractional position tolerance to find symmetry.
-                                        Defaults to 0.01.
+    symprec (float
+        Fractional position tolerance to find symmetry. Defaults to 0.01.
 
-        angleprec (float):              Angle tolerance to find symmetry.
-                                        Defaults to 5 degrees.
+    angleprec (float
+        Angle tolerance to find symmetry. Defaults to 5 degrees.
 
-        special_keys ([str]):           CIF Labels to store into structure properties, e.g.
-                                        can be used to save structure identifiers attached to it
-                                        throughout its manipulation as a python object.
+    special_keys ([str]
+        CIF Labels to store into structure properties, e.g. can be used to save structure
+        identifiers attached to it throughout its manipulation as a python object.
 
-        workers (int):                  Number of parallel processes to use.
-
-        sequential (bool):              Whether to use sequential for-loop instead of
-                                        multiprocessing scheme. If set to True, the
-                                        'workers' arg is ignored. Defaults to False.
+    workers: int, optional
+        Number of processes to use in parallel. If not given, will use default of
+        `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
+        and execute sequentially.
     """
     check_file_format(filename, allowed_formats="cif")
 
@@ -302,7 +304,7 @@ def symmetrize_and_write_cif(
             special_keys=special_keys
         )
 
-    if sequential:
+    if workers == 0:
         encoded_cif = [
             partial_fn(struct)
             for struct in VisualIterator(structures, desc="Writing data in cif format")

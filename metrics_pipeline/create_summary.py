@@ -8,7 +8,7 @@ import typing as typ
 
 from . import _parse_input_args
 from utils.utils import check_type
-from utils.io import check_file_or_dir, check_file_format, VaspParser
+from utils.io import check_file_or_dir, check_file_format, VaspParser, JsonWriter
 
 
 def _get_command_line_args() -> argp.Namespace:
@@ -134,9 +134,7 @@ def main(standalone: bool = True, **kwargs) -> None:
                 f"{args.get('key_name')}": (struct_dir in wanted_struct_dirs) ^ args["reject"]
             }
         )
-
-    with open(args["outfile"], "wt", encoding="utf-8") as fp:
-        json.dump(summary_result, fp, indent=4)
+    JsonWriter(args["outfile"], summary_result, indent=4)
 
 
 if __name__ == "__main__":

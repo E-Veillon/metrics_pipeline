@@ -72,7 +72,8 @@ class JsonWriter:
     def __init__(
         self,
         filepath: PathLike,
-        data: dict | list | tuple | int | float | bool | None = None
+        data: dict | list | tuple | int | float | bool | None = None,
+        **kwargs
     ) -> None:
         """
         Write JSON files with extra features.
@@ -84,10 +85,14 @@ class JsonWriter:
 
         data: dict | list | tuple | int | float | bool | None, optional
             Data to write in the file. Can be added after initialization.
+
+        kwargs: Any
+            Additional keyword arguments to pass to `json.dump()`.
         """
         check_file_format(filepath, allowed_formats="json")
         self.filepath = filepath
         self.data = data
+        self.kwargs = kwargs
 
     @property
     def data(self) -> tp.Any:
@@ -108,7 +113,7 @@ class JsonWriter:
         """Write the JSON data as-is."""
         os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
         with open(self.filepath, "wt", encoding="utf-8") as fp:
-            json.dump(self._data, fp)
+            json.dump(self._data, fp, **self.kwargs)
 
     def write_as_dict(self) -> None:
         """
