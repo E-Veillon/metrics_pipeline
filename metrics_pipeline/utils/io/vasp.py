@@ -40,7 +40,7 @@ class VaspWriter:
             Path to base directory to write VASP run directories to. It is recommended to
             use an empty directory. Creates the path if it does not exist.
 
-        vasp_input: list[VaspInput], optional
+        vasp_inputs: dict[str, VaspInput], optional
             Dict of {str: VaspInput} with VASP run directories names to create as keys and
             VaspInput objects containing all necessary files to write to the run directories
             as values. They can be added directly at initialization and / or one by one later
@@ -447,7 +447,9 @@ class VaspParser:
         struct_dict = {}
         for run_dir in self.struct_dirs:
             try:
-                struct_dict[run_dir.name] = self.get_struct_from_run_dir(run_dir)
+                struct_dict[run_dir.name] = self.get_struct_from_run_dir(
+                    run_dir, try_vasprun, try_contcar, try_xdatcar, try_poscar
+                )
             except FileNotFoundError:
                 struct_dict[run_dir.name] = None
         return struct_dict

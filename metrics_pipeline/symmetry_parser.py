@@ -167,6 +167,10 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     Parameters
     ----------
+    standalone: bool
+        Whether parsed script is used directly through command-line (stand-alone script)
+        or in an external pipeline script.
+
     input_file: str | Path
         CIF file to parse.
 

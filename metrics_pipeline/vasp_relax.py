@@ -1,34 +1,28 @@
 #!/usr/bin/python
 """
-A script that writes and performs VASP relaxation on structure data read from CIF files,
-using pymatgen as a setting interface between raw data and VASP.
-The relaxation results then may be used in other scripts for material properties analysis.
+Write VASP relaxation run directories for structure data read from CIF file
+or summary JSON file using pymatgen as a setting interface between raw data and VASP.
 """
 
 import os
-import json
-import typing as typ
+import typing as tp
 from datetime import datetime
-import argparse as argp
+import argparse as ap
 
-# PYTHON MATERIAL GENOMICS
 from pymatgen.core import Structure
 
-# LOCAL IMPORTS
 from . import CONFIGPATH, _parse_input_args
-from .utils import (
-    check_type, check_num_value, check_file_or_dir, add_new_dir, yaml_loader,
-    PMGRelaxSet, read_cif, vasp_relaxation_settings, write_and_run_vasp,
-    get_struct_from_vasp
+from utils.utils import check_type, check_num_value
+from utils.io import (
+    check_file_or_dir, load_yaml_as_dict, read_cif,
+    VaspWriter, VaspParser, JsonLoader
 )
+from utils.computations.vasp import vasp_relaxation_settings, PMGRelaxSet
 
 
-########################################
-# ARGUMENTS HANDLING
-
-def _get_command_line_args() -> argp.Namespace:
+def _get_command_line_args() -> ap.Namespace:
     """Command Line Interface (CLI)."""
-    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
+    parser = ap.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument(
         "input_file",
         help=(
@@ -37,11 +31,6 @@ def _get_command_line_args() -> argp.Namespace:
             "a JSON summary file from a previous pipeline step to extract "
             "structure data from a previous VASP run."
         )
-    )
-    parser.add_argument(
-        "executable_path",
-        help="Path to the VASP executable.",
-        metavar="PATH"
     )
     parser.add_argument(
         "-o", "--output",
@@ -75,12 +64,11 @@ def _get_command_line_args() -> argp.Namespace:
         dest="user_settings"
     )
     parser.add_argument(
-        "-w", "--workers",
-        type=int,
+        "--workers", "-w", type=int, metavar="int",
         help=(
-            "Number of parallel processes to spawn for parallelized steps. "
-            "If not given, default value is the 'max_workers' default value "
-            "from tqdm.contrib.concurrent.process_map function."
+            "Number of processes to use in parallel. If not given, will use default of "
+            "`tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()` "
+            "and execute sequentially."
         )
     )
     parser.add_argument(
@@ -95,11 +83,11 @@ def _get_command_line_args() -> argp.Namespace:
             "If not given, it will default to the first possible index, i.e. index 0."
         ),
     )
-    args: argp.Namespace = parser.parse_args()
+    args: ap.Namespace = parser.parse_args()
     return args
 
 
-def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
+def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     """Handle input arguments assertions and processing."""
     if args_dict is None:
         raise ValueError(f"No arguments found at '{os.path.basename(__file__)}' script call.")
@@ -142,54 +130,48 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     # Additional arguments processing
     os.makedirs(args_dict["output"], exist_ok=True)
     args_dict["preset"] = PMGRelaxSet(args_dict.get("preset"))
-    args_dict["settings"] = yaml_loader(config_path)
+    args_dict["settings"] = load_yaml_as_dict(config_path)
 
     return args_dict
 
-
-########################################
-
-
+# TODO: simplify by asking an input CIF or base dir and output base dir more explicitly
 def main(standalone: bool = True, **kwargs):
     """
-    A script that writes and performs VASP relaxation on structure data read from CIF files,
-    using pymatgen as a setting interface between raw data and VASP.
-    The relaxation results then may be used in other scripts for material properties analysis.
+    Write VASP relaxation run directories for structure data read from CIF file
+    or summary JSON file using pymatgen as a setting interface between raw data and VASP.
 
-    Args:
-        standalone (bool):          Whether parsed script is used directly through
-                                    command-line (stand-alone script) or in an external
-                                    pipeline script.
+    Parameters
+    ----------
+    standalone: bool
+        Whether parsed script is used directly through command-line (stand-alone script)
+        or in an external pipeline script.
 
-        input_file (str|Path):      Path to the file containing structure data to read. It can be
-                                    a CIF file to read structure data directly, or a JSON summary
-                                    file from a previous pipeline step to extract structure data
-                                    from a previous VASP run.
+    input_file: str | Path
+        Path to the file containing structure data to read. It can be a CIF file to read
+        structure data directly, or a JSON summary file from a previous pipeline step to
+        extract structure data from a previous VASP run.
 
-        executable_path (str|Path): Path to the output directory where VASP files will be written.
-                                    A subdirectory will be created in output directory for each
-                                    structure found in input_file.
+    output: str | Path
+        Path to the output directory where VASP files will be written. A subdirectory will
+        be created in output directory for each structure found in input_file.
 
-        output (str|Path):          Path to the output directory where VASP files will be written.
-                                    A subdirectory will be created in output directory for each
-                                    structure found in input_file.
+    preset: str, optional
+        The pymatgen preset to use for VASP relaxation. More info on possible presets in
+        pymatgen documentation: https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets.
 
-        preset (str):               The pymatgen preset to use for VASP relaxation. More info on
-                                    possible presets in pymatgen documentation:
-                                    https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets.
+    user_settings: str, optional
+        Name of the YAML file containing tags to override the PMG preset. Given filename
+        must be located in 'metrics_pipeline/config' to be found.
 
-        user_settings (str):        Name of the YAML file containing tags to override the PMG
-                                    preset. Given filename must be located in
-                                    'metrics_pipeline/config' to be found.
+    workers: int, optional
+        Number of processes to use in parallel. If not given, will use default of
+        `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
+        and execute sequentially.
 
-        workers (int):              Number of parallel processes to spawn for parallelized steps.
-                                    If not given, default value is the 'max_workers' default value
-                                    from tqdm.contrib.concurrent.process_map function.
-
-        task_index (int):           If a job array is used, provide here the structure index to
-                                    treat according to task IDs (e.g. if task ID 0 treats
-                                    structure 0 and so on, just provide the task ID). If not given,
-                                    it will default to the first possible index, i.e. index 0.
+    task_index: int, optional
+        If a job array is used, provide here the structure index to treat according to task IDs
+        (e.g. if task ID 0 treats structure 0 and so on, just provide the task ID). If not given,
+        it will default to the first possible index, i.e. index 0.
     """
     start = datetime.now()
     args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
@@ -208,24 +190,26 @@ def main(standalone: bool = True, **kwargs):
         dir_name = f"{args['task_index']}_{structure.composition.reduced_formula}"
 
     elif str(args["input_file"]).endswith(".json"):
-
-        with open(args["input_file"], "rt", encoding="utf-8") as fp:
-            data = json.load(fp)
-
+        data = JsonLoader(args["input_file"]).load_as_list()
         paths = [d["path"] for d in data]
+        task_idx: int = args["task_index"]
 
         try:
             struct_dir = next(filter(
-                lambda path: os.path.basename(path).startswith(f"{args.get('task_index')}_"),
+                lambda path: os.path.basename(path).startswith(f"{task_idx}_"),
                 paths
             ))
         except StopIteration as exc:
             raise ValueError(
-                f"Given 'task_index' value ({args.get('task_index')}) do not match any data "
+                f"Given 'task_index' value ({task_idx}) do not match any data "
                 f"in file {args.get('input_file')}."
             ) from exc
 
-        structure = get_struct_from_vasp(struct_dir, try_xdatcar=False)
+        structure = VaspParser(
+            base_dir=os.path.dirname(args["input_file"]),
+            indices=[task_idx]
+        ).parse_structures()[struct_dir]
+
         dir_name = os.path.basename(struct_dir)
 
     vasp_input = vasp_relaxation_settings(
@@ -233,9 +217,7 @@ def main(standalone: bool = True, **kwargs):
         preset=args["preset"],
         user_corrections=args.get("settings")
     )
-    run_dir = add_new_dir(args["output"], dir_name)
-
-    write_and_run_vasp(vasp_input, run_dir, args["executable_path"])
+    VaspWriter(base_dir=args["output"], vasp_inputs={dir_name: vasp_input})
 
     stop = datetime.now()
     print(f"Elapsed time: {stop-start}")
