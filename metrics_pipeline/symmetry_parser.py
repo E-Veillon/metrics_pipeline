@@ -15,10 +15,8 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from . import _parse_input_args
-from utils.utils import check_type, check_num_value, VisualIterator
-from utils.io import read_cif, symmetrize_and_write_cif, check_file_or_dir
-# TODO: legacy imports to replace.
-from utils import PG_TO_SYSTEM
+from src.utils import check_type, check_num_value, VisualIterator, PG_TO_SYSTEM
+from src.io import read_cif, symmetrize_and_write_cif, check_file_or_dir
 
 
 class SymmetryClass(Enum):

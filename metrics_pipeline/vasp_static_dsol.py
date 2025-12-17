@@ -13,12 +13,12 @@ import warnings
 from pymatgen.core import Structure
 
 from . import CONFIGPATH, _parse_input_args
-from utils.utils import check_type, check_num_value
-from utils.io import check_file_or_dir, load_yaml_as_dict, VaspWriter, VaspParser, VaspExtractor
-from utils.computations.vasp import PMGStaticSet, DSolStaticSet
+from src.utils import check_type, check_num_value
+from src.io import check_file_or_dir, load_yaml_as_dict, VaspWriter, VaspParser, VaspExtractor
+from src.computations.vasp import PMGStaticSet, dsol_calc_init
 # TODO: Legacy imports to replace
-from .utils import get_dsol_struct_dir, calc_idx_to_dir_name, dsol_calc_init
-from utils.legacy.vasp_io import extract_vasp_data_for_delta_sol_init
+from src.legacy.delta_sol import get_dsol_struct_dir, calc_idx_to_dir_name
+from src.legacy.vasp_io import extract_vasp_data_for_delta_sol_init
 
 def _get_command_line_args() -> ap.Namespace:
     parser = ap.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)

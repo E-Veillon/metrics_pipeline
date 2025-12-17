@@ -17,24 +17,21 @@ import typing as tp
 
 # LOCAL IMPORTS
 from . import CONFIGPATH, _parse_input_args
-from utils.utils import check_type, check_num_value
-from utils.io import (
+from src.utils import check_type, check_num_value
+from src.io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
     JsonWriter, read_cif, PathLike, VaspParser, VaspExtractor
 )
-from utils.computations.models import get_crystalnn_fingerprints, vectors_from_alignn
-from utils.computations.local import get_densities
+from src.computations.models import get_crystalnn_fingerprints, vectors_from_alignn
+from src.computations.local import get_densities
 # TODO: reorganize behavior between preprocess.py and this script
-from utils.metrics import (
+from src.metrics import (
     StructValidity, Viability, Symmetry,
     ElementaryMetastability, Novelty, SUN,
     Coverage, EMD, RMSD, FrechetDistance
 )
 # TODO: legacy imports to replace
-from utils import (
-    batch_group_by_equivalence, batch_get_novel_structures,
-    remove_equivalent
-)
+from src.legacy import remove_equivalent
 
 
 def _get_command_line_args() -> ap.Namespace:

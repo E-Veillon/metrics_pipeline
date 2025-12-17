@@ -17,7 +17,6 @@ Algorithm:
     5 - Reject structures too much above reference convex hull.
 """
 
-
 import os
 import argparse as argp
 import typing as tp
@@ -26,13 +25,13 @@ from datetime import datetime
 from pymatgen.core import Element
 
 from . import _parse_input_args
-from utils.utils import check_type, check_num_value
-from utils.io import (
+from src.utils import check_type, check_num_value
+from src.io import (
     VaspParser, VaspExtractor, PDDataset, JsonWriter,
     check_file_or_dir, check_file_format
 )
-from utils.metrics import Stability
-from utils.computations.local import get_lacking_elts_entries
+from src.metrics import Stability
+from src.computations.local import get_lacking_elts_entries
 
 
 def _get_command_line_args() -> argp.Namespace:

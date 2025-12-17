@@ -9,9 +9,9 @@ from tqdm import tqdm
 import pandas as pd
 
 from . import _parse_input_args
-from utils.utils import check_type, check_num_value, discard_rare_gas_structures, discard_rare_earth_structures
-from utils.io import cif_str_to_struct, check_file_or_dir, check_file_format
-from utils.metrics import StructValidity, Unicity
+from src.utils import check_type, check_num_value, discard_rare_gas_structures, discard_rare_earth_structures
+from src.io import cif_str_to_struct, check_file_or_dir, check_file_format
+from src.metrics import StructValidity, Unicity
 
 
 def _get_command_line_args() -> ap.Namespace:

@@ -12,12 +12,12 @@ import argparse as ap
 from pymatgen.core import Structure
 
 from . import CONFIGPATH, _parse_input_args
-from utils.utils import check_type, check_num_value
-from utils.io import (
+from src.utils import check_type, check_num_value
+from src.io import (
     check_file_or_dir, load_yaml_as_dict, read_cif,
     VaspWriter, VaspParser, JsonLoader
 )
-from utils.computations.vasp import vasp_relaxation_settings, PMGRelaxSet
+from src.computations.vasp import vasp_relaxation_settings, PMGRelaxSet
 
 
 def _get_command_line_args() -> ap.Namespace:

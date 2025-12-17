@@ -12,9 +12,9 @@ import argparse as argp
 
 # TODO: reorganize behavior between metrics.py and this script
 from . import _parse_input_args
-from utils.utils import check_type, check_num_value
-from utils.io import check_file_or_dir, check_file_format, read_cif, symmetrize_and_write_cif
-from utils.metrics import (
+from src.utils import check_type, check_num_value
+from src.io import check_file_or_dir, check_file_format, read_cif, symmetrize_and_write_cif
+from src.metrics import (
     StructValidity, Viability, Symmetry, Unicity
 )
 

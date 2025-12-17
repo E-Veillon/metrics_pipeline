@@ -7,8 +7,8 @@ import argparse as ap
 from pymatgen.io.vasp import Poscar
 
 from . import _parse_input_args
-from utils.utils import check_type, check_num_value, VisualIterator
-from utils.io import check_file_or_dir, check_file_format, read_cif
+from src.utils import check_type, check_num_value, VisualIterator
+from src.io import check_file_or_dir, check_file_format, read_cif
 
 
 def _get_command_line_args() -> ap.Namespace:

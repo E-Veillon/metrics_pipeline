@@ -8,8 +8,8 @@ import typing as typ
 import argparse as argp
 
 from . import _parse_input_args
-from .utils.utils import check_type
-from utils.io import check_file_or_dir, JsonLoader, JsonWriter
+from src.utils import check_type
+from src.io import check_file_or_dir, JsonLoader, JsonWriter
 
 
 def _get_command_line_args() -> argp.Namespace:

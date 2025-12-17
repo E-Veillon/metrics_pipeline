@@ -12,11 +12,11 @@ import argparse as argp
 from pymatgen.core.structure import SiteCollection
 
 from . import CONFIGPATH, _parse_input_args
-from utils.utils import check_type, check_num_value
-from utils.io import (
+from src.utils import check_type, check_num_value
+from src.io import (
     check_file_or_dir, read_cif, load_yaml_as_dict, VaspParser, VaspWriter, JsonLoader
 )
-from .utils.computations.vasp import vasp_static_settings, PMGStaticSet
+from src.computations.vasp import vasp_static_settings, PMGStaticSet
 
 
 def _get_command_line_args() -> argp.Namespace:

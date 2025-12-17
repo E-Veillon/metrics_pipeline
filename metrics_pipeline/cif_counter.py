@@ -6,7 +6,7 @@ import argparse as ap
 import typing as tp
 
 from . import _parse_input_args
-from .utils.utils import check_type
+from src.utils import check_type
 
 
 def _get_command_line_args() -> ap.Namespace:

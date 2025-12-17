@@ -12,10 +12,10 @@ import typing as tp
 from datetime import datetime
 
 from . import _parse_input_args
-from utils.utils import check_type, check_num_value
-from utils.io import check_file_format, check_file_or_dir, VaspParser, VaspExtractor, JsonWriter
+from src.utils import check_type, check_num_value
+from src.io import check_file_format, check_file_or_dir, VaspParser, VaspExtractor, JsonWriter
 # TODO: legacy imports to replace
-from utils import batch_get_dsol_band_gaps
+from src.legacy.delta_sol import batch_get_dsol_band_gaps
 
 
 ########################################

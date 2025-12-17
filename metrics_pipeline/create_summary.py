@@ -2,13 +2,12 @@
 """A script to generate a JSON summary from manually selected structures."""
 
 import os
-import json
 import argparse as argp
 import typing as typ
 
 from . import _parse_input_args
-from utils.utils import check_type
-from utils.io import check_file_or_dir, check_file_format, VaspParser, JsonWriter
+from src.utils import check_type
+from src.io import check_file_or_dir, check_file_format, VaspParser, JsonWriter
 
 
 def _get_command_line_args() -> argp.Namespace:
