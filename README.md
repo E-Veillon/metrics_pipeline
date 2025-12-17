@@ -1,4 +1,4 @@
-metrics_pipeline v1.2.7
+Official implementation of the GenMat-metrics metrics pipeline for evaluation of generated materials.
 
 The main goal of this pipeline is to measure some of the metrics that are often used in recent works that propose generative AI models to predict new materials from an input of known materials.
 
