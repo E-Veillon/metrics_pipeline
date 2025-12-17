@@ -8,8 +8,10 @@ from tqdm import tqdm
 
 import pandas as pd
 
-from . import _parse_input_args
-from src.utils import check_type, check_num_value, discard_rare_gas_structures, discard_rare_earth_structures
+from src.utils import (
+    parse_input_args, check_type, check_num_value,
+    discard_rare_gas_structures, discard_rare_earth_structures
+)
 from src.io import cif_str_to_struct, check_file_or_dir, check_file_format
 from src.metrics import StructValidity, Unicity
 
@@ -174,7 +176,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         softlocked. Only pass it if such problems were to arise when no_dist_check is set to
         True and no_equiv_match is set to False.
     """
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     df = pd.read_csv(args["infile"])
     ids: list[int] = df[args["id_key"]].tolist()

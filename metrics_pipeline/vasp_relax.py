@@ -11,8 +11,8 @@ import argparse as ap
 
 from pymatgen.core import Structure
 
-from . import CONFIGPATH, _parse_input_args
-from src.utils import check_type, check_num_value
+from . import CONFIGPATH
+from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
     check_file_or_dir, load_yaml_as_dict, read_cif,
     VaspWriter, VaspParser, JsonLoader
@@ -159,7 +159,7 @@ def main(standalone: bool = True, **kwargs):
         it will default to the first possible index, i.e. index 0.
     """
     start = datetime.now()
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     if str(args.get("input_file")).endswith(".cif"):
         # Convert CIF data into Structure objects

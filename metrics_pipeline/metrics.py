@@ -16,8 +16,8 @@ import argparse as ap
 import typing as tp
 
 # LOCAL IMPORTS
-from . import CONFIGPATH, _parse_input_args
-from src.utils import check_type, check_num_value
+from . import CONFIGPATH
+from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
     JsonWriter, read_cif, PathLike, VaspParser, VaspExtractor
@@ -295,7 +295,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     threshold: float
         Threshold for the computation of coverage recall and coverage precision metrics.
     """
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     print("===== LOAD NECESSARY DATA FILES =====")
 

@@ -6,8 +6,7 @@ import argparse as ap
 
 from pymatgen.io.vasp import Poscar
 
-from . import _parse_input_args
-from src.utils import check_type, check_num_value, VisualIterator
+from src.utils import parse_input_args, check_type, check_num_value, VisualIterator
 from src.io import check_file_or_dir, check_file_format, read_cif
 
 
@@ -134,7 +133,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
         and execute sequentially.
     """
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     structures, *_ = read_cif(
         filename=args["input_file"],

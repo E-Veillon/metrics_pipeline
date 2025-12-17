@@ -7,8 +7,7 @@ import os
 import typing as typ
 import argparse as argp
 
-from . import _parse_input_args
-from src.utils import check_type
+from src.utils import parse_input_args, check_type
 from src.io import check_file_or_dir, JsonLoader, JsonWriter
 
 
@@ -70,7 +69,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         If set to True, the new path is absolutized before replacing the old one.
         Defaults to False.
     """
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     data = JsonLoader(args["input_file"]).load_as_list()
 

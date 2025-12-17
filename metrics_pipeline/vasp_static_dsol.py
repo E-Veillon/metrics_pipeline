@@ -12,8 +12,8 @@ import warnings
 
 from pymatgen.core import Structure
 
-from . import CONFIGPATH, _parse_input_args
-from src.utils import check_type, check_num_value
+from . import CONFIGPATH
+from src.utils import parse_input_args, check_type, check_num_value
 from src.io import check_file_or_dir, load_yaml_as_dict, VaspWriter, VaspParser, VaspExtractor
 from src.computations.vasp import PMGStaticSet, dsol_calc_init
 # TODO: Legacy imports to replace
@@ -205,7 +205,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         DeprecationWarning
     )
     start = datetime.now()
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Variables deduced from args
     struct_path, struct_idx, calc_idx = get_dsol_struct_dir(

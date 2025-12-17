@@ -11,8 +11,7 @@ from datetime import datetime
 import argparse as argp
 
 # TODO: reorganize behavior between metrics.py and this script
-from . import _parse_input_args
-from src.utils import check_type, check_num_value
+from src.utils import parse_input_args, check_type, check_num_value
 from src.io import check_file_or_dir, check_file_format, read_cif, symmetrize_and_write_cif
 from src.metrics import (
     StructValidity, Viability, Symmetry, Unicity
@@ -326,7 +325,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         and execute sequentially.
     """
     start = datetime.now()
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Extraction des données CIF et conversion en structures
     structures, nbr_rare_gas_structs, nbr_rare_earth_structs = read_cif(

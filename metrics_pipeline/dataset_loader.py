@@ -8,8 +8,7 @@ import os
 import argparse as argp
 import typing as typ
 
-from . import _parse_input_args
-from src.utils import check_type
+from src.utils import parse_input_args, check_type
 from src.io import check_file_or_dir, PDDataset, MPDatasetDownloader
 
 
@@ -165,7 +164,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         The processed data is written to a file with the same name as the one given but with a
         '_genmat' suffix, at the same location as the one given."
     """
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     if args.get("from_mp_api") is not None:
         MPDatasetDownloader(args["from_mp_api"], api_key=args.get("mp_api_key"))

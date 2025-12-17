@@ -5,8 +5,7 @@ import os
 import argparse as ap
 import typing as tp
 
-from . import _parse_input_args
-from src.utils import check_type
+from src.utils import parse_input_args, check_type
 
 
 def _get_command_line_args() -> ap.Namespace:
@@ -209,7 +208,7 @@ def main(standalone: bool = True, **kwargs) -> None:
 
         Indexation of data is zero-based, and in the file order.
     """
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     for file in args["filenames"]:
 

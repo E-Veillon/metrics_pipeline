@@ -11,8 +11,7 @@ import argparse as argp
 import typing as tp
 from datetime import datetime
 
-from . import _parse_input_args
-from src.utils import check_type, check_num_value
+from src.utils import parse_input_args, check_type, check_num_value
 from src.io import check_file_format, check_file_or_dir, VaspParser, VaspExtractor, JsonWriter
 # TODO: legacy imports to replace
 from src.legacy.delta_sol import batch_get_dsol_band_gaps
@@ -169,7 +168,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         for uncertainty calculations results.
     """
     start = datetime.now()
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Extract VASP static calculations results
     bg_data = VaspExtractor(

@@ -1,28 +1,16 @@
 #!/usr/bin/python
+"""Parse arguments either from CLI or higher level script for all executable scripts of GenMat."""
 
-
-import os
+import typing as tp
 from collections.abc import Callable
-from typing import Any
 
 
-# Main paths inside pipeline file tree
-ROOT = os.path.dirname(__file__)
-"""Absolute path to the metrics pipeline main directory."""
-
-UTILSPATH = os.path.join(ROOT, "utils")
-"""Absolute path to the pipeline utils directory containing importable features."""
-
-CONFIGPATH = os.path.join(ROOT, "config")
-"""Absolute path to the pipeline config directory containing all YAML config files."""
-
-# Arguments parsing for all executable scripts inside this project
 def parse_input_args(
     cmd_line_func: Callable,
     process_args_func: Callable,
     standalone: bool = True,
     **kwargs
-) -> dict[str, Any]:
+) -> dict[str, tp.Any]:
     """
     Gather and process input arguments, either from command-line or external script.
     
@@ -49,6 +37,6 @@ def parse_input_args(
         print("Pipeline mode detected.")
         args = kwargs
 
-    args: dict[str, Any] = process_args_func(args)
+    args: dict[str, tp.Any] = process_args_func(args)
 
     return args

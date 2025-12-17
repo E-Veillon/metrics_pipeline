@@ -24,8 +24,7 @@ from datetime import datetime
 
 from pymatgen.core import Element
 
-from . import _parse_input_args
-from src.utils import check_type, check_num_value
+from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
     VaspParser, VaspExtractor, PDDataset, JsonWriter,
     check_file_or_dir, check_file_format
@@ -250,7 +249,7 @@ def main(standalone: bool = True, **kwargs):
         Defaults to False.
 """
     start = datetime.now()
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Extract generated data
     gen_data = VaspExtractor(
