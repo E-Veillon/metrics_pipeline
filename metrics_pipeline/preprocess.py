@@ -44,8 +44,7 @@ def _get_command_line_args() -> argp.Namespace:
         help="Path to the CIF file containing structure data to process.",
     )
     parser.add_argument(
-        "-o",
-        "--output",
+        "--output", "-o",
         help=(
             "Path to wanted CIF output file where processed structures "
             "will be stored. If not given, output file is written in input file "
@@ -53,28 +52,19 @@ def _get_command_line_args() -> argp.Namespace:
         ),
     )
     parser.add_argument(
-        "--no-rare-gas-check",
-        action="store_true",
-        help="A flag to disable elimination of structures containing rare gas elements.",
-        dest="no_rare_gas_check"
+        "--no-rare-gas-check", action="store_true",
+        help="A flag to disable elimination of structures containing rare gas elements."
     )
     parser.add_argument(
-        "--no-rare-earth-check",
-        action="store_true",
-        help="A flag to disable elimination of structures containing f-block elements.",
-        dest="no_rare_earth_check"
+        "--no-rare-earth-check", action="store_true",
+        help="A flag to disable elimination of structures containing f-block elements."
     )
     parser.add_argument(
-        "--no-dist-check",
-        action="store_true",
-        help="A flag to disable structures interatomic distances checking.",
-        dest="no_dist_check"
+        "--no-dist-check", action="store_true",
+        help="A flag to disable structures interatomic distances checking."
     )
     parser.add_argument(
-        "-d",
-        "--dist-tolerance",
-        type=float,
-        default="radii",
+        "--dist-tolerance", "-d", type=float,
         help=(
             "Tolerance for checking interatomic distances in Angstroms. "
             "Structures containing atoms that are closer than this value will be discarded. "
@@ -82,27 +72,18 @@ def _get_command_line_args() -> argp.Namespace:
             "(more details below)."
         ),
         metavar="float",
-        dest="dist_tolerance"
     )
     parser.add_argument(
-        "--no-symmetrization",
-        action="store_true",
-        help="A flag to disable search of structures symmetry space groups.",
-        dest="no_symmetrization"
+        "--no-symmetrization", action="store_true",
+        help="A flag to disable search of structures symmetry space groups."
     )
     parser.add_argument(
-        "-s",
-        "--symprec",
-        type=float,
-        default=0.01,
+        "--symprec", "-s", type=float, default=0.01,
         help="Fractional coordinates tolerance for symmetry finding (Default: %(default)s).",
         metavar="float",
     )
     parser.add_argument(
-        "-a",
-        "--angleprec",
-        type=float,
-        default=5.0,
+        "--angleprec", "-a", type=float, default=5.0,
         help="Angle tolerance for symmetry finding in degrees (Default: %(default)s degrees).",
         metavar="float",
     )
@@ -114,14 +95,11 @@ def _get_command_line_args() -> argp.Namespace:
         )
     )
     parser.add_argument(
-        "--no-equiv-match",
-        action="store_true",
-        help="A flag to disable structure matching and elimination of duplicates.",
-        dest="no_equiv_match"
+        "--no-equiv-match", action="store_true",
+        help="A flag to disable structure matching and elimination of duplicates."
     )
     parser.add_argument(
-        "-sk", "--special-keys",
-        nargs="*",
+        "--special-keys", "-sk", nargs="*",
         help=(
             "CIF Labels to store into structure properties, e.g. can be used "
             "to save structure identifiers attached to it throughout its manipulation "
@@ -129,8 +107,7 @@ def _get_command_line_args() -> argp.Namespace:
         )
     )
     parser.add_argument(
-        "--test-min-vol",
-        action="store_true",
+        "--test-min-vol", action="store_true",
         help=(
             "A debug flag to assume unicity of unlikely structures having a volume under "
             "1 Angström^3 without passing them into structure matching, which could cause "
