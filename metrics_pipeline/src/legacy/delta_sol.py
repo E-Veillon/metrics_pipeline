@@ -12,9 +12,9 @@ from tqdm.contrib.concurrent import process_map
 from pymatgen.core import SiteCollection
 from pymatgen.io.cif import CifParser
 
-from metrics_pipeline.src.utils import check_type, check_num_value, get_all_valence_electrons
-from metrics_pipeline.src.io import PathLike, check_file_or_dir
-from metrics_pipeline.src.computations.vasp import DSolStaticSet
+from src.utils import check_type, check_num_value, get_all_valence_electrons
+from src.io import PathLike, check_file_or_dir
+from src.computations.vasp import DSolStaticSet
 
 
 _EL_PER_XC_VOL_MIN = {

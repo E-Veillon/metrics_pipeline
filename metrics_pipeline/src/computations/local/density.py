@@ -5,7 +5,7 @@ import numpy as np
 
 from pymatgen.core import Structure
 
-from metrics_pipeline.src.utils import check_type
+from src.utils import check_type
 
 
 def _volume_cm3(s: Structure) -> float:

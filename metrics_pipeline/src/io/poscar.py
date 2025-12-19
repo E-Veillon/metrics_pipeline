@@ -12,7 +12,7 @@ import itertools as itt
 import numpy as np
 import numpy.typing as npt
 
-from metrics_pipeline.src.utils import ALL_ELT_SYMBOL_TO_Z
+from src.utils import ALL_ELT_SYMBOL_TO_Z
 
 
 @dataclass

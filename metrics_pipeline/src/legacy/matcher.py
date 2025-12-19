@@ -13,8 +13,8 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.structure import SymmetrizedStructure
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
-from metrics_pipeline.src.utils import check_type, check_num_value, flatten, VisualIterator
-from metrics_pipeline.src.metrics.hash_matcher import group_compositions
+from src.utils import check_type, check_num_value, flatten, VisualIterator
+from src.metrics.hash_matcher import group_compositions
 
 
 def _group_by_equivalence(

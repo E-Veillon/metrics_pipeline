@@ -11,7 +11,7 @@ from pymatgen.core import Structure
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 from .metric_base import Metric
-from metrics_pipeline.src.utils import flatten
+from src.utils import flatten
 
 class Stability(Metric):
     """

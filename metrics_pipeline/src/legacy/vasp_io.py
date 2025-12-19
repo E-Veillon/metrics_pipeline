@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 from pymatgen.core import Structure
 from pymatgen.io.vasp import Vasprun
 
-from metrics_pipeline.src.io import PathLike, check_file_or_dir
+from src.io import PathLike, check_file_or_dir
 
 
 def _converged_vasprun(run_path: PathLike, **kwargs) -> tp.Union[Vasprun, None]:

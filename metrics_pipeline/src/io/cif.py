@@ -9,11 +9,11 @@ from pymatgen.core import Structure
 from pymatgen.io.cif import CifParser, CifWriter
 
 from .io_base import PathLike, check_file_or_dir, check_file_format
-from metrics_pipeline.src.utils import VisualIterator
+from src.utils import VisualIterator
 
 # TODO: Split responsibilities better, e.g. define compound convenience functions
 # outside the package.
-from metrics_pipeline.src.utils.periodic_table import (
+from src.utils.periodic_table import (
     discard_rare_gas_structures, discard_rare_earth_structures
 )
 

@@ -18,7 +18,7 @@ from pymatgen.analysis.phase_diagram import PDEntry
 from .io_base import PathLike
 from .json import JsonLoader, JsonWriter
 
-from metrics_pipeline.src.utils import ALL_ELT_SYMBOL_TO_Z
+from src.utils import ALL_ELT_SYMBOL_TO_Z
 
 @dataclass
 class PDEntryParser:
