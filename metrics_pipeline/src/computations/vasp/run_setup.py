@@ -92,19 +92,19 @@ def _mitrelaxset_incar_corrections(n_sites: int|None = None) -> dict[str, tp.Any
 
 def _relax_set_init(
     structure: SiteCollection,
-    preset: PMGRelaxSet = PMGRelaxSet.MPRELAXSET,
+    preset: str,
     corrections: dict[str, tp.Any] | None = None,
 ) -> VaspInputSet:
     """Init a relaxation set of VASP input files."""
     corrections = {} if corrections is None else corrections
     incar_corrections = {}
 
-    if preset == PMGRelaxSet.MITRELAXSET:
+    if preset.lower() == PMGRelaxSet.MITRELAXSET.name.lower():
         incar_corrections = _mitrelaxset_incar_corrections(structure.num_sites)
 
     incar_corrections.update(corrections.get("INCAR", {}))
 
-    vasp_input_set = PMGRelaxSet.get_preset(preset.name)(
+    vasp_input_set = PMGRelaxSet.get_preset(preset)(
         structure=structure,
         user_incar_settings = incar_corrections,
         user_kpoints_settings = corrections.get("KPOINTS", {}),
@@ -117,7 +117,7 @@ def _relax_set_init(
 
 def _static_set_init(
     structure: SiteCollection,
-    preset: PMGStaticSet | tp.Literal["DSolStaticSet"] = PMGStaticSet.MPSTATICSET,
+    preset: str,
     nelect: float | None = None,
     corrections: dict[str, tp.Any] | None = None,
 ) -> VaspInputSet:
@@ -134,7 +134,7 @@ def _static_set_init(
             user_potcar_functional=corrections.get("POTCAR_FUNCTIONAL", {}),
         )
     else:
-        vasp_input_set = PMGStaticSet.get_preset(preset.name)(
+        vasp_input_set = PMGStaticSet.get_preset(preset)(
             structure=structure,
             user_incar_settings = corrections.get("INCAR", {}),
             user_kpoints_settings = corrections.get("KPOINTS", {}),
@@ -145,19 +145,27 @@ def _static_set_init(
     return vasp_input_set
 
 
-def vasp_relaxation_settings(
+def init_vasp_settings(
     structure: SiteCollection,
-    preset: PMGRelaxSet = PMGRelaxSet.MPRELAXSET,
+    preset: str,
+    nelect: float | None = None,
     user_corrections: dict[str, tp.Any] | None = None,
 ) -> VaspInput:
     """
-    Setup VASP inputs for a given structure using one of the pymatgen relaxation presets.
+    Setup VASP inputs for a given structure using one of the pymatgen or local presets
+    as base.
 
     Parameters:
         structure (SiteCollection):     The structure to write VASP inputs for.
 
         preset (str):                   The pymatgen preset to use for VASP inputs
-                                        initialization.
+                                        initialization. Can also be the homemade
+                                        "DSolStaticSet" if Δ-Sol method by Chan et al.
+                                        (2010) is used.
+
+        nelect (float):                 Only used if DSolStaticSet is used.
+                                        Sets the NELECT tag in INCAR file.
+                                        Ignored if from_prev_calc is True.
 
         user_corrections (dict):        User defined settings. It allows to override
                                         some of the preset INCAR, KPOINTS or POTCAR
@@ -166,64 +174,27 @@ def vasp_relaxation_settings(
     assert isinstance(structure, SiteCollection), TypeError(
         f"'structure' expected a type 'SiteCollection', got {type(structure).__name__}."
     )
-    assert preset in PMGRelaxSet, (
-        "'preset' argument not recognized. "
-        "It must be one of the allowed pymatgen relaxation presets:\n"
-        f"{', '.join(PMGRelaxSet.names())}."
+    if preset == "DSolStaticSet":
+        return _static_set_init(structure, preset, nelect, user_corrections).get_input_set()
+
+    if PMGStaticSet.is_preset(preset):
+        return _static_set_init(structure, preset, corrections=user_corrections).get_input_set()
+
+    if PMGRelaxSet.is_preset(preset):
+        return _relax_set_init(structure, preset, user_corrections).get_input_set()
+
+    raise NotImplementedError(
+        f"'preset' argument not recognized ({preset}). "
+        "It must be one of the allowed pymatgen or local presets (case insensitive): "
+        f"{', '.join(PMGStaticSet.names())}, {', '.join(PMGRelaxSet.names())}, "
+        f"{DSolStaticSet.__name__}."
     )
-
-    vasp_input = _relax_set_init(
-        structure, preset, user_corrections
-    ).get_input_set()
-
-    return vasp_input
-
-
-def vasp_static_settings(
-    structure: SiteCollection | None = None,
-    preset: PMGStaticSet | tp.Literal["DSolStaticSet"] = PMGStaticSet.MPSTATICSET,
-    nelect: float  |None = None,
-    user_corrections: dict[str, tp.Any] | None = None,
-) -> VaspInput:
-    """
-    Setup VASP inputs for a given structure using one of the pymatgen static presets.
-
-    Parameters:
-        structure (SiteCollection):     The structure to write VASP inputs for.
-
-        preset (str):                   The pymatgen preset to use for VASP inputs initialization.
-                                        Can also be the homemade "DSolStaticSet" if Δ-Sol
-                                        method by Chan et al. (2010) is used.
-
-        nelect (float):                 Only useful if DSolStaticSet is used.
-                                        Sets the NELECT tag in INCAR file.
-                                        Ignored if from_prev_calc is True.
-
-        user_corrections (dict):        User defined settings. It allows to override some of 
-                                        the preset INCAR, KPOINTS or POTCAR settings if necessary.
-                                        Defaults to None.
-    """
-    if structure is not None:
-        assert isinstance(structure, SiteCollection), TypeError(
-            f"'structure' expected a type 'SiteCollection', got {type(structure).__name__}."
-        )
-    assert preset in PMGStaticSet or preset == "DSolStaticSet", (
-        "'preset' argument not recognized. "
-        "It must be 'DSolStaticSet' or one of the allowed pymatgen static presets:\n"
-        f"{', '.join(PMGStaticSet.names())}."
-    )
-
-    vasp_input = _static_set_init(
-        structure, preset, nelect, user_corrections
-    ).get_input_set()
-
-    return vasp_input
 
 
 def dsol_calc_init(
         structure: Structure,
         calc_index: int,
-        preset: PMGStaticSet | tp.Literal["DSolStaticSet"] = "DSolStaticSet",
+        preset: str = "DSolStaticSet",
         user_corrections: dict[str, tp.Any] | None = None,
     ) -> VaspInput:
     """
@@ -260,14 +231,16 @@ def dsol_calc_init(
     assert 0 <= calc_index <= 6, ValueError(
         f"'calc_index' must be between 0 and 6 included."
     )
-    if preset not in PMGStaticSet and preset != "DSolStaticSet":
-        raise ValueError(
+    assert PMGStaticSet.is_preset(preset) or preset.lower() == "DSolStaticSet".lower(), (
+        ValueError(
             f"'preset' got unsupported value {preset!r}. "
-            f"Supported presets: {', '.join(PMGStaticSet.names() + ['DSolStaticSet'])}."
+            "Supported presets (case insensitive): "
+            f"{', '.join(PMGStaticSet.names() + ['DSolStaticSet'])}."
         )
+    )
 
     nb_val_elec = get_all_valence_electrons(structure)
-    run_set = vasp_static_settings(structure, preset, user_corrections=user_corrections)
+    run_set = init_vasp_settings(structure, preset, user_corrections=user_corrections)
 
     # Search for the right N* parameter to use with respect to the functional
     pot_func = run_set.get("POTCAR_FUNCTIONAL", "PBE")
@@ -281,7 +254,7 @@ def dsol_calc_init(
     nelect = nb_val_elec + n_ratio if calc_index % 2 == 1 else nb_val_elec - n_ratio
 
     if preset == "DSolStaticSet":
-        run_set = vasp_static_settings(
+        run_set = init_vasp_settings(
             structure, preset, nelect=nelect, user_corrections=user_corrections
         )
 

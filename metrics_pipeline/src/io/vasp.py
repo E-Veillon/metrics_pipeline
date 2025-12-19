@@ -456,9 +456,9 @@ class VaspParser:
 
 
 class ExtractMethod(Enum):
+    FINAL_STATE = "final_state"
     CONVEX_HULL = "convex_hull"
     RELAXATION = "relaxation"
-    DELTA_SOL = "delta_sol"
     DSOL_BANDGAP = "dsol_bandgap"
 
 
@@ -552,8 +552,28 @@ class VaspExtractor:
             )
         self._data = dict(structs_data_list)
 
-    def get_data(self) -> dict[str, tp.Any]:
-        """Dict of extracted data for each parsed run directory."""
+    def get_data(self) -> dict[str, dict[str, tp.Any]]:
+        """
+        Get all extracted data in a dict of parsed run directories.
+
+        Returns
+        -------
+        dict[str, dict[str, Any]]
+            Nested dict of the form {'run_dir name': {'data_name': data}}.
+            - For 'final_state' extraction method, each subdict contains
+            the final structure and its total energy (in eV).
+
+            - For 'convex_hull' extraction method, each subdict contains
+            the structure ID (run_dir name), chemical composition as
+            Composition object, and initial energy (in eV), with correct
+            keys to pass into phase diagram construction.
+
+            - For 'relaxation' extraction method, each subdict contains
+            the initial and final structures.
+
+            - For 'dsol_bandgap' extraction method, each subdict contains
+            the unmodified structure and total energies from all sub-runs.
+        """
         return self._data
 
     def _get_extractor(
@@ -561,7 +581,7 @@ class VaspExtractor:
     ) -> Callable:
         """Initialize data extraction method."""
         match method:
-            case ExtractMethod.CONVEX_HULL | ExtractMethod.RELAXATION | ExtractMethod.DELTA_SOL:
+            case ExtractMethod.FINAL_STATE | ExtractMethod.CONVEX_HULL | ExtractMethod.RELAXATION:
                 return ft.partial(
                     self._get_run_data,
                     method=method, summary_path=summary_path, summary_key=summary_key
@@ -583,7 +603,7 @@ class VaspExtractor:
 
     @staticmethod
     def _check_summary_data(
-        struct_dir: PathLike, summary_file: PathLike, key_to_check: str
+        struct_dir: PathLike, summary_file: PathLike, summary_key: str
     ) -> bool:
         """
         Check whether given structure directory is present in the summary file and
@@ -606,47 +626,7 @@ class VaspExtractor:
             )
             return False
 
-        return prev_struct_data[key_to_check]
-
-    def _check_vasp_data(
-        self,
-        struct_dir: PathLike,
-        path_to_summary: PathLike | None = None,
-        key_to_check: str | None = None
-    ) -> Vasprun | None:
-        """
-        Check whether given path leads to a previously accepted structure,
-        its vasprun.xml file exists and is a normally terminated and converged run.
-
-        Parameters
-        ----------
-        struct_dir: str | Path
-            Directory containing a finished VASP calculation on a structure.
-
-        path_to_summary: str
-            Path to a JSON summary file containing results from previous step.
-            Used to not consider structures that failed before.
-            If not provided, all structure subdirs will be extracted.
-
-        key_to_check: str
-            The dict key associated to the bool used to verify eligibility.
-            If path_to_summary is given, it must be given too.
-
-        Returns
-        -------
-        Vasprun | None
-            Vasprun object if it is eligible and normally converged, None otherwise.
-        """
-        if path_to_summary is not None:
-            if key_to_check is None:
-                raise ValueError("If path_to_summary is given, key_to_check must be given too.")
-
-            if not self._check_summary_data(struct_dir, path_to_summary, key_to_check):
-                return None
-
-        return self.parser.get_safe_vasprun(
-            struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
-        )
+        return prev_struct_data[summary_key]
 
     def _get_run_data(
         self,
@@ -655,55 +635,26 @@ class VaspExtractor:
         summary_path: PathLike | None = None,
         summary_key: str | None = None
     ) -> tuple[str, dict[str, tp.Any]] | None:
-        """
-        Extracts VASP data from a previous run for one structure.
+        """Extracts VASP data from a run directory."""
+        if (
+            summary_path is not None and summary_key is not None and
+            not self._check_summary_data(struct_dir, summary_path, summary_key)
+        ):
+                return None
 
-        Parameters
-        ----------
-        struct_dir: str | Path
-            Directory containing a finished VASP calculation on a structure.
-
-        method: ExtractMethod
-            Extraction method to use to get relevant data.
-
-        summary_path: str
-            Path to a JSON summary file containing results from previous step.
-            Used to not consider structures that failed before.
-            If not provided, all structure subdirs will be extracted.
-
-        summary_key: str
-            The dict key associated to the bool used to verify eligibility.
-            If summary_path is given, it must be given too.
-
-        Returns
-        -------
-        (str, dict[str, Any])
-            Tuple of the name of the struct_dir and exctracted data dict.
-
-            For 'relaxation' method, the dict contains:
-            - Initial structure,
-            - Final structure.
-
-            For 'convex_hull' method the dict contains:
-            - Structure ID (struct_dir name),
-            - Chemical composition as Composition object,
-            - Initial energy (in eV).
-
-            For 'delta_sol' method, the dict contains:
-            - Final structure,
-            - Final energy (in eV).
-        """
-        vasprun = self._check_vasp_data(struct_dir, summary_path, summary_key)
+        vasprun = self.parser.get_safe_vasprun(
+            struct_dir, parse_dos=False, parse_eigen=False, parse_potcar_file=False
+        )
 
         if vasprun is None:
             return None
 
         struct_name  = os.path.basename(struct_dir)
         match method:
-            case ExtractMethod.RELAXATION:
+            case ExtractMethod.FINAL_STATE:
                 struct_dict = {
-                    "in_struct": vasprun.initial_structure,
-                    "out_struct": vasprun.final_structure
+                    "structure": vasprun.final_structure,
+                    "final_energy": vasprun.final_energy,
                 }
             case ExtractMethod.CONVEX_HULL:
                 # We want data of the generated structure for convex hulls, not the relaxed one
@@ -712,15 +663,17 @@ class VaspExtractor:
                     "composition": vasprun.initial_structure.composition,
                     "final_energy": vasprun.ionic_steps[0]["e_0_energy"]
                 }
-            case ExtractMethod.DELTA_SOL:
+            case ExtractMethod.RELAXATION:
                 struct_dict = {
-                    "structure": vasprun.final_structure,
-                    "final_energy": vasprun.final_energy,
+                    "in_struct": vasprun.initial_structure,
+                    "out_struct": vasprun.final_structure
                 }
             case str():
-                raise NotImplementedError
+                raise NotImplementedError(f"Method {method.value!r} not implemented.")
             case _:
-                raise TypeError
+                raise TypeError(
+                    f"'method' expected a type 'ExtractMethod', got {type(method).__name__!r}."
+                )
 
         return struct_name, struct_dict
 
@@ -731,31 +684,9 @@ class VaspExtractor:
         summary_key: str | None = None
     ) -> tuple[str, dict[str, Structure | float]] | None:
         """
-        Extract the results of Δ-Sol computations.
-
-        Parameters
-        ----------
-        struct_dir: str | Path
-            Directory containing a finished VASP calculation on a structure.
-
-        summary_path: str
-            Path to a JSON summary file containing results from previous step.
-            Used to not consider structures that failed before.
-            If not provided, all structure subdirs will be extracted.
-
-        summary_key: str
-            The dict key associated to the bool used to verify eligibility.
-            If summary_path is given, it must be given too.
-
-        Returns
-        -------
-        tuple[str, dict]
-            tuple containing the name of the struct_dir and corresponding dict,
-            containing following data, used in bandgap calculation:
-            - structure itself,
-            - its final energy (in eV).
+        Extract the results of all Δ-Sol computations for one run.
         """
-        calc_dirs   = list(filter(os.path.isdir, os.listdir(struct_dir)))
+        calc_dirs = list(filter(os.path.isdir, os.listdir(struct_dir)))
         struct_dict = {}
 
         for calc_dir in calc_dirs:
@@ -766,7 +697,7 @@ class VaspExtractor:
                 return None
 
             calc_data = self._get_run_data(
-                calc_dir, ExtractMethod("delta_sol"), summary_path, summary_key
+                calc_dir, ExtractMethod.FINAL_STATE, summary_path, summary_key
             )
             if not calc_data:
                 msg = f"{calc_dir} could not be parsed, either because the "

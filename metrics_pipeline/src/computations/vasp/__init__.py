@@ -1,9 +1,9 @@
 """Subpackage for VASP computations setup."""
 
 from .presets import PMGStaticSet, PMGRelaxSet, DSolStaticSet
-from .run_setup import vasp_static_settings, vasp_relaxation_settings, dsol_calc_init
+from .run_setup import init_vasp_settings, dsol_calc_init
 
 __all__ = [
     "PMGStaticSet", "PMGRelaxSet", "DSolStaticSet",
-    "vasp_static_settings", "vasp_relaxation_settings", "dsol_calc_init"
+    "init_vasp_settings", "dsol_calc_init"
 ]
