@@ -1,5 +1,6 @@
 """Write slurm job submission scripts."""
 
+import typing as tp
 from dataclasses import dataclass
 
 from .io_base import PathLike
@@ -70,11 +71,25 @@ class SlurmWriter:
     account: str, optional
         Define an account to debit computation hours from, if applicable.
 
+    array: Iterable[int] | str, optional
+        Define a queue of jobs using the same script with indices.
+        Use the slurm environment variable `$SLURM_ARRAY_TASK_ID` in `content_lines` to use
+        the array index of each queued job and distinguish between each job similar actions.
+        - If a string is given, it will be written as-is in the script, and `array_max_exec`
+        is ignored.
+        - If an iterable of indices is given, consecutive indices will be concatenated
+        automatically before writing for conciseness.
+
+    array_max_exec: int, optional
+        If `array` is given as an iterable of indices, define max number of jobs in the array
+        to execute at the same time. Ignored if `array` is not given or given as a string.
+
     content_lines: list[str] | tuple[str], optional
         List or tuple of the command lines to write in the sbatch script for execution.
         Newline characters are added between each element automatically, and the
         resulting content is written as-is after all sbatch parameters.
     """
+    _sbatch_header: str = "#SBATCH"
     shebang: str = "/bin/bash"
     jobname: str = "jobname"
     output: str = "slurm_%j.out"
@@ -90,6 +105,8 @@ class SlurmWriter:
     hint: str | None = None
     qos: str | None = None
     account: str | None = None
+    array: tp.Iterable[int] | str | None = None
+    array_max_exec: int | None = None
     content_lines: list[str] | tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
@@ -109,45 +126,82 @@ class SlurmWriter:
         assert isinstance(self.hint, (type(None), str))
         assert isinstance(self.qos, (type(None), str))
         assert isinstance(self.account, (type(None), str))
+        assert isinstance(self.array, (type(None), tp.Iterable, str))
+        assert isinstance(self.array_max_exec, (type(None), int))
         assert isinstance(self.content_lines, (type(None), list, tuple))
+
+    def _process_array_indices(self) -> str | None:
+        """Process job array indices into the most compact valid string for the script."""
+        if isinstance(self.array, (type(None), str)):
+            return self.array
+
+        # Avoid any duplication and sort
+        indices = sorted(set(self.array))
+        consecutives: list[list[int]] = [[]]
+
+        # Group consecutive indices
+        for idx, array_idx in enumerate(indices[1:], start=1):
+            if array_idx == indices[idx -1] + 1:
+                consecutives[-1].append(array_idx)
+            else:
+                consecutives.append([array_idx])
+
+        array_str_list = []
+
+        # Process each group appropriately
+        for group in consecutives:
+            if len(group) > 1:
+                array_str_list.append(f"{group[0]}-{group[-1]}")
+            else:
+                array_str_list.append(f"{group[0]}")
+        array_str = ",".join(array_str_list)
+
+        # Add max parallel execution if defined
+        if self.array_max_exec:
+            array_str += f"%{self.array_max_exec}"
+
+        return array_str
 
     def write_script(self, filename: PathLike) -> None:
         """Generate the script corresponding to attributes values."""
-        sbatch_header = "#SBATCH "
-        lines = f"#!{self.shebang}\n"
-        lines += f"{sbatch_header} --job-name={self.jobname}\n"
-        lines += f"{sbatch_header} --output={self.output}\n"
-        lines += f"{sbatch_header} --error={self.error}\n"
+        HEAD = self._sbatch_header
+        lines = [f"#!{self.shebang}"]
+        lines.append(f"{HEAD} --job-name={self.jobname}")
+        lines.append(f"{HEAD} --output={self.output}")
+        lines.append(f"{HEAD} --error={self.error}")
 
         if self.time:
-            lines += f"{sbatch_header} --time={self.time}\n"
+            lines.append(f"{HEAD} --time={self.time}")
 
-        lines += f"{sbatch_header} --nodes={self.nodes}\n"
+        lines.append(f"{HEAD} --nodes={self.nodes}")
 
         if self.ntasks:
-            lines += f"{sbatch_header} --ntasks={self.ntasks_per_node}\n"
+            lines.append(f"{HEAD} --ntasks={self.ntasks_per_node}")
         if self.ntasks_per_node:
-            lines += f"{sbatch_header} --ntasks_per_node={self.ntasks_per_node}\n"
+            lines.append(f"{HEAD} --ntasks_per_node={self.ntasks_per_node}")
         if self.n_gpus:
-            lines += f"{sbatch_header} --gres=gpu:{self.n_gpus}\n"
+            lines.append(f"{HEAD} --gres=gpu:{self.n_gpus}")
 
-        lines += f"{sbatch_header} --cpus_per_task={self.cpus_per_task}\n"
+        lines.append(f"{HEAD} --cpus_per_task={self.cpus_per_task}")
 
         if self.constraint:
-            lines += f"{sbatch_header} --constraint={self.constraint}\n"
+            lines.append(f"{HEAD} --constraint={self.constraint}")
         if self.partition:
-            lines += f"{sbatch_header} --partition={self.partition}\n"
+            lines.append(f"{HEAD} --partition={self.partition}")
         if self.hint:
-            lines += f"{sbatch_header} --hint={self.hint}\n"
+            lines.append(f"{HEAD} --hint={self.hint}")
         if self.qos:
-            lines += f"{sbatch_header} --qos={self.qos}\n"
+            lines.append(f"{HEAD} --qos={self.qos}")
         if self.account:
-            lines += f"{sbatch_header} --account={self.account}\n"
+            lines.append(f"{HEAD} --account={self.account}")
+        if self.array:
+            array_str = self._process_array_indices()
+            lines.append(f"{HEAD} --array={array_str}")
 
-        lines += "\n"
+        lines.append("")
 
         if self.content_lines:
-            lines += "\n".join(self.content_lines)
+            lines.extend(self.content_lines)
 
         with open(filename, "wt", encoding="utf-8") as fp:
-            fp.write(lines)
+            fp.write("\n".join(lines))

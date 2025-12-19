@@ -7,6 +7,7 @@ from .cif import read_cif, symmetrize_and_write_cif, cif_str_to_struct
 from .dataset import PDEntryParser, PDDataset, MPDatasetDownloader
 from .json import JsonLoader, JsonWriter
 from .poscar import PoscarBlock, PoscarFile
+from .slurm import SlurmWriter
 from .vasp import VaspWriter, VaspParser, VaspExtractor, ExtractMethod
 from .yaml import load_yaml_as_dict
 
@@ -18,6 +19,7 @@ __all__ = [
     "PDEntryParser", "PDDataset", "MPDatasetDownloader",
     "JsonLoader", "JsonWriter",
     "PoscarBlock", "PoscarFile",
+    "SlurmWriter",
     "VaspWriter", "VaspParser", "VaspExtractor", "ExtractMethod",
     "load_yaml_as_dict",
 ]
