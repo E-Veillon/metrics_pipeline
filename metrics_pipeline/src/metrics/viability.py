@@ -103,7 +103,7 @@ class Viability(Metric):
         if any(length < 2 * max(radii) for length in structure.lattice.lengths):
             return False
 
-        min_dists = np.array(list(map(self._get_min_dist, *itt.combinations(radii, r=2))))
+        min_dists = np.array(list(itt.starmap(self._get_min_dist, itt.combinations(radii, r=2))))
         true_dists = structure.distance_matrix[np.triu_indices(len(structure), 1)]
         return np.all(np.subtract(true_dists, min_dists) >= 0.0).item()
 

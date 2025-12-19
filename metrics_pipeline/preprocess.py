@@ -336,8 +336,8 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     elif not args["no_dist_check"]:
         viability = Viability(structures)
-        structures, nbr_not_viable = viability.viable_structs, len(viability.non_viable_structs)
-        print(f"{nbr_not_viable} not viable structures were discarded")
+        structures, nbr_not_valid = viability.viable_structs, len(viability.non_viable_structs)
+        print(f"{nbr_not_valid} not viable structures were discarded")
 
     # Détection et élimination des structures tricliniques
     if not args["no_symmetrization"] and args["discard_asymmetrics"]:
@@ -353,7 +353,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         structures = symmetric_structs
 
     # Comparaison des structures pour éliminer les doublons
-    unicity = Unicity(structures, workers=args["workers"])
+    unicity = Unicity(structures, workers=args.get("workers"))
     kept_structs = unicity.unique_structs
     nbr_unique_structs = len(kept_structs)
     nbr_equivalent = len(unicity.duplicate_structs)
