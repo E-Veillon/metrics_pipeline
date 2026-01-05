@@ -1,7 +1,8 @@
 """Package containing all I/O operations."""
 from .io_base import (
     PathLike, ROOT, SRCPATH, CONFIGPATH,
-    check_file_format, check_file_or_dir
+    check_file_format, check_file_or_dir,
+    EmptyDirectoryError
 )
 from .cif import read_cif, symmetrize_and_write_cif, cif_str_to_struct
 from .dataset import PDEntryParser, PDDataset, MPDatasetDownloader
@@ -13,7 +14,7 @@ from .yaml import load_yaml_as_dict
 
 
 __all__ = [
-    "PathLike", "ROOT", "SRCPATH", "CONFIGPATH",
+    "PathLike", "ROOT", "SRCPATH", "CONFIGPATH", "EmptyDirectoryError",
     "check_file_format", "check_file_or_dir",
     "read_cif", "symmetrize_and_write_cif", "cif_str_to_struct",
     "PDEntryParser", "PDDataset", "MPDatasetDownloader",
