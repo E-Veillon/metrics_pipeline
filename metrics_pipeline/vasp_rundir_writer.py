@@ -56,8 +56,8 @@ def _get_command_line_args() -> ap.Namespace:
     parser.add_argument(
         "--preset", "-p",
         help=(
-            "The pymatgen preset to use as a base to write the VASP input files. "
-            "More info on possible presets in pymatgen documentation:\n"
+            "Name of the pymatgen preset to use as a base to write the VASP input files "
+            "(case insensitive). More info on possible presets in pymatgen documentation: "
             "https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets."
         )
     )
@@ -155,8 +155,9 @@ def main(standalone: bool = True, **kwargs):
         containing a boolean value telling if said structure passed previous step filter.
 
     preset: str, optional
-        The pymatgen preset to use for VASP relaxation. More info on possible presets in
-        pymatgen documentation: https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets.
+        Name of the pymatgen preset to use as a base to write the VASP input files
+        (case insensitive). More info on possible presets in pymatgen documentation:
+        https://pymatgen.org/pymatgen.io.vasp.html#pymatgen.io.vasp.sets.
 
     user_settings: str, optional
         Name of the YAML file containing tags to override the PMG preset. Given filename
