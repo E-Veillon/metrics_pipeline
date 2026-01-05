@@ -12,11 +12,10 @@ import warnings
 
 from pymatgen.core import Structure
 
-from . import CONFIGPATH
 from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
     check_file_or_dir, load_yaml_as_dict, read_cif,
-    VaspWriter, VaspParser, VaspExtractor
+    VaspWriter, VaspParser, VaspExtractor, CONFIGPATH
 )
 from src.computations.vasp import init_vasp_settings, PMGRelaxSet, PMGStaticSet
 

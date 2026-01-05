@@ -12,9 +12,8 @@ import warnings
 
 from pymatgen.core import Structure
 
-from . import CONFIGPATH
 from src.utils import parse_input_args, check_type, check_num_value
-from src.io import check_file_or_dir, load_yaml_as_dict, VaspWriter, VaspParser, VaspExtractor
+from src.io import check_file_or_dir, CONFIGPATH, load_yaml_as_dict, VaspWriter, VaspParser, VaspExtractor
 from src.computations.vasp import PMGStaticSet, dsol_calc_init
 # TODO: Legacy imports to replace
 from src.legacy.delta_sol import get_dsol_struct_dir, calc_idx_to_dir_name

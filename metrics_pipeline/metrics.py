@@ -16,11 +16,10 @@ import argparse as ap
 import typing as tp
 
 # LOCAL IMPORTS
-from . import CONFIGPATH
 from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
-    JsonWriter, read_cif, PathLike, VaspParser, VaspExtractor
+    JsonWriter, read_cif, PathLike, CONFIGPATH, VaspParser, VaspExtractor
 )
 from src.computations.models import get_crystalnn_fingerprints, vectors_from_alignn
 from src.computations.local import get_densities

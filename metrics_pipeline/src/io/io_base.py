@@ -8,14 +8,14 @@ import typing as tp
 PathLike = Path | str
 
 # Main paths inside pipeline file tree
-MAINDIRPATH = os.path.realpath(os.path.dirname(os.path.dirname(__file__)))
-"""Absolute path to the main pipeline directory."""
-SCRIPTSPATH = os.path.join(MAINDIRPATH, "scripts")
-"""Absolute path to the pipeline scripts directory containing executable scripts."""
-UTILSPATH   = os.path.join(MAINDIRPATH, "utils")
-"""Absolute path to the pipeline utils directory containing importable features."""
-CONFIGPATH  = os.path.join(MAINDIRPATH, "config")
-"""Absolute path to the pipeline config directory containing all VASP config YAML files."""
+ROOT = Path(__file__).resolve().parent.parent.parent
+"""Absolute path to the GenMat main directory."""
+
+SRCPATH = ROOT / "src"
+"""Absolute path to the GenMat src directory."""
+
+CONFIGPATH = ROOT / "config"
+"""Absolute path to the GenMat config directory."""
 
 
 class EmptyDirectoryError(FileNotFoundError):
