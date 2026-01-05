@@ -1,5 +1,6 @@
 """I/O operations for concatenated CIF data files."""
 
+import os
 import re
 import functools as ft
 
@@ -40,7 +41,7 @@ def extract_cif_from_file(filename: PathLike) -> list[str]:
 
     # match structures data with regular expression
     matcher = re.compile(r"^data.*?$(?=\ndata|\Z)", re.MULTILINE | re.DOTALL)
-    cif_str_structs = matcher.findall(data)
+    cif_str_structs = [str(cif_struct).strip() for cif_struct in matcher.findall(data)]
 
     return cif_str_structs
 
@@ -320,6 +321,6 @@ def symmetrize_and_write_cif(
                 desc="Writing data in cif format"
             )
         )
-
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "wt", encoding="utf-8") as out_file:
         out_file.write("\n".join(encoded_cif))
