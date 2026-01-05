@@ -1,16 +1,14 @@
 #!/usr/bin/python
 """
-Write VASP relaxation run directories for structure data read from CIF file
-or summary JSON file using pymatgen as a setting interface between raw data and VASP.
+Write VASP run directories for structures read from CIF file or summary JSON file
+using pymatgen as a setup interface between raw data and VASP. Can setup both static
+and relaxation runs.
 """
 
 import os
 import typing as tp
 from datetime import datetime
 import argparse as ap
-import warnings
-
-from pymatgen.core import Structure
 
 from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
@@ -128,8 +126,9 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
 def main(standalone: bool = True, **kwargs):
     """
-    Write VASP relaxation run directories for structure data read from CIF file
-    or summary JSON file using pymatgen as a setting interface between raw data and VASP.
+    Write VASP run directories for structures read from CIF file or summary JSON file
+    using pymatgen as a setup interface between raw data and VASP. Can setup both static
+    and relaxation runs.
 
     Parameters
     ----------
