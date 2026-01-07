@@ -20,6 +20,11 @@ from pymatgen.core import Structure
 from pymatgen.io.vasp import VaspInput, Vasprun, Poscar, Xdatcar
 
 from .io_base import PathLike, check_file_or_dir
+from src.utils import raise_or_warn, VisualIterator
+
+
+class VaspParsingError(Exception):
+    """An error occurred when trying to parse a VASP output file."""
 
 
 class VaspWriter:
@@ -132,6 +137,7 @@ class VaspParser:
         max_index: int | None = None,
         match_all: bool = True,
         unique: bool = True,
+        workers: int | None = None
     ) -> None:
         """
         Match and parse VASP run directories.
@@ -160,6 +166,11 @@ class VaspParser:
             If True, raise an error when an index matches several directories.
             Defaults to True.
 
+        workers: int, optional
+            Number of processes to use in parallel. If not given, will use default of
+            `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
+            and execute sequentially.
+
         Raises
         ------
         - `FileNotFoundError` if match_all is True and an index does not match any directory.
@@ -177,7 +188,7 @@ class VaspParser:
 
         # Match all existing structure directories in base directory
         subtree = list(self.base_dir.iterdir())
-        matching_dirs = sorted(list(filter(self.is_struct_dir, subtree)))
+        matching_dirs = sorted(filter(self.is_struct_dir, subtree))
         struct_indices = [int(dir.name.split("_")[0]) for dir in matching_dirs]
 
         struct_dirs_dict = defaultdict(list)
@@ -195,6 +206,7 @@ class VaspParser:
         self.indices = sorted(indices)
         self.match_all = match_all
         self.unique = unique
+        self.workers = workers
         self._all_struct_dirs = struct_dirs_dict
         self._struct_dirs = self._match_struct_dirs_indices()
 
@@ -231,7 +243,7 @@ class VaspParser:
     @property
     def all_struct_dirs(self) -> list[Path]:
         """Sorted list of all structure directories in the base directory."""
-        return sorted(list(itt.chain.from_iterable(self._all_struct_dirs.values())))
+        return sorted(itt.chain.from_iterable(self._all_struct_dirs.values()))
 
     @property
     def struct_dirs(self) -> list[Path]:
@@ -322,8 +334,9 @@ class VaspParser:
         try_vasprun: bool = True,
         try_contcar: bool = True,
         try_xdatcar: bool = False,
-        try_poscar: bool = False
-    ) -> Structure:
+        try_poscar: bool = False,
+        on_error: tp.Literal["raise", "warn", "ignore"] = "warn"
+    ) -> Structure | None:
         """
         Attempt to extract the best structure possible from a VASP run directory.
 
@@ -353,14 +366,20 @@ class VaspParser:
         try_poscar: bool
             Whether to try to get the initial structure from POSCAR. Defaults to False.
 
+        on_error: 'raise', 'warn', 'ignore'
+            What to do when no structure could be extracted from attempted files.
+            Defaults to "warn".
+
         Returns
         -------
-        Structure
-            A Structure object if it could be extracted.
+        Structure | None
+            A Structure object if it could be extracted, `None` if it could not and
+            `on_error` is not set to "raise".
 
         Raises
         ------
-        `FileNotFoundError` if none of the attempts were successful.
+        `VaspParsingError` if none of the attempts were successful and `on_error`
+        is set to "raise".
         """
         check_file_or_dir(run_dir, "dir")
 
@@ -403,8 +422,8 @@ class VaspParser:
                 return structure
             except FileNotFoundError:
                 pass
-
-        raise FileNotFoundError(
+        
+        msg = (
             f"{self.get_struct_from_run_dir.__qualname__}: "
             f"Unable to extract a structure from '{run_dir}'.\n"
             "Tried files:\n"
@@ -413,16 +432,20 @@ class VaspParser:
             f"- XDATCAR: {try_xdatcar}\n"
             f"- POSCAR: {try_poscar}\n"
         )
+        raise_or_warn(on_error, VaspParsingError, msg)
+        return None
+
 
     def parse_structures(
         self,
         try_vasprun: bool = True,
         try_contcar: bool = True,
         try_xdatcar: bool = False,
-        try_poscar: bool = False
+        try_poscar: bool = False,
+        on_error: tp.Literal["raise", "warn", "ignore"] = "warn"
     ) -> dict[str, Structure]:
         """
-        Parse all runs matching initialized indices.
+        Parse all runs matching initialized indices into structures.
 
         Parameters
         ----------
@@ -438,20 +461,53 @@ class VaspParser:
         try_poscar: bool
             Whether to try to get the initial structure from POSCAR. Defaults to False.
 
+        on_error: 'raise', 'warn', 'ignore'
+            What to do when no structure could be extracted from one of the run directories.
+            Defaults to "warn".
+
         Returns
         -------
         dict[str, Structure | None]
             Dict of run dir names and parsed Structure objects.
             Returns `None` for structures that could not be parsed.
+
+        Raises
+        ------
+        `VaspParsingError` if a structure could not be extracted and `on_error`
+        is set to "raise".
         """
-        struct_dict = {}
-        for run_dir in self.struct_dirs:
-            try:
-                struct_dict[run_dir.name] = self.get_struct_from_run_dir(
-                    run_dir, try_vasprun, try_contcar, try_xdatcar, try_poscar
+        description = "Parsing VASP runs into structures"
+        if self.workers == 0:
+            struct_dict = {
+                run_dir.name: self.get_struct_from_run_dir(
+                    run_dir, try_vasprun, try_contcar, try_xdatcar, try_poscar, on_error
+                ) for run_dir in VisualIterator(
+                    self.struct_dirs,
+                    desc=description,
+                    unit="runs parsed",
+                    percent=True
                 )
-            except FileNotFoundError:
-                struct_dict[run_dir.name] = None
+            }
+        else:
+            get_struct_from_run_dir = ft.partial(
+                self.get_struct_from_run_dir,
+                try_vasprun=try_vasprun,
+                try_contcar=try_contcar,
+                try_xdatcar=try_xdatcar,
+                try_poscar=try_poscar,
+                on_error=on_error
+            )
+            structs = process_map(
+                get_struct_from_run_dir,
+                self.struct_dirs,
+                max_workers=self.workers,
+                chunksize=min(len(self.struct_dirs) // 100, 10) + 1,
+                desc=description
+            )
+            struct_dict = {
+                run_dir.name: struct for run_dir, struct in zip(self.struct_dirs, structs)
+            }
+
         return struct_dict
 
 
@@ -536,7 +592,7 @@ class VaspExtractor:
             ))
         else: # Multi-process execution
             nbr_structs = len(self.struct_dirs)
-            chunksize = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
+            chunksize = min(nbr_structs // 100, 10) + 1
 
             structs_data_list = list(
                 filter(

@@ -14,6 +14,7 @@ import os
 import json
 import argparse as ap
 import typing as tp
+import warnings
 
 from src.utils import (
     parse_input_args, check_type, check_num_value,
@@ -180,9 +181,6 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     return args_dict
 
 
-########################################
-# CONFIG HANDLING
-
 def _match_file_arg_need(
     arg_name: str, filename: tp.Optional[PathLike] = None, is_needed: bool = False
 ) -> bool:
@@ -223,7 +221,14 @@ def _print_metrics_config(config: dict) -> None:
     print(" ")
 
 
-########################################
+def warn_summary_location(summary_file: PathLike) -> None:
+    warnings.warn(
+        f"No structure data could be extracted from {summary_file}. "
+        "Either none of the structures passed the previous filter or the "
+        "summary file is not located in the right directory. Make sure "
+        "the summary file is located in the directory containing corresponding "
+        "VASP run directories."
+    )
 
 
 def main(standalone: bool = True, **kwargs) -> None:
@@ -275,10 +280,15 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     sun_summary: str | Path
         JSON file containing the summary of phase diagrams instability energies.
+        The file must be located inside the directory where corresponding VASP run
+        directories are stored for the runs to be found and properly parsed.
         Necessary for: S.U.N.
 
     relax_summary: str | Path
-        JSON file containing a summary for the relaxation step. Necessary for: RMSD.
+        JSON file containing a summary for the relaxation step.
+        The file must be located inside the directory where corresponding VASP run
+        directories are stored for the runs to be found and properly parsed.
+        Necessary for: RMSD.
 
     output: str | Path
         Output file containing the calculated metrics (json format).
@@ -392,7 +402,6 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     if _match_file_arg_need("sun-summary", args.get("sun_summary", False), sun_summary_needed):
         print("Loading stability summary file...")
-        # TODO: make sure summary location is always in base dir
         base_dir, summary_name = os.path.split(args["sun_summary"])
         stable_structs_pairs = VaspExtractor(
             vasp_parser=VaspParser(base_dir),
@@ -401,6 +410,10 @@ def main(standalone: bool = True, **kwargs) -> None:
             summary_key="stable",
             workers=args.get("workers")
         ).get_data()
+
+        if not stable_structs_pairs:
+            warn_summary_location(args["sun_summary"])
+
         stable_structs = [
             (name, s_data["in_struct"]) for name, s_data in stable_structs_pairs.items()
         ]
@@ -411,7 +424,6 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     if _match_file_arg_need("relax-summary", args.get("relax_summary", False), relax_summary_needed):
         print("Loading relaxations summary file...")
-        # TODO: make sure summary location is always in base dir
         base_dir, summary_name = os.path.split(args["relax_summary"])
         relax_structures_dict = VaspExtractor(
             vasp_parser=VaspParser(base_dir),
@@ -420,6 +432,10 @@ def main(standalone: bool = True, **kwargs) -> None:
             summary_key="converged",
             workers=args.get("workers")
         ).get_data()
+
+        if not relax_structures_dict:
+            warn_summary_location(args["relax_summary"])
+
         relax_structures = list(relax_structures_dict.items())
         del relax_structures_dict # Free some memory
         print("Data converted.")
