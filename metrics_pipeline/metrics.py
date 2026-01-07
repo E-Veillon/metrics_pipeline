@@ -29,11 +29,9 @@ from src.computations.local import get_densities
 # TODO: reorganize behavior between preprocess.py and this script
 from src.metrics import (
     StructValidity, Viability, Symmetry,
-    ElementaryMetastability, Novelty, SUN,
+    ElementaryMetastability, Novelty, Unicity, SUN,
     Coverage, EMD, RMSD, FrechetDistance
 )
-# TODO: legacy imports to replace
-from src.legacy import remove_equivalent
 
 
 def _get_command_line_args() -> ap.Namespace:
@@ -358,9 +356,8 @@ def main(standalone: bool = True, **kwargs) -> None:
 
         print("Dataset loaded.")
         # remove duplicate structures from the dataset
-        dataset, *_ = remove_equivalent(
-            structures=dataset, workers=args.get("workers"), keep_equivalent=False
-        )
+        dataset = Unicity(dataset, workers=args.get("workers")).unique_structs
+
     else:
         dataset = []
 
