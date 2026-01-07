@@ -70,7 +70,7 @@ class CIFFile:
         """
         Compute chunksize for multiprocess tasks based on current stored data length.
         """
-        return min(len(self._data) // 100, 10) + 1
+        return min(10, len(self._data) // 100 + 1)
 
     def get_cifs(self) -> list[str]:
         """Get the list of individual CIF strings."""

@@ -47,14 +47,11 @@ def get_crystalnn_fingerprints(
         fingerprints = [_get_fingerprint(struct) for struct in structures]
 
     else:
-        nb_structs = len(structures)
-        chunksize = (min(nb_structs // 100, 10) if nb_structs >= 200 else 1)
-
         fingerprints = process_map(
             _get_fingerprint,
             structures,
             max_workers=workers,
-            chunksize=chunksize,
+            chunksize=min(10, len(structures) // 100 + 1),
             desc="Convert structures to CrystalNN fingerprints"
         )
     fingerprints = np.concatenate(list(filter(None, fingerprints)))

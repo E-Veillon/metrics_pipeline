@@ -210,14 +210,12 @@ def main(standalone: bool = True, **kwargs) -> None:
         structs_tups = [partial_fn(struct) for struct in structs]
 
     else:
-        nbr_struct = len(structs)
-        chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
         structs_tups = list(
             process_map(
                 partial_fn,
                 structs,
                 max_workers=args.get("workers"),
-                chunksize=chunksize,
+                chunksize=min(10, len(structs) // 100 + 1),
                 desc=sym_desc
             )
         )

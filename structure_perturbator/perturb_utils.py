@@ -231,14 +231,12 @@ def simply_read_cif(
 
     assert nbr_struct > 0, "No structure data found in provided file."
 
-    chunksize = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
-
     structs_list = list(
         process_map(
             cif_str_to_struct,
             struct_strings,
             max_workers=workers,
-            chunksize=chunksize,
+            chunksize=min(10, nbr_struct // 100 + 1),
             desc="load and read data",
         )
     )
@@ -260,16 +258,12 @@ def write_cif(
 
         workers (int):                Number of parallel processes to use.
     """
-
-    nbr_struct = len(structures)
-    chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
-
     encoded_cif = list(
         process_map(
             struct_to_cif_str, 
             structures,
             max_workers=workers, 
-            chunksize=chunksize, 
+            chunksize=min(10, len(structures) // 100 + 1), 
             desc="Writing data in cif format"
         )
     )
@@ -583,8 +577,6 @@ def batch_generate_perturbed_structs(
     assert isinstance(perturbs_dict, Dict), "'perturbs_dict' argument value must be a dict."
     assert workers >= 1, "'workers' argument value must be strictly positive."
 
-    nbr_structs = len(structures)
-    chunksize   = (min(nbr_structs // 100, 10) if nbr_structs >= 200 else 1)
     perturb_setup = partial(generate_perturbed_structs,
         perturbs_dict=perturbs_dict, sample_size=sample_size, 
         modified_lattice=modified_lattice, lattice_retries=lattice_retries
@@ -596,7 +588,7 @@ def batch_generate_perturbed_structs(
                 perturb_setup,
                 structures,
                 max_workers=workers,
-                chunksize=chunksize,
+                chunksize=min(10, len(structures) // 100 + 1),
                 desc=f"generating {sample_size} perturbed struct(s) per structure"
             )
         )

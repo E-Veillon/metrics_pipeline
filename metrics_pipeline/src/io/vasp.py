@@ -501,7 +501,7 @@ class VaspParser:
                 get_struct_from_run_dir,
                 self.struct_dirs,
                 max_workers=self.workers,
-                chunksize=min(len(self.struct_dirs) // 100, 10) + 1,
+                chunksize=min(10, len(self.struct_dirs) // 100 + 1),
                 desc=description
             )
             struct_dict = {
@@ -591,9 +591,6 @@ class VaspExtractor:
                 None, [self.extractor(struct_dir) for struct_dir in self.struct_dirs]
             ))
         else: # Multi-process execution
-            nbr_structs = len(self.struct_dirs)
-            chunksize = min(nbr_structs // 100, 10) + 1
-
             structs_data_list = list(
                 filter(
                     None,
@@ -601,7 +598,7 @@ class VaspExtractor:
                         self.extractor,
                         self.struct_dirs,
                         max_workers=workers,
-                        chunksize=chunksize,
+                        chunksize=min(10, len(self.struct_dirs) // 100 + 1),
                         desc="Extracting data from VASP output",
                     ),
                 )

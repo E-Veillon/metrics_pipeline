@@ -212,14 +212,12 @@ class Stability(Metric):
                 self._stable_entries.extend(stable_entries)
                 self._unstable_entries.extend(unstable_entries)
         else:
-            n_systems = len(self.entries_dict)
-            chunksize = min(n_systems // 100, 10) + 1
             stable_entries, unstable_entries = zip(
                 *process_map(
                     self._compute_system,
                     *zip(*self.entries_dict.items()),
                     max_workers=self.workers,
-                    cheunksize=chunksize,
+                    chunksize=min(10, len(self.entries_dict) // 100 + 1),
                     desc="Computing Stability"
                 )
             )

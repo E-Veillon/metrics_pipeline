@@ -6,9 +6,10 @@ from pymatgen.core import SiteCollection, Structure
 from pymatgen.io.vasp.sets import VaspInput, VaspInputSet
 
 from .presets import PMGRelaxSet, PMGStaticSet, DSolStaticSet
+from src.utils import get_all_valence_electrons
 # TODO: Split responsibilities better, e.g. define compound convenience functions
 # outside the package.
-from src.legacy.delta_sol import get_all_valence_electrons, get_dsol_n_ratio
+from src.legacy.delta_sol import get_dsol_n_ratio
 
 U_VALUES = {
     "F": {
