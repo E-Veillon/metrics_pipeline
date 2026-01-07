@@ -319,7 +319,7 @@ def main(standalone: bool = True, **kwargs):
             "name": name,
             "path": os.path.join(args["run_dir"], name),
             "e_above_hull": entry.attribute[Stability._delta_e_attr], # type: ignore
-            "is_stable": id(entry) in stable_ids
+            "stable": id(entry) in stable_ids
         }
         results[name] = dct
 

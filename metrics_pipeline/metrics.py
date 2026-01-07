@@ -15,11 +15,13 @@ import json
 import argparse as ap
 import typing as tp
 
-# LOCAL IMPORTS
-from src.utils import parse_input_args, check_type, check_num_value
+from src.utils import (
+    parse_input_args, check_type, check_num_value,
+    discard_rare_gas_structures, discard_rare_earth_structures
+)
 from src.io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
-    JsonWriter, read_cif, PathLike, CONFIGPATH, VaspParser, VaspExtractor
+    JsonWriter, CIFFile, PathLike, CONFIGPATH, VaspParser, VaspExtractor
 )
 from src.computations.models import get_crystalnn_fingerprints, vectors_from_alignn
 from src.computations.local import get_densities
@@ -314,22 +316,36 @@ def main(standalone: bool = True, **kwargs) -> None:
     _print_metrics_config(CONFIG)
 
     print("Loading generated structures...")
-    generated, *_ = read_cif(
-        filename=args["generated"],
-        workers=args.get("workers"),
-        keep_rare_gases=args["no_rare_gas_check"],
-        keep_rare_earths=args["no_rare_earth_check"]
+    gen_file = CIFFile.from_file(
+        args["generated"],
+        workers=args.get("workers")
     )
+    gen_cifs = gen_file.get_cifs()
+    if not args["no_rare_gas_check"]:
+        gen_cifs, _ = discard_rare_gas_structures(gen_cifs)
+    if not args["no_rare_earth_check"]:
+        gen_cifs, _ = discard_rare_earth_structures(gen_cifs)
+    gen_file.clear()
+    gen_file.add_cifs(gen_cifs)
+    generated, _ = gen_file.parse_structures()
+
     print("Generated structures loaded.")
 
     if _match_file_arg_need("dataset", args.get("dataset", False), dataset_needed):
         print("Loading dataset...")
-        dataset, *_ = read_cif(
-            filename=args["dataset"],
-            workers=args.get("workers"),
-            keep_rare_gases=args["no_rare_gas_check"],
-            keep_rare_earths=args["no_rare_earth_check"]
+        data_file = CIFFile.from_file(
+            args["dataset"],
+            workers=args.get("workers")
         )
+        data_cifs = data_file.get_cifs()
+        if not args["no_rare_gas_check"]:
+            data_cifs, _ = discard_rare_gas_structures(data_cifs)
+        if not args["no_rare_earth_check"]:
+            data_cifs, _ = discard_rare_earth_structures(data_cifs)
+        data_file.clear()
+        data_file.add_cifs(data_cifs)
+        dataset, _ = data_file.parse_structures()
+
         print("Dataset loaded.")
         # remove duplicate structures from the dataset
         dataset, *_ = remove_equivalent(
@@ -340,24 +356,36 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     if _match_file_arg_need("valid", args.get("valid", False), valid_needed):
         print("Loading preprocessed valid structures...")
-        valids, *_ = read_cif(
-            filename=args["valid"],
-            workers=args.get("workers"),
-            keep_rare_gases=args["no_rare_gas_check"],
-            keep_rare_earths=args["no_rare_earth_check"]
+        valid_file = CIFFile.from_file(
+            args["dataset"],
+            workers=args.get("workers")
         )
+        valid_cifs = valid_file.get_cifs()
+        if not args["no_rare_gas_check"]:
+            valid_cifs, _ = discard_rare_gas_structures(valid_cifs)
+        if not args["no_rare_earth_check"]:
+            valid_cifs, _ = discard_rare_earth_structures(valid_cifs)
+        valid_file.clear()
+        valid_file.add_cifs(valid_cifs)
+        valids, _ = valid_file.parse_structures()
         print("Preprocessed valid structures loaded.")
     else:
         valids = []
 
     if _match_file_arg_need("uniques", args.get("uniques", False), uniques_needed):
         print("Loading preprocessed uniques structures...")
-        uniques, *_ = read_cif(
-            filename=args["uniques"],
-            workers=args.get("workers"),
-            keep_rare_gases=args["no_rare_gas_check"],
-            keep_rare_earths=args["no_rare_earth_check"]
+        uniq_file = CIFFile.from_file(
+            args["dataset"],
+            workers=args.get("workers")
         )
+        uniq_cifs = uniq_file.get_cifs()
+        if not args["no_rare_gas_check"]:
+            uniq_cifs, _ = discard_rare_gas_structures(uniq_cifs)
+        if not args["no_rare_earth_check"]:
+            uniq_cifs, _ = discard_rare_earth_structures(uniq_cifs)
+        uniq_file.clear()
+        uniq_file.add_cifs(uniq_cifs)
+        uniques, _ = uniq_file.parse_structures()
         print("Preprocessed uniques structures loaded.")
     else:
         uniques = []
@@ -365,18 +393,18 @@ def main(standalone: bool = True, **kwargs) -> None:
     if _match_file_arg_need("sun-summary", args.get("sun_summary", False), sun_summary_needed):
         print("Loading stability summary file...")
         # TODO: make sure summary location is always in base dir
-        base_dir = os.path.dirname(args["sun_summary"])
-        summary_name = os.path.basename(args["sun_summary"])
+        base_dir, summary_name = os.path.split(args["sun_summary"])
         stable_structs_pairs = VaspExtractor(
             vasp_parser=VaspParser(base_dir),
             method="relaxation",
             summary_name=summary_name,
-            summary_key="is_stable",
+            summary_key="stable",
             workers=args.get("workers")
         ).get_data()
         stable_structs = [
             (name, s_data["in_struct"]) for name, s_data in stable_structs_pairs.items()
         ]
+        del stable_structs_pairs # Free some memory
         print("Data converted.")
     else:
         stable_structs = []
@@ -384,8 +412,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     if _match_file_arg_need("relax-summary", args.get("relax_summary", False), relax_summary_needed):
         print("Loading relaxations summary file...")
         # TODO: make sure summary location is always in base dir
-        base_dir = os.path.dirname(args["relax_summary"])
-        summary_name = os.path.basename(args["relax_summary"])
+        base_dir, summary_name = os.path.split(args["relax_summary"])
         relax_structures_dict = VaspExtractor(
             vasp_parser=VaspParser(base_dir),
             method="relaxation",
@@ -394,6 +421,7 @@ def main(standalone: bool = True, **kwargs) -> None:
             workers=args.get("workers")
         ).get_data()
         relax_structures = list(relax_structures_dict.items())
+        del relax_structures_dict # Free some memory
         print("Data converted.")
     else:
         relax_structures = []

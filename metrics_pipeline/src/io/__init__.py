@@ -4,7 +4,7 @@ from .io_base import (
     check_file_format, check_file_or_dir,
     EmptyDirectoryError
 )
-from .cif import read_cif, symmetrize_and_write_cif, cif_str_to_struct
+from .cif import CIFFile, CIFParsingError
 from .dataset import PDEntryParser, PDDataset, MPDatasetDownloader
 from .json import JsonLoader, JsonWriter
 from .poscar import PoscarBlock, PoscarFile
@@ -16,7 +16,7 @@ from .yaml import load_yaml_as_dict
 __all__ = [
     "PathLike", "ROOT", "SRCPATH", "CONFIGPATH", "EmptyDirectoryError",
     "check_file_format", "check_file_or_dir",
-    "read_cif", "symmetrize_and_write_cif", "cif_str_to_struct",
+    "CIFFile", "CIFParsingError",
     "PDEntryParser", "PDDataset", "MPDatasetDownloader",
     "JsonLoader", "JsonWriter",
     "PoscarBlock", "PoscarFile",

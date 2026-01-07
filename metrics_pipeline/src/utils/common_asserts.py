@@ -3,7 +3,7 @@
 
 
 import typing as tp
-
+import warnings
 
 CompareStr = tp.Union[
     tp.Literal["=="],
@@ -103,6 +103,74 @@ def check_num_value(
             )
         case _:
             check_type(cdt, "cdt", (str,))
+
+
+def raise_or_warn(
+    action: tp.Literal["raise", "warn", "ignore"],
+    exception: type[Exception] | None = None,
+    err_msg: str | None = None,
+    warn_type: type[Warning] | None = None,
+    warn_msg: str | None = None
+) -> None:
+    """
+    Flexibly raise an exception, print a warning or ignore
+    with a message that can be different in each case.
+
+    Parameters
+    ----------
+
+    action: "raise" | "warn" | "ignore"
+        What kind of action to do when going through this function.
+
+    exception: Exception, optional
+        What class of exception to raise when `raise_or_warn` is set to "raise".
+        If not given and `raise_or_warn` is set to "raise", defaults to base
+        exception class `Exception`.
+
+    err_msg: str, optional
+        The message to print when raising an exception.
+
+    warn_type: Warning, optional
+        What class of warning to show when `raise_or_warn` is set to "warn".
+        If not given and `raise_or_warn` is set to "warn", defaults to
+        warning class `UserWarning`.
+
+    warn_msg: str, optional
+        The message to print when printing a warning.
+
+    Notes
+    -----
+    If the message argument corresponding to given `raise_or_warn` action is not given,
+    the message set for the other action is used instead, so if the message is the same for
+    both actions it can be passed only once to one or the other message argument indifferently.
+    At least one message argument must be given.
+    """
+    match (err_msg, warn_msg):
+        case (str(), str()): pass
+        case (None, str()): err_msg = warn_msg
+        case (str(), None): warn_msg = err_msg
+        case (None, None):
+            raise ValueError(
+                f"{raise_or_warn.__name__}: at least one of either 'err_msg' or 'warn_msg' "
+                "arguments must be set."
+            )
+        case _:
+            raise TypeError(
+                f"{raise_or_warn.__name__}: At least one of either 'err_msg' or 'warn_msg' "
+                "arguments were given a wrong type:\n"
+                f"- 'err_msg' expected a type 'str', got {type(err_msg).__name__!r}.\n"
+                f"- 'warn_msg' expected a type 'str', got {type(warn_msg).__name__!r}.\n"
+            )
+
+    if action == "raise":
+        exception = exception if exception is not None else Exception
+        err_msg = err_msg if err_msg is not None else warn_msg
+        raise exception(err_msg)
+
+    if action == "warn":
+        warn_type = warn_type if warn_type is not None else UserWarning
+        warn_msg = warn_msg if warn_msg is not None else err_msg
+        warnings.warn(warn_msg, warn_type, stacklevel = 2)
 
 
 if __name__ == "__main__":

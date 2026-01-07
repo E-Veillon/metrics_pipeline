@@ -12,7 +12,7 @@ import argparse as ap
 
 from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
-    check_file_or_dir, load_yaml_as_dict, read_cif,
+    check_file_or_dir, load_yaml_as_dict, CIFFile,
     VaspWriter, VaspParser, VaspExtractor, CONFIGPATH, EmptyDirectoryError
 )
 from src.computations.vasp import init_vasp_settings, PMGRelaxSet, PMGStaticSet
@@ -175,12 +175,11 @@ def main(standalone: bool = True, **kwargs):
 
     if input_file.endswith(".cif"):
         # Convert CIF data into Structure objects
-        structures, *_ = read_cif(
-            filename=input_file,
-            workers=args.get("workers"),
-            keep_rare_gases=True, # Avoid calling rare gas screening function
-            keep_rare_earths=True # Avoid calling rare earth screening function
-        )
+        structures, _ = CIFFile.from_file(
+            input_file,
+            workers=args.get("workers")
+        ).parse_structures()
+
         # Get structures of interest
         if indices is None:
             structs_data = [

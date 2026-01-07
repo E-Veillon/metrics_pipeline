@@ -15,7 +15,7 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from src.utils import parse_input_args, check_type, check_num_value, VisualIterator, PG_TO_SYSTEM
-from src.io import read_cif, symmetrize_and_write_cif, check_file_or_dir
+from src.io import CIFFile, check_file_or_dir
 
 
 class SymmetryClass(Enum):
@@ -196,13 +196,12 @@ def main(standalone: bool = True, **kwargs) -> None:
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
     _print_config(args)
 
-    structs, *_ = read_cif(
+    cif_file = CIFFile.from_file(
         args["input_file"],
-        keep_rare_earths=True,
-        keep_rare_gases=True,
         special_keys=args.get("special_keys"),
         workers=args.get("workers")
     )
+    structs, _ = cif_file.parse_structures()
 
     partial_fn = ft.partial(get_sym_and_refined_struct, sym_class=args["filter_by"])
     sym_desc = "Computing symmetries"
@@ -246,6 +245,7 @@ def main(standalone: bool = True, **kwargs) -> None:
                 f"'--filter-by' argument value {args['filter_by']} is not supported."
             )
 
+    cif_file.clear()
     for sym_class in VisualIterator(
         classes, desc="Parsing symmetry classes", percent=True, unit="symmetry classes"
     ):
@@ -254,15 +254,14 @@ def main(standalone: bool = True, **kwargs) -> None:
             args["output"],
             str(path.basename(args["input_file"])).replace(".cif", f"_{sym_class}.cif")
         )
-        symmetrize_and_write_cif(
-            outfile,
+        cif_file.add_structures(
             [struct for _, struct in sym_structs],
-            symmetrize=False,
-            special_keys=args.get("special_keys"),
-            workers=args.get("workers")
+            symmetrize=False
         )
+        cif_file.write_file(outfile)
+        cif_file.clear()
         structs_tups = list(filter(lambda t: t[0] != sym_class, structs_tups))
-    
+
     assert len(structs_tups) == 0, (
         "Not all structures were parsed at the end, "
         "some symmetry classes may not have been accounted for in the code. "

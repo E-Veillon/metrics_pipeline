@@ -1,326 +1,403 @@
-"""I/O operations for concatenated CIF data files."""
+"""I/O operations for concatenated CIF data files and strings."""
 
 import os
 import re
+from pathlib import Path
 import functools as ft
+import typing as tp
+import typing_extensions as tpe
 
 from tqdm.contrib.concurrent import process_map
 
 from pymatgen.core import Structure
-from pymatgen.io.cif import CifParser, CifWriter
+from pymatgen.io.cif import CifParser, CifWriter, CifBlock
+from pymatgen.symmetry.structure import SymmetrizedStructure
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmOp
 
-from .io_base import PathLike, check_file_or_dir, check_file_format
-from src.utils import VisualIterator
-
-# TODO: Split responsibilities better, e.g. define compound convenience functions
-# outside the package.
-from src.utils.periodic_table import (
-    discard_rare_gas_structures, discard_rare_earth_structures
-)
+from .io_base import PathLike
+from src.utils import VisualIterator, raise_or_warn
 
 
-def extract_cif_from_file(filename: PathLike) -> list[str]:
+class CIFParsingError(Exception):
+    """An error occurred while trying to parse a CIF string."""
+
+
+class CIFFile:
     """
-    Reads and separate concatenated structures from a cif file.
-
-    Parameters
-    ----------
-    filename: str
-        Path to a cif file.
-
-    Returns
-    -------
-    list[str]
-        List of CIF strings, each one representing a single structure.
+    Load, write and parse concatenated CIF strings into structures.
     """
-    check_file_or_dir(filename, "file", allowed_formats="cif")
+    matcher: re.Pattern = re.compile(r"^data_.*?$(?=\ndata_|\Z)", re.MULTILINE | re.DOTALL)
 
-    # load file
-    with open(filename, "rt", encoding="utf-8") as input_file:
-        data = input_file.read()
+    def __init__(
+        self,
+        data: list[str] | None = None,
+        special_keys: list[str] | None = None,
+        workers: int | None = None
+    ) -> None:
+        """
+        Load, write and parse concatenated CIF strings into structures.
+        Stored CIFs are purposefully not checked unless conversion to structure is needed
+        to keep the representation as close as possible to what was in the loaded data.
+        The constructor is typically not called directly when loading external data
+        (prefer using either `from_str()` or `from_file()`), but can be called without
+        specifying `data` to create an empty instance to fill manually with CIF strings and
+        write a file out of them afterward.
 
-    # match structures data with regular expression
-    matcher = re.compile(r"^data.*?$(?=\ndata|\Z)", re.MULTILINE | re.DOTALL)
-    cif_str_structs = [str(cif_struct).strip() for cif_struct in matcher.findall(data)]
+        Parameters
+        ----------
+        data: list[str], optional
+            List of CIF strings, each representing an individual structure.
 
-    return cif_str_structs
+        special_keys: list[str], optional
+            Keys pointing to data inside the CIFs that should be stored inside corresponding
+            structure's `properties` dict attribute, either when converting string to structure
+            or when searching for stored data when converting structure back to string. Pass
+            'header' to store the header line (without the 'data' part) inside a 'header' key.
 
+        workers: int, optional
+            Number of processes to use in parallel. If not given, will use default of
+            `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
+            and execute sequentially.
+        """
+        if data is None:
+            data = []
 
-def cif_str_to_struct(
-    cif_str: str, special_keys: list[str] | None = None
-) -> Structure:
-    """
-    Convert data from a cif formatted string to a pymatgen Structure object.
+        self._data = data
+        self.special_keys = special_keys
+        self.workers = workers
 
-    Parameters
-    ----------
-    cif_str: str
-        The string of a structure encoded in the cif format.
+    def _get_chunksize(self) -> int:
+        """
+        Compute chunksize for multiprocess tasks based on current stored data length.
+        """
+        return min(len(self._data) // 100, 10) + 1
 
-    special_keys: list[str], optional
-        CIF Labels to store into structure properties, e.g. can be used to save
-        structure identifiers attached to it throughout its manipulation as a
-        python object. Pass "header" to save the original header.
+    def get_cifs(self) -> list[str]:
+        """Get the list of individual CIF strings."""
+        return self._data
 
-    Returns
-    -------
-    Structure
-        A Pymatgen Structure object.
-    """
-    parser = CifParser.from_str(cif_string=cif_str)
-    structure = parser.parse_structures(primitive=False)[0]
+    def add_cifs(self, cifs: list[str]) -> None:
+        """Add a list of CIF strings to the file."""
+        assert all(isinstance(cif, str) for cif in cifs)
+        self._data.extend(cifs)
 
-    if special_keys is not None:
-        props = dict.fromkeys(special_keys)
+    def clear(self) -> None:
+        """Remove all stored CIF data without changing other initialized parameters."""
+        self._data.clear()
+
+    def _parse_structure(self, cif: str) -> Structure | None:
+        """Parse a Structure object from a CIF string. Return None if parsing fails."""
+        parser = CifParser.from_str(cif)
+        try:
+            structure = parser.parse_structures(primitive=False, on_error="raise")[0]
+        except ValueError:
+            return None
+
+        if not self.special_keys:
+            return structure
+
+        props = dict.fromkeys(self.special_keys)
         cif_dict: dict = parser.as_dict().popitem()[1]
-        for key in special_keys:
+
+        for key in self.special_keys:
             if key == "header":
                 props[key] = parser._cif.data.popitem()[1].header
             else:
                 props[key] = cif_dict.get(key)
 
         structure.properties.update(props)
+        return structure
 
-    return structure
+    def parse_structures(
+        self, on_error: tp.Literal["raise", "warn", "ignore"] = "warn"
+    ) -> tuple[list[Structure], list[int]]:
+        """
+        Get Structure objects from stored CIF strings.
 
+        Parameters
+        ----------
+        on_error: 'raise', 'warn', 'ignore'
+            What to do in case not all CIF strings could be parsed into structures.
+            Defaults to 'warn'.
 
-def struct_to_sym_cif_str(
-    structure: Structure,
-    significant_figures: int = 8,
-    symprec: float|None = 0.01,
-    angleprec: float = 5.0,
-    special_keys: list[str]|None = None
-) -> str:
-    """
-    Symmetrize and converts a pymatgen Structure object into a CIF formatted string.
+        Returns
+        -------
+        list[Structure]
+            Structures parsed from stored CIFs. Only contains successfully parsed
+            structures, in the same order as the internally stored CIFs.
 
-    Parameters:
-        structure (Structure):      Structure object to convert.
+        list[int]
+            Indices inside the stored CIFs list where the data could not be parsed.
+        """
+        # Avoid multiprocess overhead for only one structure
+        workers = 0 if len(self._data) == 1 else self.workers
+        description = "Parsing CIFs into structures"
 
-        significant_figures (int):  Number of decimal places to keep for atomic positions.
-
-        symprec (float|None):       Fractional position tolerance to find symmetry.
-                                    If set to None, symmetry finding is disabled.
-                                    Defaults to 0.01.
-
-        angleprec (float):          Angle tolerance to find symmetry. Defaults to 5 degrees.
-
-        special_keys ([str]):       CIF Labels to store into structure properties, e.g.
-                                    can be used to save structure identifiers attached to it
-                                    throughout its manipulation as a python object.
-
-    Returns:
-        str: CIF formatted string.
-    """
-    writer = CifWriter(
-            struct=structure,
-            symprec=symprec,
-            significant_figures=significant_figures,
-            angle_tolerance=angleprec
-        )
-
-    if special_keys is not None:
-        final_cif = []
-        auto_cif = str(writer).splitlines(keepends=True)
-
-        # Remove comment lines
-        auto_cif = list(filter(lambda line: not line.startswith("#"), auto_cif))
-
-        # Recovery of the saved header
-        if "header" in special_keys:
-            final_cif.append(f"data_{structure.properties.pop('header')}\n")
+        if workers == 0:
+            structures = [
+                self._parse_structure(cif)
+                for cif in VisualIterator(
+                    self._data,
+                    desc=description,
+                    unit="parsed",
+                    percent=True
+                )
+            ]
         else:
-            final_cif.append(auto_cif[0])
-
-        # Recovery of saved attributes
-        for key in special_keys:
-            if key == "header":
-                continue
-            final_cif.append(f"{key}   {structure.properties.get(key)}\n")
-
-        # Addition of the generated CIF data
-        final_cif.extend(auto_cif[1:])
-        final_cif = "".join(final_cif)
-
-    else:
-        final_cif = str(writer)
-
-    return final_cif
-
-
-def read_cif(
-    filename: PathLike,
-    keep_rare_gases: bool = False,
-    keep_rare_earths: bool = False,
-    special_keys: list[str] | None = None,
-    workers: int | None = None,
-) -> tuple[list[Structure], int, int]:
-    """
-    Read a cif file containing concatenated structures data and parse them using multiprocess.
-
-    Parameters
-    ----------
-    filename: str | Path
-        Path to the input CIF file.
-
-    keep_rare_gases: bool
-        Whether structures containing rare gases should be kept. Defaults to false.
-
-    keep_rare_earths (bool
-        Whether structures containing f-block elements should be kept. Defaults to False.
-
-    special_keys: list[str], optional
-        CIF Labels to store into structure properties, e.g. can be used to save structure
-        identifiers attached to it throughout its manipulation as a python object.
-
-    workers: int, optional
-        Number of processes to use in parallel. If not given, will use default of
-        `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
-        and execute sequentially.
-
-    Returns
-    -------
-    List[Structure]
-        Decoded Structure objects in a list.
-    Int
-        Number of structures containing rare gases discarded.
-    Int
-        Number of structures containing rare earth elements discarded.
-    """
-    check_file_or_dir(filename, "file", allowed_formats="cif")
-
-    struct_strings = extract_cif_from_file(filename)
-    nbr_rare_gas_structs, nbr_rare_earth_structs = 0, 0
-
-    if not keep_rare_gases:
-        struct_strings, nbr_rare_gas_structs = discard_rare_gas_structures(struct_strings)
-        print(f"{nbr_rare_gas_structs} rare gas structures ignored")
-
-    if not keep_rare_earths:
-        struct_strings, nbr_rare_earth_structs = discard_rare_earth_structures(struct_strings)
-        print(f"{nbr_rare_earth_structs} rare earths structures ignored")
-
-    nbr_struct = len(struct_strings)
-    assert nbr_struct > 0, (
-    "No structure data found in provided file (maybe they all have been discarded ?)"
-    )
-    chunksize = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
-
-    if special_keys is not None:
-        partial_fn = ft.partial(cif_str_to_struct, special_keys=special_keys)
-    else:
-        partial_fn = cif_str_to_struct
-
-    if workers is not None and workers == 0:
-        data_list = [
-            partial_fn(struct_string)
-            for struct_string in VisualIterator(
-                struct_strings, desc="Read and load data", unit="structures", percent=True
+            structures = process_map(
+                self._parse_structure,
+                self._data,
+                max_workers=self.workers,
+                chunksize=self._get_chunksize(),
+                desc=description
             )
-        ]
-    else:
-        data_list = list(process_map(
-            partial_fn,
-            struct_strings,
-            max_workers=workers,
-            chunksize=chunksize,
-            desc="load and read data",
-        ))
-    structs_list: list[Structure] = list(filter(lambda data: isinstance(data, Structure), data_list))
-    unparsed_cifs: list[str] = list(filter(lambda data: isinstance(data, str), data_list))
-    if unparsed_cifs:
-        print(
-            f"WARNING: {len(unparsed_cifs)} data could not be parsed into "
-            "Structure objects, they will be removed from processing and "
-            "written as-is in a 'pmg_unparsed.cif' file."
-        )
-        with open("pmg_unparsed.cif","wt") as fp:
-            fp.write("\n".join(unparsed_cifs))
 
-    return structs_list, nbr_rare_gas_structs, nbr_rare_earth_structs
+        invalid_indices = [idx for idx, struct in enumerate(structures) if struct is None]
+        structures = list(filter(None, structures))
 
+        if invalid_indices:
+            msg = (
+                "Some CIFs could not be parsed. See their 0-based positions in the input file "
+                f"hereafter: {', '.join(sorted(map(str, invalid_indices)))}."
+            )
+            raise_or_warn(on_error, CIFParsingError, msg)
 
-def symmetrize_and_write_cif(
-    filename: str,
-    structures: list[Structure],
-    significant_figures: int = 8,
-    symmetrize: bool = True,
-    symprec: float = 0.01,
-    angleprec: float = 5.0,
-    special_keys: list[str]|None = None,
-    workers: int|None = None
-) -> None:
-    """
-    Symmetrize and encode multiple structures in CIF format and write them in a file
-    using multiprocess.
+        return structures, invalid_indices
 
-    Parameters
-    ----------
-    filename (str
-        Name of the input file.
+    @staticmethod
+    def _add_symmetry_data(
+        block: CifBlock,
+        sym_struct: SymmetrizedStructure,
+        significant_figures: int = 8,
+        remove_equivalents: bool = False
+    ) -> CifBlock:
+        """Add symmetry infos in the CIF data of a structure."""
+        block.data["_symmetry_space_group_name_H-M"] = sym_struct.spacegroup.int_symbol
+        block.data["_symmetry_Int_Tables_number"] = sym_struct.spacegroup.int_number
+        ops: list[SymmOp] = [op.as_xyz_str() for op in sym_struct.spacegroup]
+        block.data["_symmetry_equiv_pos_site_id"] = [f"{i}" for i in range(1, len(ops) + 1)]
+        block.data["_symmetry_equiv_pos_as_xyz"] = ops
 
-    structures (List[Structure]
-        The structures to encode.
+        if remove_equivalents:
+            # Same behavior as CifWriter with defined symprec
+            unique_sites = [
+                (
+                    min(sites, key=lambda site: tuple(abs(x) for x in site.frac_coords)),
+                    len(sites),
+                )
+                for sites in sym_struct.equivalent_sites
+            ]
+            sorted_unique_sites = sorted(
+                unique_sites,
+                key=lambda t: (
+                    t[0].species.average_electroneg,
+                    -t[1],
+                    t[0].a,
+                    t[0].b,
+                    t[0].c,
+                ),
+            )
+            atom_site_type_symbol = []
+            atom_site_symmetry_multiplicity = []
+            atom_site_fract_x = []
+            atom_site_fract_y = []
+            atom_site_fract_z = []
+            atom_site_label = []
+            atom_site_occupancy = []
+            for idx, (site, mult) in enumerate(sorted_unique_sites):
+                for species, occupancy in site.species.items():
+                    atom_site_type_symbol.append(str(species))
+                    atom_site_symmetry_multiplicity.append(f"{mult}")
+                    atom_site_fract_x.append(f"{site.a:.{significant_figures}f}")
+                    atom_site_fract_y.append(f"{site.b:.{significant_figures}f}")
+                    atom_site_fract_z.append(f"{site.c:.{significant_figures}f}")
+                    atom_site_label.append(
+                        f"{species.symbol}{idx}"
+                        if site.label == site.species_string else site.label
+                    )
+                    atom_site_occupancy.append(str(occupancy))
 
-    significant_figures (int
-        Number of decimal places to keep for atomic positions.
+            block.data["_atom_site_type_symbol"] = atom_site_type_symbol
+            block.data["_atom_site_label"] = atom_site_label
+            block.data["_atom_site_symmetry_multiplicity"] = atom_site_symmetry_multiplicity
+            block.data["_atom_site_fract_x"] = atom_site_fract_x
+            block.data["_atom_site_fract_y"] = atom_site_fract_y
+            block.data["_atom_site_fract_z"] = atom_site_fract_z
+            block.data["_atom_site_occupancy"] = atom_site_occupancy
 
-    symmetrize (bool
-        Whether to search for structures spacegroup symmetry and refine their atomic positions
-        according to found symmetry before encoding them. Defaults to True.
+        return block
 
-    symprec (float
-        Fractional position tolerance to find symmetry. Defaults to 0.01.
+    def _convert_to_cif(
+        self,
+        structure: Structure | SymmetrizedStructure,
+        symmetrize: bool = False,
+        symprec: float = 0.1,
+        angleprec: float = 5.0,
+        refine: bool = False,
+        remove_equivalents: bool = False,
+        significant_figures: int = 8
+    ) -> str:
+        """
+        Convert a structure to CIF formatted string. See the `add_structures()` method
+        for informations on the arguments. Do not use this method directly.
+        """
+        # Symmetrize and refine structure
+        if symmetrize and not isinstance(structure, SymmetrizedStructure):
+            spga = SpacegroupAnalyzer(structure, symprec, angleprec)
 
-    angleprec (float
-        Angle tolerance to find symmetry. Defaults to 5 degrees.
+            if refine:
+                structure = SpacegroupAnalyzer(
+                    spga.get_refined_structure(), symprec, angleprec
+                ).get_symmetrized_structure()
+            else:
+                structure = spga.get_symmetrized_structure()
 
-    special_keys ([str]
-        CIF Labels to store into structure properties, e.g. can be used to save structure
-        identifiers attached to it throughout its manipulation as a python object.
+        # Get unsymmetrized auto-generated CifBlock of the structure
+        cif_block = CifWriter(
+            structure, significant_figures=significant_figures
+        ).cif_file.data.popitem()[1]
 
-    workers: int, optional
-        Number of processes to use in parallel. If not given, will use default of
-        `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
-        and execute sequentially.
-    """
-    check_file_format(filename, allowed_formats="cif")
+        # Add eventual symmetry informations manually
+        if isinstance(structure, SymmetrizedStructure):
+            cif_block = self._add_symmetry_data(
+                cif_block, structure, significant_figures, remove_equivalents
+            )
+        
+        # Add back saved special data, before actual structure description
+        if self.special_keys:
+            saved_data = []
+            for key in self.special_keys:
+                if key == "header":
+                    cif_block.header = structure.properties[key]
+                else:
+                    saved_data.append((key, structure.properties[key]))
+            saved_data.extend(list(cif_block.data.items()))
+            cif_block.data = dict(saved_data)
+        
+        return str(cif_block)
 
-    nbr_struct = len(structures)
-    chunksize  = (min(nbr_struct // 100, 10) if nbr_struct >= 200 else 1)
+    def add_structures(
+        self, structures: list[Structure | SymmetrizedStructure], *args, **kwargs
+    ) -> None:
+        """
+        Add structures data into the file, with multiprocess if `workers` was not set
+        to 0 at initialization.
 
-    if symmetrize:
-        partial_fn = ft.partial(
-            struct_to_sym_cif_str,
-            significant_figures=significant_figures,
-            symprec=symprec,
-            angleprec=angleprec,
-            special_keys=special_keys
-        )
-    else:
-        partial_fn = ft.partial(
-            struct_to_sym_cif_str,
-            significant_figures=significant_figures,
-            symprec=None,
-            special_keys=special_keys
-        )
+        Parameters
+        ----------
+        structures: list[Structure | SymmetrizedStructure]
+            List of structures to add to the file.
 
-    if workers == 0:
-        encoded_cif = [
-            partial_fn(struct)
-            for struct in VisualIterator(structures, desc="Writing data in cif format")
-        ]
+        symmetrize: bool
+            Whether to search for the spacegroup symmetry before converting to string.
+            If a SymmetrizedStructure object is passed, this step is ignored for efficiency.
+            Defaults to False.
 
-    else:
-        encoded_cif = list(
-            process_map(
-                partial_fn,
+        symprec: float
+            Tolerance for symmetry finding. See pymatgen's `SpacegroupAnalyzer` for more details.
+            Defaults to 0.1 (instead of pymatgen's 0.01) for better computation stability with
+            simulated crystals.
+
+        angleprec: float
+            Angle tolerance for symmetry finding. Defaults to 5.0 degrees.
+
+        refine: bool
+            Whether sites inside the newly symmetrized structure should be moved to their
+            expected positions according to spacegroup. Ignored if `symmetrize` is `False`
+            or if a SymmetrizedStructure is passed. Defaults to False.
+
+        remove_equivalents: bool
+            Whether to only keep symmetrically distinct sites in the final string.
+            **WARNING**: the final string may generate a different structure if converted again
+            with the `parse_structures()` method, as it assumes all sites are present in data.
+            Defaults to False.
+
+        significant_figures: int
+            Number of decimals to keep for floats formatting. Defaults to 8.
+        """
+        # Avoid multiprocess overhead for only one structure
+        workers = 0 if len(structures) == 1 else self.workers
+        description = "Converting structures to CIF"
+
+        if workers == 0:
+                cif_strings = [
+                    self._convert_to_cif(structure, *args, **kwargs)
+                    for structure in VisualIterator(
+                        structures,
+                        desc=description,
+                        unit="converted",
+                        percent=True
+                    )
+                ]
+        else:
+            convert_to_cif = ft.partial(self._convert_to_cif, *args, **kwargs)
+            cif_strings = process_map(
+                convert_to_cif,
                 structures,
                 max_workers=workers,
-                chunksize=chunksize,
-                desc="Writing data in cif format"
+                chunksize=self._get_chunksize(),
+                desc=description
             )
+        self._data.extend(cif_strings)
+
+    @classmethod
+    def from_str(cls, string: str, **kwargs) -> tpe.Self:
+        """
+        Load CIFs from a concatenated string.
+
+        Parameters
+        ----------
+        string: str
+            String to parse.
+
+        kwargs: Any
+            Additional keyword arguments to pass to the constructor.
+        """
+        return cls(
+            [str(cif).strip() for cif in re.findall(cls.matcher, string)],
+            **kwargs
         )
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    with open(filename, "wt", encoding="utf-8") as out_file:
-        out_file.write("\n".join(encoded_cif))
+
+    @classmethod
+    def from_file(cls, filename: PathLike, **kwargs) -> tpe.Self:
+        """
+        Load a concatenated CIF file.
+        
+        Parameters
+        ----------
+        filename: str | Path
+            File to load.
+
+        kwargs: Any
+            Additional keyword arguments to pass to the constructor.
+        """
+        with open(filename, "rt", encoding="utf-8") as fp:
+            str_data = fp.read()
+
+        return cls.from_str(str_data, **kwargs)
+
+    def __getitem__(self, index: int) -> str:
+        """Get data for one structure."""
+        return self._data[index]
+
+    def __str__(self) -> str:
+        """File content as a single string."""
+        return "\n".join(self._data)
+
+    def __len__(self) -> int:
+        """Number of stored CIF strings."""
+        return len(self._data)
+
+    def __eq__(self, other: tpe.Self) -> bool:
+        """Whether two files contain exactly the same data."""
+        if not isinstance(other, CIFFile):
+            return NotImplemented
+
+        return self is other or str(self) == str(other)
+
+    def write_file(self, filename: PathLike) -> None:
+        """Write concatenated CIF strings into a file."""
+        os.makedirs(Path(filename).parent, exist_ok=True)
+
+        with open(filename, "wt", encoding="utf-8") as fp:
+            fp.write(str(self))

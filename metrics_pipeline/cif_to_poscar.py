@@ -3,11 +3,12 @@
 import os
 import typing as tp
 import argparse as ap
+import warnings
 
 from pymatgen.io.vasp import Poscar
 
 from src.utils import parse_input_args, check_type, check_num_value, VisualIterator
-from src.io import check_file_or_dir, check_file_format, read_cif
+from src.io import check_file_or_dir, check_file_format, CIFFile
 
 
 def _get_command_line_args() -> ap.Namespace:
@@ -135,18 +136,22 @@ def main(standalone: bool = True, **kwargs) -> None:
     """
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
-    structures, *_ = read_cif(
-        filename=args["input_file"],
-        keep_rare_gases=True,
-        keep_rare_earths=True,
+    structures, _ = CIFFile.from_file(
+        args["input_file"],
         special_keys=(["header"] if args.get("save_header") else None),
         workers=args.get("workers")
+    ).parse_structures()
+
+    structures = VisualIterator(
+        structures, desc="Converting to Poscar", unit="converted", percent=True
     )
-    structures = VisualIterator(structures, desc="Converting to Poscar")
     outfile_content = [
         Poscar(
             structure=struct,
-            comment=f"# {struct.properties['header']}" if args.get("save_header") else None
+            comment=(
+                f"# {struct.properties['header']}" if args.get("save_header")
+                else f"# {struct.reduced_formula}"
+            )
         ).get_str(significant_figures=args["significant_figures"]) for struct in structures
     ]
     with open(args["output"], "wt", encoding="utf-8") as fp:

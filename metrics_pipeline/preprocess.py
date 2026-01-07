@@ -11,8 +11,11 @@ from datetime import datetime
 import argparse as argp
 
 # TODO: reorganize behavior between metrics.py and this script
-from src.utils import parse_input_args, check_type, check_num_value
-from src.io import check_file_or_dir, check_file_format, read_cif, symmetrize_and_write_cif
+from src.utils import (
+    parse_input_args, check_type, check_num_value,
+    discard_rare_gas_structures, discard_rare_earth_structures
+)
+from src.io import check_file_or_dir, check_file_format, CIFFile
 from src.metrics import (
     StructValidity, Viability, Symmetry, Unicity
 )
@@ -305,27 +308,29 @@ def main(standalone: bool = True, **kwargs) -> None:
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Extraction des données CIF et conversion en structures
-    structures, nbr_rare_gas_structs, nbr_rare_earth_structs = read_cif(
-        filename=args["input_file"],
-        keep_rare_gases=args["no_rare_gas_check"],
-        keep_rare_earths=args["no_rare_earth_check"],
+    cif_file = CIFFile.from_file(
+        args["input_file"],
         special_keys=args.get("special_keys"),
         workers=args.get("workers")
     )
-
-    nbr_loaded_structs = len(structures)
-    nbr_total_structs  = nbr_loaded_structs + nbr_rare_gas_structs + nbr_rare_earth_structs
-    assert nbr_loaded_structs > 0, "No structure could be parsed from given data"
-
-    print(f"{nbr_total_structs} structures detected in total")
+    cifs = cif_file.get_cifs()
+    nbr_loaded_data = len(cifs)
+    assert nbr_loaded_data > 0, "No structure could be parsed from given data"
+    print(f"{nbr_loaded_data} structures detected in total")
 
     if not args["no_rare_gas_check"]:
-        print(f"{nbr_rare_gas_structs} structures containing rare gases were ignored")
+        cifs, nbr_rare_gas_structs = discard_rare_gas_structures(cifs)
+        print(f"{nbr_rare_gas_structs} structures containing rare gases were discarded")
 
     if not args["no_rare_earth_check"]:
-        print(f"{nbr_rare_earth_structs} structures containing rare earths were ignored")
+        cifs, nbr_rare_earth_structs = discard_rare_earth_structures(cifs)
+        print(f"{nbr_rare_earth_structs} structures containing rare earths were discarded")
 
-    print(f"{nbr_loaded_structs} structures are kept for further processing")
+    cif_file.clear()
+    cif_file.add_cifs(cifs)
+    structures, _ = cif_file.parse_structures()
+
+    print(f"{len(structures)} structures are kept for further processing")
 
     # Vérification des distances interatomiques
 
@@ -373,23 +378,23 @@ def main(standalone: bool = True, **kwargs) -> None:
     else:
         print("Symmetrization is activated, now symmetrizing and writing CIF file...")
 
-    symmetrize_and_write_cif(
-        filename=args["output"],
-        structures=kept_structs,
+    cif_file.clear()
+    cif_file.add_structures(
+        kept_structs,
         symmetrize=(not args["no_symmetrization"]),
         symprec=args["symprec"],
         angleprec=args["angleprec"],
-        special_keys=args.get("special_keys"),
-        workers=args.get("workers")
+        refine=True
     )
+    cif_file.write_file(args["output"])
 
     # Calcul du temps total pris par la procédure
     stop = datetime.now()
 
     print("\n------------------------------")
     print("\nSUMMARY OF THE CALCULATION")
-    print(f"{nbr_total_structs} structures detected in total, including:")
-    print(f"- {nbr_unique_structs} unique structure(s)")
+    print(f"{nbr_loaded_data} structures detected in total, including:")
+    print(f"- {nbr_unique_structs} structure(s) passing filters")
 
     if not args["no_rare_gas_check"]:
         print(f"- {nbr_rare_gas_structs} structure(s) containing rare gases")
@@ -399,6 +404,9 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     if not args["no_dist_check"]:
         print(f"- {nbr_not_valid} structure(s) with too small interatomic distances")
+
+    if not args["no_symmetrization"] and args["discard_asymmetrics"]:
+        print(f"- {nbr_asymmetric} structure(s) that are triclinics")
 
     if not args["no_equiv_match"]:
         print(f"- {nbr_equivalent} structure(s) that are duplicates")

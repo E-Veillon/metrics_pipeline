@@ -12,7 +12,7 @@ from src.utils import (
     parse_input_args, check_type, check_num_value,
     discard_rare_gas_structures, discard_rare_earth_structures
 )
-from src.io import cif_str_to_struct, check_file_or_dir, check_file_format
+from src.io import CIFFile, check_file_or_dir, check_file_format
 from src.metrics import StructValidity, Unicity
 
 
@@ -186,7 +186,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     # Rename CIFs headers with their 'id_key'
     new_cifs = []
     for id, cif in tqdm(list(zip(ids, cifs)),desc="Renaming CIFs"):
-        split_cif = cif.splitlines()
+        split_cif = cif.split(sep="\n", maxsplit=1)
         split_cif[0] = "data_" + str(id)
         new_cif = "\n".join(split_cif)
         new_cifs.append(new_cif)
@@ -212,10 +212,10 @@ def main(standalone: bool = True, **kwargs) -> None:
         print(step_sep)
 
     # Structurize kept CIFs and save their id
-    structs = [
-        cif_str_to_struct(cif, special_keys=["header"])
-        for cif in tqdm(new_data, desc="Structurize CIFs")
-    ]
+    structs, _ = CIFFile(
+        new_data, special_keys=["header"], workers=args.get("workers")
+    ).parse_structures()
+
     new_data = structs
     print(step_sep)
 

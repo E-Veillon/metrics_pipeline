@@ -12,6 +12,7 @@ import itertools as itt
 import numpy as np
 import numpy.typing as npt
 
+from .io_base import PathLike
 from src.utils import ALL_ELT_SYMBOL_TO_Z
 
 
@@ -208,7 +209,7 @@ class PoscarFile:
     positions informations.
     Each poscar structure has to begin by a comment line starting with "#".
     """
-    filename: str | None
+    filename: PathLike | None
     _data: list[str]
     matcher: re.Pattern = re.compile(r"^#.*?$(?=\n#|\Z)", re.MULTILINE | re.DOTALL)
 
@@ -221,7 +222,13 @@ class PoscarFile:
     _positions_basis_cache: list[str] | None = None
     _positions_cache: list[np.ndarray] | None = None
 
-    def __init__(self, filename: str | None = None, strict: bool = True, cache: bool = True, cache_all: bool = False) -> None:
+    def __init__(
+        self,
+        filename: PathLike | None = None,
+        strict: bool = True,
+        cache: bool = True,
+        cache_all: bool = False
+    ) -> None:
         """
         Read and parse concatenated minimal VASP 5.0+ poscar formatted structures in a file.
         Minimal means each data block only contains a comment header, lattice, elements and
@@ -296,7 +303,7 @@ class PoscarFile:
                     f"See below for details:\n{exc}"
                 )
 
-    def _parse_file_data(self, filename: str, strict: bool = True) -> list[str]:
+    def _parse_file_data(self, filename: PathLike, strict: bool = True) -> list[str]:
         """Read the file and parse poscar structures."""
         with open(filename, "rt", encoding="utf-8") as fp:
             file_data = fp.read()
