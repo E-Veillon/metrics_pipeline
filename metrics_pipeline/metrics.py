@@ -22,7 +22,7 @@ from src.utils import (
 )
 from src.io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
-    JsonWriter, CIFFile, PathLike, CONFIGPATH, VaspParser, VaspExtractor
+    JsonWriter, CIFFile, PathLike, CONFIGPATH, VaspParser, VaspExtractor, ExtractMethod
 )
 from src.computations.models import get_crystalnn_fingerprints, vectors_from_alignn
 from src.computations.local import get_densities
@@ -402,7 +402,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         base_dir, summary_name = os.path.split(args["sun_summary"])
         stable_structs_pairs = VaspExtractor(
             vasp_parser=VaspParser(base_dir),
-            method="relaxation",
+            method=ExtractMethod.RELAXATION,
             summary_name=summary_name,
             summary_key="stable",
             workers=args.get("workers")
@@ -424,7 +424,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         base_dir, summary_name = os.path.split(args["relax_summary"])
         relax_structures_dict = VaspExtractor(
             vasp_parser=VaspParser(base_dir),
-            method="relaxation",
+            method=ExtractMethod.RELAXATION,
             summary_name=summary_name,
             summary_key="converged",
             workers=args.get("workers")

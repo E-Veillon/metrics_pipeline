@@ -26,7 +26,7 @@ from pymatgen.core import Element
 
 from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
-    VaspParser, VaspExtractor, PDDataset, JsonWriter,
+    VaspParser, VaspExtractor, ExtractMethod, PDDataset, JsonWriter,
     check_file_or_dir, check_file_format
 )
 from src.metrics import Stability
@@ -254,7 +254,7 @@ def main(standalone: bool = True, **kwargs):
     # Extract generated data
     gen_data = VaspExtractor(
         vasp_parser=VaspParser(args["run_dir"]),
-        method="convex_hull",
+        method=ExtractMethod.CONVEX_HULL,
         summary_name=args.get("prev_summary"),
         summary_key=args.get("key_to_check"),
         workers=args.get("workers")

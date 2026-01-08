@@ -209,7 +209,6 @@ EXP_DELTA_H = {
         }
     }
 }
-
 """
 Experimentally measured heats of formations at 298K,
 extracted from the Open Quantum Materials Database (OQMD).
