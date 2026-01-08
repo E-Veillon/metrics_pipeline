@@ -62,7 +62,7 @@ class VaspWriter:
             assert isinstance(self.vasp_inputs, dict), TypeError(
                 f"'vasp_inputs' expected a type 'dict', got {type(self.vasp_inputs).__name__}."
             )
-            for run_name, vasp_input in vasp_inputs.values():
+            for run_name, vasp_input in vasp_inputs.items():
                 assert isinstance(run_name, str), TypeError(
                     f"'vasp_inputs' key {run_name} must be of type 'str', "
                     f"got {type(run_name).__name__}."
@@ -737,7 +737,7 @@ class VaspExtractor:
         summary_key: str | None = None
     ) -> tuple[str, dict[str, Structure | float]] | None:
         """
-        Extract the results of all Δ-Sol computations for one run.
+        Extract the results of all Δ-Sol computations for one structure.
         """
         calc_dirs = list(filter(os.path.isdir, os.listdir(struct_dir)))
         struct_dict = {}
@@ -752,7 +752,7 @@ class VaspExtractor:
             calc_data = self._get_run_data(
                 calc_dir, ExtractMethod.FINAL_STATE, summary_path, summary_key
             )
-            if not calc_data:
+            if not calc_data: # TODO: Add a choice to raise or warn
                 msg = f"{calc_dir} could not be parsed, either because the "
                 msg += "VASP run terminated on an error, on a timeout limit "
                 msg += "or it did not converge after the maximum ionic step was reached."
