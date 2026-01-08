@@ -526,7 +526,8 @@ class VaspExtractor:
         method: str | ExtractMethod,
         summary_name: str | None = None,
         summary_key: str | None = None,
-        workers: int | None = None
+        workers: int | None = None,
+        on_error: tp.Literal["raise", "warn", "ignore"] = "warn"
     ) -> None:
         """
         Extract data from VASP run directories.
@@ -553,6 +554,10 @@ class VaspExtractor:
             Number of parallel processes to spawn for efficient file parsing. If not given,
             `tqdm.contrib.concurrent.process_map()` default is used. Pass 0 to disable
             `process_map()` and execute sequentially.
+
+        on_error: "raise", "warn", "ignore"
+            What to do in case of an error occurring while parsing VASP Δ-Sol runs data.
+            Defaults to "warn".
         """
         assert isinstance(method, (str, ExtractMethod)), TypeError(
             f"'method' expected a type 'str' or 'ExtractMethod', got {type(method).__name__}."
@@ -583,7 +588,7 @@ class VaspExtractor:
             )
 
         self.parser = vasp_parser
-        self.extractor = self._get_extractor(method, summary_path, summary_key)
+        self.extractor = self._get_extractor(method, summary_path, summary_key, on_error)
         self.struct_dirs = self.parser.struct_dirs
 
         if workers is not None and workers == 0: # Sequential execution
@@ -630,7 +635,11 @@ class VaspExtractor:
         return self._data
 
     def _get_extractor(
-        self, method: ExtractMethod, summary_path: PathLike | None = None, summary_key: str | None = None
+        self,
+        method: ExtractMethod,
+        summary_path: PathLike | None = None,
+        summary_key: str | None = None,
+        on_error: tp.Literal["raise", "warn", "ignore"] = "warn"
     ) -> Callable:
         """Initialize data extraction method."""
         match method:
@@ -642,7 +651,7 @@ class VaspExtractor:
             case ExtractMethod.DSOL_BANDGAP:
                 return ft.partial(
                     self._get_dsol_bandgap_data,
-                    summary_path=summary_path, summary_key=summary_key    
+                    summary_path=summary_path, summary_key=summary_key, on_error=on_error
                 )
             case str():
                 raise NotImplementedError(
@@ -734,7 +743,8 @@ class VaspExtractor:
         self,
         struct_dir: PathLike,
         summary_path: PathLike | None = None,
-        summary_key: str | None = None
+        summary_key: str | None = None,
+        on_error: tp.Literal["raise", "warn", "ignore"] = "warn"
     ) -> tuple[str, dict[str, Structure | float]] | None:
         """
         Extract the results of all Δ-Sol computations for one structure.
@@ -752,11 +762,13 @@ class VaspExtractor:
             calc_data = self._get_run_data(
                 calc_dir, ExtractMethod.FINAL_STATE, summary_path, summary_key
             )
-            if not calc_data: # TODO: Add a choice to raise or warn
-                msg = f"{calc_dir} could not be parsed, either because the "
-                msg += "VASP run terminated on an error, on a timeout limit "
-                msg += "or it did not converge after the maximum ionic step was reached."
-                warnings.warn(msg)
+            if not calc_data:
+                msg = (
+                    f"{calc_dir} could not be parsed, either because the "
+                    "VASP run terminated on an error, on a timeout limit "
+                    "or it did not converge after the maximum ionic step was reached."
+                )
+                raise_or_warn(on_error, VaspParsingError, msg)
                 continue
 
             struct_dict.setdefault("structure", calc_data[1]["structure"])
