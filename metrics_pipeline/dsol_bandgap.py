@@ -12,9 +12,10 @@ import typing as tp
 from datetime import datetime
 
 from src.utils import parse_input_args, check_type, check_num_value
-from src.io import check_file_format, check_file_or_dir, VaspParser, VaspExtractor, JsonWriter
-# TODO: legacy imports to replace
-from src.legacy.delta_sol import batch_get_dsol_band_gaps
+from src.io import (
+    check_file_format, check_file_or_dir, VaspParser, VaspExtractor, ExtractMethod, JsonWriter
+)
+from src.computations.local import DSolStructure, batch_get_dsol_band_gaps
 
 
 ########################################
@@ -66,13 +67,6 @@ def _get_command_line_args() -> argp.Namespace:
         ),
         metavar="<new_file_name>"
     )
-    parser.add_argument(
-        "--with-uncertainties",  action="store_true",
-        help=(
-            "Enables computation of minimal and maximal Δ-Sol band gaps.\n"
-            "If enabled, it will search for uncertainty calculations results."
-        )
-    )
     args = parser.parse_args()
     return args
 
@@ -89,7 +83,6 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict.setdefault("functional", "PBE")
     args_dict.setdefault("valid_interval", (1.3, 3.6))
     args_dict.setdefault("summary", "summary.json")
-    args_dict.setdefault("with_uncertainties", False)
 
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_dir"), "dir")
@@ -162,10 +155,6 @@ def main(standalone: bool = True, **kwargs) -> None:
         Output file indicating calculation results for this step (json format). Also usable
         by further steps to filter out structures rejected in this step. This arg only changes
         the file name, its path is automatically set in the step directory.
-
-    with_uncertainties: bool
-        Enables computation of minimal and maximal Δ-Sol band gaps. If enabled, it will search
-        for uncertainty calculations results.
     """
     start = datetime.now()
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
@@ -173,13 +162,26 @@ def main(standalone: bool = True, **kwargs) -> None:
     # Extract VASP static calculations results
     bg_data = VaspExtractor(
         vasp_parser=VaspParser(args["input_dir"]),
-        method="dsol_bandgap",
+        method=ExtractMethod.DSOL_BANDGAP,
         workers=args.get("workers")
     ).get_data()
 
-    e_band_gaps = batch_get_dsol_band_gaps(
-        bg_data, args["functional"], args["with_uncertainties"], args.get("workers")
-    )
+    dsol_structs = [
+        DSolStructure(
+            data["structure"],
+            name,
+            args["functional"],
+            data[name + "_neutral"],
+            data[name + "_best_plus"],
+            data[name + "_best_minus"],
+            data.get(name + "_min_plus"),
+            data.get(name + "_min_minus"),
+            data.get(name + "_max_plus"),
+            data.get(name + "_max_minus"),
+        ) for name, data in bg_data.items()
+    ]
+
+    e_band_gaps = batch_get_dsol_band_gaps(dsol_structs, args.get("workers"))
 
     def is_good_bg(e_band_gap: float) -> bool:
         return min(args["valid_interval"]) <= e_band_gap <= max(args["valid_interval"])
@@ -197,7 +199,7 @@ def main(standalone: bool = True, **kwargs) -> None:
                 "valid_gap": is_good_bg(bgdict["E_band_gap"])
         }
 
-        if args.get("with_uncertainties"):
+        if len(bgdict) > 1:
             e_band_gap_min = round(bgdict["E_band_gap_min"], 6)
             e_band_gap_max = round(bgdict["E_band_gap_max"], 6)
             e_band_gap_min_rectified = max(e_band_gap_min, 0.0)

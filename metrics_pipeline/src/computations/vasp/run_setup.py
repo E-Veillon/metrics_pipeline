@@ -7,9 +7,8 @@ from pymatgen.io.vasp.sets import VaspInput, VaspInputSet
 
 from .presets import PMGRelaxSet, PMGStaticSet, DSolStaticSet
 from src.utils import get_all_valence_electrons
-# TODO: Split responsibilities better, e.g. define compound convenience functions
-# outside the package.
-from src.legacy.delta_sol import get_dsol_n_ratio
+from src.computations.local import DSolInput
+
 
 U_VALUES = {
     "F": {
@@ -246,11 +245,11 @@ def dsol_calc_init(
     # Search for the right N* parameter to use with respect to the functional
     pot_func = run_set.get("POTCAR_FUNCTIONAL", "PBE")
 
-    n_ratio = get_dsol_n_ratio(
+    n_ratio = DSolInput(
         structure=structure,
-        dft_functional=pot_func,
-        n_star_idx=calc_index
-    )
+        calc_type=calc_index,
+        functional=pot_func
+    ).n_ratio
 
     nelect = nb_val_elec + n_ratio if calc_index % 2 == 1 else nb_val_elec - n_ratio
 

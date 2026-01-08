@@ -10,12 +10,17 @@ import typing as tp
 from datetime import datetime
 import argparse as ap
 
+from pymatgen.io.vasp import VaspInput
+
 from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
     check_file_or_dir, load_yaml_as_dict, CIFFile,
-    VaspWriter, VaspParser, VaspExtractor, CONFIGPATH, EmptyDirectoryError
+    VaspWriter, VaspParser, VaspExtractor, ExtractMethod, CONFIGPATH, EmptyDirectoryError
 )
-from src.computations.vasp import init_vasp_settings, PMGRelaxSet, PMGStaticSet
+from src.computations.local import DSolCalcType
+from src.computations.vasp import (
+    init_vasp_settings, PMGRelaxSet, PMGStaticSet, dsol_calc_init
+)
 
 
 def _get_command_line_args() -> ap.Namespace:
@@ -69,6 +74,25 @@ def _get_command_line_args() -> ap.Namespace:
         )
     )
     parser.add_argument(
+        "--delta-sol", action="store_true",
+        help=(
+            "Pass this flag to enable delta-sol method sub-runs generation. Inside each written "
+            "structure directory, 3 VASP run subdirectories will be generated to compute energy "
+            "for neutral and ionized versions of the structure in order to compute the band gap. "
+            "Note that only structures that are relaxed may give accurate band gap values."
+        )
+    )
+    parser.add_argument(
+        "--dsol-uncertainty", action="store_true",
+        help=(
+            "If 'delta-sol' flag is passed, pass this flag to enable computations of delta-sol"
+            "uncertainties on the band gap value, generating 7 sub-runs instead of 3."
+            "Ignored if 'delta-sol' flag is not passed. WARNING: uncertainty computations were "
+            "not rigorously tested yet and might give weird results in some cases. To interpret "
+            "with caution."
+        )
+    )
+    parser.add_argument(
         "--workers", "-w", type=int, metavar="int",
         help=(
             "Number of processes to use in parallel. If not given, will use default of "
@@ -91,6 +115,8 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     default_output = os.path.join(os.path.dirname(args_dict.get("input_file", "")), "Relaxations")
     args_dict.setdefault("output", default_output)
     args_dict.setdefault("user_settings", "default_settings.yaml")
+    args_dict.setdefault("delta_sol", False)
+    args_dict.setdefault("dsol_uncertainty", False)
 
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats=("cif", "json"))
@@ -163,6 +189,18 @@ def main(standalone: bool = True, **kwargs):
         Name of the YAML file containing tags to override the PMG preset. Given filename
         must be located in 'metrics_pipeline/config' to be found.
 
+    delta_sol: bool
+        Whether to enable delta-sol method sub-runs generation. Inside each written structure
+        directory, 3 VASP run subdirectories will be generated to compute energy for neutral
+        and ionized versions of the structure in order to compute the band gap. Note that only
+        structures that are relaxed may give accurate band gap values.
+
+    dsol_uncertainty: bool
+        Only used if `delta_sol` is set to True. Enable computations of delta-sol uncertainties
+        on the band gap value, generating 7 sub-runs instead of 3. WARNING: uncertainty
+        computations were not rigorously tested yet and might give weird results in some cases.
+        To interpret with caution.
+
     workers: int, optional
         Number of processes to use in parallel. If not given, will use default of
         `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
@@ -214,7 +252,7 @@ def main(standalone: bool = True, **kwargs):
                 )
 
         data_dict = VaspExtractor(
-            vparser, method="final_state",
+            vparser, method=ExtractMethod.FINAL_STATE,
             summary_name=summary_name,
             summary_key=args["summary_key"],
             workers=args.get("workers")
@@ -232,14 +270,27 @@ def main(standalone: bool = True, **kwargs):
             for dir_path, structure_data in data_dict.items()
         ]
 
-    vasp_inputs = {}
-    for dir_name, structure in structs_data:
-        vasp_input = init_vasp_settings(
-            structure=structure,
-            preset=args["preset"],
-            user_corrections=args.get("settings")
-        )
-        vasp_inputs[dir_name] = vasp_input
+    vasp_inputs: dict[str, VaspInput] = {}
+    if args["delta_sol"]:
+        for dir_name, structure in structs_data:
+            for calc_idx in range(7 if args["dsol_uncertainty"] else 3):
+                vasp_input = dsol_calc_init(
+                    structure=structure,
+                    calc_index=calc_idx,
+                    preset=args["preset"],
+                    user_corrections=args.get("settings")
+                )
+                run_name = "_".join((dir_name, DSolCalcType(calc_idx).name.lower()))
+                vasp_inputs[os.path.join(dir_name, run_name)] = vasp_input
+
+    else:
+        for dir_name, structure in structs_data:
+            vasp_input = init_vasp_settings(
+                structure=structure,
+                preset=args["preset"],
+                user_corrections=args.get("settings")
+            )
+            vasp_inputs[dir_name] = vasp_input
 
     VaspWriter(base_dir=args["output"], vasp_inputs=vasp_inputs)
     print(f"{len(vasp_inputs)} run directories were successfully written in {args['output']}.")
