@@ -9,7 +9,7 @@ import numpy as np
 from pymatgen.core import Structure, Element
 
 from .metric_base import Metric
-from .radii_table import (
+from .backend import (
     slater_radii_table_pm_1,
     clementi_et_al_radii_table_pm
 )

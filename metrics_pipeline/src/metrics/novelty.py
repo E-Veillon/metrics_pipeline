@@ -9,7 +9,7 @@ from pymatgen.core import Structure
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 from .metric_base import Metric
-from .hash_matcher import group_compositions
+from .backend import group_compositions
 
 
 class Novelty(Metric):
