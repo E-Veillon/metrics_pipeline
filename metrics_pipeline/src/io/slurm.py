@@ -22,12 +22,12 @@ class SlurmWriter:
 
     output: str, optional
         Name of the slurm output file capturing stdout output.
-        Defaults to "slurm_%j.out", where %j is replaced with Job ID at execution time.
+        Defaults to 'slurm_%j.out', or 'slurm_%A_%a.out' if 'array' is given.
         See Slurm documentation for more details about '%' shortcuts behaviors.
 
     error: str, optional
         Name of the slurm error file capturing stderr output.
-        Defaults to "slurm_%j.err", where %j is replaced with Job ID at execution time.
+        Defaults to 'slurm_%j.err', or 'slurm_%A_%a.err' if 'array' is given.
         See Slurm documentation for more details about '%' shortcuts behaviors.
 
     nodes: int, optional
@@ -55,18 +55,18 @@ class SlurmWriter:
 
     constraint: str, optional
         Apply a constraint to the job parameters, such as reserving only specific nodes.
-        Must be a valid constraint defined for the slurm installation. See documentation
+        Must be a valid constraint defined for the slurm installation. See cluster documentation
         for more details.
 
     partition: str, optional
         Name of a specific partition to target for the run.
 
     hint: str, optional
-        Apply a specific property to the run, such as deactivationg hyperthreading. See
-        documentation for more details.
+        Apply a specific property to the run, such as deactivationg hyperthreading.
+        See cluster documentation for more details.
 
     qos: str, optional
-        Apply a defined Quality of Service. See documentation for more details.
+        Apply a defined Quality of Service. See cluster documentation for more details.
 
     account: str, optional
         Define an account to debit computation hours from, if applicable.
@@ -92,8 +92,8 @@ class SlurmWriter:
     _sbatch_header: str = "#SBATCH"
     shebang: str = "/bin/bash"
     jobname: str = "jobname"
-    output: str = "slurm_%j.out"
-    error: str = "slurm_%j.err"
+    output: str | None = None
+    error: str | None = None
     nodes: int = 1
     ntasks: int = 0
     ntasks_per_node: int = 0
@@ -112,8 +112,12 @@ class SlurmWriter:
     def __post_init__(self) -> None:
         assert isinstance(self.shebang, PathLike)
         assert isinstance(self.jobname, str)
-        assert isinstance(self.output, str)
-        assert isinstance(self.error, str)
+        assert isinstance(self.output, (str, type(None)))
+        if self.output is None:
+            self.output = f"slurm_{'%j' if self.array is None else '%A_%a'}.out"
+        assert isinstance(self.error, (str, type(None)))
+        if self.error is None:
+            self.error = f"slurm_{'%j' if self.array is None else '%A_%a'}.err"
         assert self.nodes > 0
         assert bool(self.ntasks) ^ bool(self.ntasks_per_node)
         assert self.ntasks >= 0
