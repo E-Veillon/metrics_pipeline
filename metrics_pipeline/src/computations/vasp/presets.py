@@ -81,59 +81,56 @@ class PMGStaticSet(PresetEnum):
 
 
 @dataclass
-class DSolStaticSet(MPRelaxSet):
+class DSolStaticSet(MPStaticSet):
     """
     Initialize VASP input files for Δ-Sol method computations using
     PBE_54_W_HASH pymatgen set of POTCAR files. Parameters are as 
     described in Δ-Sol method original work by Chan et al. in 2010.
     DFT+U corrections are used as proposed by Jain et al. in 2011.
 
-    References:
-        - M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010).
+    References
+    ----------
+    Δ-Sol method:
+    - M.K.Y. Chan and G. Ceder, Phys. Rev. Lett., 105, 196403 (2010).
 
-        - A. Jain, G. Hautier, C.J. Moore, S.P. Ong, C.C. Fischer, T. Mueller, 
-        K.A. Persson, and G. Ceder, Computational Materials Science, 50, 2295-2310 (2011).
+    DFT + U corrections:
+    - A. Jain, G. Hautier, C.J. Moore, S.P. Ong, C.C. Fischer, T. Mueller, 
+    K.A. Persson, and G. Ceder, Computational Materials Science, 50, 2295-2310 (2011).
 
-    Args:
-        structure (Structure):  The Structure to create inputs for. If None, the input
-                                set is initialized without a Structure but one must be
-                                set separately before the inputs are generated.
+    Parameters
+    ----------
+    structure: Structure, optional
+        The Structure to create inputs for. If `None`, the input set is initialized without
+        a Structure but one must be set separately before the inputs are generated.
 
-        incar_nelect (float):   The number of electrons to put in the NELECT INCAR tag.
-                                In Δ-Sol, several computations with distinct number of 
-                                electrons are done, this is a convenient arg to set that.
-                                If not given, infers the Δ-Sol N0 electrons calculation 
-                                from the given structure.
+    incar_nelect: float, optional
+        The number of electrons to put in the `NELECT` INCAR tag. In Δ-Sol, several computations
+        with distinct number of electrons are done, this is a convenient arg to set that.
+        If not given, infers the Δ-Sol N0 electrons calculation from the given structure.
 
-        **kwargs:               kwargs supported by DictSet.
+    kwargs: Any
+        keyword arguments supported by `VaspInputSet`.
     
-    Raises: ValueError if neither structure nor nelect are given at instanciation time.
+    Raises
+    ------
+    `ValueError` if neither structure nor nelect are given at instanciation time.
     """
+    incar_nelect: float | None = None
     CONFIG = load_yaml_as_dict(
         os.path.join(LOCAL_PRESETS_PATH, "DSolStaticSet.yaml"), on_error="raise"
     )
 
-    def __init__(
-            self,
-            structure: Structure|None = None,
-            incar_nelect: float|None = None,
-            **kwargs
-        ) -> None:
-        """DSolStaticSet init."""
-        super().__init__(structure, **kwargs)
-
-        if incar_nelect is None:
-            try:
-                incar_nelect = get_all_valence_electrons(structure)
-            except TypeError as e:
-                raise ValueError("Either structure or incar_nelect must be given.") from e
-
-        self.incar_nelect = incar_nelect
-
     @property
     def incar_updates(self) -> dict:
         """Get updates to the INCAR config for this calculation type."""
-        updates: dict[str, tp.Any] = {"MAGMOM": None, "NELECT": self.incar_nelect}
+        updates: dict[str, tp.Any] = super().incar_updates
+        if self.incar_nelect is None:
+            try:
+                self.incar_nelect = get_all_valence_electrons(self.structure)
+            except TypeError as e:
+                raise ValueError("Either structure or incar_nelect must be given.") from e
+        
+        updates.update({"MAGMOM": None, "NELECT": self.incar_nelect})
         return updates
 
 

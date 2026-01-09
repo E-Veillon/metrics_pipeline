@@ -85,7 +85,7 @@ INCAR:
       W: 6.2
 
 KPOINTS:
-  reciprocal_density: 10000
+  reciprocal_density: 100
 
 POTCAR_FUNCTIONAL: PBE_54_W_HASH
 POTCAR:
