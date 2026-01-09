@@ -80,6 +80,44 @@ class PMGStaticSet(PresetEnum):
     MPSOCSET = MPSOCSet
 
 
+def _get_genmat_settings() -> dict[str, tp.Any]:
+    """Load GenMat settings to override pymatgen defaults."""
+    return load_yaml_as_dict(
+        os.path.join(LOCAL_PRESETS_PATH, "default_settings.yaml"), on_error="raise"
+    )
+
+
+@dataclass
+class GenMatRelaxSet(VaspInputSet):
+    """
+    VASP input set derived from pymatgen MPRelaxSet for GenMat relaxation step.
+    """
+    _GENMAT_SETTINGS = _get_genmat_settings()
+    CONFIG = MPRelaxSet.CONFIG | _GENMAT_SETTINGS
+
+    @property
+    def incar_updates(self) -> dict[str, tp.Any]:
+        """Get updates to the INCAR config for this calculation type."""
+        updates = super().incar_updates
+        updates.update(self._GENMAT_SETTINGS.get("INCAR", {}))
+        return updates
+
+
+class GenMatStaticSet(MPStaticSet):
+    """
+    VASP input set derived from pymatgen MPStaticSet for GenMat static step.
+    """
+    _GENMAT_SETTINGS = _get_genmat_settings()
+    CONFIG = MPStaticSet.CONFIG | _GENMAT_SETTINGS
+
+    @property
+    def incar_updates(self) -> dict[str, tp.Any]:
+        """Get updates to the INCAR config for this calculation type."""
+        updates = super().incar_updates
+        updates.update(self._GENMAT_SETTINGS.get("INCAR", {}))
+        return updates
+
+
 @dataclass
 class DSolStaticSet(MPStaticSet):
     """
@@ -113,7 +151,7 @@ class DSolStaticSet(MPStaticSet):
     
     Raises
     ------
-    `ValueError` if neither structure nor nelect are given at instanciation time.
+    `ValueError` if neither structure nor nelect are given at initialization time.
     """
     incar_nelect: float | None = None
     CONFIG = load_yaml_as_dict(
@@ -126,12 +164,34 @@ class DSolStaticSet(MPStaticSet):
         updates: dict[str, tp.Any] = super().incar_updates
         if self.incar_nelect is None:
             try:
-                self.incar_nelect = get_all_valence_electrons(self.structure)
-            except TypeError as e:
-                raise ValueError("Either structure or incar_nelect must be given.") from e
-        
+                self.incar_nelect = self.nelect
+            except RuntimeError as e:
+                raise ValueError(
+                    "Either 'structure' or 'incar_nelect' must be given at initialization."
+                ) from e
+
         updates.update({"MAGMOM": None, "NELECT": self.incar_nelect})
         return updates
+
+
+class GenMatSet(PresetEnum):
+    """Enum class of VASP presets defined for the GenMat-metrics project."""
+    GENMATRELAXSET = GenMatRelaxSet
+    GENMATSTATICSET = GenMatStaticSet
+    DSOLSTATICSET = DSolStaticSet
+
+# Shortcut constants for easy checks and messages
+ALL_PRESETS_NAMES = PMGStaticSet.names() + PMGRelaxSet.names() + GenMatSet.names()
+ALL_RELAX_PRESETS_NAMES = PMGRelaxSet.names() + [GenMatSet.GENMATRELAXSET.name]
+ALL_STATIC_PRESETS_NAMES = PMGStaticSet.names() + [
+    GenMatSet.GENMATSTATICSET.name, GenMatSet.DSOLSTATICSET.name
+]
+STATIC_PRESETS_NAMES_NO_DSOL = PMGStaticSet.names() + [GenMatSet.GENMATSTATICSET.name]
+
+ALL_PRESETS_NAMES_LOWER = [name.lower() for name in ALL_PRESETS_NAMES]
+ALL_RELAX_PRESETS_NAMES_LOWER = [name.lower() for name in ALL_RELAX_PRESETS_NAMES]
+ALL_STATIC_PRESETS_NAMES_LOWER = [name.lower() for name in ALL_STATIC_PRESETS_NAMES]
+STATIC_PRESETS_NAMES_NO_DSOL_LOWER = [name.lower() for name in STATIC_PRESETS_NAMES_NO_DSOL]
 
 
 if __name__ == "__main__":

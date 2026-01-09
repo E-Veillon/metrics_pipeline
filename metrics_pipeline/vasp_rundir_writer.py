@@ -19,7 +19,7 @@ from src.io import (
 )
 from src.computations.local import DSolCalcType
 from src.computations.vasp import (
-    init_vasp_settings, PMGRelaxSet, PMGStaticSet, dsol_calc_init
+    init_vasp_settings, dsol_calc_init, ALL_PRESETS_NAMES, ALL_PRESETS_NAMES_LOWER
 )
 
 
@@ -133,12 +133,9 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     if str(args_dict["input_file"]).endswith(".json") and not args_dict.get("summary_key"):
         raise ValueError("Given input file is a JSON summary, but the summary key was not given.")
 
-    allowed_presets = list(
-        map(str.lower, PMGRelaxSet.names() + PMGStaticSet.names() + ["DsolStaticSet"])
-    )
-    assert str(args_dict.get("preset", "")).lower() in allowed_presets, (
+    assert str(args_dict.get("preset", "")).lower() in ALL_PRESETS_NAMES_LOWER, (
         "Provided preset must be one of the following (case insensitive): "
-        f"{', '.join(sorted(allowed_presets))}."
+        f"{', '.join(ALL_PRESETS_NAMES_LOWER)}."
     )
     config_path = os.path.join(CONFIGPATH, args_dict["user_settings"])
     check_file_or_dir(config_path, "file", allowed_formats=("yml", "yaml"))

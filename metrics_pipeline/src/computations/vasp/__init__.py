@@ -1,9 +1,19 @@
 """Subpackage for VASP computations setup."""
 
-from .presets import PMGStaticSet, PMGRelaxSet, DSolStaticSet
+from .presets import (
+    PMGStaticSet, PMGRelaxSet, GenMatSet,
+    ALL_PRESETS_NAMES, ALL_PRESETS_NAMES_LOWER,
+    ALL_RELAX_PRESETS_NAMES, ALL_RELAX_PRESETS_NAMES_LOWER,
+    ALL_STATIC_PRESETS_NAMES, ALL_STATIC_PRESETS_NAMES_LOWER,
+    STATIC_PRESETS_NAMES_NO_DSOL, STATIC_PRESETS_NAMES_NO_DSOL_LOWER
+)
 from .run_setup import init_vasp_settings, dsol_calc_init
 
 __all__ = [
-    "PMGStaticSet", "PMGRelaxSet", "DSolStaticSet",
+    "PMGStaticSet", "PMGRelaxSet", "GenMatSet",
+    "ALL_PRESETS_NAMES", "ALL_PRESETS_NAMES_LOWER",
+    "ALL_RELAX_PRESETS_NAMES", "ALL_RELAX_PRESETS_NAMES_LOWER",
+    "ALL_STATIC_PRESETS_NAMES", "ALL_STATIC_PRESETS_NAMES_LOWER",
+    "STATIC_PRESETS_NAMES_NO_DSOL", "STATIC_PRESETS_NAMES_NO_DSOL_LOWER",
     "init_vasp_settings", "dsol_calc_init"
 ]

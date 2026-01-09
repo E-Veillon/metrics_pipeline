@@ -5,7 +5,14 @@ import typing as tp
 from pymatgen.core import SiteCollection, Structure
 from pymatgen.io.vasp.sets import VaspInput, VaspInputSet
 
-from .presets import PMGRelaxSet, PMGStaticSet, DSolStaticSet
+from .presets import (
+    PMGRelaxSet, PMGStaticSet, GenMatSet,
+    ALL_PRESETS_NAMES,
+    STATIC_PRESETS_NAMES_NO_DSOL_LOWER,
+    ALL_RELAX_PRESETS_NAMES_LOWER,
+    ALL_STATIC_PRESETS_NAMES,
+    ALL_STATIC_PRESETS_NAMES_LOWER
+)
 from src.utils import get_all_valence_electrons
 from src.computations.local import DSolInput
 
@@ -104,13 +111,22 @@ def _relax_set_init(
 
     incar_corrections.update(corrections.get("INCAR", {}))
 
-    vasp_input_set = PMGRelaxSet.get_preset(preset)(
-        structure=structure,
-        user_incar_settings = incar_corrections,
-        user_kpoints_settings = corrections.get("KPOINTS", {}),
-        user_potcar_settings = corrections.get("POTCAR", {}),
-        user_potcar_functional = corrections.get("POTCAR_FUNCTIONAL", {}),
-    )
+    if preset.lower() == GenMatSet.GENMATRELAXSET.name.lower():
+        vasp_input_set = GenMatSet.GENMATRELAXSET.value(
+            structure=structure,
+            user_incar_settings = incar_corrections,
+            user_kpoints_settings = corrections.get("KPOINTS", {}),
+            user_potcar_settings = corrections.get("POTCAR", {}),
+            user_potcar_functional = corrections.get("POTCAR_FUNCTIONAL", {}),
+        )
+    else:
+        vasp_input_set = PMGRelaxSet.get_preset(preset)(
+            structure=structure,
+            user_incar_settings = incar_corrections,
+            user_kpoints_settings = corrections.get("KPOINTS", {}),
+            user_potcar_settings = corrections.get("POTCAR", {}),
+            user_potcar_functional = corrections.get("POTCAR_FUNCTIONAL", {}),
+        )
 
     return vasp_input_set
 
@@ -124,10 +140,18 @@ def _static_set_init(
     """Init a static calculation set of VASP input files."""
     corrections = {} if corrections is None else corrections
 
-    if preset == "DSolStaticSet":
-        vasp_input_set = DSolStaticSet(
+    if preset.lower() == GenMatSet.DSOLSTATICSET.name.lower():
+        vasp_input_set = GenMatSet.DSOLSTATICSET.value(
             structure=structure,
             incar_nelect=nelect,
+            user_incar_settings=corrections.get("INCAR", {}),
+            user_kpoints_settings=corrections.get("KPOINTS", {}),
+            user_potcar_settings=corrections.get("POTCAR", {}),
+            user_potcar_functional=corrections.get("POTCAR_FUNCTIONAL", {}),
+        )
+    elif preset.lower() == GenMatSet.GENMATSTATICSET.name.lower():
+        vasp_input_set = GenMatSet.GENMATSTATICSET.value(
+            structure=structure,
             user_incar_settings=corrections.get("INCAR", {}),
             user_kpoints_settings=corrections.get("KPOINTS", {}),
             user_potcar_settings=corrections.get("POTCAR", {}),
@@ -174,20 +198,19 @@ def init_vasp_settings(
     assert isinstance(structure, SiteCollection), TypeError(
         f"'structure' expected a type 'SiteCollection', got {type(structure).__name__}."
     )
-    if preset == "DSolStaticSet":
+    if preset.lower() == GenMatSet.DSOLSTATICSET.name.lower():
         return _static_set_init(structure, preset, nelect, user_corrections).get_input_set()
 
-    if PMGStaticSet.is_preset(preset):
+    if preset.lower() in STATIC_PRESETS_NAMES_NO_DSOL_LOWER:
         return _static_set_init(structure, preset, corrections=user_corrections).get_input_set()
 
-    if PMGRelaxSet.is_preset(preset):
+    if preset.lower() in ALL_RELAX_PRESETS_NAMES_LOWER:
         return _relax_set_init(structure, preset, user_corrections).get_input_set()
 
     raise NotImplementedError(
         f"'preset' argument not recognized ({preset}). "
-        "It must be one of the allowed pymatgen or local presets (case insensitive): "
-        f"{', '.join(PMGStaticSet.names())}, {', '.join(PMGRelaxSet.names())}, "
-        f"{DSolStaticSet.__name__}."
+        "It must be one of the allowed GenMat or pymatgen presets (case insensitive): "
+        f"{', '.join(ALL_PRESETS_NAMES)}."
     )
 
 
@@ -231,11 +254,11 @@ def dsol_calc_init(
     assert 0 <= calc_index <= 6, ValueError(
         f"'calc_index' must be between 0 and 6 included."
     )
-    assert PMGStaticSet.is_preset(preset) or preset.lower() == "DSolStaticSet".lower(), (
+    assert preset.lower() in ALL_STATIC_PRESETS_NAMES_LOWER, (
         ValueError(
             f"'preset' got unsupported value {preset!r}. "
             "Supported presets (case insensitive): "
-            f"{', '.join(PMGStaticSet.names() + ['DSolStaticSet'])}."
+            f"{', '.join(ALL_STATIC_PRESETS_NAMES)}."
         )
     )
 
