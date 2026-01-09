@@ -70,7 +70,8 @@ def _get_command_line_args() -> ap.Namespace:
         "--user-settings", "-u", default="default_settings.yaml",
         help=(
             "Name of the YAML file containing tags to override the PMG preset. "
-            f"Given filename must be located in {CONFIGPATH} to be found."
+            f"Given filename must be located in {CONFIGPATH} to be found. "
+            "Defaults to %(default)s."
         )
     )
     parser.add_argument(
@@ -120,7 +121,6 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats=("cif", "json"))
-    check_file_or_dir(args_dict.get("output"), "dir")
 
     if args_dict.get("indices") is not None:
         for idx, struct_idx in enumerate(args_dict["indices"]):
