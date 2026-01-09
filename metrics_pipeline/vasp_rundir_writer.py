@@ -44,6 +44,10 @@ def _get_command_line_args() -> ap.Namespace:
         )
     )
     parser.add_argument(
+        "--output-names",
+        help="Path to a file to create and store all created run directories paths."
+    )
+    parser.add_argument(
         "--indices", "-i", nargs="*", type=int, metavar="int",
         help=(
             "If only a few specific structures need to be parsed, pass here their respective index "
@@ -145,6 +149,8 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     # Additional arguments processing
     os.makedirs(args_dict["output"], exist_ok=True)
+    if args_dict.get("output_names") is not None:
+        os.makedirs(os.path.dirname(args_dict["output_names"]), exist_ok=True)
     args_dict["settings"] = load_yaml_as_dict(config_path)
 
     return args_dict
@@ -170,6 +176,9 @@ def main(standalone: bool = True, **kwargs):
     output: str | Path
         Path to the output directory where VASP files will be written. A subdirectory will
         be created in output directory for each structure found in input_file.
+
+    output_names: str | Path
+        Path to a file to create and store all created run directories paths.
 
     indices: list[int], optional
         If only a few specific structures need to be parsed, pass here their respective index
@@ -293,6 +302,12 @@ def main(standalone: bool = True, **kwargs):
             vasp_inputs[dir_name] = vasp_input
 
     VaspWriter(base_dir=args["output"], vasp_inputs=vasp_inputs)
+
+    if args.get("output_names"):
+        dir_list = [os.path.join(args["output"], run_dir) for run_dir in vasp_inputs.keys()]
+        with open(args["output_names"], "wt", encoding="utf-8") as fp:
+            fp.write("\n".join(dir_list))
+
     print(f"{len(vasp_inputs)} run directories were successfully written in {args['output']}.")
 
     stop = datetime.now()
