@@ -71,7 +71,7 @@ def _get_command_line_args() -> ap.Namespace:
         )
     )
     parser.add_argument(
-        "--user-settings", "-u", default="default_settings.yaml",
+        "--user-settings", "-u",
         help=(
             "Name of the YAML file containing tags to override the PMG preset. "
             f"Given filename must be located in {CONFIGPATH} to be found. "
@@ -119,7 +119,6 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
     default_output = os.path.join(os.path.dirname(args_dict.get("input_file", "")), "Relaxations")
     args_dict.setdefault("output", default_output)
-    args_dict.setdefault("user_settings", "default_settings.yaml")
     args_dict.setdefault("delta_sol", False)
     args_dict.setdefault("dsol_uncertainty", False)
 
@@ -137,9 +136,11 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
         "Provided preset must be one of the following (case insensitive): "
         f"{', '.join(ALL_PRESETS_NAMES_LOWER)}."
     )
-    config_path = os.path.join(CONFIGPATH, args_dict["user_settings"])
-    check_file_or_dir(config_path, "file", allowed_formats=("yml", "yaml"))
-    
+    if args_dict.get("user_settings"):
+        config_path = os.path.join(CONFIGPATH, args_dict["user_settings"])
+        check_file_or_dir(config_path, "file", allowed_formats=("yml", "yaml"))
+        args_dict["user_settings"] = load_yaml_as_dict(config_path)
+
     if args_dict.get("workers") is not None:
         check_type(args_dict.get("workers"), "workers", (int,))
         check_num_value(args_dict.get("workers"), "workers", ">", 0)
@@ -148,7 +149,6 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     os.makedirs(args_dict["output"], exist_ok=True)
     if args_dict.get("output_names") is not None:
         os.makedirs(os.path.dirname(args_dict["output_names"]), exist_ok=True)
-    args_dict["settings"] = load_yaml_as_dict(config_path)
 
     return args_dict
 
@@ -284,7 +284,7 @@ def main(standalone: bool = True, **kwargs):
                     structure=structure,
                     calc_index=calc_idx,
                     preset=args["preset"],
-                    user_corrections=args.get("settings")
+                    user_corrections=args.get("user_settings")
                 )
                 run_name = "_".join((dir_name, DSolCalcType(calc_idx).name.lower()))
                 vasp_inputs[os.path.join(dir_name, run_name)] = vasp_input
@@ -294,7 +294,7 @@ def main(standalone: bool = True, **kwargs):
             vasp_input = init_vasp_settings(
                 structure=structure,
                 preset=args["preset"],
-                user_corrections=args.get("settings")
+                user_corrections=args.get("user_settings")
             )
             vasp_inputs[dir_name] = vasp_input
 
