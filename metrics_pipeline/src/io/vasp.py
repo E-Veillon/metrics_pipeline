@@ -59,8 +59,8 @@ class VaspWriter:
             self.vasp_inputs = {}
 
         else:
-            assert isinstance(self.vasp_inputs, dict), TypeError(
-                f"'vasp_inputs' expected a type 'dict', got {type(self.vasp_inputs).__name__}."
+            assert isinstance(vasp_inputs, dict), TypeError(
+                f"'vasp_inputs' expected a type 'dict', got {type(vasp_inputs).__name__}."
             )
             for run_name, vasp_input in vasp_inputs.items():
                 assert isinstance(run_name, str), TypeError(

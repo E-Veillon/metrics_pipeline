@@ -122,12 +122,10 @@ class CIFFile:
 
         Returns
         -------
-        list[Structure]
-            Structures parsed from stored CIFs. Only contains successfully parsed
-            structures, in the same order as the internally stored CIFs.
-
-        list[int]
-            Indices inside the stored CIFs list where the data could not be parsed.
+        (list[Structure], list[int])
+            List of structures successfully parsed from stored CIFs, in the same order
+            as the internally stored CIFs, and list of indices inside the stored CIFs
+            list where the data could not be parsed.
         """
         # Avoid multiprocess overhead for only one structure
         workers = 0 if len(self._data) == 1 else self.workers
