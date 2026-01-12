@@ -298,7 +298,7 @@ def main(standalone: bool = True, **kwargs):
             )
             vasp_inputs[dir_name] = vasp_input
 
-    VaspWriter(base_dir=args["output"], vasp_inputs=vasp_inputs)
+    VaspWriter(base_dir=args["output"], vasp_inputs=vasp_inputs).write_run_dirs()
 
     if args.get("output_names"):
         dir_list = [os.path.join(args["output"], run_dir) for run_dir in vasp_inputs.keys()]
