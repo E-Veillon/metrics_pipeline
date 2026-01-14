@@ -94,7 +94,10 @@ class GenMatRelaxSet(MPRelaxSet):
     """
     _GENMAT_SETTINGS = _get_genmat_settings()
     CONFIG: dict[str, tp.Any] = MPRelaxSet.CONFIG
-    CONFIG.update(_GENMAT_SETTINGS)
+
+    def __post_init__(self) -> None:
+        self.CONFIG.update(self._GENMAT_SETTINGS)
+        super().__post_init__()
 
     @property
     def incar_updates(self) -> dict[str, tp.Any]:
@@ -113,7 +116,10 @@ class GenMatStaticSet(MPStaticSet):
     """
     _GENMAT_SETTINGS = _get_genmat_settings()
     CONFIG: dict[str, tp.Any] = MPStaticSet.CONFIG
-    CONFIG.update(_GENMAT_SETTINGS)
+
+    def __post_init__(self) -> None:
+        self.CONFIG.update(self._GENMAT_SETTINGS)
+        super().__post_init__()
 
     @property
     def incar_updates(self) -> dict[str, tp.Any]:
