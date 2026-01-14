@@ -76,14 +76,31 @@ class CIFFile:
         """Get the list of individual CIF strings."""
         return self._data
 
-    def add_cifs(self, cifs: list[str]) -> None:
-        """Add a list of CIF strings to the file."""
-        assert all(isinstance(cif, str) for cif in cifs)
-        self._data.extend(cifs)
+    def add_cifs(self, cifs: str | tp.Sequence[str]) -> None:
+        """
+        Add CIF strings to the file.
+        If a single string is given, it is assumed to be a single CIF string.
+        If a list or tuple is given, each element is a CIF string.
+        """
+        match cifs:
+            case str():
+                self._data.append(cifs)
+            case list() | tuple() if all(isinstance(cif, str) for cif in cifs):
+                self._data.extend(cifs)
+            case _:
+                types = (
+                    f"'Sequence[{' | '.join(sorted(set(type(cif).__name__ for cif in cifs)))}]'"
+                    if isinstance(cifs, tp.Sequence) else f"{type(cifs).__name__!r}"
+                )
+                raise TypeError(
+                    f"{self.__class__.__name__}: "
+                    "'cifs' expected a type 'str' or 'Sequence[str]', "
+                    f"got {types}."
+                )
 
     def clear(self) -> None:
         """Remove all stored CIF data without changing other initialized parameters."""
-        self._data.clear()
+        self._data = []
 
     def _parse_structure(self, cif: str) -> Structure | None:
         """Parse a Structure object from a CIF string. Return None if parsing fails."""
