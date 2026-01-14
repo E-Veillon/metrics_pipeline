@@ -3,7 +3,7 @@
 import os
 import typing as tp
 from enum import Enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pymatgen.core import Structure
 from pymatgen.io.vasp.sets import (
@@ -92,7 +92,7 @@ class GenMatRelaxSet(MPRelaxSet):
     """
     VASP input set derived from pymatgen MPRelaxSet for GenMat relaxation step.
     """
-    _GENMAT_SETTINGS: dict[str, tp.Any] = {}
+    _GENMAT_SETTINGS: dict[str, tp.Any] = field(default_factory=dict)
     CONFIG: dict[str, tp.Any] = MPRelaxSet.CONFIG
 
     def __post_init__(self) -> None:
@@ -115,7 +115,7 @@ class GenMatStaticSet(MPStaticSet):
     """
     VASP input set derived from pymatgen MPStaticSet for GenMat static step.
     """
-    _GENMAT_SETTINGS: dict[str, tp.Any] = {}
+    _GENMAT_SETTINGS: dict[str, tp.Any] = field(default_factory=dict)
     CONFIG: dict[str, tp.Any] = MPStaticSet.CONFIG
 
     def __post_init__(self) -> None:
