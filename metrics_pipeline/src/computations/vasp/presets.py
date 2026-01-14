@@ -88,18 +88,22 @@ def _get_genmat_settings() -> dict[str, tp.Any]:
 
 
 @dataclass
-class GenMatRelaxSet(VaspInputSet):
+class GenMatRelaxSet(MPRelaxSet):
     """
     VASP input set derived from pymatgen MPRelaxSet for GenMat relaxation step.
     """
     _GENMAT_SETTINGS = _get_genmat_settings()
-    CONFIG = MPRelaxSet.CONFIG | _GENMAT_SETTINGS
+    CONFIG: dict[str, tp.Any] = MPRelaxSet.CONFIG
+    CONFIG.update(_GENMAT_SETTINGS)
 
     @property
     def incar_updates(self) -> dict[str, tp.Any]:
         """Get updates to the INCAR config for this calculation type."""
         updates = super().incar_updates
-        updates.update(self._GENMAT_SETTINGS.get("INCAR", {}))
+        local_incar: dict[str, tp.Any] = self._GENMAT_SETTINGS.get("INCAR", {})
+        for key in {"MAGMOM", "LDAUU", "LDAUL", "LDAUJ"}:
+            local_incar.pop(key)
+        updates.update(local_incar)
         return updates
 
 
@@ -108,13 +112,17 @@ class GenMatStaticSet(MPStaticSet):
     VASP input set derived from pymatgen MPStaticSet for GenMat static step.
     """
     _GENMAT_SETTINGS = _get_genmat_settings()
-    CONFIG = MPStaticSet.CONFIG | _GENMAT_SETTINGS
+    CONFIG: dict[str, tp.Any] = MPStaticSet.CONFIG
+    CONFIG.update(_GENMAT_SETTINGS)
 
     @property
     def incar_updates(self) -> dict[str, tp.Any]:
         """Get updates to the INCAR config for this calculation type."""
         updates = super().incar_updates
-        updates.update(self._GENMAT_SETTINGS.get("INCAR", {}))
+        local_incar: dict[str, tp.Any] = self._GENMAT_SETTINGS.get("INCAR", {})
+        for key in {"MAGMOM", "LDAUU", "LDAUL", "LDAUJ"}:
+            local_incar.pop(key)
+        updates.update(local_incar)
         return updates
 
 
