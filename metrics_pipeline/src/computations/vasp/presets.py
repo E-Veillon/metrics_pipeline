@@ -104,7 +104,7 @@ class GenMatRelaxSet(MPRelaxSet):
         updates = super().incar_updates
         local_incar: dict[str, tp.Any] = self._GENMAT_SETTINGS.get("INCAR", {})
         for key in {"MAGMOM", "LDAUU", "LDAUL", "LDAUJ"}:
-            local_incar.pop(key)
+            local_incar.pop(key, None)
         updates.update(local_incar)
         return updates
 
@@ -125,7 +125,7 @@ class GenMatStaticSet(MPStaticSet):
         updates = super().incar_updates
         local_incar: dict[str, tp.Any] = self._GENMAT_SETTINGS.get("INCAR", {})
         for key in {"MAGMOM", "LDAUU", "LDAUL", "LDAUJ"}:
-            local_incar.pop(key)
+            local_incar.pop(key, None)
         updates.update(local_incar)
         return updates
 

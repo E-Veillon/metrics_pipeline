@@ -1,8 +1,33 @@
 #!/bin/bash
-# The built-in bash "cp" command allows to copy several files and directories in one destination.
-# This script is designed to do the reverse, i.e. distribute a single source file or directory to a range of destinations.
-# If -r is used, the source directory and everything contained inside is distributed.
-# Usage: ./multicopy.sh [-r] SOURCE DEST1 DEST2 ...
+
+##### DOCUMENTATION #####
+
+SCRIPT_NAME="$(basename -- "${BASH_SOURCE[0]}")"
+
+Help() {
+cat << EOF
+
+Usage: $SCRIPT_NAME [-r|--recursive] SOURCE DEST1 [DEST2 ...]
+
+The built-in bash "cp" command allows to copy several files and directories in one destination.
+This script is designed to do the reverse, i.e. distribute a single source file or directory to a range of destinations.
+
+Options
+	-h, --help		Show this message and exit.
+
+	-r, --recursive 	The source directory and everything contained inside is distributed.
+
+EOF
+}
+
+for arg in "$@"; do
+	if [ $arg = "-h" -o $arg = "--help" ]; then
+		Help
+		exit 0
+	fi
+done
+
+##### ACTUAL CONTENT #####
 
 declare -i src_defined=0
 declare -i recursive=0
