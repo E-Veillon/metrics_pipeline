@@ -41,7 +41,7 @@ def _get_command_line_args() -> argp.Namespace:
         help="Base directory containing VASP run directories."
     )
     parser.add_argument(
-        "-r", "--reference", metaver="<path>",
+        "-r", "--reference", metavar="<path>",
         help=(
             "JSON dataset file of already known structure to construct a reference "
             "convex hull and compare generated structure against it. If not given, "
