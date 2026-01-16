@@ -152,7 +152,6 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     args_dict.setdefault("discard_asymmetrics", False)
     args_dict.setdefault("no_equiv_match", False)
     args_dict.setdefault("test_min_vol", False)
-    args_dict.setdefault("sequential", False)
 
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="cif")
@@ -220,7 +219,6 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
         f"{'(ignored)' if args_dict.get('no_symmetrization') else ''}"
     )
     print(f"STRUCTURE MATCHING: {not args_dict.get('no_equiv_match')}")
-    print(f"IS SEQUENTIAL: {args_dict.get('sequential')}")
     print(
         "NUMBER OF WORKERS: "
         f"{'auto' if args_dict.get('workers') is None else args_dict.get('workers')} "

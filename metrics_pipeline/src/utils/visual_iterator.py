@@ -3,6 +3,7 @@ A minimalist way to visualize progression while iterating through long sequences
 Possibility to custom printed messages.
 """
 
+import sys
 import typing as tp
 import typing_extensions as tpe
 
@@ -143,10 +144,10 @@ class VisualIterator:
                 sf = self.significant_figures
                 fmt = f".{sf}f"
                 percent = f" ({round(idx / maxlen * 100, sf):{fmt}}%)"
-                print(counter + percent, end="\r", flush=True)
+                print(counter + percent, end="\r", flush=True, file=sys.stderr)
 
             else:
-                print(counter, end="\r", flush=True)
+                print(counter, end="\r", flush=True, file=sys.stderr)
 
             yield obj
 
@@ -175,13 +176,17 @@ class VisualIterator:
         length. If the iterator to wrap can generate enough data to overflow memory,
         use from_big_iterator instead for lazy wrapping.
 
-        Parameters:
-            iterator (Iterator):    The iterator to wrap.
+        Parameters
+        ----------
+        iterator: Iterator
+            The iterator to wrap.
 
-            **kwargs:               Keyword arguments to pass to the constructor.
+        kwargs: Any
+            Keyword arguments to pass to the constructor.
 
-        Returns:
-            VisualIterator.
+        Returns
+        -------
+        VisualIterator.
         """
         return cls(list(iterator), **kwargs)
 
@@ -194,20 +199,23 @@ class VisualIterator:
 
         This method wraps iterators lazily, so that they do not overflow memory.
         
-        Parameters:
-            iterator (Iterator):    The iterator to wrap.
+        Parameters
+        ----------
+        iterator: Iterator
+            The iterator to wrap.
             
-            n_elts (int):           The total number of elements to consider to render
-                                    a max limit and a percentage. This method won't search
-                                    for a total number of elements in the iterator as it
-                                    would overflow memory, hence it will print a maximum of
-                                    '-1' and deactivate the 'percent' option if no value
-                                    is given.
+        n_elts: int
+            The total number of elements to consider to render a max limit and a percentage.
+            This method won't search for a total number of elements in the iterator as it
+            would overflow memory, hence it will print a maximum of 'Unknown' and deactivate
+            the 'percent' option if no value is given.
             
-            **kwargs:               Keyword arguments to pass to the constructor.
+        kwargs: Any
+            Keyword arguments to pass to the constructor.
 
-        Returns:
-            VisualIterator.    
+        Returns
+        -------
+        VisualIterator.    
         """
         kwargs.setdefault("on_error", "ignore")
         visual_iterator = cls(iterator, **kwargs)
