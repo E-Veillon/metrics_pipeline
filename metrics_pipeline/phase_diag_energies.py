@@ -297,19 +297,20 @@ def main(standalone: bool = True, **kwargs):
     stability = Stability.from_entries(
         entries=list(gen_entries.values()),
         ref_entries=list(ref_entries.values()),
-        stable_tol=args["stable_tol"],
+        stable_tol=args["limit"],
         workers=args.get("workers")
     )
     results = {}
-    stable_ids = set(id(entry) for entry in stability.stable_entries)
-    for name, entry in gen_entries.items():
+    stable_names = set(entry.name for entry in stability.stable_entries)
+    computed_entries = stability.stable_entries + stability.unstable_entries
+    for entry in computed_entries:
         dct = {
-            "name": name,
-            "path": os.path.join(args["base_dir"], name),
-            "e_above_hull": entry.attribute[Stability._delta_e_attr], # type: ignore
-            "stable": id(entry) in stable_ids
+            "name": entry.name,
+            "path": os.path.join(args["base_dir"], entry.name),
+            "e_above_hull": entry.attribute[stability._delta_e_attr], # type: ignore
+            "stable": entry.name in stable_names
         }
-        results[name] = dct
+        results[entry.name] = dct
 
     # Too high dimension structures are added as not stable in results
     high_dim_entries = generated_dataset.get_uncomputable_entries()

@@ -89,7 +89,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
         check_num_value(args_dict.get("workers"), "workers", ">", 0)
 
     # Additional arguments processing
-    args_dict["summarypath"] = Path(args_dict["base_dir"], args_dict["summary"]).resolve()
+    args_dict["summarypath"] = str(Path(args_dict["base_dir"], args_dict["summary"]).resolve())
 
     return args_dict
 
@@ -126,7 +126,6 @@ def main(standalone: bool = True, **kwargs) -> None:
         Pass 0 to disable the use of `process_map()` and execute sequentially.
     """
     args = parse_input_args(_get_cmd_line_args, _process_input_args, standalone, **kwargs)
-
     all_runs = VaspParser(args["base_dir"], workers=args.get("workers")).all_struct_dirs
     converged_runs_set = {
         run for run in all_runs if VaspParser.get_safe_vasprun(
@@ -135,9 +134,14 @@ def main(standalone: bool = True, **kwargs) -> None:
     }
     results = {}
     for run in VisualIterator(all_runs, desc="Writing relax summary", percent=True):
-        results[run] = {
-            "path": Path(run).resolve(),
-            "name": Path(run).name,
+        results[run.name] = {
+            "path": str(run.resolve()),
+            "name": run.name,
             "converged": run in converged_runs_set
         }
     JsonWriter(args["summarypath"], data=results, indent=4).write_as_dict()
+
+
+if __name__ == "__main__":
+    main()
+

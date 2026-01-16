@@ -27,8 +27,8 @@ class Stability(Metric):
     NOTE: Given structures (both computed and references) must have their total energy
     in eV stored in their properties under the 'energy' key.
     """
-    _struct_attr = f"{__name__}_structure"
-    _delta_e_attr = f"{__name__}_e_above_hull"
+    _struct_attr = f"{__qualname__}_structure"
+    _delta_e_attr = f"{__qualname__}_e_above_hull"
     def __init__(
         self,
         structures: list[Structure],
