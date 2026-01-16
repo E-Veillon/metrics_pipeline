@@ -37,8 +37,8 @@ def _get_command_line_args() -> argp.Namespace:
     """Command Line Interface (CLI)."""
     parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument(
-        "run_dir",
-        help="Base directory containing structure directories with VASP runs inside.",
+        "base_dir",
+        help="Base directory containing VASP run directories."
     )
     parser.add_argument(
         "-r", "--reference", metaver="<path>",
@@ -69,7 +69,7 @@ def _get_command_line_args() -> argp.Namespace:
         help=(
             "Name of output JSON summary file indicating calculation results for this step. "
             "Also usable by further steps to filter out structures rejected in this step. "
-            "The file will be automatically written in the 'run_dir' directory."
+            "The file will be automatically written in the 'base_dir' directory."
         )
     )
     parser.add_argument(
@@ -127,7 +127,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict.setdefault("pause_after_init", False)
 
     # Assert set arguments conformity
-    check_file_or_dir(args_dict.get("run_dir"), "dir")
+    check_file_or_dir(args_dict.get("base_dir"), "dir")
     if args_dict.get("reference") is not None:
         check_file_or_dir(args_dict.get("reference"), "file", allowed_formats="json")
 
@@ -154,7 +154,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     # Additional arguments processing
     args_dict["limit"] = round(args_dict["limit"], 8)
-    args_dict["summarypath"] = os.path.join(args_dict["run_dir"], args_dict["summary"])
+    args_dict["summarypath"] = os.path.join(args_dict["base_dir"], args_dict["summary"])
 
     return args_dict
 
@@ -188,7 +188,7 @@ def main(standalone: bool = True, **kwargs):
         Whether parsed script is used directly through command-line (stand-alone script)
         or in an external pipeline script.
 
-    run_dir: str | Path
+    base_dir: str | Path
         Base directory containing structure directories with VASP runs inside.
 
     reference: str | Path, optional
@@ -207,7 +207,7 @@ def main(standalone: bool = True, **kwargs):
     summary: str | Path, optional
         Name of output JSON summary file indicating calculation results for this step. Also usable
         by further steps to filter out structures rejected in this step. The file will be
-        automatically written in the 'run_dir' directory.
+        automatically written in the 'base_dir' directory.
 
     limit: float, optional
         Maximum value of ΔH (in eV/atom) above which structures are considered too unstable and
@@ -242,7 +242,7 @@ def main(standalone: bool = True, **kwargs):
 
     # Extract generated data
     gen_data = VaspExtractor(
-        vasp_parser=VaspParser(args["run_dir"]),
+        vasp_parser=VaspParser(args["base_dir"]),
         method=ExtractMethod.CONVEX_HULL,
         summary_name=args.get("prev_summary"),
         summary_key=args.get("summary_key"),
@@ -305,7 +305,7 @@ def main(standalone: bool = True, **kwargs):
     for name, entry in gen_entries.items():
         dct = {
             "name": name,
-            "path": os.path.join(args["run_dir"], name),
+            "path": os.path.join(args["base_dir"], name),
             "e_above_hull": entry.attribute[Stability._delta_e_attr], # type: ignore
             "stable": id(entry) in stable_ids
         }
@@ -317,7 +317,7 @@ def main(standalone: bool = True, **kwargs):
         msg = f"Uncomputable due to its too high dimension ({len(entry.composition)} > 10)."
         results[name] = {
                 "name": entry.name,
-                "path": os.path.abspath(os.path.join(args["run_dir"], entry.name)),
+                "path": os.path.abspath(os.path.join(args["base_dir"], entry.name)),
                 "e_above_hull": None, # type: ignore
                 "stable": False,
                 "comment": msg

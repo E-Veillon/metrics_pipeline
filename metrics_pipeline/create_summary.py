@@ -132,7 +132,7 @@ def main(standalone: bool = True, **kwargs) -> None:
                 f"{args.get('key_name')}": (struct_dir in wanted_struct_dirs) ^ args["reject"]
             }
         )
-    JsonWriter(args["outfile"], summary_result, indent=4)
+    JsonWriter(args["outfile"], summary_result, indent=4).write_as_dict()
 
 
 if __name__ == "__main__":
