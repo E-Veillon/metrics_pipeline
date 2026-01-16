@@ -41,83 +41,70 @@ def _get_command_line_args() -> argp.Namespace:
         help="Base directory containing structure directories with VASP runs inside.",
     )
     parser.add_argument(
-        "-r", "--reference",
+        "-r", "--reference", metaver="<path>",
         help=(
-            "Dataset of already known structure to construct a reference convex hull "
-            "and compare generated structure against it (json format).\n"
-            "If not given, the default reference hull will be defined only with "
-            "elemental entries of energy 0.0 eV/atom."
+            "JSON dataset file of already known structure to construct a reference "
+            "convex hull and compare generated structure against it. If not given, "
+            "the default reference hull will be defined only with elemental entries "
+            "of energy 0.0 eV/atom."
         ),
     )
     parser.add_argument(
-        "-R", "--read-previous-summary",
+        "-p", "--prev-summary", metavar="<path>",
         help=(
-            "Path to a JSON summary file produced by a previous screening step.\n"
+            "Path to a JSON summary file produced by a previous screening step. "
             "If given, the file will be checked to filter out structures that are "
             "already rejected."
-        ),
-        metavar="<path>",
-        dest="prev_summary"
+        )
     )
     parser.add_argument(
-        "-k", "--key-to-check",
+        "-k", "--summary-key",
         help=(
-            "The dict key associated to the bool used to verify eligibility "
-            "in the previous summary file.\n"
-            "If --read-previous-summary is given, it must be given too."
-        ),
-        metavar="<str>"
+            "The dict key associated to the bool used to verify eligibility in previous "
+            "summary file. If --prev-summary is given, it must be given too."
+        )
     )
     parser.add_argument(
-        "-s", "--summary",
-        default="summary.json",
+        "-s", "--summary", default="stability_summary.json",
         help=(
-            "Output file indicating calculation results for this step (json format).\n"
-            "Also usable by further steps to filter out structures rejected in this step."
-            "This argument only affects the name of the file, it is automatically written "
-            "at the location given by the 'run_dir' argument."
-        ),
-        metavar="<str>"
+            "Name of output JSON summary file indicating calculation results for this step. "
+            "Also usable by further steps to filter out structures rejected in this step. "
+            "The file will be automatically written in the 'run_dir' directory."
+        )
     )
     parser.add_argument(
-        "-l", "--limit",
-        type=float,
-        default=0.1,
+        "-l", "--limit", type=float, default=0.1,
         help=(
-            "Maximum value of ΔH (in eV/atom) above which structures "
-            "are considered too unstable and rejected.\n"
-            "Defaults to 0.1 eV/atom, as it is commonly assumed to be sufficient.\n"
-        ),
-        metavar="<float>",
+            "Maximum value of ΔH (in eV/atom) above which structures are considered too "
+            "unstable and rejected. Defaults to 0.1 eV/atom, as it is commonly assumed "
+            "to be sufficient."
+        )
     )
     parser.add_argument(
         "--compact", action="store_true",
         help=(
-            "Only used if 'process-dataset is given. "
-            "If passed, tells the parser that given JSON is organized by lists of "
-            "attributes, e.g. {'id': [id1, id2, ...], 'composition': [comp1, comp2, ...], ...} "
-            "instead of being organized by individual objects (default), "
-            "e.g. {'data1': {'id': id1, ...}, 'data2': {'id': id2, ...}, ...}."
+            "Flag to pass if reference dataset is organized by data type instead of by structure. "
+            "By default, dataset is assumed to be organized by structure, i.e. "
+            "{'struct_name_1': struct_dict_1, 'struct_name_2': struct_dict_2, ...}. "
+            "If the flag is passed, dataset is instead assumed to be organized by data key, i.e. "
+            "{'entry_id': [struct_name_1, struct_name_2, ...], "
+            "'composition': [struct_comp_1, struct_comp_2, ...], ...}."
         )
     )
     parser.add_argument(
-        "-w", "--workers",
-        type=int,
+        "-w", "--workers", type=int, metavar="int",
         help=(
-            "Number of parallel processes to spawn for parallelized steps. "
-            "If not given, If not given, default value is the 'max_workers' "
-            "default value from tqdm.contrib.concurrent.process_map function."
-        ),
-        metavar="<int>",
+            "Number of processes to use in parallel. If not given, will use default of "
+            "`tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()` "
+            "and execute sequentially."
+        )
     )
     parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
+        "-v", "--verbose", action="store_true",
         help="Whether to print each reference entry used when building a phase diagram."
     )
     parser.add_argument(
-        "--pause-after-init",
-        action="store_true",
+        "--pause-after-init", action="store_true",
         help="Pauses the program after finishing data preparations. Press Enter to unpause."
     )
     args: argp.Namespace = parser.parse_args()
@@ -133,7 +120,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     # Set default values for unset optional arguments
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
-    args_dict.setdefault("summary", "summary.json")
+    args_dict.setdefault("summary", "stability_summary.json")
     args_dict.setdefault("limit", 0.1)
     args_dict.setdefault("compact", False)
     args_dict.setdefault("verbose", False)
@@ -147,14 +134,14 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     if args_dict.get("prev_summary") is not None:
         check_file_or_dir(args_dict.get("prev_summary"), "file", allowed_formats="json")
 
-        if args_dict.get("key_to_check") is None:
+        if args_dict.get("summary_key") is None:
             raise ValueError(
                 f"'prev_summary' argument was provided ({args_dict.get('prev_summary')}), "
                 "therefore 'key-to-check' argument has to be given as well."
             )
 
-    if args_dict.get("key_to_check") is not None:
-        check_type(args_dict.get("key_to_check"), "key_to_check", (str,))
+    if args_dict.get("summary_key") is not None:
+        check_type(args_dict.get("summary_key"), "summary_key", (str,))
 
     check_file_format(args_dict.get("summary"), allowed_formats="json")
     check_type(args_dict.get("limit"), "limit", (float,))
@@ -204,38 +191,40 @@ def main(standalone: bool = True, **kwargs):
     run_dir: str | Path
         Base directory containing structure directories with VASP runs inside.
 
-    reference: str | Path
-        Dataset of already known structure to construct a reference convex hull and compare
-        generated structure against it (json format). If not given, the default reference hull
+    reference: str | Path, optional
+        JSON dataset file of already known structure to construct a reference  convex hull
+        and compare generated structure against it. If not given, the default reference hull
         will be defined only with elemental entries of energy 0.0 eV/atom.
 
-    prev_summary: str | Path
+    prev_summary: str | Path, optional
         Path to a JSON summary file produced by a previous screening step. If given, the file
         will be checked to filter out structures that are already rejected.
 
-    key_to_check: str
-        The dict key associated to the bool used to verify eligibility in the previous summary
-        file. If prev_summary is given, it must be given too.
+    summary_key: str, optional
+        The dict key associated to the bool used to verify eligibility in previous summary file.
+        If --prev-summary is given, it must be given too.
 
-    summary: str | Path
-        Output file indicating calculation results for this step (json format). Also usable by
-        further steps to filter out structures rejected in this step. This argument only affects
-        the name of the file, it is automatically written at the location given by the 'run_dir'
-        argument.
+    summary: str | Path, optional
+        Name of output JSON summary file indicating calculation results for this step. Also usable
+        by further steps to filter out structures rejected in this step. The file will be
+        automatically written in the 'run_dir' directory.
 
-    limit: float
+    limit: float, optional
         Maximum value of ΔH (in eV/atom) above which structures are considered too unstable and
         rejected. Defaults to 0.1 eV/atom, as it is commonly assumed to be sufficient.
 
     compact: bool
-        Only used if 'process-dataset is given. If passed, tells the parser that given JSON is
-        organized by lists of attributes, e.g.
-        {'id': [id1, id2, ...], 'composition': [comp1, comp2, ...], ...} instead of being organized
-        by individual objects (default), e.g.
-        {'data1': {'id': id1, ...}, 'data2': {'id': id2, ...}, ...}.
-        Defaults to False.
+        Whather reference dataset is organized by data type instead of by structure.
+        By default, dataset is assumed to be organized by structure, i.e.
+        {'struct_name_1': struct_dict_1, 'struct_name_2': struct_dict_2, ...}.
+        If the flag is passed, dataset is instead assumed to be organized by data key, i.e.
+        {
+            'entry_id': [struct_name_1, struct_name_2, ...],
+            'composition': [struct_comp_1, struct_comp_2, ...],
+            ...
+        }. Defaults to False.
 
-    workers: int
+    workers: int, optional
         Number of parallel processes to spawn for parallelized steps. If not given, default value
         is the 'max_workers' default value from `tqdm.contrib.concurrent.process_map()` function.
         Pass 0 to disable the use of `process_map()` and execute sequentially.
@@ -256,7 +245,7 @@ def main(standalone: bool = True, **kwargs):
         vasp_parser=VaspParser(args["run_dir"]),
         method=ExtractMethod.CONVEX_HULL,
         summary_name=args.get("prev_summary"),
-        summary_key=args.get("key_to_check"),
+        summary_key=args.get("summary_key"),
         workers=args.get("workers")
     ).get_data()
 
@@ -264,8 +253,7 @@ def main(standalone: bool = True, **kwargs):
         gen_data,
         composition_key="composition",
         energy_key="final_energy",
-        attribute="generated",
-        compact=False
+        attribute="generated"
     )
 
     # Eliminate high dimension structures (> 10) from computations to avoid softlock
@@ -290,7 +278,7 @@ def main(standalone: bool = True, **kwargs):
         )
         ref_entries = ref_dataset.get_filtered_entries(
             elts=used_elts,
-            dims=set(list(range(max_dim_generated)))
+            dims=set(range(max_dim_generated))
         )
     else:
         ref_entries = {}

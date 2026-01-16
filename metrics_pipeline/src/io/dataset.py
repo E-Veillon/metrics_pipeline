@@ -227,13 +227,13 @@ class PDDataset:
 
         Parameters
         ----------
-        elts: list[str], optional
-            List of elements the entries compositions must fit in.
+        elts: set[str], optional
+            Set of elements the entries compositions must fit in.
             Only entries containing only elements in the list are returned.
             If not given, no restriction is applied.
 
-        dims: list[int], optional
-            List of accepted element dimensions.
+        dims: set[int], optional
+            Set of accepted element dimensions.
             Only entries having a composition of these dimensions will be returned.
             If not given, no restriction is applied.
 
