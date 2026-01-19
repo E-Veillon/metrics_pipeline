@@ -53,7 +53,7 @@ def _get_command_line_args() -> argp.Namespace:
         help=(
             "CIF Labels to store into structure properties, e.g. can be used "
             "to save structure identifiers attached to it throughout its manipulation "
-            "as a python object."
+            "as a python object. Pass 'header' to save structures header (after 'data_')"
         )
     )
     parser.add_argument(

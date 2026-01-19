@@ -14,6 +14,8 @@ from materials_toolkit.models.alignn.pretrained import get_pretrained_alignn, mo
 
 from pymatgen.core import Structure, Element, Species
 
+from src.utils import VisualIterator
+
 
 def _species_to_tensor(elements: list[Element | Species]) -> torch.Tensor:
     """Convert Element objects to a Tensor containing their atomic numbers."""
@@ -70,7 +72,8 @@ def vectors_from_alignn(
     batch_size: int = 128,
     device: torch.device | str | None = None,
     model_name: models_name = "mp/e_form",
-    output: tp.Literal["latent","energy"] = "latent"
+    output: tp.Literal["latent","energy"] = "latent",
+    load_bar: str | None = "tqdm"
 ) -> np.ndarray:
     """
     Computes vector representation of structures with ALIGNN
@@ -79,6 +82,10 @@ def vectors_from_alignn(
     assert output in {"latent", "energy"}, ValueError(
         f"'output' only supports 'energy' and 'latent', got {output!r}."
     )
+    if load_bar is not None:
+        assert load_bar in {"tqdm", "local"}, ValueError(
+            f"'load_bar' only supports 'tqdm' or 'local', got {load_bar!r}."
+        )
 
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -93,7 +100,14 @@ def vectors_from_alignn(
         """True if 'output' == "latent"."""
         return output == "latent"
 
-    for batch in tqdm.tqdm(loader):
+    description = f"Comuting ALIGNN {output} values"
+
+    if load_bar == "tqdm":
+        loader = tqdm.tqdm(loader, desc=description)
+    elif load_bar == "local":
+        loader = VisualIterator(loader, desc=description, unit="computed", percent=True)
+
+    for batch in loader:
         batch = batch.to(device)
         batch.build_graph(knn=12)
         batch.build_tripets()

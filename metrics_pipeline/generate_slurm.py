@@ -181,6 +181,10 @@ def main(standalone: bool = True, **kwargs) -> None:
     
     Parameters
     ----------
+    standalone (bool
+        Whether parsed script is used directly through command-line (stand-alone script)
+        or in an external pipeline script.
+
     jobname: str, optional
         Name of the job in the job queue. Defaults to "jobname".
 
