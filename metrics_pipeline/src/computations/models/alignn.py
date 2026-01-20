@@ -73,7 +73,7 @@ def vectors_from_alignn(
     device: torch.device | str | None = None,
     model_name: models_name = "mp/e_form",
     output: tp.Literal["latent","energy"] = "latent",
-    load_bar: str | None = "tqdm"
+    load_bar: tp.Literal["tqdm", "local", "quiet"] = "tqdm"
 ) -> np.ndarray:
     """
     Computes vector representation of structures with ALIGNN
@@ -83,8 +83,8 @@ def vectors_from_alignn(
         f"'output' only supports 'energy' and 'latent', got {output!r}."
     )
     if load_bar is not None:
-        assert load_bar in {"tqdm", "local"}, ValueError(
-            f"'load_bar' only supports 'tqdm' or 'local', got {load_bar!r}."
+        assert load_bar in {"tqdm", "local", "quiet"}, ValueError(
+            f"'load_bar' only supports 'tqdm', 'local' and 'quiet', got {load_bar!r}."
         )
 
     if device is None:

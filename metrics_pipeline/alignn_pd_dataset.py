@@ -54,6 +54,14 @@ def _get_cmd_line_args() -> ap.Namespace:
         )
     )
     parser.add_argument(
+        "-l", "--load-bar-style", default="tqdm", choices=["tqdm", "local", "quiet"],
+        help=(
+            "Choose a style for the ALIGNN process bar, between 'tqdm', 'local' and 'none'. "
+            "'tqdm' uses the default tqdm.tqdm() bar, 'local' uses GenMat VisualIterator(), "
+            "and 'quiet' deactivates progress bar completely. Defaults to %(default)s."
+        )
+    )
+    parser.add_argument(
         "-w", "--workers", type=int, metavar="int",
         help=(
             "Number of processes to use in parallel. If not given, will use default of "
@@ -77,6 +85,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     default_output = args_dict["input_file"].replace(".cif", ".json")
     args_dict.setdefault("output", default_output)
     args_dict.setdefault("on_error", "warn")
+    args_dict.setdefault("load_bar_style", "tqdm")
     
     # Assert set arguments conformity
     check_file_or_dir(args_dict["input_file"], allowed_formats="cif")
@@ -89,6 +98,10 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     check_type(args_dict["on_error"], "on_error", (str,))
     assert args_dict["on_error"].lower() in {"raise", "warn", "ignore"}, ValueError(
         f"'on_error' must be either 'raise', 'warn' or 'ignore', got {args_dict['on_error']!r}."
+    )
+    assert args_dict["load_bar_style"] in {"tqdm", "local", "quiet"}, ValueError(
+        "'load_bar_style' must be either 'tqdm', 'local' or 'quiet', "
+        f"got {args_dict['load_bar_style']}"
     )
 
     return args_dict
@@ -133,6 +146,11 @@ def main(standalone: bool = True, **kwargs) -> None:
             ...
         }. Defaults to False.
 
+    load_bar_style: str
+        Choose a style for the ALIGNN process bar, between 'tqdm', 'local' and 'none'.
+        'tqdm' uses the default tqdm.tqdm() bar, 'local' uses GenMat VisualIterator(),
+        and 'none' deactivates progress bar completely. Defaults to 'tqdm'.
+
     workers: int, optional
         Number of parallel processes to spawn for parallelized steps. If not given, default value
         is the 'max_workers' default value from `tqdm.contrib.concurrent.process_map()` function.
@@ -146,7 +164,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         workers=args["workers"]
     )
     structures, _ = cfile.parse_structures(on_error=args["on_error"])
-    energies = vectors_from_alignn(structures, output="energy", load_bar="local")
+    energies = vectors_from_alignn(structures, output="energy", load_bar=args["load_bar_style"])
 
     if args["compact"]:
         results = {}
