@@ -121,7 +121,7 @@ class PoscarBlock:
         """Whether the object misses any data or contains out-of-specs data."""
         try:
             self._check_string(str(self))
-        except ValueError:
+        except (ValueError, AssertionError):
             return False
         return True
 
