@@ -174,15 +174,15 @@ class PoscarBlock:
         scale_factor = float(lines[1])
         lattice = np.array(
             [
-                list(map(float, lines[2])),
-                list(map(float, lines[3])),
-                list(map(float, lines[4]))
+                list(map(float, lines[2].split())),
+                list(map(float, lines[3].split())),
+                list(map(float, lines[4].split()))
             ], dtype=np.float32
         )
         elements = lines[5].split()
         elts_count = list(map(int, lines[6].split()))
         pos_basis = lines[7]
-        pos_list = [list(map(float, atom_line.split())) for atom_line in lines[8:]]
+        pos_list = [list(map(float, atom_line.split()[:3])) for atom_line in lines[8:]]
         positions = np.array(pos_list, dtype=np.float32)
         return cls(header, scale_factor, lattice, elements, elts_count, pos_basis, positions)
 
