@@ -66,7 +66,7 @@ class PoscarBlock:
     def _check_string(string: str) -> None:
         """Assertions to verify if given string conforms to POSCAR formatting."""
         lines = string.strip().splitlines()
-        assert len(lines) > 9, ValueError(
+        assert len(lines) >= 9, ValueError(
             "Given string must contain at least 9 lines to be a valid POSCAR: "
             "1 header, 1 scale factor, 3 lattice vectors, 1 element list, "
             "1 element counts list, 1 position basis ('direct' or 'cartesian'), "
@@ -86,10 +86,12 @@ class PoscarBlock:
             )
         valid_elements = set(ALL_ELT_SYMBOL_TO_Z)
         assert all(elt in valid_elements for elt in lines[5].split()), ValueError(
-            "6th line contains data that is not a valid element symbol."
+            "6th line contains data that is not a valid element symbol. "
+            f"Line got: {lines[5]!r}."
         )
         assert all(s.isdecimal() for s in lines[6].split()), ValueError(
-            "7th line contains data that is not an integer."
+            "7th line contains data that is not an integer. "
+            f"Line got: {lines[6]!r}."
         )
         assert len(lines[5].split()) == len(lines[6].split()), ValueError(
             "6th and 7th lines should have the same number of data, "
@@ -118,7 +120,7 @@ class PoscarBlock:
     def is_valid(self) -> bool:
         """Whether the object misses any data or contains out-of-specs data."""
         try:
-            self._check_string(self.as_string())
+            self._check_string(str(self))
         except ValueError:
             return False
         return True
@@ -144,24 +146,22 @@ class PoscarBlock:
         )
         lines = [f"# {self.header}"]
         lines.append(f"{self.scale_factor}")
+        BASE_RJUST = 5 # Enough space to go from -999.* to 9999.*
+        RJUST = BASE_RJUST + decimals
         for lattice_line_idx in range(self.lattice.shape[0]):
-            base_rjust = 6 if lattice_line_idx else 5 # first coeff has one less space than others
-            rjust = base_rjust + decimals
             coeffs = [
-                f"{coeff:>{rjust}.{decimals}f}" for coeff in self.lattice[lattice_line_idx, :]
+                f"{coeff:>{RJUST}.{decimals}f}" for coeff in self.lattice[lattice_line_idx, :]
             ]
-            lines.append(f"{''.join(coeffs)}")
+            lines.append(f"{' '.join(coeffs)}")
         lines.append(f"{' '.join(self.elements)}")
         lines.append(f"{' '.join(list(map(str, self.elts_count)))}")
         lines.append(f"{self.positions_basis}")
         elt_list = get_element_list(self.elements, self.elts_count)
         for pos_line_idx, elt in zip(range(self.positions.shape[0]), elt_list):
-            base_rjust = 6 if pos_line_idx else 5 # first coeff has one less space than others
-            rjust = base_rjust + decimals
             coeffs = [
-                f"{coeff:>{rjust}.{decimals}f}" for coeff in self.positions[pos_line_idx, :]
+                f"{coeff:>{RJUST}.{decimals}f}" for coeff in self.positions[pos_line_idx, :]
             ]
-            lines.append(f"{''.join(coeffs)} {elt}")
+            lines.append(f"{' '.join(coeffs)} {elt}")
 
         return "\n".join(lines)
 
@@ -297,7 +297,7 @@ class PoscarFile:
         for idx, block in enumerate(data):
             try:
                 PoscarBlock._check_string(block)
-            except ValueError as exc:
+            except (ValueError, AssertionError) as exc:
                 raise ValueError(
                     f"An error occurred while trying to parse structure {idx}. "
                     f"See below for details:\n{exc}"
@@ -404,9 +404,9 @@ class PoscarFile:
         parsed = [
             np.array(
                 [
-                    list(map(float, poscar.splitlines()[2])),
-                    list(map(float, poscar.splitlines()[3])),
-                    list(map(float, poscar.splitlines()[4]))
+                    list(map(float, poscar.splitlines()[2].split())),
+                    list(map(float, poscar.splitlines()[3].split())),
+                    list(map(float, poscar.splitlines()[4].split()))
                 ], dtype=np.float32
             ) for poscar in self._data
         ]
@@ -466,7 +466,7 @@ class PoscarFile:
         parsed = []
         for poscar in self._data:
             lines = poscar.splitlines()
-            atoms_pos = [list(map(float, atom_line.split())) for atom_line in lines[8:]]
+            atoms_pos = [list(map(float, atom_line.split()[:3])) for atom_line in lines[8:]]
             parsed.append(np.array(atoms_pos, dtype=np.float32))
 
         if self.cache and not self.cache_all:
@@ -546,7 +546,7 @@ class PoscarFile:
             "This instance contains some missing or out-of-specs data, "
             "preventing proper file writing."
         )
-        os.makedirs(filename, exist_ok=exist_ok)
+        os.makedirs(os.path.dirname(filename), exist_ok=exist_ok)
         with open(filename, "wt", encoding="utf-8") as fp:
             fp.write("\n".join(self._data))
 
@@ -554,7 +554,7 @@ class PoscarFile:
 def is_float_string(string: str) -> bool:
     """Check if given string is a floating point number."""
     parts = string.split(".")
-    return len(parts) == 2 and all(s.isdecimal() for s in parts)
+    return len(parts) == 2 and all(s.lstrip("-").isdecimal() for s in parts)
 
 
 def get_element_list(elements: list[str], counts: list[int]) -> list[str]:
