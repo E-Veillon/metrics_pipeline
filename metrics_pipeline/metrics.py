@@ -183,7 +183,10 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
         check_file_or_dir(args_dict.get("relax_summary"), "file", allowed_formats="json")
 
     check_file_format(args_dict.get("output"), allowed_formats="json")
-    check_num_value(args_dict.get("workers"), "workers", ">", 0)
+
+    if args_dict.get("workers") is not None:
+        check_type(args_dict["workers"], "workers", (int,))
+        check_num_value(args_dict.get("workers"), "workers", ">", 0)
     check_num_value(args_dict.get("threshold"), "threshold", ">", 0.0)
 
     return args_dict

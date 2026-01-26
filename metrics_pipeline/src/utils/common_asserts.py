@@ -55,7 +55,7 @@ def check_num_value(
 
         ref_val (int|float):    The value to compare 'val' to. Defaults to 0.
     """
-    check_type(val, "val", (int, float))
+    check_type(val, val_name, (int, float))
     assert val is not None, "Never triggered, used for type checker."
     check_type(val_name, "val_name", (str,))
     check_type(ref_val, "ref_val", (int, float))
