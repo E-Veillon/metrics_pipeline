@@ -58,14 +58,21 @@ def _get_command_line_args() -> ap.Namespace:
         "-d", "--dataset",
         help=(
             "Cif file containing the list of known structures. "
-            "Necessary for: S.U.N., COV-P, COV-R, FAD, EMD(density), EMD(energy)."
+            "Necessary for: Elementary Metastability, S.U.N., COV-P, COV-R, FAD, EMD(density), EMD(energy)."
         )
     )
     parser.add_argument(
         "-v", "--valid",
         help=(
-            "Cif file containing the preprocessed valid structures. "
+            "Cif file containing the preprocessed valid structures (i.e. preprocessed with 'dist-tolerance' = 0.5). "
             "Necessary for: Validity."
+        )
+    )
+    parser.add_argument(
+        "-V", "--viable",
+        help=(
+            "Cif file containing the preprocessed viable structures. (i.e. preprocessed with 'dist-tolerance' = 'radii'). "
+            "Necessary for: Viability."
         )
     )
     parser.add_argument(
@@ -166,6 +173,9 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     if args_dict.get("valid") is not None:
         check_file_or_dir(args_dict.get("valid"), "file", allowed_formats="cif")
 
+    if args_dict.get("viable") is not None:
+        check_file_or_dir(args_dict.get("viable"), "file", allowed_formats="cif")
+
     if args_dict.get("sun_summary") is not None:
         check_file_or_dir(args_dict.get("sun_summary"), "file", allowed_formats="json")
 
@@ -207,6 +217,9 @@ def _print_metrics_config(config: dict) -> None:
     print("- ACTIVATED METRICS -")
     print(" ")
     print(f"Validity: {config.get('Validity')}")
+    print(f"Viability: {config.get('Viability')}")
+    print(f"Symmetry: {config.get('Symmetry')}")
+    print(f"Elementary Metastability: {config.get('ElementaryMetastability')}")
     print(f"Stability, Unicity, Novelty (SUN): {config.get('SUN')}")
     print(f"Avg. Root Mean Square Displacement (RMSD): {config.get('RMSD')}")
     print(f"Coverage - Precision (COV-P): {config.get('COV-P')}")
@@ -234,6 +247,9 @@ def main(standalone: bool = True, **kwargs) -> None:
     Compute various metrics based on previously done computations.
     Computable metrics are:
     - Validity,
+    - Viability,
+    - Symmetry,
+    - Elementary Metastability,
     - Stability, Unicity, Novelty (S.U.N),
     - Average Root Mean Square Displacement (RMSD),
     - Coverage - Precision (COV-P) and Coverage - Recall (COV-R),
@@ -257,11 +273,16 @@ def main(standalone: bool = True, **kwargs) -> None:
         provide the one needed here.
 
     dataset: str | Path
-        Cif file containing the list of known structures. Necessary for: S.U.N.,
+        Cif file containing the list of known structures. Necessary for: Elementary Metastability, S.U.N.,
         COV-P, COV-R, FAD, EMD(density), EMD(energy).
 
     valid: str | Path
-        Cif file containing the preprocessed valid structures. Necessary for: Validity.
+        Cif file containing the preprocessed valid structures (i.e. preprocessed with 'dist-tolerance' = 0.5).
+        Necessary for: Validity.
+
+    viable: str | Path
+        Cif file containing the preprocessed viable structures (i.e. preprocessed with 'dist-tolerance' = 'radii').
+        Necessary for: Viability.
 
     uniques: str | Path
         Cif file containing the preprocessed unique structures. Necessary for: S.U.N.
@@ -310,7 +331,8 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     CONFIG = load_yaml_as_dict(os.path.join(CONFIGPATH, args["config"]), on_error='raise')
     dataset_needed: bool = (
-        CONFIG.get("SUN", False)
+        CONFIG.get("ElementaryMetastability")
+        or CONFIG.get("SUN", False)
         or CONFIG.get("COV-P", False)
         or CONFIG.get("COV-R", False)
         or CONFIG.get("FAD", False)
@@ -318,6 +340,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         or CONFIG.get("EMD_density", False)
     )
     valid_needed: bool = CONFIG.get("Validity", False)
+    viable_needed: bool = CONFIG.get("Viability", False)
     uniques_needed = sun_summary_needed = CONFIG.get("SUN", False)
     relax_summary_needed = CONFIG.get("RMSD", False)
 
@@ -378,6 +401,24 @@ def main(standalone: bool = True, **kwargs) -> None:
         print("Preprocessed valid structures loaded.")
     else:
         valids = []
+
+    if _match_file_arg_need("viable", args.get("viable", False), viable_needed):
+        print("Loading preprocessed viable structures...")
+        viable_file = CIFFile.from_file(
+            args["dataset"],
+            workers=args.get("workers")
+        )
+        viable_cifs = viable_file.get_cifs()
+        if not args["no_rare_gas_check"]:
+            viable_cifs, _ = discard_rare_gas_structures(viable_cifs)
+        if not args["no_rare_earth_check"]:
+            viable_cifs, _ = discard_rare_earth_structures(viable_cifs)
+        viable_file.clear()
+        viable_file.add_cifs(viable_cifs)
+        viables, _ = viable_file.parse_structures()
+        print("Preprocessed valid structures loaded.")
+    else:
+        viables = []
 
     if _match_file_arg_need("uniques", args.get("uniques", False), uniques_needed):
         print("Loading preprocessed uniques structures...")
@@ -440,11 +481,17 @@ def main(standalone: bool = True, **kwargs) -> None:
         relax_structures = []
 
     general_metrics = dict.fromkeys(
-        ("num_generated", "num_valid", "percent_valid")
+        (
+            "num_generated",
+            "num_valid", "percent_valid",
+            "num_viable", "percent_viable",
+            "num_symmetric", "percent_symmetric"
+        )
     )
 
     dft_metrics = dict.fromkeys(
         (
+            "num_elem_metastable", "percent_elem_metastable",
             "num_unique", "percent_unique",
             "num_novel", "num_unmatched_novel", "percent_novel",
             "num_unique_novel", "num_unmatched_unique_novel", "percent_unique_novel",
@@ -470,6 +517,31 @@ def main(standalone: bool = True, **kwargs) -> None:
         prop_valid = len(valids) / len(generated)
         general_metrics["percent_valid"] = round(prop_valid * 100, 6)
         print(f"Validity = {general_metrics.get('percent_valid')}%")
+
+    if CONFIG.get("Viability", False):
+        # Viability metric
+        print("Computing Viability metric...")
+        general_metrics["num_viable"] = len(viables)
+        prop_viable = len(viables) / len(generated)
+        general_metrics["percent_viable"] = round(prop_viable * 100, 6)
+        print(f"Viability = {general_metrics.get('percent_viable')}%")
+
+    if CONFIG.get("Symmetry", False):
+        # Symmetry metric
+        print("Computing Symmetry metric...")
+        symmetry = Symmetry(generated, symprec=0.1, workers=args.get("workers"))
+        general_metrics["num_symmetric"] = len(symmetry.symmetric_structs)
+        prop_symmetric = len(symmetry.symmetric_structs) / len(generated)
+        general_metrics["percent_symmetric"] = round(prop_symmetric * 100, 6)
+        print(f"Symmetry = {general_metrics.get('percent_symmetric')}")
+
+    if CONFIG.get("ElementaryMetastability", False):
+        ref_unaries = [struct for struct in dataset if struct.composition.is_element]
+        metastability = ElementaryMetastability(generated, ref_unaries)
+        dft_metrics["num_elem_metastable"] = len(metastability.metastable_structs)
+        prop_metastables = len(metastability.metastable_structs) / len(generated)
+        dft_metrics["percent_elem_metastable"] = round(prop_metastables * 100, 6)
+        print(f"Elem. Metastability = {dft_metrics.get('percent_elem_metastable')}")
 
     if CONFIG.get("SUN", False):
         # S.U.N. metrics
