@@ -355,16 +355,16 @@ def main(standalone: bool = True, **kwargs) -> None:
         print(f"{nbr_asymmetric} triclinic structures discarded")
         structures = symmetric_structs
 
-    # Comparaison des structures pour éliminer les doublons
-    unicity = Unicity(structures, workers=args.get("workers"))
-    kept_structs = unicity.unique_structs
-    nbr_unique_structs = len(kept_structs)
-    nbr_equivalent = len(unicity.duplicate_structs)
-    nbr_unmatched = len(unicity.unmatchable_structs)
-
     if not args["no_equiv_match"]:
+        # Comparaison des structures pour éliminer les doublons
+        unicity = Unicity(structures, workers=args.get("workers"))
+        kept_structs = unicity.unique_structs
+        nbr_unique_structs = len(kept_structs)
+        nbr_equivalent = len(unicity.duplicate_structs)
+        nbr_unmatched = len(unicity.unmatchable_structs)
         print(f"{nbr_unique_structs} unique structures detected")
         print(f"{nbr_equivalent} duplicates were discarded")
+        structures = kept_structs
 
     if args["test_min_vol"]:
         print("--test-min-vol debug flag was passed:")
@@ -378,7 +378,7 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     cif_file.clear()
     cif_file.add_structures(
-        kept_structs,
+        structures,
         symmetrize=(not args["no_symmetrization"]),
         symprec=args["symprec"],
         angleprec=args["angleprec"],
