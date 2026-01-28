@@ -9,11 +9,16 @@ import typing_extensions as tpe
 from dataclasses import dataclass, asdict
 import itertools as itt
 
+from tqdm.contrib.concurrent import process_map
+
 import numpy as np
 import numpy.typing as npt
 
+from pymatgen.core import Structure
+from pymatgen.io.vasp.inputs import Poscar
+
 from .io_base import PathLike
-from src.utils import ALL_ELT_SYMBOL_TO_Z
+from src.utils import ALL_ELT_SYMBOL_TO_Z, VisualIterator
 
 
 @dataclass
@@ -126,6 +131,31 @@ class PoscarBlock:
         return True
 
     # ===== I/O methods =====
+    def get_structure(self) -> Structure:
+        """Get the pymatgen Structure object corresponding to data."""
+        return Poscar.from_str(str(self), read_velocities=False).structure
+
+    @classmethod
+    def from_structure(cls, structure: Structure, header: str | None = None, decimals: int = 8) -> tpe.Self:
+        """
+        Get a valid PoscarBlock from a pymatgen Structure object.
+        
+        Parameters
+        ----------
+        structure: Structure
+            Structure to convert.
+
+        header: str, optional
+            Header to put in the comment line before structure data. If not given,
+            defaults to the formula of the structure.
+
+        decimals: int
+            Number of decimal places for lattice vectors and atomic positions.
+            Defaults to 8.        
+        """
+        poscar_string = Poscar(structure, comment=header).get_str(significant_figures=decimals)
+        return cls.from_string(poscar_string)
+
     def as_string(self, decimals: int = 8):
         """
         Get POSCAR formatted string from data.
@@ -227,7 +257,8 @@ class PoscarFile:
         filename: PathLike | None = None,
         strict: bool = True,
         cache: bool = True,
-        cache_all: bool = False
+        cache_all: bool = False,
+        workers: int | None = None
     ) -> None:
         """
         Read and parse concatenated minimal VASP 5.0+ poscar formatted structures in a file.
@@ -260,7 +291,7 @@ class PoscarFile:
             )
         )
         if filename is None:
-            self._create_empty_instance()
+            self._create_empty_instance(workers)
 
         else:
             if not os.path.isfile(filename):
@@ -269,6 +300,7 @@ class PoscarFile:
             self.filename = filename
             self.cache = cache
             self.cache_all = cache_all
+            self.workers = workers
             self._data = self._parse_file_data(filename, strict)
 
             if self.cache_all:
@@ -318,11 +350,12 @@ class PoscarFile:
     def _get_attr_from_cache(self, cache_attr: str) -> str:
         return cache_attr.lstrip("_").replace("_cache", "")
 
-    def _create_empty_instance(self) -> None:
+    def _create_empty_instance(self, workers) -> None:
         """Create empty instance to populate manually."""
         self.filename = None
         self.cache = True
         self.cache_all = True
+        self.workers = workers
         self._data = []
 
     # ===== Public methods and properties =====
@@ -475,6 +508,56 @@ class PoscarFile:
         return parsed
 
     # ===== I/O methods =====
+    def parse_structures(self) -> list[Structure]:
+        """Convert all data into pymatgen Structure objects."""
+        description = "Parsing POSCARs into structures"
+        if self.workers == 0:
+            structures = [
+                block.get_structure() for block in VisualIterator.from_big_iterator(
+                    iter(self), n_elts=len(self), desc=description, unit="converted", percent=True
+                )
+            ]
+        else:
+            structures = process_map(
+                PoscarBlock.get_structure,
+                self,
+                max_workers=self.workers,
+                chunksize=min(10, len(self) // 100 + 1),
+                desc=description
+            )
+        return structures
+
+    @classmethod
+    def from_structures(cls, structures: list[Structure], **kwargs) -> tpe.Self:
+        """
+        Build a POSCAR file from a list of pymatgen Structure objects.
+        
+        Parameters
+        ----------
+        structures: list[Structure]
+            Structures to add to POSCAR file.
+        """
+        pfile = cls(**kwargs)
+        description="Converting structures to POSCAR"
+        if pfile.workers == 0:
+            blocks = [
+                PoscarBlock.from_structure(structure) for structure in VisualIterator(
+                    structures, desc=description, unit="converted", percent=True
+                )
+            ]
+        else:
+            blocks = process_map(
+                PoscarBlock.from_structure,
+                structures,
+                max_workers=pfile.workers,
+                chunksize=min(10, len(structures) // 100 + 1),
+                desc=description
+            )
+        for block in blocks:
+            pfile.add_poscar_block(block)
+
+        return pfile
+
     def as_dict(self) -> dict[str, list[tp.Any]]:
         """Get all the data in a dict format."""
         dct = {}
