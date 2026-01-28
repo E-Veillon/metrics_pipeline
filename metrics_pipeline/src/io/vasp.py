@@ -20,6 +20,7 @@ from pymatgen.core import Structure
 from pymatgen.io.vasp import VaspInput, Vasprun, Poscar, Xdatcar
 
 from .io_base import PathLike, check_file_or_dir
+from .json import JsonLoader
 from src.utils import raise_or_warn, VisualIterator
 
 
@@ -671,13 +672,12 @@ class VaspExtractor:
         Check whether given structure directory is present in the summary file and
         whether it was rejected in the previous step.
         """
-        with open(summary_file, "rt", encoding="utf-8") as fp:
-            summary = json.load(fp)
+        summary = JsonLoader(summary_file).load_as_dict()
 
         try:
-            prev_struct_data = next(filter(
-                lambda data: os.path.samefile(data["path"], struct_dir),
-                summary
+            prev_struct_name, prev_struct_data = next(filter(
+                lambda data: os.path.samefile(data[1]["path"], struct_dir),
+                summary.items()
             ))
         except StopIteration:
             warnings.warn(
