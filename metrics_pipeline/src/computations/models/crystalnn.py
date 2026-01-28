@@ -23,7 +23,7 @@ def _get_fingerprint(structure: Structure) -> np.ndarray | None:
 
 def get_crystalnn_fingerprints(
     structures: list[Structure], workers: int | None = None
-) -> np.ndarray:
+) -> list[np.ndarray | None]:
     """
     Convert a list of structures to their CrystalNN fingerprints.
     
@@ -53,6 +53,6 @@ def get_crystalnn_fingerprints(
             max_workers=workers,
             chunksize=min(10, len(structures) // 100 + 1),
             desc="Convert structures to CrystalNN fingerprints"
-        )
-    fingerprints = np.concatenate(list(filter(lambda f: f is not None, fingerprints))) # type: ignore
+        ) # FIXME: temporary bugfix
+    #fingerprints = np.concatenate(list(filter(lambda f: f is not None, fingerprints))) # type: ignore
     return fingerprints
