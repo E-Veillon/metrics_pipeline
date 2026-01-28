@@ -15,7 +15,7 @@ from src.utils import (
     parse_input_args, check_type, check_num_value,
     discard_rare_gas_structures, discard_rare_earth_structures
 )
-from src.io import check_file_or_dir, check_file_format, CIFFile
+from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile
 from src.metrics import (
     StructValidity, Viability, Symmetry, Unicity
 )
@@ -44,7 +44,10 @@ def _get_command_line_args() -> argp.Namespace:
     )
     parser.add_argument(
         "input_file",
-        help="Path to the CIF file containing structure data to process.",
+        help=(
+            "Path to the CIF or POSCAR file containing structure data to process. "
+            "If POSCAR format, it must have extension '.poscar'."
+        ),
     )
     parser.add_argument(
         "--output", "-o",
@@ -139,7 +142,11 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
 
     # Set default values for unset optional arguments
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
-    default_output = str(args_dict.get("input_file")).replace(".cif", "_out.cif")
+    check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats=("cif", "poscar"))
+    if args_dict["input_file"].endswith(".cif"):
+        default_output = str(args_dict.get("input_file")).replace(".cif", "_out.cif")
+    else:
+        default_output = str(args_dict.get("input_file")).replace(".poscar", "_out.cif")
     args_dict.setdefault("output", default_output)
     args_dict["output"] = os.path.realpath(args_dict["output"])
     args_dict.setdefault("no_rare_gas_check", False)
@@ -154,7 +161,6 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     args_dict.setdefault("test_min_vol", False)
 
     # Assert set arguments conformity
-    check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="cif")
     check_file_format(args_dict.get("output"), allowed_formats="cif")
     if args_dict.get("dist_tolerance") != "radii":
         check_type(args_dict.get("dist_tolerance"), "dist_tolerance", (float,))
@@ -247,7 +253,8 @@ def main(standalone: bool = True, **kwargs) -> None:
         or in an external pipeline script.
 
     input_file (str|Path
-        Path to the CIF file containing structure data to process.
+        Path to the CIF or POSCAR file containing structure data to process.
+        If POSCAR format, it must have extension '.poscar'.
 
     output (str|Path
         Path to wanted CIF output file where processed structures will be stored. If not given,
@@ -306,27 +313,44 @@ def main(standalone: bool = True, **kwargs) -> None:
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     # Extraction des données CIF et conversion en structures
-    cif_file = CIFFile.from_file(
-        args["input_file"],
-        special_keys=args.get("special_keys"),
-        workers=args.get("workers")
-    )
-    cifs = cif_file.get_cifs()
-    nbr_loaded_data = len(cifs)
-    assert nbr_loaded_data > 0, "No structure could be parsed from given data"
-    print(f"{nbr_loaded_data} structures detected in total")
+    if args["input_file"].endswith(".cif"):
+        cif_file = CIFFile.from_file(
+            args["input_file"],
+            special_keys=args.get("special_keys"),
+            workers=args.get("workers")
+        )
+        cifs = cif_file.get_cifs()
+        nbr_loaded_data = len(cifs)
+        assert nbr_loaded_data > 0, "No structure could be parsed from given data"
+        print(f"{nbr_loaded_data} structures detected in total")
 
-    if not args["no_rare_gas_check"]:
-        cifs, nbr_rare_gas_structs = discard_rare_gas_structures(cifs)
-        print(f"{nbr_rare_gas_structs} structures containing rare gases were discarded")
+        if not args["no_rare_gas_check"]:
+            cifs, nbr_rare_gas_structs = discard_rare_gas_structures(cifs)
+            print(f"{nbr_rare_gas_structs} structures containing rare gases were discarded")
 
-    if not args["no_rare_earth_check"]:
-        cifs, nbr_rare_earth_structs = discard_rare_earth_structures(cifs)
-        print(f"{nbr_rare_earth_structs} structures containing rare earths were discarded")
+        if not args["no_rare_earth_check"]:
+            cifs, nbr_rare_earth_structs = discard_rare_earth_structures(cifs)
+            print(f"{nbr_rare_earth_structs} structures containing rare earths were discarded")
 
-    cif_file.clear()
-    cif_file.add_cifs(cifs)
-    structures, _ = cif_file.parse_structures()
+        cif_file.clear()
+        cif_file.add_cifs(cifs)
+        structures, _ = cif_file.parse_structures()
+
+    elif args["input_file"].endswith(".poscar"):
+        pfile = PoscarFile(args["input_file"], workers=args["workers"])
+        structures = pfile.parse_structures()
+
+        if args["special_keys"] is not None and "header" in args["special_keys"]:
+            for header, structure in zip(pfile.headers, structures):
+                structure.properties["header"] = header
+
+        if not args["no_rare_gas_check"]:
+            structures, nbr_rare_gas_structs = discard_rare_gas_structures(structures)
+            print(f"{nbr_rare_gas_structs} structures containing rare gases were discarded")
+
+        if not args["no_rare_earth_check"]:
+            structures, nbr_rare_earth_structs = discard_rare_earth_structures(structures)
+            print(f"{nbr_rare_earth_structs} structures containing rare earths were discarded")
 
     print(f"{len(structures)} structures are kept for further processing")
 
@@ -376,7 +400,11 @@ def main(standalone: bool = True, **kwargs) -> None:
     else:
         print("Symmetrization is activated, now symmetrizing and writing CIF file...")
 
-    cif_file.clear()
+    if args["input_file"].endswith(".cif"):
+        cif_file.clear()
+    else:
+        cif_file = CIFFile(special_keys=args.get("special_keys"), workers=args.get("workers"))
+
     cif_file.add_structures(
         structures,
         symmetrize=(not args["no_symmetrization"]),
