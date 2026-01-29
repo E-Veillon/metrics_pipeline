@@ -146,7 +146,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     if args_dict.get("workers") is not None:
         check_type(args_dict.get("workers"), "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">", 0)
+        check_num_value(args_dict.get("workers"), "workers", ">=", 0)
 
     # Additional arguments processing
     args_dict["limit"] = round(args_dict["limit"], 8)

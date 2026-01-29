@@ -193,6 +193,7 @@ class Stability(Metric):
             print(f"Comparing entry {entry} to convex hull:")
             print(f"{e_per_atom=}")
         e_above_hull = pd.get_e_above_hull(entry, allow_negative=True, check_stable=False)
+        e_above_hull = e_above_hull.item() if hasattr(e_above_hull, "item") else e_above_hull
         entry.attribute[self._delta_e_attr] = e_above_hull # type: ignore
         if self.verbose:
             print(f"{e_above_hull=}")
