@@ -337,8 +337,13 @@ def main(standalone: bool = True, **kwargs) -> None:
         structures, _ = cif_file.parse_structures()
 
     elif args["input_file"].endswith(".poscar"):
-        pfile = PoscarFile(args["input_file"], workers=args["workers"])
+        pfile = PoscarFile(args["input_file"], workers=args.get("workers"))
         structures = pfile.parse_structures()
+
+        nbr_loaded_data = len(structures)
+        assert nbr_loaded_data > 0, "No structure could be parsed from given data"
+        print(f"{nbr_loaded_data} structures detected in total")
+
 
         if args["special_keys"] is not None and "header" in args["special_keys"]:
             for header, structure in zip(pfile.headers, structures):
@@ -420,7 +425,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     print("\n------------------------------")
     print("\nSUMMARY OF THE CALCULATION")
     print(f"{nbr_loaded_data} structures detected in total, including:")
-    print(f"- {nbr_unique_structs} structure(s) passing filters")
+    print(f"- {len(structures)} structure(s) passing filters")
 
     if not args["no_rare_gas_check"]:
         print(f"- {nbr_rare_gas_structs} structure(s) containing rare gases")

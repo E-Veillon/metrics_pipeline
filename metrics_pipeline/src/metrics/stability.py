@@ -34,7 +34,8 @@ class Stability(Metric):
         structures: list[Structure],
         ref_structs: list[Structure],
         stable_tol: float = 0.1,
-        workers: int | None = None
+        workers: int | None = None,
+        verbose: bool = False
     ) -> None:
         """
         Compute Stability metric.
@@ -55,6 +56,10 @@ class Stability(Metric):
             Number of parallel processes to spawn for efficient computation. If not given,
             `tqdm.contrib.concurrent.process_map()` default is used. Pass 0 to disable
             `process_map()` and execute sequentially.
+
+        verbose: bool
+            Whether to print entries used to build convex hulls with their energies,
+            and computed energies above hull from tested entries.
         """
         super().__init__(structures)
 
@@ -77,6 +82,7 @@ class Stability(Metric):
         self.ref_structs = ref_structs
         self.stable_tol = stable_tol
         self.workers = workers
+        self.verbose = verbose
 
         chemical_systems: dict[str, list[PDEntry]] = defaultdict(list[PDEntry])
         # Group entries to compute into distinct chemical systems
@@ -182,22 +188,40 @@ class Stability(Metric):
 
     def is_stable(self, pd: PhaseDiagram, entry: PDEntry) -> bool:
         """Whether entry is stable compared to the convex hull, within initialized tolerance."""
+        if self.verbose:
+            e_per_atom = entry.energy / entry.composition.num_atoms
+            print(f"Comparing entry {entry} to convex hull:")
+            print(f"{e_per_atom=}")
         e_above_hull = pd.get_e_above_hull(entry, allow_negative=True, check_stable=False)
         entry.attribute[self._delta_e_attr] = e_above_hull # type: ignore
-        if e_above_hull is None:
+        if self.verbose:
+            print(f"{e_above_hull=}")
+        if e_above_hull is None or e_above_hull > self.stable_tol:
+            if self.verbose:
+                print(f"stable: False")
             return False
-        return e_above_hull <= self.stable_tol
+        if self.verbose:
+            print("stable: True")
+        return True
 
     def _compute_system(
         self, system: str, entries: list[PDEntry]
     ) -> tuple[list[PDEntry], list[PDEntry]]:
         """Compute stability inside a chemical system."""
+        if self.verbose:
+            print(f"Computing system {system}")
         system_set = set(system.split("-"))
         ref_entries = [
             entry for entry in self.ref_entries
             if entry.composition.chemical_system_set.issubset(system_set)
         ]
         pd = PhaseDiagram(ref_entries)
+        if self.verbose:
+            print("Built phase diagram with following stable entries:")
+            hull_entries = pd.qhull_entries
+            for entry in hull_entries:
+                e_per_atom = entry.energy / entry.composition.num_atoms
+                print(f"{entry=}, {e_per_atom=} eV/atom")
         stable_structs = [entry for entry in entries if self.is_stable(pd, entry)]
         unstable_structs = [entry for entry in entries if not self.is_stable(pd, entry)]
 

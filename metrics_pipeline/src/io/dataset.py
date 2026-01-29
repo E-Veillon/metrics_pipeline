@@ -250,10 +250,11 @@ class PDDataset:
         if elts is not None:
             data_tuples = list(
                 filter(
-                    lambda data_tup: all(elt in elts for elt in data_tup[1].elements),
+                    lambda data_tup: data_tup[1].composition.chemical_system_set.issubset(elts),
                     data_tuples
                 )
             )
+
         if dims is not None:
             data_tuples = list(
                 filter(
@@ -261,6 +262,7 @@ class PDDataset:
                     data_tuples
                 )
             )
+
         return dict(data_tuples)
 
     @property

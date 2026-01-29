@@ -278,7 +278,7 @@ def main(standalone: bool = True, **kwargs):
         )
         ref_entries = ref_dataset.get_filtered_entries(
             elts=used_elts,
-            dims=set(range(max_dim_generated))
+            dims=set(range(max_dim_generated + 1))
         )
     else:
         ref_entries = {}
@@ -298,7 +298,8 @@ def main(standalone: bool = True, **kwargs):
         entries=list(gen_entries.values()),
         ref_entries=list(ref_entries.values()),
         stable_tol=args["limit"],
-        workers=args.get("workers")
+        workers=args.get("workers"),
+        verbose=args["verbose"]
     )
     results = {}
     stable_names = set(entry.name for entry in stability.stable_entries)

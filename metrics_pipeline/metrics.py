@@ -367,7 +367,7 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     print("Generated structures loaded.")
 
-    if _match_file_arg_need("dataset", args.get("dataset", False), dataset_needed):
+    if _match_file_arg_need("dataset", args.get("dataset", None), dataset_needed):
         print("Loading dataset...")
         data_file = CIFFile.from_file(
             args["dataset"],
@@ -389,10 +389,10 @@ def main(standalone: bool = True, **kwargs) -> None:
     else:
         dataset = []
 
-    if _match_file_arg_need("valid", args.get("valid", False), valid_needed):
+    if _match_file_arg_need("valid", args.get("valid", None), valid_needed):
         print("Loading preprocessed valid structures...")
         valid_file = CIFFile.from_file(
-            args["dataset"],
+            args["valid"],
             workers=args.get("workers")
         )
         valid_cifs = valid_file.get_cifs()
@@ -407,10 +407,10 @@ def main(standalone: bool = True, **kwargs) -> None:
     else:
         valids = []
 
-    if _match_file_arg_need("viable", args.get("viable", False), viable_needed):
+    if _match_file_arg_need("viable", args.get("viable", None), viable_needed):
         print("Loading preprocessed viable structures...")
         viable_file = CIFFile.from_file(
-            args["dataset"],
+            args["viable"],
             workers=args.get("workers")
         )
         viable_cifs = viable_file.get_cifs()
@@ -425,10 +425,10 @@ def main(standalone: bool = True, **kwargs) -> None:
     else:
         viables = []
 
-    if _match_file_arg_need("uniques", args.get("uniques", False), uniques_needed):
+    if _match_file_arg_need("uniques", args.get("uniques", None), uniques_needed):
         print("Loading preprocessed uniques structures...")
         uniq_file = CIFFile.from_file(
-            args["dataset"],
+            args["uniques"],
             workers=args.get("workers")
         )
         uniq_cifs = uniq_file.get_cifs()
@@ -443,7 +443,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     else:
         uniques = []
 
-    if _match_file_arg_need("sun-summary", args.get("sun_summary", False), sun_summary_needed):
+    if _match_file_arg_need("sun-summary", args.get("sun_summary", None), sun_summary_needed):
         print("Loading stability summary file...")
         base_dir, summary_name = os.path.split(args["sun_summary"])
         stable_structs_pairs = VaspExtractor(
@@ -465,7 +465,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     else:
         stable_structs = []
 
-    if _match_file_arg_need("relax-summary", args.get("relax_summary", False), relax_summary_needed):
+    if _match_file_arg_need("relax-summary", args.get("relax_summary", None), relax_summary_needed):
         print("Loading relaxations summary file...")
         base_dir, summary_name = os.path.split(args["relax_summary"])
         relax_structures_dict = VaspExtractor(
@@ -513,13 +513,13 @@ def main(standalone: bool = True, **kwargs) -> None:
     print("===== COMPUTE ACTIVATED METRICS =====")
 
     # total number of generated structures
-    general_metrics["num_generated"] = len(generated)
+    general_metrics["num_generated"] = len(gen_cifs)
 
     if CONFIG.get("Validity", False):
         # Validity metric
         print("Computing Validity metric...")
         general_metrics["num_valid"] = len(valids)
-        prop_valid = len(valids) / len(generated)
+        prop_valid = len(valids) / general_metrics["num_generated"]
         general_metrics["percent_valid"] = round(prop_valid * 100, 6)
         print(f"Validity = {general_metrics.get('percent_valid')}%")
 
@@ -527,7 +527,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         # Viability metric
         print("Computing Viability metric...")
         general_metrics["num_viable"] = len(viables)
-        prop_viable = len(viables) / len(generated)
+        prop_viable = len(viables) / general_metrics["num_generated"]
         general_metrics["percent_viable"] = round(prop_viable * 100, 6)
         print(f"Viability = {general_metrics.get('percent_viable')}%")
 
@@ -536,15 +536,15 @@ def main(standalone: bool = True, **kwargs) -> None:
         print("Computing Symmetry metric...")
         symmetry = Symmetry(generated, symprec=0.1, workers=args.get("workers"))
         general_metrics["num_symmetric"] = len(symmetry.symmetric_structs)
-        prop_symmetric = len(symmetry.symmetric_structs) / len(generated)
+        prop_symmetric = len(symmetry.symmetric_structs) / general_metrics["num_generated"]
         general_metrics["percent_symmetric"] = round(prop_symmetric * 100, 6)
         print(f"Symmetry = {general_metrics.get('percent_symmetric')}")
 
-    if CONFIG.get("ElementaryMetastability", False):
+    if CONFIG.get("ElementaryMetastability", False) and False: # FIXME: get actual energies to compute this, unavailable until then
         ref_unaries = [struct for struct in dataset if struct.composition.is_element]
         metastability = ElementaryMetastability(generated, ref_unaries)
         dft_metrics["num_elem_metastable"] = len(metastability.metastable_structs)
-        prop_metastables = len(metastability.metastable_structs) / len(generated)
+        prop_metastables = len(metastability.metastable_structs) / general_metrics["num_generated"]
         dft_metrics["percent_elem_metastable"] = round(prop_metastables * 100, 6)
         print(f"Elem. Metastability = {dft_metrics.get('percent_elem_metastable')}")
 
@@ -640,7 +640,7 @@ def main(standalone: bool = True, **kwargs) -> None:
                 fingerprint_dataset, fingerprint_gen
             )
             mask = distance < args["threshold"]
-            ml_metrics["precision"] = mask.astype(np.float32).mean().item()
+            ml_metrics["recall"] = mask.astype(np.float32).mean().item()
             print(f"COV-R = {ml_metrics['recall']}")
         #coverage = Coverage(
         #    generated, dataset,
