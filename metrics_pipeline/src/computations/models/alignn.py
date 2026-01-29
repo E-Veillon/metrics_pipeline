@@ -100,7 +100,7 @@ def vectors_from_alignn(
         """True if 'output' == "latent"."""
         return output == "latent"
 
-    description = f"Comuting ALIGNN {output} values"
+    description = f"Computing ALIGNN {output} values"
 
     if load_bar == "tqdm":
         loader = tqdm.tqdm(loader, desc=description)

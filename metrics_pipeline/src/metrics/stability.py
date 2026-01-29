@@ -11,7 +11,7 @@ from pymatgen.core import Structure
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 from .metric_base import Metric
-from src.utils import flatten
+from src.utils import flatten, VisualIterator
 
 class Stability(Metric):
     """
@@ -229,10 +229,14 @@ class Stability(Metric):
         return stable_structs, unstable_structs
 
     def _compute(self) -> None:
+        desc="Computing Stability"
         if self.workers == 0:
             self._stable_entries: list[PDEntry] = []
             self._unstable_entries: list[PDEntry] = []
-            for system, entries in self.entries_dict.items():
+            iterator = VisualIterator(
+                self.entries_dict.items(), desc=desc, unit="computed", percent=True
+            )
+            for system, entries in iterator:
                 stable_entries, unstable_entries = self._compute_system(system, entries)
                 self._stable_entries.extend(stable_entries)
                 self._unstable_entries.extend(unstable_entries)
@@ -243,7 +247,7 @@ class Stability(Metric):
                     *zip(*self.entries_dict.items()),
                     max_workers=self.workers,
                     chunksize=min(10, len(self.entries_dict) // 100 + 1),
-                    desc="Computing Stability"
+                    desc=desc
                 )
             )
             self._stable_entries = flatten(stable_entries)
