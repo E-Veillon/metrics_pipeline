@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "metrics-pipeline"
-version = "2.2.1"
+version = "2.2.2"
 description = "Screening pipeline for metrics evaluation in Generative AI for materials"
 readme = "README.md"
 license-files = ["LICENSE"]
