@@ -399,13 +399,13 @@ class PoscarFile:
 
     @property
     def data(self) -> list[str]:
-        """Get the POSCAR formatted string of each structure."""
+        """POSCAR formatted string of each structure."""
         return self._data
 
     @property
     def headers(self) -> list[str]:
         """Get the header comment line of each structure."""
-        if self._headers_cache is not None:
+        if self._headers_cache:
             return self._headers_cache
 
         parsed = [poscar.splitlines()[0][1:].strip() for poscar in self._data]
@@ -418,7 +418,7 @@ class PoscarFile:
     @property
     def scale_factors(self) -> list[float]:
         """Get the lattice scale factor of each structure."""
-        if self._scale_factors_cache is not None:
+        if self._scale_factors_cache:
             return self._scale_factors_cache
 
         parsed = [float(poscar.splitlines()[1]) for poscar in self._data]
@@ -431,7 +431,7 @@ class PoscarFile:
     @property
     def lattices(self) -> list[np.ndarray]:
         """Get the lattice matrix in a numpy 3x3 array of each structure."""
-        if self._lattices_cache is not None:
+        if self._lattices_cache:
             return self._lattices_cache
 
         parsed = [
@@ -452,7 +452,7 @@ class PoscarFile:
     @property
     def elements(self) -> list[list[str]]:
         """Get the element list of each structure."""
-        if self._elements_cache is not None:
+        if self._elements_cache:
             return self._elements_cache
 
         parsed = [poscar.splitlines()[5].split() for poscar in self._data]
@@ -465,7 +465,7 @@ class PoscarFile:
     @property
     def elts_counts(self) -> list[list[int]]:
         """Get the count of each element of each structure."""
-        if self._elts_counts_cache is not None:
+        if self._elts_counts_cache:
             return self._elts_counts_cache
 
         parsed = [list(map(int, poscar.splitlines()[6].split())) for poscar in self._data]
@@ -480,7 +480,7 @@ class PoscarFile:
         """
         Get the atomic positions base (i.e. 'direct' or 'cartesian') of each structure.
         """
-        if self._positions_basis_cache is not None:
+        if self._positions_basis_cache:
             return self._positions_basis_cache
 
         parsed = [poscar.splitlines()[7] for poscar in self._data]
@@ -493,7 +493,7 @@ class PoscarFile:
     @property
     def positions(self) -> list[np.ndarray]:
         """Get atomic positions of all atoms in each structure."""
-        if self._positions_cache is not None:
+        if self._positions_cache:
             return self._positions_cache
 
         parsed = []
@@ -508,6 +508,29 @@ class PoscarFile:
         return parsed
 
     # ===== I/O methods =====
+    @classmethod
+    def from_str(cls, string: str, strict: bool = True) -> tpe.Self:
+        """
+        Create a file from already formatted strings.
+        
+        Parameters
+        ----------
+        strings: str
+            (concatenated) POSCAR formatted string to get into the file.
+
+        strict: bool
+            Whether to verify data validity while parsing. Defaults to True.
+        """
+        data = [str(block).strip() for block in cls.matcher.findall(string)]
+
+        if strict:
+            cls._check_data(data)
+
+        pfile = cls()
+        pfile._data = data
+
+        return pfile
+
     def parse_structures(self) -> list[Structure]:
         """Convert all data into pymatgen Structure objects."""
         description = "Parsing POSCARs into structures"
@@ -631,7 +654,7 @@ class PoscarFile:
         )
         os.makedirs(os.path.dirname(filename), exist_ok=exist_ok)
         with open(filename, "wt", encoding="utf-8") as fp:
-            fp.write("\n".join(self._data))
+            fp.write("\n".join(self._data) + "\n")
 
 
 def is_float_string(string: str) -> bool:

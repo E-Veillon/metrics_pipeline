@@ -5,28 +5,156 @@ Functions relative to Periodic Table's (PT) elements properties.
 
 import re
 from itertools import filterfalse
-from typing import Union, List, Tuple, Literal, Sequence
+import functools as ft
+import typing as tp
+from collections.abc import Callable
 
-from pymatgen.core import SiteCollection, Composition, Element, Species, DummySpecies
+from pymatgen.core import SiteCollection, Structure, Composition, Element, Species, DummySpecies
+from pymatgen.core.periodic_table import ElementType
 from pymatgen.io.cif import CifBlock
 
 from .common_asserts import check_type
 
 
-FormulaLike = str | Sequence[str | int | Element]
+FormulaLike = str | tp.Sequence[str | int | Element]
 
-ALL_ELT_Z_TO_SYMBOL = dict(enumerate(Element.__members__, start=1))
+ALL_ELT_Z_TO_SYMBOL = dict(enumerate((str(elt) for elt in Element), start=1))
 """Dict of {Z: symbol} of all 118 elements of the periodic table."""
 
-ALL_ELT_SYMBOL_TO_Z = dict([(symbol, z) for z, symbol in enumerate(Element.__members__, start=1)])
+ALL_ELT_SYMBOL_TO_Z = dict([(symbol, z) for z, symbol in enumerate((str(elt) for elt in Element), start=1)])
 """Dict of {symbol: Z} of all 118 elements of the periodic table."""
 
-def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
+PMG_ELTS_CATEGORIES = {
+    str(elt_grp.value) for elt_grp in ElementType if elt_grp != ElementType.quadrupolar
+}
+GRP_ELTS_CATEGORIES = {f"group_{i}" for i in range(1,18)}
+PRD_ELTS_CATEGORIES = {f"period_{i}" for i in range(1,7)}
+ALL_ELTS_CATEGORIES = PMG_ELTS_CATEGORIES | GRP_ELTS_CATEGORIES | PRD_ELTS_CATEGORIES
+
+
+def get_elts_in_categories(cdts_list: list[str]) -> dict[str, int]:
+    """
+    Get symbols and atomic numbers of elements that are part of given categories.
+
+    Parameters
+    ----------
+    cdts_list: list[str]
+        List of string categories to parse.
+
+    Returns
+    -------
+    dict[str, int]
+        Dict of the form {"symbol": atomic number} containing elements that are parts of at least
+        one of given categories. If an empty list was passed, an empty dict is returned.
+    """
+    if cdts_list == []:
+        return {}
+
+    # Parse conditions
+    pmg_cdts = list(filter(lambda cdt: cdt in PMG_ELTS_CATEGORIES, cdts_list))
+    grps_set = {
+        int(cdt.split("_")[1])
+        for cdt in filter(lambda cdt: cdt in GRP_ELTS_CATEGORIES, cdts_list)
+    }
+    prds_set = {
+        int(cdt.split("_")[1])
+        for cdt in filter(lambda cdt: cdt in PRD_ELTS_CATEGORIES, cdts_list)
+    }
+    # Embed all conditions in a single lambda
+    predicate_func: Callable[[Element], bool] = lambda elt: (
+        any(getattr(elt, f"is_{cdt}")() for cdt in pmg_cdts) or
+        elt.group in grps_set or elt.row in prds_set
+    )
+    # Iterate on all elements
+    all_elts = (Element(symbol) for symbol in ALL_ELT_SYMBOL_TO_Z)
+    found_elts: dict[str, int] = dict(
+        [(elt.symbol, elt.Z) for elt in filter(predicate_func, all_elts)]
+    )
+    return found_elts
+
+
+def has_elements(
+    structure: Structure | str, elements: list[str], format: str | None = None
+) -> bool:
+    """
+    Whether the structure data contains at least one of given elements.
+
+    Parameters
+    ----------
+    struccture: Structure | str
+        The structure data to search into.
+
+    elements: list[str]
+        List of element symbols to search for.
+
+    format: str, optional
+        If `data` is passed as a str, precise the formatting ("cif" or "poscar").
+
+    Returns
+    -------
+    bool
+        `True` if the data contains at least one of the elements, else `False`.
+    """
+    if isinstance(structure, Structure):
+        return any(elt in elements for elt in structure.composition.get_el_amt_dict().keys())
+
+    if not isinstance(structure, str):
+        raise TypeError(
+            f"'data' expected a type 'Structure' or 'str', got {type(structure).__name__!r}."
+        )
+    elts_pattern = fr"({'|'.join(elements)})"
+    match format:
+        case "cif":
+            # Search for any label beginning with '_chemical_formula' containing composition
+            cif_pattern = re.compile(fr"^_chemical_formula.+{elts_pattern}.*$", flags=re.MULTILINE)
+            return re.search(cif_pattern, structure) is not None
+        case "poscar":
+            # Search in the POSCAR element line (VASP 5.0+ format)
+            return re.search(elts_pattern, structure.split("\n", maxsplit=6)[5]) is not None
+        case str():
+            raise ValueError(f"Unsupported format {format!r}.")
+        case None:
+            raise ValueError("'format' must be given when passing data as a string.")
+        case _:
+            raise TypeError(f"'format' expected a type 'str', got {type(format).__name__!r}.")
+    
+
+def filter_by_elements(
+    structures: list[Structure] | list[str], elements: list[str], format: str | None = None
+) -> tuple[list[Structure] | list[str], int]:
+    """
+    Filter structures containing at least one of given elements.
+
+    Parameters
+    ----------
+    structures: list[Structure] | list[str]
+        List of structure data to filter.
+
+    elements: list[str]
+        List of element symbols to search for.
+
+    format: str, optional
+        If structure data are passed as strings, precise the formatting ("cif" or "poscar").
+
+    Returns
+    -------
+    list[Structure] | list[str]
+        The filtered list of structure data that do not contain any searched element.
+    int
+        The number of filtered data.
+    """
+    has_elts = ft.partial(has_elements, elements=elements, format=format)
+    filtered_structs = list(filterfalse(has_elts, structures))
+    nbr_discarded = len(structures) - len(filtered_structs)
+    return filtered_structs, nbr_discarded
+
+
+def has_rare_gas(structure: SiteCollection | str) -> bool:
     """
     Searches for rare gas symbols in structural formula.
 
     Parameters:
-        structure (Union[SiteCollection, str]): A pymatgen structure or a chemical formula.
+        structure (SiteCollection | str): A pymatgen structure or a chemical formula.
 
     Returns:
         bool: True if the formula contains rare gases, False otherwise.
@@ -40,8 +168,8 @@ def has_rare_gas(structure: Union[SiteCollection, str]) -> bool:
 
 
 def discard_rare_gas_structures(
-        structures: Sequence[Union[SiteCollection, str]]
-    ) -> Tuple[List[Union[SiteCollection, str]], int]:
+        structures: tp.Sequence[SiteCollection | str]
+    ) -> tuple[list[SiteCollection | str], int]:
     """
     Eliminates structures containing rare gases and counts the number eliminated.
 
@@ -49,10 +177,10 @@ def discard_rare_gas_structures(
         structures ([SiteCollection | str]): the structure data to scan.
     
     Returns:
-        List[Union[SiteCollection, str]]: The list of data not containing rare gases.
+        List[SiteCollection | str]: The list of data not containing rare gases.
         Int: The number of structures discarded.
     """
-    check_type(structures, "structures", (Sequence,))
+    check_type(structures, "structures", (tp.Sequence,))
     for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (SiteCollection, str))
 
@@ -66,12 +194,12 @@ def discard_rare_gas_structures(
     return kept_structs, nbr_discarded
 
 
-def has_rare_earth(structure: Union[SiteCollection, str]) -> bool:
+def has_rare_earth(structure: SiteCollection | str) -> bool:
     """
     Searches for rare earth (f block elements) symbols in structural formula.
 
     Parameters:
-        structure (Union[SiteCollection, str]): A pymatgen structure or a chemical formula.
+        structure (SiteCollection | str): A pymatgen structure or a chemical formula.
 
     Returns:
         bool: True if the formula contains rare earth, False otherwise.
@@ -89,8 +217,8 @@ def has_rare_earth(structure: Union[SiteCollection, str]) -> bool:
 
 
 def discard_rare_earth_structures(
-        structures: Sequence[Union[SiteCollection, str]]
-    ) -> Tuple[List[Union[SiteCollection, str]], int]:
+        structures: tp.Sequence[SiteCollection | str]
+    ) -> tuple[list[SiteCollection | str], int]:
     """
     Eliminates structures containing rare earth elements and counts the number eliminated.
 
@@ -98,10 +226,10 @@ def discard_rare_earth_structures(
         structures ([SiteCollection | str]): the structure data to scan.
     
     Returns:
-        List[Union[SiteCollection, str]]: The list of data not containing rare earth elements.
+        List[SiteCollection | str]: The list of data not containing rare earth elements.
         Int: The number of structures discarded.
     """
-    check_type(structures, "structures", (Sequence,))
+    check_type(structures, "structures", (tp.Sequence,))
     for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (SiteCollection, str))
 
@@ -115,7 +243,7 @@ def discard_rare_earth_structures(
     return kept_structs, nbr_discarded
 
 
-def get_elements(elts_data: FormulaLike) -> List[Element|Species|DummySpecies]:
+def get_elements(elts_data: FormulaLike) -> list[Element|Species|DummySpecies]:
     """
     Flexible converter to get a list of unique Element objects from a single string or any 
     iterable providing valid element symbols, atomic numbers, Element objects, or a mixture 
@@ -137,7 +265,7 @@ def get_elements(elts_data: FormulaLike) -> List[Element|Species|DummySpecies]:
     Returns: 
         A list of parsed Element objects.
     """
-    check_type(elts_data, "elts_data", (str, Sequence))
+    check_type(elts_data, "elts_data", (str, tp.Sequence))
 
     if isinstance(elts_data, str):
         return Composition(
@@ -155,8 +283,8 @@ def get_elements(elts_data: FormulaLike) -> List[Element|Species|DummySpecies]:
 
 def get_elemental_subsets(
         main_elts_set: FormulaLike,
-        elts_subsets: Sequence[FormulaLike]
-    ) -> List[FormulaLike]:
+        elts_subsets: tp.Sequence[FormulaLike]
+    ) -> list[FormulaLike]:
     """
     Flexible function to extract all formulas from a given sequence that are fully made 
     of same elements as the given main formula. The atomic fractions are not taken into 
@@ -173,7 +301,7 @@ def get_elemental_subsets(
     Returns:
         List of the formulas fully included in the main one.
     """
-    check_type(elts_subsets, "elts_subsets", (str, Sequence))
+    check_type(elts_subsets, "elts_subsets", (str, tp.Sequence))
     for idx, data in enumerate(elts_subsets):
         check_type(data, f"elts_data[{idx}]", (str, int, Element))
 
@@ -188,9 +316,9 @@ def get_elemental_subsets(
 
 
 def get_element_group(
-        atom: Union[Element, str],
-        return_type: Literal["int", "str"] = "str"
-    ) -> Union[int, str]:
+        atom: Element | str,
+        return_type: tp.Literal["int", "str"] = "str"
+    ) -> int | str:
     """
     Finds the Periodic Table group of an element given as a string or Element object.
 
@@ -251,7 +379,7 @@ def get_element_group(
             )
 
 
-def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
+def get_all_elements_groups(structure: SiteCollection | str) -> list[str]:
     """
     Finds PT group of each element contained in a structure.
     Provided structure can either be a pymatgen SiteCollection object,
@@ -280,7 +408,7 @@ def get_all_elements_groups(structure: Union[SiteCollection, str]) -> List[str]:
     return grps_list # type: ignore
 
 
-def get_element_valence_electrons(atom: Union[str,Element]) -> int:
+def get_element_valence_electrons(atom: str | Element) -> int:
     """
     Gets the number of valence electrons of an element according to its group.
 
