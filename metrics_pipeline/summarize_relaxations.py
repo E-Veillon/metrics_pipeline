@@ -85,8 +85,8 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     check_file_format(args_dict.get("summary"), allowed_formats="json")
 
     if args_dict.get("workers") is not None:
-        check_type(args_dict.get("workers"), "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">", 0)
+        check_type(args_dict["workers"], "workers", (int,))
+        check_num_value(args_dict["workers"], "workers", ">", 0)
 
     # Additional arguments processing
     args_dict["summarypath"] = str(Path(args_dict["base_dir"], args_dict["summary"]).resolve())

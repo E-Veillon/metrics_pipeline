@@ -335,15 +335,15 @@ class CIFFile:
         description = "Converting structures to CIF"
 
         if workers == 0:
-                cif_strings = [
-                    self._convert_to_cif(structure, *args, **kwargs)
-                    for structure in VisualIterator(
-                        structures,
-                        desc=description,
-                        unit="converted",
-                        percent=True
-                    )
-                ]
+            cif_strings = [
+                self._convert_to_cif(structure, *args, **kwargs)
+                for structure in VisualIterator(
+                    structures,
+                    desc=description,
+                    unit="converted",
+                    percent=True
+                )
+            ]
         else:
             convert_to_cif = ft.partial(self._convert_to_cif, *args, **kwargs)
             cif_strings = process_map(

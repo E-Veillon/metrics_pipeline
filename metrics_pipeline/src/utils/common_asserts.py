@@ -14,32 +14,28 @@ CompareStr = tp.Union[
     tp.Literal[">"],
 ]
 
-
-def _get_class_name(class_str: str) -> str:
-    """Extract the class name from a string of the form '<class 'name'>'."""
-    return class_str.split()[-1].rstrip(">")
-
-
 def check_type(
     obj: tp.Any, obj_name: str, wanted_types: tp.Tuple[tp.Type, ...]
 ) -> None:
     """Check whether the type of passed object matches wanted type."""
-    if not isinstance(obj, wanted_types):
-        obj_type = _get_class_name(str(type(obj)))
+    if isinstance(obj, wanted_types):
+        return
 
-        wanted_str_types = ""
-        for allowed_type in wanted_types[:-1]:
-            str_type = _get_class_name(str(allowed_type))
-            wanted_str_types += f"{str_type}, "
-        wanted_str_types += f"or {_get_class_name(str(wanted_types[-1]))}"
+    obj_type = type(obj).__name__
 
-        raise TypeError(
-            f"'{obj_name}' argument expected a type {wanted_str_types}, "
-            f"got {obj_type} instead."
-        )
+    wanted_str_types = ""
+    for allowed_type in wanted_types[:-1]:
+        str_type = allowed_type.__name__
+        wanted_str_types += f"{str_type}, "
+    wanted_str_types += f"or {wanted_types[-1].__name__}"
+
+    raise TypeError(
+        f"'{obj_name}' argument expected a type {wanted_str_types}, "
+        f"got {obj_type} instead."
+    )
 
 def check_num_value(
-    val: int|float|None, val_name: str, cdt: CompareStr = "==", ref_val: int|float = 0
+    val: int | float, val_name: str, cdt: CompareStr = "==", ref_val: int | float = 0
 ) -> None:
     """
     Test given condition on given numeric value (int or float),
@@ -56,7 +52,6 @@ def check_num_value(
         ref_val (int|float):    The value to compare 'val' to. Defaults to 0.
     """
     check_type(val, val_name, (int, float))
-    assert val is not None, "Never triggered, used for type checker."
     check_type(val_name, "val_name", (str,))
     check_type(ref_val, "ref_val", (int, float))
 

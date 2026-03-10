@@ -67,16 +67,16 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="cif")
     check_file_format(args_dict.get("output"), allowed_formats="poscar")
     check_type(args_dict.get("save_header"), "save_header", (bool,))
-    check_type(args_dict.get("significant_figures"), "significant_figures", (int,))
-    check_num_value(args_dict.get("significant_figures"), "significant_figures", ">=", 4)
-    check_num_value(args_dict.get("significant_figures"), "significant_figures", "<=", 20)
+    check_type(args_dict["significant_figures"], "significant_figures", (int,))
+    check_num_value(args_dict["significant_figures"], "significant_figures", ">=", 4)
+    check_num_value(args_dict["significant_figures"], "significant_figures", "<=", 20)
 
     args_dict["input_file"] = os.path.abspath(os.path.realpath(args_dict["input_file"]))
     args_dict["output"] = os.path.abspath(os.path.realpath(args_dict["output"]))
 
     if args_dict.get("workers") is not None and not args_dict.get("sequential", False):
-        check_type(args_dict.get("workers"), "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">", 0)
+        check_type(args_dict["workers"], "workers", (int,))
+        check_num_value(args_dict["workers"], "workers", ">", 0)
 
     # Print final configuration
     print(" ")

@@ -140,13 +140,13 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
         check_type(args_dict.get("summary_key"), "summary_key", (str,))
 
     check_file_format(args_dict.get("summary"), allowed_formats="json")
-    check_type(args_dict.get("limit"), "limit", (float,))
-    check_num_value(args_dict.get("limit"), "limit", ">=", 0.0)
+    check_type(args_dict["limit"], "limit", (float,))
+    check_num_value(args_dict["limit"], "limit", ">=", 0.0)
     check_type(args_dict.get("compact"), "compact", (bool,))
 
     if args_dict.get("workers") is not None:
-        check_type(args_dict.get("workers"), "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">=", 0)
+        check_type(args_dict["workers"], "workers", (int,))
+        check_num_value(args_dict["workers"], "workers", ">=", 0)
 
     # Additional arguments processing
     args_dict["limit"] = round(args_dict["limit"], 8)

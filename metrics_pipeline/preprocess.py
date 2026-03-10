@@ -162,15 +162,15 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
 
     # Assert set arguments conformity
     check_file_format(args_dict.get("output"), allowed_formats="cif")
-    if args_dict.get("dist_tolerance") != "radii":
-        check_type(args_dict.get("dist_tolerance"), "dist_tolerance", (float,))
-        check_num_value(args_dict.get("dist_tolerance"), "dist_tolerance", ">", 0.0)
-    check_type(args_dict.get("symprec"), "symprec", (float,))
-    check_num_value(args_dict.get("symprec"), "symprec", ">=", 0.0)
-    check_num_value(args_dict.get("symprec"), "symprec", "<=", 1.0)
-    check_type(args_dict.get("angleprec"), "angleprec", (float,))
-    check_num_value(args_dict.get("angleprec"), "angleprec", ">=", 0.0)
-    check_num_value(args_dict.get("angleprec"), "angleprec", "<=", 90.0)
+    if args_dict["dist_tolerance"] != "radii":
+        check_type(args_dict["dist_tolerance"], "dist_tolerance", (float,))
+        check_num_value(args_dict["dist_tolerance"], "dist_tolerance", ">", 0.0)
+    check_type(args_dict["symprec"], "symprec", (float,))
+    check_num_value(args_dict["symprec"], "symprec", ">=", 0.0)
+    check_num_value(args_dict["symprec"], "symprec", "<=", 1.0)
+    check_type(args_dict["angleprec"], "angleprec", (float,))
+    check_num_value(args_dict["angleprec"], "angleprec", ">=", 0.0)
+    check_num_value(args_dict["angleprec"], "angleprec", "<=", 90.0)
 
     args_dict["input_file"] = os.path.abspath(os.path.realpath(args_dict["input_file"]))
     args_dict["output"] = os.path.abspath(os.path.realpath(args_dict["output"]))
@@ -181,8 +181,8 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
             check_type(elt, f"special_keys[{idx}]", (str,))
 
     if args_dict.get("workers") is not None:
-        check_type(args_dict.get("workers"), "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">=", 0)
+        check_type(args_dict["workers"], "workers", (int,))
+        check_num_value(args_dict["workers"], "workers", ">=", 0)
 
     # Print final configuration
     print(" ")
@@ -204,7 +204,7 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     print(f"CHECK INTERATOMIC DISTANCES: {not args_dict.get('no_dist_check')}")
     dist_tol = (
         f"{args_dict.get('dist_tolerance')} Angstroms"
-        if isinstance(args_dict.get("dist_tolerance"), float)
+        if isinstance(args_dict["dist_tolerance"], float)
         else f"{args_dict.get('dist_tolerance')!r}"
     )
     print(

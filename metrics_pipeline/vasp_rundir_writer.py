@@ -142,8 +142,8 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
         args_dict["user_settings"] = load_yaml_as_dict(config_path)
 
     if args_dict.get("workers") is not None:
-        check_type(args_dict.get("workers"), "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">", 0)
+        check_type(args_dict["workers"], "workers", (int,))
+        check_num_value(args_dict["workers"], "workers", ">", 0)
 
     # Additional arguments processing
     os.makedirs(args_dict["output"], exist_ok=True)

@@ -113,11 +113,11 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     check_type(args_dict["id_key"], "id_key", (str,))
 
     if args_dict.get("workers") is not None:
-        check_type(args_dict.get("workers"), "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">", 0)
+        check_type(args_dict["workers"], "workers", (int,))
+        check_num_value(args_dict["workers"], "workers", ">", 0)
     
-    check_type(args_dict.get("dist_tolerance"), "dist_tolerance", (float,))
-    check_num_value(args_dict.get("dist_tolerance"), "dist_tolerance", ">", 0.0)
+    check_type(args_dict["dist_tolerance"], "dist_tolerance", (float,))
+    check_num_value(args_dict["dist_tolerance"], "dist_tolerance", ">", 0.0)
 
     return args_dict
 

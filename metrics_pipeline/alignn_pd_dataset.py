@@ -92,8 +92,8 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     check_file_format(args_dict["output"], allowed_formats="json")
 
     if args_dict.get("workers") is not None:
-        check_type(args_dict.get("workers"), "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">=", 0)
+        check_type(args_dict["workers"], "workers", (int,))
+        check_num_value(args_dict["workers"], "workers", ">=", 0)
     
     check_type(args_dict["on_error"], "on_error", (str,))
     assert args_dict["on_error"].lower() in {"raise", "warn", "ignore"}, ValueError(
