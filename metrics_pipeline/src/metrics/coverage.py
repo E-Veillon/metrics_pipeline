@@ -57,10 +57,9 @@ class Coverage(Metric):
         ref_structs: list[Structure]
             Known structures to use as reference distribution.
 
-        transform: StructureFingerprint
+        transform: StructureDistribution
             A callable taking a list of Structure objects and eventual keyword arguments and
-            returning a list of numpy arrays representing structures fingerprints. Can return
-            `None` for structures that could not be converted (e.g. weird unphysical structures).
+            returning a numpy arrays of structures fingerprints.
 
         compute_precision: bool
             Whether to compute the Precision metric. Defaults to True.

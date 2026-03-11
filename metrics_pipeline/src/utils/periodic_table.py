@@ -24,12 +24,52 @@ ALL_ELT_Z_TO_SYMBOL = dict(enumerate((str(elt) for elt in Element), start=1))
 ALL_ELT_SYMBOL_TO_Z = dict([(symbol, z) for z, symbol in enumerate((str(elt) for elt in Element), start=1)])
 """Dict of {symbol: Z} of all 118 elements of the periodic table."""
 
+ELEMENT_TUPLE: dict[str | int, tuple[str, int]] = (
+    {z: (symbol, z) for z, symbol in enumerate((str(elt) for elt in Element), start=1)} |
+    {symbol: (symbol, z) for z, symbol in enumerate((str(elt) for elt in Element), start=1)}
+)
+"""
+Convenient dict to get the (symbol, Z) pair corresponding to any passed
+valid chemical element symbol or Z.
+"""
+
 PMG_ELTS_CATEGORIES = {
     str(elt_grp.value) for elt_grp in ElementType if elt_grp != ElementType.quadrupolar
 }
 GRP_ELTS_CATEGORIES = {f"group_{i}" for i in range(1,18)}
 PRD_ELTS_CATEGORIES = {f"period_{i}" for i in range(1,7)}
 ALL_ELTS_CATEGORIES = PMG_ELTS_CATEGORIES | GRP_ELTS_CATEGORIES | PRD_ELTS_CATEGORIES
+
+
+def get_elts_from_symbol_or_z(symbols_or_z: list[str | int]) -> dict[str, int]:
+    """
+    Get symbols and atomic numbers of specified elements symbol or atomic number.
+
+    Parameters
+    ----------
+    symbols_or_z: list[str | int]
+        List of element symbols or atomic numbers to parse.
+
+    Returns
+    -------
+    dict[str, int]
+        Dict of the form {"symbol": atomic number} containing specified elements.
+        If an empty list is passed, an empty dict is returned.
+    """
+    if symbols_or_z == []:
+        return {}
+    
+    elts_dict = {}
+    for elt in symbols_or_z:
+        elt = int(elt) if isinstance(elt, str) and elt.isdecimal() else elt
+        try:
+            symbol, z = ELEMENT_TUPLE[elt]
+        except KeyError:
+            raise ValueError(f"Given symbol or atomic number {elt!r} is not a valid element.")
+
+        elts_dict[symbol] = z
+
+    return elts_dict
 
 
 def get_elts_in_categories(cdts_list: list[str]) -> dict[str, int]:
@@ -45,7 +85,7 @@ def get_elts_in_categories(cdts_list: list[str]) -> dict[str, int]:
     -------
     dict[str, int]
         Dict of the form {"symbol": atomic number} containing elements that are parts of at least
-        one of given categories. If an empty list was passed, an empty dict is returned.
+        one of given categories. If an empty list is passed, an empty dict is returned.
     """
     if cdts_list == []:
         return {}
@@ -117,7 +157,17 @@ def has_elements(
             raise ValueError("'format' must be given when passing data as a string.")
         case _:
             raise TypeError(f"'format' expected a type 'str', got {type(format).__name__!r}.")
-    
+
+
+@tp.overload
+def filter_by_elements(
+    structures: list[Structure], elements: list[str], format: str | None = None
+) -> tuple[list[Structure], int]: ...
+
+@tp.overload
+def filter_by_elements(
+    structures: list[str], elements: list[str], format: str | None = None
+) -> tuple[list[str], int]: ...
 
 def filter_by_elements(
     structures: list[Structure] | list[str], elements: list[str], format: str | None = None

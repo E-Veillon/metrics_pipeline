@@ -59,13 +59,16 @@ class SUN(Metric):
         self.ltol = kwargs.pop("ltol", 0.2)
         self.stol = kwargs.pop("stol", 0.3)
         self.angle_tol = kwargs.pop("angle_tol", 5.0)
+        self.workers = kwargs.pop("workers", None)
 
         self._compute()
 
     def _compute(self) -> None:
-        stability = Stability(self.structures, self.ref_structs, self.stable_tol)
-        unicity = Unicity(self.structures, self.ltol, self.stol, self.angle_tol)
-        novelty = Novelty(self.structures, self.ref_structs, self.ltol, self.stol, self.angle_tol)
+        stability = Stability(self.structures, self.ref_structs, self.stable_tol, self.workers)
+        unicity = Unicity(self.structures, self.ltol, self.stol, self.angle_tol, self.workers)
+        novelty = Novelty(
+            self.structures, self.ref_structs, self.ltol, self.stol, self.angle_tol, self.workers
+        )
         for struct in self.structures:
             struct.properties[self.stable_key] = struct in stability.stable_structs
             struct.properties[self.unique_key] = (
@@ -116,10 +119,10 @@ class SUN(Metric):
 
     def get_computed_subset(
         self,
-        stable: bool | None = True,
-        unique: bool | None = True,
-        novel: bool | None = True,
-        unmatchable: bool | None = False
+        stable: bool | None = None,
+        unique: bool | None = None,
+        novel: bool | None = None,
+        unmatchable: bool | None = None
     ) -> list[Structure]:
         """
         Get a subset of computed structures according to given metrics flags.
@@ -130,25 +133,25 @@ class SUN(Metric):
             - If set to True, only return structures that passed the Stability metric.
             - If set to False, only return structures that failed the Stability metric.
             - If set to None, return structures indifferently for this metric.
-            Defaults to True.
+            Defaults to None.
 
         unique: bool or None
             - If set to True, only return structures that passed the Unicity metric.
             - If set to False, only return structures that failed the Unicity metric.
             - If set to None, return structures indifferently for this metric.
-            Defaults to True.
+            Defaults to None.
 
         novel: bool or None
             - If set to True, only return structures that passed the Novelty metric.
             - If set to False, only return structures that failed the Novelty metric.
             - If set to None, return structures indifferently for this metric.
-            Defaults to True.
+            Defaults to None.
 
         unmatchable: bool or None
             - If set to True, only return structures that could not be matched.
             - If set to False, only return structures that could be matched.
             - If set to None, return structures indifferently for this metric.
-            Defaults to False.
+            Defaults to None.
 
         Returns
         -------
@@ -157,9 +160,8 @@ class SUN(Metric):
 
         Notes
         -----
-        - The default behavior returns matched S.U.N. structures only.
-        - Passing `None` to all metrics is equivalent to the `computed_structs`
-        property return.
+        - Passing `None` to all metrics (default) is equivalent to calling the
+        `computed_structs` property.
         """
         if stable is None and unique is None and novel is None and unmatchable is None:
             return self.computed_structs
@@ -178,15 +180,14 @@ class SUN(Metric):
     def write_result(self, filename: str, verbose: bool = False) -> None:
         subsets: OrderedDict[str, list[Structure]] = OrderedDict(
             [
-                ("Stable", self.get_computed_subset(unique=None, novel=None)),
-                ("Unique", self.get_computed_subset(stable=None, novel=None)),
-                ("Novel",  self.get_computed_subset(stable=None, unique=None)),
-                ("Stable Unique", self.get_computed_subset(novel=None)),
-                ("Stable Novel", self.get_computed_subset(unique=None)),
-                ("Unique Novel", self.get_computed_subset(stable=None)),
-                ("S.U.N.", self.get_computed_subset()),
-                ("Unmatchable", self.get_computed_subset(
-                    stable=None, unique=None, novel=None, unmatchable=True))
+                ("Stable", self.get_computed_subset(stable=True)),
+                ("Unique", self.get_computed_subset(unique=True)),
+                ("Novel",  self.get_computed_subset(novel=True)),
+                ("Stable Unique", self.get_computed_subset(stable=True, unique=True)),
+                ("Stable Novel", self.get_computed_subset(stable=True, novel=True)),
+                ("Unique Novel", self.get_computed_subset(unique=True, novel=True)),
+                ("S.U.N.", self.get_computed_subset(stable=True, unique=True, novel=True)),
+                ("Unmatchable", self.get_computed_subset(unmatchable=True))
             ]
         )
         self._write_filter_metric_result(filename, subsets, verbose)

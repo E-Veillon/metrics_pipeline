@@ -15,18 +15,13 @@ import typing as tp
 from datetime import datetime
 import argparse as ap
 
-# TODO: reorganize behavior between metrics.py and this script
 from src.utils import (
     parse_input_args, check_type, check_num_value,
-    discard_rare_gas_structures, discard_rare_earth_structures,
-    ALL_ELT_Z_TO_SYMBOL, ALL_ELT_SYMBOL_TO_Z,
-    ALL_ELTS_CATEGORIES, get_elts_in_categories,
+    ALL_ELTS_CATEGORIES,
+    get_elts_from_symbol_or_z, get_elts_in_categories,
     filter_by_elements
 )
 from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile
-from src.metrics import (
-    StructValidity, Viability, Symmetry, Unicity
-)
 
 
 def _get_command_line_args() -> ap.Namespace:
@@ -155,16 +150,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     # Parse forbidden elements
     forbidden_elts = get_elts_in_categories(args_dict["remove_elt_categories"])
-
-    for elt in args_dict["remove_elts"]:
-        try:
-            symbol = ALL_ELT_Z_TO_SYMBOL[int(elt)] if elt.isdecimal() else elt
-            z = elt if elt.isdecimal() else ALL_ELT_SYMBOL_TO_Z[elt]
-        except KeyError:
-            raise ValueError(f"Given symbol or atomic number {elt!r} is not a valid element.")
-
-        forbidden_elts[symbol] = z
-
+    forbidden_elts.update(get_elts_from_symbol_or_z(args_dict["remove_elts"]))
     args_dict["forbidden_elts"] = forbidden_elts
 
     return args_dict
