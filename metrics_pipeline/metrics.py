@@ -188,8 +188,8 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     if args_dict.get("workers") is not None:
         check_type(args_dict["workers"], "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">", 0)
-    check_num_value(args_dict.get("threshold"), "threshold", ">", 0.0)
+        check_num_value(args_dict["workers"], "workers", ">=", 0)
+    check_num_value(args_dict["threshold"], "threshold", ">", 0.0)
 
     return args_dict
 
@@ -612,46 +612,46 @@ def main(standalone: bool = True, **kwargs) -> None:
         print(f"RMSD = {dft_metrics['RMSD']}")
 
     if CONFIG.get("COV-P", False) or CONFIG.get("COV-R", False):
-        # Compute Coverage (Precision, Recall) FIXME: temporary debug by rollback to <2.0 behavior
+        # Compute Coverage (Precision, Recall)
         print("Computing fingerprints for Coverage metrics...")
-        fingerprint_dataset = get_crystalnn_fingerprints(dataset, workers=args.get("workers"))
-        fingerprint_gen = get_crystalnn_fingerprints(generated, workers=args.get("workers"))
+        #fingerprint_dataset = get_crystalnn_fingerprints(dataset, workers=args.get("workers"))
+        #fingerprint_gen = get_crystalnn_fingerprints(generated, workers=args.get("workers"))
 
-        fingerprint_dataset, fingerprint_gen = map(np.array,zip(
-            *filter(
-                lambda x: x[0] is not None and x[1] is not None,
-                zip(fingerprint_dataset, fingerprint_gen),
-            )
-        ))
+        #fingerprint_dataset, fingerprint_gen = map(np.array,zip(
+        #    *filter(
+        #        lambda x: x[0] is not None and x[1] is not None,
+        #        zip(fingerprint_dataset, fingerprint_gen),
+        #    )
+        #))
 
-        if CONFIG.get("COV-P", False):
-            print("Computing Coverage (Precision)...")
-            distance = Coverage._get_distance_closest(
-                fingerprint_gen, fingerprint_dataset
-            )
-            mask = distance < args["threshold"]
-            ml_metrics["precision"] = mask.astype(np.float32).mean().item()
+        #if CONFIG.get("COV-P", False):
+        #    print("Computing Coverage (Precision)...")
+        #    distance = Coverage._get_distance_closest(
+        #        fingerprint_gen, fingerprint_dataset
+        #    )
+        #    mask = distance < args["threshold"]
+        #    ml_metrics["precision"] = mask.astype(np.float32).mean().item()
         
-            print(f"COV-P = {ml_metrics['precision']}")
+        #    print(f"COV-P = {ml_metrics['precision']}")
 
-        if CONFIG.get("COV-R", False):
-            print("Computing Coverage (Recall)...")
-            distance = Coverage._get_distance_closest(
-                fingerprint_dataset, fingerprint_gen
-            )
-            mask = distance < args["threshold"]
-            ml_metrics["recall"] = mask.astype(np.float32).mean().item()
-            print(f"COV-R = {ml_metrics['recall']}")
-        #coverage = Coverage(
-        #    generated, dataset,
-        #    transform=get_crystalnn_fingerprints, # type: ignore # TODO: Figure out how to use Protocols properly
-        #    compute_precision=CONFIG.get("COV-P", False),
-        #    compute_recall=CONFIG.get("COV-R", False),
-        #    threshold=args["threshold"],
-        #    workers=args.get("workers")
-        #)
-        #ml_metrics["precision"] = coverage.precision
-        #ml_metrics["recall"] = coverage.recall
+        #if CONFIG.get("COV-R", False):
+        #    print("Computing Coverage (Recall)...")
+        #    distance = Coverage._get_distance_closest(
+        #        fingerprint_dataset, fingerprint_gen
+        #    )
+        #    mask = distance < args["threshold"]
+        #    ml_metrics["recall"] = mask.astype(np.float32).mean().item()
+        #    print(f"COV-R = {ml_metrics['recall']}")
+        coverage = Coverage(
+            generated, dataset,
+            transform=get_crystalnn_fingerprints,
+            compute_precision=CONFIG.get("COV-P", False),
+            compute_recall=CONFIG.get("COV-R", False),
+            threshold=args["threshold"],
+            workers=args.get("workers")
+        )
+        ml_metrics["precision"] = coverage.precision
+        ml_metrics["recall"] = coverage.recall
 
     if CONFIG.get("FAD", False):
         # Compute Fréchet ALIGNN Distance
@@ -659,7 +659,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         frechet_distance = FrechetDistance(
             structures=generated,
             ref_structs=dataset,
-            transform=vectors_from_alignn, # type: ignore # TODO: Figure out how to use Protocols properly
+            transform=vectors_from_alignn,
             output="latent"
         )
         ml_metrics["frechet_distance"] = frechet_distance.computed_distance
@@ -671,7 +671,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         emd_energy = EMD(
             structures=generated,
             ref_structs=dataset,
-            transform=vectors_from_alignn, # type: ignore # TODO: Figure out how to use Protocols properly
+            transform=vectors_from_alignn,
             output="energy"
         )
         ml_metrics["EMD_energy"] = emd_energy.computed_distance
@@ -683,7 +683,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         emd_density = EMD(
             structures=generated,
             ref_structs=dataset,
-            transform=get_densities # type: ignore # TODO: Figure out how to use Protocols properly
+            transform=get_densities
         )
         ml_metrics["EMD_density"] = emd_density.computed_distance
         print(f"Density EMD = {ml_metrics['EMD_density']}")

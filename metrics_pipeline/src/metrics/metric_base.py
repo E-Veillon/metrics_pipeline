@@ -14,7 +14,7 @@ class StructureDistribution(tp.Protocol):
     Any callable taking a list of Structure objects and eventual keyword arguments
     and returning a numpy array representation of the structures distribution.
     """
-    def __call__(self, structures: list[Structure], **kwargs) -> np.ndarray:
+    def __call__(self, structures: list[Structure], *args, **kwargs) -> np.ndarray:
         ...
 
 
