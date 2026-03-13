@@ -131,9 +131,18 @@ class PoscarBlock:
         return True
 
     # ===== I/O methods =====
-    def get_structure(self) -> Structure:
+    def get_structure(self, save_header: bool = False) -> Structure:
         """Get the pymatgen Structure object corresponding to data."""
-        return Poscar.from_str(str(self), read_velocities=False).structure
+        species = sum([[elt] * count for elt, count in zip(self.elements, self.elts_count)], [])
+        return Structure(
+            lattice=self.lattice,
+            species=species,
+            coords=self.positions,
+            validate_proximity=False,
+            to_unit_cell=False,
+            coords_are_cartesian=self.positions_basis[0] in "cCkK",
+            properties={"header": self.header} if save_header else None
+        )
 
     @classmethod
     def from_structure(cls, structure: Structure, header: str | None = None, decimals: int = 8) -> tpe.Self:
@@ -350,7 +359,7 @@ class PoscarFile:
     def _get_attr_from_cache(self, cache_attr: str) -> str:
         return cache_attr.lstrip("_").replace("_cache", "")
 
-    def _create_empty_instance(self, workers) -> None:
+    def _create_empty_instance(self, workers: int | None = None) -> None:
         """Create empty instance to populate manually."""
         self.filename = None
         self.cache = True
@@ -509,7 +518,7 @@ class PoscarFile:
 
     # ===== I/O methods =====
     @classmethod
-    def from_str(cls, string: str, strict: bool = True) -> tpe.Self:
+    def from_str(cls, string: str, strict: bool = True, workers: int | None = None) -> tpe.Self:
         """
         Create a file from already formatted strings.
         
@@ -526,7 +535,7 @@ class PoscarFile:
         if strict:
             cls._check_data(data)
 
-        pfile = cls()
+        pfile = cls(workers)
         pfile._data = data
 
         return pfile

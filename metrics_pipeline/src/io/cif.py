@@ -104,9 +104,9 @@ class CIFFile:
 
     def _parse_structure(self, cif: str) -> Structure | None:
         """Parse a Structure object from a CIF string. Return None if parsing fails."""
-        parser = CifParser.from_str(cif)
+        parser = CifParser.from_str(cif, site_tolerance=0.0)
         try:
-            structure = parser.parse_structures(primitive=False, on_error="raise")[0]
+            structure = parser.parse_structures(primitive=False, check_occu=False, on_error="raise")[0]
         except ValueError:
             return None
 
@@ -283,7 +283,7 @@ class CIFFile:
             saved_data = []
             for key in self.special_keys:
                 if key == "header":
-                    cif_block.header = structure.properties[key]
+                    cif_block.header = structure.properties[key].replace(" ", "_")
                 else:
                     saved_data.append((key, structure.properties[key]))
             saved_data.extend(list(cif_block.data.items()))

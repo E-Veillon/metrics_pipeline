@@ -48,7 +48,7 @@ def check_file_format(
         allowed_formats = (allowed_formats,)
 
     filename = str(filename)
-    file_format = os.path.splitext(filename)[1]
+    file_format = os.path.splitext(filename)[1].lstrip(".")
 
     if all(file_format != ext for ext in allowed_formats):
         plural = "s are" if len(allowed_formats) > 1 else " is"
