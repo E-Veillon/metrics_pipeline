@@ -535,7 +535,7 @@ class PoscarFile:
         if strict:
             cls._check_data(data)
 
-        pfile = cls(workers)
+        pfile = cls(workers=workers)
         pfile._data = data
 
         return pfile
