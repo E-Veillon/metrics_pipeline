@@ -3,6 +3,7 @@ Read and parse concatenated minimal POSCAR formatted structures from a file.
 """
 
 import os
+from io import StringIO
 import re
 import typing as tp
 import typing_extensions as tpe
@@ -248,7 +249,7 @@ class PoscarFile:
     positions informations.
     Each poscar structure has to begin by a comment line starting with "#".
     """
-    filename: PathLike | None
+    filename: PathLike | StringIO | None
     _data: list[str]
     matcher: re.Pattern = re.compile(r"^#.*?$(?=\n#|\Z)", re.MULTILINE | re.DOTALL)
 
@@ -263,7 +264,7 @@ class PoscarFile:
 
     def __init__(
         self,
-        filename: PathLike | None = None,
+        filename: PathLike | StringIO | None = None,
         strict: bool = True,
         cache: bool = True,
         cache_all: bool = False,
@@ -303,14 +304,11 @@ class PoscarFile:
             self._create_empty_instance(workers)
 
         else:
-            if not os.path.isfile(filename):
-                    raise FileNotFoundError(f"{filename}: No such file found.")
-
+            self._data = self._parse_file_data(filename, strict)
             self.filename = filename
             self.cache = cache
             self.cache_all = cache_all
             self.workers = workers
-            self._data = self._parse_file_data(filename, strict)
 
             if self.cache_all:
                 for cache_attr in self._cache_list:
@@ -344,11 +342,19 @@ class PoscarFile:
                     f"See below for details:\n{exc}"
                 )
 
-    def _parse_file_data(self, filename: PathLike, strict: bool = True) -> list[str]:
+    def _parse_file_data(self, filename: PathLike | StringIO, strict: bool = True) -> list[str]:
         """Read the file and parse poscar structures."""
-        with open(filename, "rt", encoding="utf-8") as fp:
-            file_data = fp.read()
-
+        match filename:
+            case str():
+                with open(filename, "rt", encoding="utf-8") as fp:
+                    file_data = fp.read()
+            case StringIO():
+                file_data = filename.read()
+            case _:
+                raise TypeError(
+                    "'filename' expected a type 'str' or 'StringIO', "
+                    f"got {type(filename).__name__!r}."
+                )
         data = [str(block).strip() for block in self.matcher.findall(file_data)]
 
         if strict:
@@ -518,27 +524,19 @@ class PoscarFile:
 
     # ===== I/O methods =====
     @classmethod
-    def from_str(cls, string: str, strict: bool = True, workers: int | None = None) -> tpe.Self:
+    def from_str(cls, string: str, **kwargs) -> tpe.Self:
         """
         Create a file from already formatted strings.
         
         Parameters
         ----------
-        strings: str
+        string: str
             (concatenated) POSCAR formatted string to get into the file.
 
-        strict: bool
-            Whether to verify data validity while parsing. Defaults to True.
+        **kwargs: Any
+            Additional keyword arguments to pass to the constructor.
         """
-        data = [str(block).strip() for block in cls.matcher.findall(string)]
-
-        if strict:
-            cls._check_data(data)
-
-        pfile = cls(workers=workers)
-        pfile._data = data
-
-        return pfile
+        return cls(StringIO(string), **kwargs)
 
     def parse_structures(self) -> list[Structure]:
         """Convert all data into pymatgen Structure objects."""
