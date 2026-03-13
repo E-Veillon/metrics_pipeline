@@ -70,57 +70,68 @@ class PoscarBlock:
 
     @staticmethod
     def _check_string(string: str) -> None:
-        """Assertions to verify if given string conforms to POSCAR formatting."""
+        """Verify if given string conforms to POSCAR formatting."""
         lines = string.strip().splitlines()
-        assert len(lines) >= 9, ValueError(
+        if len(lines) < 9:
+            raise ValueError(
             "Given string must contain at least 9 lines to be a valid POSCAR: "
             "1 header, 1 scale factor, 3 lattice vectors, 1 element list, "
             "1 element counts list, 1 position basis ('direct' or 'cartesian'), "
             "and at least 1 atomic position."
         )
-        assert lines[0].startswith("#"), ValueError(
-            f"1st line must be a header comment line starting with a '#', got {lines[0]!r}."
+        if not lines[0].startswith("#"):
+            raise ValueError(
+                f"1st line must be a header comment line starting with a '#', got {lines[0]!r}."
         )
-        assert is_float_string(lines[1]), ValueError(
-            f"2nd line must be a floating point number, got {lines[1]!r}."
+        if not is_float_string(lines[1]):
+            raise ValueError(
+                f"2nd line must be a floating point number, got {lines[1]!r}."
         )
         for idx, line in enumerate(lines[2:5], start=1):
             coeffs = line.split()
             all_floats = all(is_float_string(coeff) for coeff in coeffs)
-            assert len(coeffs) == 3 and all_floats, ValueError(
-                f"Lattice vector line {idx} must be 3 floating point numbers, got {line!r}."
+            if not (len(coeffs) == 3 and all_floats):
+                raise ValueError(
+                    f"Lattice vector line {idx} must be 3 floating point numbers, got {line!r}."
             )
         valid_elements = set(ALL_ELT_SYMBOL_TO_Z)
-        assert all(elt in valid_elements for elt in lines[5].split()), ValueError(
-            "6th line contains data that is not a valid element symbol. "
-            f"Line got: {lines[5]!r}."
+        if not all(elt in valid_elements for elt in lines[5].split()):
+            raise ValueError(
+                "6th line contains data that is not a valid element symbol. "
+                f"Line got: {lines[5]!r}."
         )
-        assert all(s.isdecimal() for s in lines[6].split()), ValueError(
-            "7th line contains data that is not an integer. "
-            f"Line got: {lines[6]!r}."
+        if not all(s.isdecimal() for s in lines[6].split()):
+            raise ValueError(
+                "7th line contains data that is not an integer. "
+                f"Line got: {lines[6]!r}."
         )
-        assert len(lines[5].split()) == len(lines[6].split()), ValueError(
-            "6th and 7th lines should have the same number of data, "
-            f"got {len(lines[5].split())} for 6th line and {len(lines[6].split())} for 7th line."
+        if len(lines[5].split()) != len(lines[6].split()):
+            raise ValueError(
+                "6th and 7th lines should have the same number of data, "
+                f"got {len(lines[5].split())} for 6th line and {len(lines[6].split())} for 7th line."
         )
-        assert lines[7] in {"direct", "cartesian"}, ValueError(
-            f"8th line should be either 'direct' or 'cartesian', got {lines[7]!r}."
+        if lines[7] not in {"direct", "cartesian"}:
+            raise ValueError(
+                f"8th line should be either 'direct' or 'cartesian', got {lines[7]!r}."
         )
         elts_list = get_element_list(lines[5].split(), list(map(int, lines[6].split())))
-        assert len(elts_list) == len(lines[8:]), ValueError(
-            f"Declared number of atoms ({len(elts_list)}) does not match with the number "
-            f"of atomic positions ({len(lines[8:])})."
+        if len(elts_list) != len(lines[8:]):
+            raise ValueError(
+                f"Declared number of atoms ({len(elts_list)}) does not match with the number "
+                f"of atomic positions ({len(lines[8:])})."
         )
         for idx, atom_line in enumerate(lines[8:]):
             position_str = atom_line.split()
             if len(position_str) == 4 and position_str[3] in valid_elements:
-                assert position_str[3] == elts_list[idx], ValueError(
-                    f"Element shown next to atomic position line {idx + 1} does not match "
-                    "with global element order."
+                if position_str[3] != elts_list[idx]:
+                    raise ValueError(
+                        f"Element shown next to atomic position line {idx + 1} does not match "
+                        "with global element order."
                 )
                 position_str = position_str[:3]
-            assert len(position_str) == 3, ValueError(
-                f"The number of position values is not 3 for atomic position line {idx + 1}."
+            if len(position_str) != 3:
+                raise ValueError(
+                    f"The number of position values is not 3 for atomic position line {idx + 1}."
             )
 
     def is_valid(self) -> bool:
@@ -181,8 +192,9 @@ class PoscarBlock:
         str
             POSCAR formatted string of data.
         """
-        assert decimals > 0, ValueError(
-            f"{self.as_string.__qualname__}: 'decimals' argument must be > 0."
+        if decimals <= 0:
+            raise ValueError(
+                f"{self.as_string.__qualname__}: 'decimals' argument must be > 0."
         )
         lines = [f"# {self.header}"]
         lines.append(f"{self.scale_factor}")
@@ -392,25 +404,16 @@ class PoscarFile:
             Number of decimals to keep in the string representation of the PoscarBlock
             for lattice vectors and atomic positions. Defaults to 8.
         """
-        assert block.is_valid(), ValueError(
-            "Given PoscarBlock is not filled with valid data only. "
-            "It is not added to the PoscarFile in order to avoid file's data corruption."
+        if not block.is_valid():
+            raise ValueError(
+                "Given PoscarBlock is not filled with valid data only. "
+                "It is not added to the PoscarFile in order to avoid file's data corruption."
         )
         self._data.append(block.as_string(decimals))
+        
+        # Invalidate all caches since data has changed
         for cache_attr in self._cache_list:
-            attr_content: list[tp.Any] | None = getattr(self, cache_attr)
-            if attr_content is None:
-                continue
-            attr = self._get_attr_from_cache(cache_attr)
-            # Remove plural 's' for some attributes to correspond
-            block_attr = attr if hasattr(block, attr) else attr[:-1]
-            assert hasattr(block, block_attr), AttributeError(
-                f"Attribute {block_attr}(s) in {self.__class__.__name__} does not match "
-                f"any {block.__class__.__name__} attribute. This error is likely caused "
-                "by a bug in the code and should be reported as issue to the developpers."
-            )
-            attr_content.append(getattr(block, block_attr))
-            setattr(self, cache_attr, attr_content)
+            setattr(self, cache_attr, None)
 
     @property
     def data(self) -> list[str]:
@@ -618,9 +621,10 @@ class PoscarFile:
         pfile = cls()
         for cache_attr in pfile._cache_list:
             attr = pfile._get_attr_from_cache(cache_attr)
-            assert dct.get(attr, False), KeyError(
-                f"{cls.from_dict.__qualname__}: dictionary lacks"
-                f"the following key or it is empty: {attr!r}."
+            if not dct.get(attr, False):
+                raise KeyError(
+                    f"{cls.from_dict.__qualname__}: dictionary lacks"
+                    f"the following key or it is empty: {attr!r}."
             )
             setattr(pfile, cache_attr, dct[attr])
 
@@ -655,9 +659,10 @@ class PoscarFile:
         MissingDataError
             If some data in the instance is missing or not valid.
         """
-        assert self.is_valid(), ValueError(
-            "This instance contains some missing or out-of-specs data, "
-            "preventing proper file writing."
+        if not self.is_valid():
+            raise ValueError(
+                "This instance contains some missing or out-of-specs data, "
+                "preventing proper file writing."
         )
         os.makedirs(os.path.dirname(filename), exist_ok=exist_ok)
         with open(filename, "wt", encoding="utf-8") as fp:

@@ -65,16 +65,16 @@ class Metric(ABC):
         verbose: bool
             Whether to list the structures in each subset. Defaults to False.
         """
-        text = f"===== {self.__class__.__name__} Results ====="
-        text += f"Total structures:  {len(self)}"
+        text_lines = [f"===== {self.__class__.__name__} Results ====="]
+        text_lines.append(f"Total structures:  {len(self)}")
 
         for name, subset in subsets.items():
-            text += f"{name} structures: {len(subset)}"
+            text_lines.append(f"{name} structures: {len(subset)}")
 
         if verbose:
             for name, subset in subsets.items():
-                str_list = "\n".join(list(map(str, subset)))
-                text += f"List of {name} structures:\n{str_list}\n"
+                text_lines.append(f"\nList of {name} structures:")
+                text_lines.extend(list(map(str, subset)))
 
         with open(filename, "wt", encoding="utf-8") as fp:
-            fp.write("\n".join(text))
+            fp.write("\n".join(text_lines))

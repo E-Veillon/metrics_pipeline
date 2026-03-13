@@ -100,8 +100,9 @@ class JsonWriter:
 
     @data.setter
     def data(self, data: tp.Any) -> None:
-        assert isinstance(data, (dict, list, tuple, int, float, bool, type(None))), TypeError(
-            f"'data' type ({type(data).__qualname__}) is not JSON serializable."
+        if not isinstance(data, (dict, list, tuple, int, float, bool, type(None))):
+            raise TypeError(
+                f"'data' type ({type(data).__qualname__}) is not JSON serializable."
         )
         self._data = data
 
@@ -146,7 +147,7 @@ class JsonWriter:
         if isinstance(self._data, (list, tuple)):
             written_data = self._data
 
-        if isinstance(self._data, dict):
+        elif isinstance(self._data, dict):
             written_data = list(self._data.items())
 
         else:

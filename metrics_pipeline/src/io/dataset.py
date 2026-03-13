@@ -31,14 +31,16 @@ class PDEntryParser:
     energy_per_atom: float | None = None
 
     def __post_init__(self) -> None:
-        assert isinstance(self.id, str), TypeError(
-            f"'id' expected a type 'str', got {type(self.id).__name__}."
+        if not isinstance(self.id, str):
+            raise TypeError(
+                f"'id' expected a type 'str', got {type(self.id).__name__}."
         )
 
         # Get composition from formula and natoms
         if self.composition is None:
-            assert self.formula is not None and self.natoms is not None, ValueError(
-                f"Either 'composition' or 'formula' and 'natoms' must be given."
+            if not (self.formula is not None and self.natoms is not None):
+                raise ValueError(
+                    f"Either 'composition' or 'formula' and 'natoms' must be given."
             )
             formula_unit = Composition(self.formula, strict=True)
             if formula_unit.num_atoms != self.natoms:
@@ -49,15 +51,17 @@ class PDEntryParser:
             self.composition = Composition(self.composition, strict=True)
 
         else:
-            assert isinstance(self.composition, Composition), TypeError(
-                "'composition' expected a type 'Composition', "
-                f"got {type(self.composition).__name__}."
+            if not isinstance(self.composition, Composition):
+                raise TypeError(
+                    "'composition' expected a type 'Composition', "
+                    f"got {type(self.composition).__name__}."
             )
 
         # Get total energy from energy per atom and composition atoms
         if self.energy is None:
-            assert self.energy_per_atom is not None, ValueError(
-                f"Either 'energy' or 'energy_per_atom' must be given."
+            if self.energy_per_atom is None:
+                raise ValueError(
+                    f"Either 'energy' or 'energy_per_atom' must be given."
             )
             assert self.composition is not None, "Type checker assertion."
             self.energy = self.energy_per_atom * self.composition.num_atoms
@@ -134,21 +138,26 @@ class PDDataset:
 
             Defaults to `False`.
         """
-        assert isinstance(data, dict), TypeError(
-            f"'data' expected a type 'dict', got {type(data).__name__}."
+        if not isinstance(data, dict):
+            raise TypeError(
+                f"'data' expected a type 'dict', got {type(data).__name__}."
         )
         val_types = ", ".join(sorted(set(type(val).__name__ for val in data.values())))
-        assert all(isinstance(val, dict) for val in data.values()), TypeError(
-            f"'data' values must contain only dict, got following types: {val_types}."
+        if not all(isinstance(val, dict) for val in data.values()):
+            raise TypeError(
+                f"'data' values must contain only dict, got following types: {val_types}."
         )
-        assert all(isinstance(val.get(id_key), str) for val in data.values()), TypeError(
-            f"Given 'id_key' ({id_key}) does not always match a string ID in the data."
+        if not all(isinstance(val.get(id_key), str) for val in data.values()):
+            raise TypeError(
+                f"Given 'id_key' ({id_key}) does not always match a string ID in the data."
         )
-        assert composition_key or (formula_key and natoms_key), ValueError(
-            f"Either 'composition_key' or 'formula_key' and 'natoms_key' must be given."
+        if not (composition_key or (formula_key and natoms_key)):
+            raise ValueError(
+                f"Either 'composition_key' or 'formula_key' and 'natoms_key' must be given."
         )
-        assert energy_key or energy_per_atom_key, ValueError(
-            f"Either 'energy_key' or 'energy_per_atom_key' must be given."
+        if not (energy_key or energy_per_atom_key):
+            raise ValueError(
+                f"Either 'energy_key' or 'energy_per_atom_key' must be given."
         )
 
         self._data: dict[str, PDEntry] = {}
@@ -171,35 +180,37 @@ class PDDataset:
 
             # Iterate over already parsed structure data
             for struct_data in data_list:
-                entry_parser = PDEntryParser(**struct_data)
-                entry = entry_parser.get_entry()
-                self._data[entry_parser.id] = entry
-                self._elements.update(
-                    set(entry.composition.get_el_amt_dict().keys())
-                )
-                if len(entry.composition) < 11:
-                    self._computable_elements.update(
-                        set(entry.composition.get_el_amt_dict().keys())
-                    )
+                self._process_structure_data(struct_data)
 
         else:
             # parse each structure data dict
             for _, struct_data in data.items():
                 processed_data = {k: struct_data.get(v) for k, v in self.key_dict.items()}
-                entry_parser = PDEntryParser(**processed_data) # type: ignore
-                entry = entry_parser.get_entry()
-                self._data[entry_parser.id] = entry
-                self._elements.update(
-                    set(entry.composition.get_el_amt_dict().keys())
-                )
-                if len(entry.composition) < 11:
-                    self._computable_elements.update(
-                        set(entry.composition.get_el_amt_dict().keys())
-                    )
+                self._process_structure_data(processed_data) # type: ignore
 
         if attribute is not None:
             for entry in self._data.values():
                 entry.attribute = attribute
+
+    def _process_structure_data(self, struct_data: dict) -> None:
+        """
+        Process and store a single structure data dictionary.
+        
+        Parameters
+        ----------
+        struct_data: dict
+            Dictionary containing structure data with parsed keys.
+        """
+        entry_parser = PDEntryParser(**struct_data)
+        entry = entry_parser.get_entry()
+        self._data[entry_parser.id] = entry
+        self._elements.update(
+            set(entry.composition.get_el_amt_dict().keys())
+        )
+        if len(entry.composition) < 11:
+            self._computable_elements.update(
+                set(entry.composition.get_el_amt_dict().keys())
+            )
 
     def get_all_entries(self) -> dict[str, PDEntry]:
         """Get dataset dict of all phase diagram entries."""

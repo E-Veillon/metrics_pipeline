@@ -8,14 +8,14 @@ from pymatgen.core import Structure
 from src.utils import check_type
 
 
-def _volume_cm3(s: Structure) -> float:
+def _volume_cm3(structure: Structure) -> float:
     """Get the structure volume in cm³."""
-    return s.volume*1e-24
+    return structure.volume*1e-24
 
 
-def _mass_g(s: Structure) -> float:
+def _mass_g(structure: Structure) -> float:
     """Get the structure mass in grams."""
-    return sum(s.atomic_mass.to("g") for s in s.species)
+    return sum(s.atomic_mass.to("g") for s in structure.species)
 
 
 def get_densities(structures: list[Structure]) -> np.ndarray:

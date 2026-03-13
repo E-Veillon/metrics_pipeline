@@ -37,15 +37,21 @@ class ElementaryMetastability(Metric):
         """
         super().__init__(structures)
 
+        if not self.structures:
+            raise ValueError("'structures' cannot be empty.")
+        if not ref_unaries:
+            raise ValueError("'ref_unaries' cannot be empty.")
+
         assert all(struct.properties.get("energy") is not None for struct in self.structures)
         assert all(struct.properties.get("energy") is not None for struct in ref_unaries)
         assert all(len(struct.composition) == 1 for struct in ref_unaries)
         used_elts = self.get_elements(self.structures)
         ref_elts = self.get_elements(ref_unaries)
         lacking_elts = list(used_elts - ref_elts)
-        assert not lacking_elts, ValueError(
-            "Following elements are present in structures but lacking in references: "
-            f"{', '.join(sorted(lacking_elts))}."
+        if lacking_elts:
+            raise ValueError(
+                "Following elements are present in structures but lacking in references: "
+                f"{', '.join(sorted(lacking_elts))}."
         )
 
         self.ref_unaries = ref_unaries

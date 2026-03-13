@@ -1,9 +1,7 @@
 """Compute Symmetry metric."""
 
 import typing as tp
-import functools as ft
 from collections import OrderedDict
-import warnings
 
 from tqdm.contrib.concurrent import process_map
 
@@ -11,7 +9,7 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmetryUndeterminedError
 
 from .metric_base import Metric
-
+from src.utils import raise_or_warn
 
 class Symmetry(Metric):
     """
@@ -22,6 +20,8 @@ class Symmetry(Metric):
     Structures are considered symmetric if their spacegroup symmetry is not one of the
     triclinic crystal systems, i.e. P1 (no space symmetry element) or P-1 (inversion center only).
     """
+    on_error: tp.Literal["raise", "warn", "ignore"]
+
     def __init__(
         self,
         structures: list[Structure],
@@ -57,18 +57,20 @@ class Symmetry(Metric):
         """
         super().__init__(structures)
         if workers is not None:
-            assert isinstance(workers, int), TypeError(
-                f"'workers' expected a type 'int', got  {type(workers).__name__}."
+            if not isinstance(workers, int):
+                raise TypeError(
+                    f"'workers' expected a type 'int', got  {type(workers).__name__}."
             )
-            assert workers >= 0, ValueError(
-                f"'workers' must be positive or zero, got {workers}."
+            if workers < 0:
+                raise ValueError(
+                    f"'workers' must be positive or zero, got {workers}."
             )
-        assert on_error.lower() in {"raise", "warn", "ignore"}, ValueError(
-            f"'on_error' only supports 'raise', 'warn' or 'ignore', got {on_error}."
+        if on_error.lower() not in {"raise", "warn", "ignore"}:
+            raise ValueError(
+                f"'on_error' only supports 'raise', 'warn' or 'ignore', got {on_error}."
         )
         self.symprec = symprec
         self.angleprec = angleprec
-        self.analyzer = ft.partial(SpacegroupAnalyzer, symprec=symprec, angle_tolerance=angleprec)
         self.workers = workers
         self.on_error = on_error
 
@@ -77,21 +79,12 @@ class Symmetry(Metric):
     def is_symmetric(self, structure: Structure) -> bool:
         """Whether a structure has higher symmetry than triclinic system."""
         try:
-            is_sym = self.analyzer(structure).get_crystal_system() != "triclinic"
+            analyzer = SpacegroupAnalyzer(structure, symprec=self.symprec, 
+                                         angle_tolerance=self.angleprec)
+            is_sym = analyzer.get_crystal_system() != "triclinic"
         except SymmetryUndeterminedError as exc:
-            match self.on_error:
-                case "raise":
-                    raise exc
-                case "warn":
-                    warnings.warn(str(exc))
-                    return False
-                case "ignore":
-                    return False
-                case _:
-                    raise ValueError(
-                        "'on_error' only supports 'raise', 'warn' or 'ignore', "
-                        f"got {self.on_error}."
-                    )
+            raise_or_warn(self.on_error, type(exc), str(exc))
+            return False
         return is_sym
 
     def _compute(self) -> None:

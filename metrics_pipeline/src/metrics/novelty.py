@@ -73,11 +73,13 @@ class Novelty(Metric):
 
         if not database_mode:
             if workers is not None:
-                assert isinstance(workers, int), TypeError(
-                    f"'workers' expected a type 'int', got  {type(workers).__name__}."
+                if not isinstance(workers, int):
+                    raise TypeError(
+                        f"'workers' expected a type 'int', got  {type(workers).__name__}."
                 )
-                assert workers >= 0, ValueError(
-                    f"'workers' must be positive or zero, got {workers}."
+                if workers < 0:
+                    raise ValueError(
+                        f"'workers' must be positive or zero, got {workers}."
                 )
             self.workers = workers
             self._compute()

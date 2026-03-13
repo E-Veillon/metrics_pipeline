@@ -6,13 +6,15 @@ import itertools as itt
 from collections import OrderedDict
 
 import numpy as np
-from pymatgen.core import Structure, Element
+from scipy.spatial.distance import pdist
+from pymatgen.core import Structure
 
 from .metric_base import Metric
 from .backend import (
     slater_radii_table_pm_1,
     clementi_et_al_radii_table_pm
 )
+from src.utils import ALL_ELT_SYMBOL_TO_Z
 
 class Viability(Metric):
     """
@@ -76,11 +78,7 @@ class Viability(Metric):
                     f"'table_name' expected a type 'str', got {type(table_name).__name__!r}."
                 )
 
-        all_elts = set(Element.__members__)
-        if "D" in all_elts:
-            all_elts.remove("D") # Remove Deuterium (H isotope)
-        if "T" in all_elts:
-            all_elts.remove("T") # Remove Tritium (H isotope)
+        all_elts = set(ALL_ELT_SYMBOL_TO_Z.keys())
 
         assert isinstance(table, dict)
         assert all(isinstance(key, str) for key in table.keys())
@@ -104,12 +102,14 @@ class Viability(Metric):
             return False
 
         min_dists = np.array(list(itt.starmap(self._get_min_dist, itt.combinations(radii, r=2))))
-        true_dists = structure.distance_matrix[np.triu_indices(len(structure), 1)]
+        # Use pdist to compute only upper-triangle distances, avoiding redundant computation
+        true_dists = pdist(structure.cart_coords)
         return np.all(np.subtract(true_dists, min_dists) >= 0.0).item()
 
     def _compute(self) -> None:
-        self._viable_structs = [struct for struct in self.structures if self.is_viable(struct)]
-        self._non_viable_structs = [struct for struct in self.structures if not self.is_viable(struct)]
+        viability_results = [(struct, self.is_viable(struct)) for struct in self.structures]
+        self._viable_structs = [struct for struct, viable in viability_results if viable]
+        self._non_viable_structs = [struct for struct, viable in viability_results if not viable]
 
     @property
     def viable_structs(self) -> list[Structure]:

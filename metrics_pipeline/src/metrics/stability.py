@@ -68,16 +68,19 @@ class Stability(Metric):
         used_elts = self.get_elements(self.structures)
         ref_elts = self.get_elements(ref_structs)
         lacking_elts = list(used_elts - ref_elts)
-        assert not lacking_elts, ValueError(
-            "Following elements are present in structures but lacking in references: "
-            f"{', '.join(sorted(lacking_elts))}."
+        if lacking_elts:
+            raise ValueError(
+                "Following elements are present in structures but lacking in references: "
+                f"{', '.join(sorted(lacking_elts))}."
         )
-        assert stable_tol >= 0.0, ValueError(
-            f"'stable_tol' must be positive or zero, got {stable_tol}."
+        if stable_tol < 0.0:
+            raise ValueError(
+                f"'stable_tol' must be positive or zero, got {stable_tol}."
         )
         if workers is not None:
-            assert workers >= 0, ValueError(
-                f"'workers must be positive or zero, got {workers}."
+            if workers < 0:
+                raise ValueError(
+                    f"'workers must be positive or zero, got {workers}."
             )
         self.ref_structs = ref_structs
         self.stable_tol = stable_tol
@@ -96,8 +99,9 @@ class Stability(Metric):
                 }
                 chemical_systems[struct.chemical_system].append(entry)
             else:
-                assert isinstance(internal_entry, PDEntry), RuntimeError(
-                    "Type checker assertion."
+                if not isinstance(internal_entry, PDEntry):
+                    raise RuntimeError(
+                        "Type checker assertion."
                 )
                 internal_entry.attribute = {
                     "orig_attribute": internal_entry.attribute,
@@ -120,7 +124,7 @@ class Stability(Metric):
         ]
         self._unstable_structs: list[Structure] = [
             entry.attribute[self._struct_attr] # type: ignore
-            for entry in self._stable_entries
+            for entry in self._unstable_entries
         ]
 
     @classmethod
@@ -193,7 +197,6 @@ class Stability(Metric):
             print(f"Comparing entry {entry} to convex hull:")
             print(f"{e_per_atom=}")
         e_above_hull = pd.get_e_above_hull(entry, allow_negative=True, check_stable=False)
-        e_above_hull = e_above_hull.item() if hasattr(e_above_hull, "item") else e_above_hull
         entry.attribute[self._delta_e_attr] = e_above_hull # type: ignore
         if self.verbose:
             print(f"{e_above_hull=}")

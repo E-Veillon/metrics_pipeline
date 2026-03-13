@@ -21,9 +21,29 @@ class RMSD(Metric):
     of a structure. The final result is the average RMSD over all structure pairs.
     """
     _offset_range = torch.arange(-5, 6, dtype=torch.float32)
-    _offsets = torch.stack(
+    _offsets_cpu = torch.stack(
         torch.meshgrid(_offset_range, _offset_range, _offset_range, indexing="xy"), dim=3
     ).view(-1, 3)
+    _offsets_cache: dict[torch.device, torch.Tensor] = {}
+
+    @classmethod
+    def _get_offsets(cls, device: torch.device) -> torch.Tensor:
+        """
+        Get offset tensor on the specified device, caching to avoid redundant transfers.
+        
+        Parameters
+        ----------
+        device: torch.device
+            Target device (CPU or GPU).
+            
+        Returns
+        -------
+        torch.Tensor
+            Offset tensor on the specified device.
+        """
+        if device not in cls._offsets_cache:
+            cls._offsets_cache[device] = cls._offsets_cpu.to(device)
+        return cls._offsets_cache[device]
 
     def __init__(self, structures: list[Structure], relaxed_structs: list[Structure]) -> None:
         """
@@ -85,7 +105,7 @@ class RMSD(Metric):
         idx = torch.arange(self.num_atoms.shape[0], dtype=torch.long, device=self.num_atoms.device)
         batch = idx.repeat_interleave(self.num_atoms)
 
-        offset = self._offsets.clone().to(x_src.device)
+        offset = self._get_offsets(x_src.device)
         offset_euc = torch.einsum("ij,ljk->lik", offset, cell_src)
 
         paths = x_dst[:, None] + offset_euc[batch] - x_src[:, None]

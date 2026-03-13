@@ -2,6 +2,7 @@
 
 import warnings
 
+import numpy as np
 from scipy.stats import wasserstein_distance
 
 from pymatgen.core import Structure
@@ -73,14 +74,16 @@ class EMD(Metric):
 
         if computed_property is not None:
             try:
-                assert all(has_property(struct) for struct in self.structures), KeyError(
-                    "Some computed structures do not have the property "
-                    f"{computed_property!r} defined."
-                )
-                assert all(has_property(struct) for struct in ref_structs), KeyError(
-                    "Some reference structures do not have the property "
-                    f"{computed_property!r} defined."
-                )
+                if not all(has_property(struct) for struct in self.structures):
+                    raise KeyError(
+                        "Some computed structures do not have the property "
+                        f"{computed_property!r} defined."
+                    )
+                if not all(has_property(struct) for struct in ref_structs):
+                    raise KeyError(
+                        "Some reference structures do not have the property "
+                        f"{computed_property!r} defined."
+                    )
             except KeyError as exc:
                 if transform is None:
                     raise exc
@@ -98,13 +101,14 @@ class EMD(Metric):
 
     def _compute(self) -> None:
         if self.computed_property is None:
-            assert self.transform is not None, RuntimeError("Type checker assertion.")
+            if self.transform is None:
+                raise RuntimeError("Type checker assertion.")
             computed_values = self.transform(self.structures, **self.kwargs)
             ref_values = self.transform(self.ref_structs, **self.kwargs)
 
         else:
-            computed_values = [struct.properties[self.computed_property] for struct in self.structures]
-            ref_values = [struct.properties[self.computed_property] for struct in self.ref_structs]
+            computed_values = np.array([struct.properties[self.computed_property] for struct in self.structures])
+            ref_values = np.array([struct.properties[self.computed_property] for struct in self.ref_structs])
 
         self._distance = wasserstein_distance(ref_values, computed_values)
 
