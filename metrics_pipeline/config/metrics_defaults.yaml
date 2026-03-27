@@ -7,7 +7,6 @@
 Validity: true
 Viability: true
 Symmetry: true
-ElementaryMetastability: true
 SUN: true
 RMSD: true
 COV-P: true

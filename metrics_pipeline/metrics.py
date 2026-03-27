@@ -5,7 +5,6 @@ Computable metrics are:
 - Validity,
 - Viability,
 - Symmetry,
-- Elementary Metastability,
 - Stability, Unicity, Novelty (S.U.N),
 - Average Root Mean Square Displacement (RMSD),
 - Coverage - Precision (COV-P) and Coverage - Recall (COV-R),
@@ -19,21 +18,21 @@ import argparse as ap
 import typing as tp
 import warnings
 
+from pymatgen.core import Structure
+
 from src.utils import (
     parse_input_args, check_type, check_num_value,
-    discard_rare_gas_structures, discard_rare_earth_structures,
     ALL_ELTS_CATEGORIES, get_elts_from_symbol_or_z, get_elts_in_categories,
     filter_by_elements
 )
 from src.io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
-    JsonWriter, CIFFile, PathLike, CONFIGPATH, VaspParser, VaspExtractor, ExtractMethod
+    JsonLoader, JsonWriter, CIFFile, PathLike, CONFIGPATH, VaspParser, VaspExtractor, ExtractMethod
 )
 from src.computations.models import get_crystalnn_fingerprints, vectors_from_alignn
 from src.computations.local import get_densities
 from src.metrics import (
-    StructValidity, Viability, Symmetry,
-    ElementaryMetastability, Novelty, Unicity, SUN,
+    StructValidity, Viability, Symmetry, Unicity, SUN,
     Coverage, EMD, RMSD, FrechetDistance
 )
 
@@ -216,7 +215,6 @@ def _print_metrics_config(config: dict) -> None:
     print(f"Validity: {config.get('Validity')}")
     print(f"Viability: {config.get('Viability')}")
     print(f"Symmetry: {config.get('Symmetry')}")
-    print(f"Elementary Metastability: {config.get('ElementaryMetastability')}")
     print(f"Stability, Unicity, Novelty (SUN): {config.get('SUN')}")
     print(f"Avg. Root Mean Square Displacement (RMSD): {config.get('RMSD')}")
     print(f"Coverage - Precision (COV-P): {config.get('COV-P')}")
@@ -317,15 +315,14 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     CONFIG = load_yaml_as_dict(os.path.join(CONFIGPATH, args["config"]), on_error='raise')
     dataset_needed: bool = (
-        CONFIG.get("ElementaryMetastability")
-        or CONFIG.get("SUN", False)
+        CONFIG.get("SUN", False)
         or CONFIG.get("COV-P", False)
         or CONFIG.get("COV-R", False)
         or CONFIG.get("FAD", False)
         or CONFIG.get("EMD_energy", False)
         or CONFIG.get("EMD_density", False)
     )
-    sun_summary_needed = CONFIG.get("ElementaryMetastability", False) or CONFIG.get("SUN", False)
+    sun_summary_needed = CONFIG.get("SUN", False)
     relax_summary_needed = CONFIG.get("RMSD", False)
 
     _print_metrics_config(CONFIG)
@@ -335,6 +332,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     print("Loading generated structures...")
     gen_file = CIFFile.from_file(
         args["generated"],
+        special_keys=["header"],
         workers=args.get("workers")
     )
     gen_cifs = gen_file.get_cifs()
@@ -342,10 +340,12 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     print("Generated structures loaded.")
 
+    dataset = []
     if _match_file_arg_need("dataset", args.get("dataset", None), dataset_needed):
         print("Loading dataset...")
         data_file = CIFFile.from_file(
             args["dataset"],
+            special_keys=["header"],
             workers=args.get("workers")
         )
         data_cifs = data_file.get_cifs()
@@ -361,31 +361,14 @@ def main(standalone: bool = True, **kwargs) -> None:
         # remove duplicate structures from the dataset
         if args["unique_dataset"]:
             dataset = Unicity(dataset, workers=args.get("workers")).unique_structs
-    else:
-        dataset = []
 
     if _match_file_arg_need("sun-summary", args.get("sun_summary", None), sun_summary_needed):
         print("Loading stability summary file...")
-        base_dir, summary_name = os.path.split(args["sun_summary"])
-        stable_structs_pairs = VaspExtractor(
-            vasp_parser=VaspParser(base_dir),
-            method=ExtractMethod.RELAXATION,
-            summary_name=summary_name,
-            summary_key="stable",
-            workers=args.get("workers")
-        ).get_data()
+        sun_summary = JsonLoader(args["sun_summary"]).load_as_dict()
+        stable_names = [name for name, s_data in sun_summary.items() if s_data["stable"]]
+        print("Stability data loaded.")
 
-        if not stable_structs_pairs:
-            _warn_summary_location(args["sun_summary"])
-
-        stable_structs = [
-            (name, s_data["in_struct"]) for name, s_data in stable_structs_pairs.items()
-        ]
-        del stable_structs_pairs # Free some memory
-        print("Data converted.")
-    else:
-        stable_structs = []
-
+    relax_structures: list[tuple[Structure, Structure]] = []
     if _match_file_arg_need("relax-summary", args.get("relax_summary", None), relax_summary_needed):
         print("Loading relaxations summary file...")
         base_dir, summary_name = os.path.split(args["relax_summary"])
@@ -400,11 +383,15 @@ def main(standalone: bool = True, **kwargs) -> None:
         if not relax_structures_dict:
             _warn_summary_location(args["relax_summary"])
 
-        relax_structures = list(relax_structures_dict.items())
+        for name, s_data in relax_structures_dict.items():
+            init_struct = s_data["in_struct"]
+            init_struct.properties["header"] = name
+            final_struct = s_data["out_struct"]
+            final_struct.properties["header"] = name
+            relax_structures.append((init_struct, final_struct))
+
         del relax_structures_dict # Free some memory
         print("Data converted.")
-    else:
-        relax_structures = []
 
     general_metrics = dict.fromkeys(
         (
@@ -460,38 +447,32 @@ def main(standalone: bool = True, **kwargs) -> None:
         # Symmetry metric
         print("Computing Symmetry metric...")
         num_symmetric = len(
-            Symmetry(generated, symprec=0.1, workers=args.get("workers")).symmetric_structs
+            Symmetry(generated, workers=args.get("workers")).symmetric_structs
         )
         percent_symmetric = round(num_symmetric / num_generated * 100, round_digits)
         general_metrics["num_symmetric"] = num_symmetric
         general_metrics["percent_symmetric"] = percent_symmetric
         print(f"Symmetry = {general_metrics.get('percent_symmetric')}")
 
-    # FIXME: get actual energies to compute this, unavailable until then
-    if CONFIG.get("ElementaryMetastability", False) and False:
-        ref_unaries = [struct for struct in dataset if struct.composition.is_element]
-        metastability = ElementaryMetastability(generated, ref_unaries)
-        dft_metrics["num_elem_metastable"] = len(metastability.metastable_structs)
-        prop_metastables = len(metastability.metastable_structs) / num_generated
-        dft_metrics["percent_elem_metastable"] = round(prop_metastables * 100, 6)
-        print(f"Elem. Metastability = {dft_metrics.get('percent_elem_metastable')}")
-
     if CONFIG.get("SUN", False):
         # S.U.N. metrics
         print("Computing S.U.N. metrics...")
-        sun = SUN(generated, dataset, workers=args.get("workers"))
+        # We already have the stability summary, thus we deactivate stability computing
+        sun_wo_staility = SUN(generated, dataset, compute_stability=False, workers=args.get("workers"))
+        unique_novel = sun_wo_staility.get_computed_subset(unique=True, novel=True, unmatchable=False)
+        sun_structs = [struct for struct in unique_novel if struct.properties["header"] in stable_names]
 
-        num_unmatchable = len(sun.get_computed_subset(unmatchable=True))
+        num_unmatchable = len(sun_wo_staility.get_computed_subset(unmatchable=True))
         percent_unmatchable = round(num_unmatchable / num_generated * 100, round_digits)
-        num_unique = len(sun.get_computed_subset(unique=True, unmatchable=False))
+        num_unique = len(sun_wo_staility.get_computed_subset(unique=True, unmatchable=False))
         percent_unique = round(num_unique / num_generated * 100, round_digits)
-        num_novel = len(sun.get_computed_subset(novel=True, unmatchable=False))
+        num_novel = len(sun_wo_staility.get_computed_subset(novel=True, unmatchable=False))
         percent_novel = round(num_novel / num_generated * 100, round_digits)
-        num_unique_novel = len(sun.get_computed_subset(unique=True, novel=True, unmatchable=False))
+        num_unique_novel = len(unique_novel)
         percent_unique_novel = round(num_unique_novel / num_generated * 100, round_digits)
-        num_stable = len(sun.get_computed_subset(stable=True))
+        num_stable = len(stable_names)
         percent_stable = round(num_stable / num_generated * 100, round_digits)
-        num_SUN = len(sun.get_computed_subset(stable=True, unique=True, novel=True, unmatchable=False))
+        num_SUN = len(sun_structs)
         percent_SUN = round(num_SUN / num_generated * 100, round_digits)
 
         dft_metrics["num_unmatchable"] = num_unmatchable
@@ -515,8 +496,9 @@ def main(standalone: bool = True, **kwargs) -> None:
     if CONFIG.get("RMSD", False):
         # RMSD metric
         print("Computing RMSD metric...")
-        in_structs = [s_data["in_struct"] for _, s_data in relax_structures]
-        out_structs = [s_data["out_struct"] for _, s_data in relax_structures]
+        _in_structs, _out_structs = zip(*relax_structures)
+        in_structs: list[Structure] = list(_in_structs)
+        out_structs: list[Structure] = list(_out_structs)
         dft_metrics["RMSD"] = round(RMSD(in_structs, out_structs).average_rmsd, round_digits)
         print(f"RMSD = {dft_metrics['RMSD']}")
 
