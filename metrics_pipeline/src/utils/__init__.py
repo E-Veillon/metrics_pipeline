@@ -12,7 +12,10 @@ from .periodic_table import (
     get_elements, get_elemental_subsets, get_element_group, get_all_elements_groups,
     get_element_valence_electrons, get_all_valence_electrons
 )
-from .spg_data import PG_TO_SYSTEM, SPG_NUM_TO_PG
+from .spg_data import (
+    ALL_CRYSTAL_FAMILIES, ALL_CRYSTAL_SYSTEMS, ALL_POINT_GROUPS, ALL_SPACEGROUPS,
+    ALL_SYMMETRY_CLASSES, PG_TO_SYSTEM, SPG_NUM_TO_PG, Spacegroup
+)
 from .parse_args import parse_input_args
 
 __all__ = [
@@ -26,6 +29,7 @@ __all__ = [
     "has_rare_gas", "has_rare_earth", "discard_rare_gas_structures", "discard_rare_earth_structures",
     "get_elements", "get_elemental_subsets", "get_element_group", "get_all_elements_groups",
     "get_element_valence_electrons", "get_all_valence_electrons",
-    "PG_TO_SYSTEM", "SPG_NUM_TO_PG",
+    "ALL_CRYSTAL_FAMILIES", "ALL_CRYSTAL_SYSTEMS", "ALL_POINT_GROUPS", "ALL_SPACEGROUPS",
+    "ALL_SYMMETRY_CLASSES", "PG_TO_SYSTEM", "SPG_NUM_TO_PG", "Spacegroup",
     "parse_input_args"
 ]
