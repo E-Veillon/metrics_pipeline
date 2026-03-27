@@ -14,7 +14,8 @@ from tqdm.contrib.concurrent import process_map
 from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-from src.utils import parse_input_args, check_type, check_num_value, VisualIterator, PG_TO_SYSTEM
+from src.utils import parse_input_args, check_type, check_num_value, VisualIterator
+from src.utils.spg_data import ALL_SYMMETRY_CLASSES, PG_TO_SYSTEM, Spacegroup
 from src.io import CIFFile, check_file_or_dir
 
 
@@ -131,25 +132,23 @@ def get_sym_and_refined_struct(
     spga = SpacegroupAnalyzer(structure)
     refined_struct = spga.get_refined_structure()
     refined_struct.properties = structure.properties
+    struct_spg = Spacegroup(spga.get_space_group_number())
 
     match sym_class:
         case SymmetryClass.FAMILY:
-            family = (
-                "hexagonal" if spga.get_crystal_system() == "trigonal"
-                else str(spga.get_crystal_system())
-            )
+            family = struct_spg.crystal_family
             return family, refined_struct
 
         case SymmetryClass.SYSTEM:
-            system = str(spga.get_crystal_system())
+            system = struct_spg.crystal_system
             return system, refined_struct
 
         case SymmetryClass.POINTGROUP:
-            pg = spga.get_point_group_symbol().strip()
+            pg = struct_spg.point_group
             return pg, refined_struct
 
         case SymmetryClass.SPACEGROUP:
-            spg = str(spga.get_space_group_number())
+            spg = str(struct_spg.int_number)
             return spg, refined_struct
 
         case _:
@@ -222,21 +221,13 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     match args["filter_by"]:
         case SymmetryClass.FAMILY:
-            classes = (
-                "triclinic", "monoclinic", "orthorhombic", "tetragonal",
-                "hexagonal", "cubic"
-            )
+            classes = ALL_SYMMETRY_CLASSES["CRYSTAL_FAMILIES"]
         case SymmetryClass.SYSTEM:
-            classes = (
-                "triclinic", "monoclinic", "orthorhombic", "tetragonal",
-                "trigonal", "hexagonal", "cubic"
-            )
+            classes = ALL_SYMMETRY_CLASSES["CRYSTAL_SYSTEMS"]
         case SymmetryClass.POINTGROUP:
-            classes = tuple(PG_TO_SYSTEM.keys())
-
+            classes = ALL_SYMMETRY_CLASSES["POINT_GROUPS"]
         case SymmetryClass.SPACEGROUP:
             classes = tuple(map(str, range(1, 231)))
-
         case _:
             check_type(args["filter_by"], "--filter-by", (SymmetryClass,))
             raise NotImplementedError(
