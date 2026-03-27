@@ -26,7 +26,13 @@ class SUN(Metric):
     In: Nature 639.8055 (2025), pp. 624–632.
     """
     def __init__(
-        self, structures: list[Structure], ref_structs: list[Structure], **kwargs
+        self,
+        structures: list[Structure],
+        ref_structs: list[Structure],
+        compute_stability: bool = True,
+        compute_unicity: bool = True,
+        compute_novelty: bool = True,
+        **kwargs
     ) -> None:
         """
         Compute the Stability, Unicity, Novelty compound metric (S.U.N.).
@@ -38,6 +44,18 @@ class SUN(Metric):
 
         ref_structs: list[Structure]
             Structures of known formation energy to use as references.
+
+        compute_stability: bool
+            Whether to compute the Stability metric as part of S.U.N. computation.
+            Defaults to True.
+
+        compute_unicity: bool
+            Whether to compute the Unicity metric as part of S.U.N. computation.
+            Defaults to True.
+
+        compute_novelty: bool
+            Whether to compute the Novelty metric as part of S.U.N. computation.
+            Defaults to True.
 
         kwargs: Any
             Additionnal arguments to pass to the respective metrics.
@@ -52,9 +70,15 @@ class SUN(Metric):
         checked and removed from those computations beforehand and labeled as 'unmatchable'.
         Due to their very unlikely shape, unmatchable structures are all assumed to be unique
         and novel by default, but are not suitable for any kind of chemistry.
+
+        - If a metric is deactivated, all structures are assumed to pass it by default.
+        If neither Unicity nor Novelty is computed, all structures are assumed to be matchable.
         """
         super().__init__(structures)
         self.ref_structs = ref_structs
+        self.compute_stability = compute_stability
+        self.compute_unicity = compute_unicity
+        self.compute_novelty = compute_novelty
         self.stable_tol = kwargs.pop("stable_tol", 0.1)
         self.ltol = kwargs.pop("ltol", 0.2)
         self.stol = kwargs.pop("stol", 0.3)
@@ -64,21 +88,29 @@ class SUN(Metric):
         self._compute()
 
     def _compute(self) -> None:
-        stability = Stability(self.structures, self.ref_structs, self.stable_tol, self.workers)
-        unicity = Unicity(self.structures, self.ltol, self.stol, self.angle_tol, self.workers)
-        novelty = Novelty(
-            self.structures, self.ref_structs, self.ltol, self.stol, self.angle_tol, self.workers
-        )
+        if self.compute_stability:
+            stability = Stability(self.structures, self.ref_structs, self.stable_tol, self.workers)
+        if self.compute_unicity:
+            unicity = Unicity(self.structures, self.ltol, self.stol, self.angle_tol, self.workers)
+        if self.compute_novelty:
+            novelty = Novelty(
+                self.structures, self.ref_structs, self.ltol, self.stol, self.angle_tol, self.workers
+            )
         for struct in self.structures:
-            struct.properties[self.stable_key] = struct in stability.stable_structs
+            struct.properties[self.stable_key] = (
+                struct in stability.stable_structs if self.compute_stability else True
+            )
             struct.properties[self.unique_key] = (
                 struct in unicity.unique_structs + unicity.unmatchable_structs
+                if self.compute_unicity else True
             )
             struct.properties[self.novel_key] = (
                 struct in novelty.novel_structs + novelty.unmatchable_structs
+                if self.compute_novelty else True
             )
             struct.properties[self.unmatch_key] = (
                 struct in unicity.unmatchable_structs + novelty.unmatchable_structs
+                if self.compute_unicity or self.compute_novelty else False
             )
         self._computed_structs = self.structures
 
