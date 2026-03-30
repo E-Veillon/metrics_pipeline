@@ -112,7 +112,9 @@ class JsonWriter:
 
     def write(self) -> None:
         """Write the JSON data as-is."""
-        os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
+        filedir = os.path.dirname(self.filepath)
+        write_dir = filedir if filedir else os.getcwd()
+        os.makedirs(write_dir, exist_ok=True)
         with open(self.filepath, "wt", encoding="utf-8") as fp:
             json.dump(self._data, fp, **self.kwargs)
 
