@@ -142,15 +142,31 @@ def has_elements(
         raise TypeError(
             f"'data' expected a type 'Structure' or 'str', got {type(structure).__name__!r}."
         )
-    elts_pattern = fr"({'|'.join(elements)})"
+    if not elements:
+        return False
+
+
     match format:
         case "cif":
             # Search for any label beginning with '_chemical_formula' containing composition
-            cif_pattern = re.compile(fr"^_chemical_formula.+{elts_pattern}.*$", flags=re.MULTILINE)
-            return re.search(cif_pattern, structure) is not None
+            formula_line = re.compile(fr"^_chemical_formula[a-zA-Z0-9_]+\s+(.+)$", flags=re.MULTILINE)
+            for match in re.finditer(formula_line, structure):
+                # Extract formula from the line
+                formula = match.group(1)
+                # Next line if no formula in the line
+                if not formula:
+                    continue
+                # Parse element symbols from formula
+                elts = re.findall(r"[A-Z][a-z]?", formula)
+                if any(elt in elements for elt in elts):
+                    return True
+            else:
+                # None of the formula lines contained any of searched elements
+                return False
         case "poscar":
             # Search in the POSCAR element line (VASP 5.0+ format)
-            return re.search(elts_pattern, structure.split("\n", maxsplit=6)[5]) is not None
+            elts = structure.split("\n", maxsplit=6)[5].split()
+            return any(elt in elements for elt in elts)
         case str():
             raise ValueError(f"Unsupported format {format!r}.")
         case None:

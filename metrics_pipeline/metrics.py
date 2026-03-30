@@ -226,6 +226,23 @@ def _print_metrics_config(config: dict) -> None:
     print("------------------------------")
     print(" ")
 
+def _print_elements_removal(args_dict: dict[str, tp.Any]) -> None:
+    print("------------------------------")
+    print(" ")
+    print(
+        "REMOVED ELEMENTS: "
+        f"{', '.join(args_dict['remove_elts']) if args_dict['remove_elts'] != [] else None}."
+    )
+    print(
+        "REMOVED CATEGORIES: "
+        f"{', '.join(args_dict['remove_elt_categories']) if args_dict['remove_elt_categories'] != [] else None}."
+    )
+    print(
+        "ALL REMOVED ELEMENTS (parsed categories): "
+        f"{', '.join(args_dict['forbidden_elts'].keys()) if args_dict['forbidden_elts'] != {} else None}."
+    )
+    print(" ")
+    print("------------------------------")
 
 def _warn_summary_location(summary_file: PathLike) -> None:
     warnings.warn(
@@ -343,6 +360,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     dataset = []
     if _match_file_arg_need("dataset", args.get("dataset", None), dataset_needed):
         print("Loading dataset...")
+        _print_elements_removal(args)
         data_file = CIFFile.from_file(
             args["dataset"],
             special_keys=["header"],
@@ -452,7 +470,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         percent_symmetric = round(num_symmetric / num_generated * 100, round_digits)
         general_metrics["num_symmetric"] = num_symmetric
         general_metrics["percent_symmetric"] = percent_symmetric
-        print(f"Symmetry = {general_metrics.get('percent_symmetric')}")
+        print(f"Symmetry = {general_metrics.get('percent_symmetric')}%")
 
     if CONFIG.get("SUN", False):
         # S.U.N. metrics
@@ -523,6 +541,7 @@ def main(standalone: bool = True, **kwargs) -> None:
             structures=generated,
             ref_structs=dataset,
             transform=vectors_from_alignn,
+            device="cpu",
             output="latent"
         ).computed_distance
         ml_metrics["frechet_distance"] = frechet_distance
@@ -535,6 +554,7 @@ def main(standalone: bool = True, **kwargs) -> None:
             structures=generated,
             ref_structs=dataset,
             transform=vectors_from_alignn,
+            device="cpu",
             output="energy"
         ).computed_distance
         ml_metrics["EMD_energy"] = emd_energy
