@@ -61,14 +61,14 @@ def _get_command_line_args() -> ap.Namespace:
         "-d", "--dataset",
         help=(
             "CIF file containing the list of known structures. "
-            "Necessary for: Elementary Metastability, S.U.N., COV-P, COV-R, FAD, EMD(density), EMD(energy)."
+            "Necessary for: Novelty part of S.U.N. metrics, COV-P, COV-R, FAD, EMD(density), EMD(energy)."
         )
     )
     parser.add_argument(
         "-ss", "--sun-summary",
         help=(
             "JSON file containing the summary of phase diagrams instability energies. "
-            "Necessary for: S.U.N."
+            "Necessary for: Stability part of S.U.N. metrics."
         )
     )
     parser.add_argument(
@@ -216,6 +216,9 @@ def _print_metrics_config(config: dict) -> None:
     print(f"Viability: {config.get('Viability')}")
     print(f"Symmetry: {config.get('Symmetry')}")
     print(f"Stability, Unicity, Novelty (SUN): {config.get('SUN')}")
+    print(f"- Stability: {config.get('Stability')}")
+    print(f"- Unicity: {config.get('Unicity')}")
+    print(f"- Novelty: {config.get('Novelty')}")
     print(f"Avg. Root Mean Square Displacement (RMSD): {config.get('RMSD')}")
     print(f"Coverage - Precision (COV-P): {config.get('COV-P')}")
     print(f"Coverage - Recall (COV-R): {config.get('COV-R')}")
@@ -331,15 +334,19 @@ def main(standalone: bool = True, **kwargs) -> None:
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
     CONFIG = load_yaml_as_dict(os.path.join(CONFIGPATH, args["config"]), on_error='raise')
+    CONFIG.update(CONFIG.pop("SUN", {})) # Add SUN sub-metrics for easier access
+    # SUN section activation boolean
+    CONFIG["SUN"] = any(CONFIG.get(metric, False) for metric in ("Stability", "Unicity", "Novelty"))
     dataset_needed: bool = (
-        CONFIG.get("SUN", False)
+        CONFIG.get("Stability", False)
+        or CONFIG.get("Novelty", False)
         or CONFIG.get("COV-P", False)
         or CONFIG.get("COV-R", False)
         or CONFIG.get("FAD", False)
         or CONFIG.get("EMD_energy", False)
         or CONFIG.get("EMD_density", False)
     )
-    sun_summary_needed = CONFIG.get("SUN", False)
+    sun_summary_needed = CONFIG.get("Stability", False)
     relax_summary_needed = CONFIG.get("RMSD", False)
 
     _print_metrics_config(CONFIG)
@@ -359,8 +366,8 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     dataset = []
     if _match_file_arg_need("dataset", args.get("dataset", None), dataset_needed):
-        print("Loading dataset...")
         _print_elements_removal(args)
+        print("Loading dataset...")
         data_file = CIFFile.from_file(
             args["dataset"],
             special_keys=["header"],
@@ -380,6 +387,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         if args["unique_dataset"]:
             dataset = Unicity(dataset, workers=args.get("workers")).unique_structs
 
+    stable_names: list[str] = []
     if _match_file_arg_need("sun-summary", args.get("sun_summary", None), sun_summary_needed):
         print("Loading stability summary file...")
         sun_summary = JsonLoader(args["sun_summary"]).load_as_dict()
@@ -475,39 +483,65 @@ def main(standalone: bool = True, **kwargs) -> None:
     if CONFIG.get("SUN", False):
         # S.U.N. metrics
         print("Computing S.U.N. metrics...")
+        # Define all necessary computing flags combinations for conditions readability
+        compute_stability = CONFIG.get("Stability", False)
+        compute_unicity = CONFIG.get("Unicity", False)
+        compute_novelty = CONFIG.get("Novelty", False)
+        compute_unique_novel = compute_unicity and compute_novelty
+        compute_unmatchable = compute_unicity or compute_novelty
+        compute_sun = compute_stability and compute_unicity and compute_novelty
+
         # We already have the stability summary, thus we deactivate stability computing
-        sun_wo_staility = SUN(generated, dataset, compute_stability=False, workers=args.get("workers"))
-        unique_novel = sun_wo_staility.get_computed_subset(unique=True, novel=True, unmatchable=False)
-        sun_structs = [struct for struct in unique_novel if struct.properties["header"] in stable_names]
+        sun_wo_stability = SUN(
+            generated, dataset,
+            compute_stability=False,
+            compute_unicity=compute_unicity,
+            compute_novelty=compute_novelty,
+            workers=args.get("workers")
+        )
 
-        num_unmatchable = len(sun_wo_staility.get_computed_subset(unmatchable=True))
-        percent_unmatchable = round(num_unmatchable / num_generated * 100, round_digits)
-        num_unique = len(sun_wo_staility.get_computed_subset(unique=True, unmatchable=False))
-        percent_unique = round(num_unique / num_generated * 100, round_digits)
-        num_novel = len(sun_wo_staility.get_computed_subset(novel=True, unmatchable=False))
-        percent_novel = round(num_novel / num_generated * 100, round_digits)
-        num_unique_novel = len(unique_novel)
-        percent_unique_novel = round(num_unique_novel / num_generated * 100, round_digits)
-        num_stable = len(stable_names)
-        percent_stable = round(num_stable / num_generated * 100, round_digits)
-        num_SUN = len(sun_structs)
-        percent_SUN = round(num_SUN / num_generated * 100, round_digits)
+        if compute_unmatchable:
+            num_unmatchable = len(sun_wo_stability.get_computed_subset(unmatchable=True))
+            percent_unmatchable = round(num_unmatchable / num_generated * 100, round_digits)
+            dft_metrics["num_unmatchable"] = num_unmatchable
+            dft_metrics["percent_unmatchable"] = percent_unmatchable
 
-        dft_metrics["num_unmatchable"] = num_unmatchable
-        dft_metrics["percent_unmatchable"] = percent_unmatchable
-        dft_metrics["num_unique"] = num_unique
-        dft_metrics["percent_unique"] = percent_unique
-        dft_metrics["num_novel"] = num_novel
-        dft_metrics["percent_novel"] = percent_novel
-        dft_metrics["num_unique_novel"] = num_unique_novel
-        dft_metrics["percent_unique_novel"] = percent_unique_novel
-        dft_metrics["num_stable"] = num_stable
-        dft_metrics["percent_stable"] = percent_stable
-        dft_metrics["num_SUN"] = num_SUN
-        dft_metrics["percent_SUN"] = percent_SUN
+        if compute_unicity:
+            num_unique = len(sun_wo_stability.get_computed_subset(unique=True, unmatchable=False))
+            percent_unique = round(num_unique / num_generated * 100, round_digits)
+            dft_metrics["num_unique"] = num_unique
+            dft_metrics["percent_unique"] = percent_unique
+
+        if compute_novelty:
+            num_novel = len(sun_wo_stability.get_computed_subset(novel=True, unmatchable=False))
+            percent_novel = round(num_novel / num_generated * 100, round_digits)
+            dft_metrics["num_novel"] = num_novel
+            dft_metrics["percent_novel"] = percent_novel
+
+        if compute_unique_novel:
+            unique_novel = sun_wo_stability.get_computed_subset(unique=True, novel=True, unmatchable=False)
+            num_unique_novel = len(unique_novel)
+            percent_unique_novel = round(num_unique_novel / num_generated * 100, round_digits)
+            dft_metrics["num_unique_novel"] = num_unique_novel
+            dft_metrics["percent_unique_novel"] = percent_unique_novel
+
+        if compute_stability:
+            num_stable = len(stable_names)
+            percent_stable = round(num_stable / num_generated * 100, round_digits)
+            dft_metrics["num_stable"] = num_stable
+            dft_metrics["percent_stable"] = percent_stable
+
+        if compute_sun:
+            sun_structs = [
+                struct for struct in unique_novel if struct.properties["header"] in stable_names
+            ]
+            num_SUN = len(sun_structs)
+            percent_SUN = round(num_SUN / num_generated * 100, round_digits)
+            dft_metrics["num_SUN"] = num_SUN
+            dft_metrics["percent_SUN"] = percent_SUN
 
         for key, val in dft_metrics.items():
-            if key == "RMSD":
+            if key == "RMSD" or val is None:
                 continue
             print(f"{key} = {val}")
 
