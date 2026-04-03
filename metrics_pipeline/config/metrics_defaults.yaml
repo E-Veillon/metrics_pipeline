@@ -8,9 +8,9 @@ Validity: true
 Viability: true
 Symmetry: true
 SUN:
-  - Stability: true
-  - Unicity: true
-  - Novelty: true
+    Stability: true
+    Unicity: true
+    Novelty: true
 RMSD: true
 COV-P: true
 COV-R: true

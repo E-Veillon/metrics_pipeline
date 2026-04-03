@@ -101,15 +101,17 @@ class SUN(Metric):
                 struct in stability.stable_structs if self.compute_stability else True
             )
             struct.properties[self.unique_key] = (
-                struct in unicity.unique_structs + unicity.unmatchable_structs
+                struct in (unicity.unique_structs + unicity.unmatchable_structs)
                 if self.compute_unicity else True
             )
             struct.properties[self.novel_key] = (
-                struct in novelty.novel_structs + novelty.unmatchable_structs
+                struct in (novelty.novel_structs + novelty.unmatchable_structs)
                 if self.compute_novelty else True
             )
+            unique_unmatchables = unicity.unmatchable_structs if self.compute_unicity else []
+            novel_unmatchables = novelty.unmatchable_structs if self.compute_novelty else []
             struct.properties[self.unmatch_key] = (
-                struct in unicity.unmatchable_structs + novelty.unmatchable_structs
+                struct in (unique_unmatchables + novel_unmatchables)
                 if self.compute_unicity or self.compute_novelty else False
             )
         self._computed_structs = self.structures
