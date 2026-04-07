@@ -311,7 +311,14 @@ class SymmetryClassifier(Metric):
             Whether to add the list of headers in each symmetry class.
             Defaults to False.
         """
-        results = {"by_system": {}, "by_point_group": {}, "by_space_group": {}}
+        results = {
+            "uncomputable": {}, "by_system": {}, "by_point_group": {}, "by_space_group": {}
+        }
+
+        results["uncomputable"] = {
+                "total": len(self.uncomputable_structs),
+                "headers": [struct.properties["header"] for struct in self.uncomputable_structs]
+            } if verbose else {"total": len(self.uncomputable_structs)}
 
         for system in ALL_CRYSTAL_SYSTEMS:
             structures = self.get_symmetry_subset("system", system)
@@ -332,11 +339,6 @@ class SymmetryClassifier(Metric):
             results["by_space_group"][sg] = {
                 "total": len(structures),
                 "headers": [struct.properties["header"] for struct in structures]
-            } if verbose else {"total": len(structures)}
-
-        results["uncomputable"] = {
-                "total": len(self.uncomputable_structs),
-                "headers": [struct.properties["header"] for struct in self.uncomputable_structs]
             } if verbose else {"total": len(structures)}
 
         JsonWriter(filename, results, indent=4).write_as_dict()

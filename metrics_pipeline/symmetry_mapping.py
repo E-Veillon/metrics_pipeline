@@ -76,8 +76,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict.setdefault("verbose", False)
 
     # Assert set arguments conformity
-    check_file_or_dir(args_dict["input_file"], "file", allowed_formats="cif")
-    check_file_or_dir(args_dict["reference"], "file", allowed_formats="cif")
+    check_file_or_dir(args_dict["input_file"], "file", allowed_formats=("cif", "poscar"))
     check_file_format(args_dict["output"], allowed_formats="json")
 
     if args_dict.get("workers") is not None:
@@ -137,7 +136,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     args = parse_input_args(_get_cmd_line_args, _process_input_args, standalone, **kwargs)
 
     # Read input file
-    match os.path.splitext(args["input_file"]):
+    match os.path.splitext(args["input_file"])[1]:
         case ".cif":
             cfile = CIFFile.from_file(
                 args["input_file"],
@@ -151,6 +150,8 @@ def main(standalone: bool = True, **kwargs) -> None:
                 workers=args.get("workers")
             )
             structures = pfile.parse_structures()
+        case ext:
+            raise ValueError(f"'input_file' must be of format '.cif' or '.poscar', got {ext!r}.")
 
     # Compute symmetries
     classifier = SymmetryClassifier(
