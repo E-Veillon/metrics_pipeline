@@ -13,6 +13,7 @@ from src.utils import raise_or_warn
 from src.utils.spg_data import (
     ALL_CRYSTAL_FAMILIES, ALL_CRYSTAL_SYSTEMS, ALL_POINT_GROUPS, ALL_SPACEGROUPS
 )
+from src.io import JsonWriter
 
 class SymmetryClassifier(Metric):
     """
@@ -295,3 +296,47 @@ class SymmetryClassifier(Metric):
         )
         subsets: OrderedDict[str, list[Structure]] = system_subsets | pg_subsets | spg_subsets
         self._write_filter_metric_result(filename, subsets, verbose)
+
+    def write_json(self, filename: str, verbose: bool = False) -> None:
+        """
+        Write compact JSON file containing all results of this metric
+        at crystal system, point group and space group levels.
+        
+        Parameters
+        ----------
+        filename: str
+            Path to output JSON file to write.
+
+        verbose: bool
+            Whether to add the list of headers in each symmetry class.
+            Defaults to False.
+        """
+        results = {"by_system": {}, "by_point_group": {}, "by_space_group": {}}
+
+        for system in ALL_CRYSTAL_SYSTEMS:
+            structures = self.get_symmetry_subset("system", system)
+            results["by_system"][system] = {
+                "total": len(structures),
+                "headers": [struct.properties["header"] for struct in structures]
+            } if verbose else {"total": len(structures)}
+
+        for pg in ALL_POINT_GROUPS:
+            structures = self.get_symmetry_subset("point_group", pg)
+            results["by_point_group"][pg] = {
+                "total": len(structures),
+                "headers": [struct.properties["header"] for struct in structures]
+            } if verbose else {"total": len(structures)}
+
+        for sg in ALL_SPACEGROUPS:
+            structures = self.get_symmetry_subset("space_group", sg)
+            results["by_space_group"][sg] = {
+                "total": len(structures),
+                "headers": [struct.properties["header"] for struct in structures]
+            } if verbose else {"total": len(structures)}
+
+        results["uncomputable"] = {
+                "total": len(self.uncomputable_structs),
+                "headers": [struct.properties["header"] for struct in self.uncomputable_structs]
+            } if verbose else {"total": len(structures)}
+
+        JsonWriter(filename, results, indent=4).write_as_dict()

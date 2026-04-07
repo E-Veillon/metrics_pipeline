@@ -20,7 +20,7 @@ def _get_cmd_line_args() -> ap.Namespace:
     )
     parser.add_argument(
         "-o", "--output",
-        help="path to write symmetry distribution report (plain '.txt' file)."
+        help="path to write symmetry distribution report (JSON file)."
     )
     parser.add_argument(
         "-w", "--workers", type=int, metavar="int",
@@ -67,7 +67,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
     default_output = os.path.join(
         os.path.dirname(args_dict["input_file"]),
-        "symmetry_distribution.txt"
+        "symmetry_distribution.json"
     )
     args_dict.setdefault("output", default_output)
     args_dict.setdefault("symprec", 0.01)
@@ -78,7 +78,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     # Assert set arguments conformity
     check_file_or_dir(args_dict["input_file"], "file", allowed_formats="cif")
     check_file_or_dir(args_dict["reference"], "file", allowed_formats="cif")
-    check_file_format(args_dict["output"], allowed_formats="txt")
+    check_file_format(args_dict["output"], allowed_formats="json")
 
     if args_dict.get("workers") is not None:
         check_type(args_dict["workers"], "workers", (int,))
@@ -162,7 +162,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     )
 
     # Write results to file
-    classifier.write_result(args["output"], verbose=args["verbose"])
+    classifier.write_json(args["output"], verbose=args["verbose"])
 
 
 if __name__ == "__main__":
