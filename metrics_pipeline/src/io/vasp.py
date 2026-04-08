@@ -21,7 +21,7 @@ from pymatgen.io.vasp import VaspInput, Vasprun, Poscar, Xdatcar
 
 from .io_base import PathLike, check_file_or_dir
 from .json import JsonLoader
-from src.utils import raise_or_warn, VisualIterator
+from src.utils import raise_or_warn, VisualIterator, is_genmat_name
 
 
 class VaspParsingError(Exception):
@@ -130,7 +130,7 @@ class VaspWriter:
 
 
 class VaspParser:
-    """Match and parse VASP run directories."""
+    """Match and parse GenMat-generated VASP run directories."""
     def __init__(
         self,
         base_dir: PathLike,
@@ -138,11 +138,12 @@ class VaspParser:
         max_index: int | None = None,
         match_all: bool = True,
         unique: bool = True,
+        check_empty: bool = True,
         workers: int | None = None
     ) -> None:
         """
-        Match and parse VASP run directories.
-        
+        Match and parse GenMat-generated VASP run directories.
+
         Parameters
         ----------
         base_dir: PathLike
@@ -159,13 +160,18 @@ class VaspParser:
 
         match_all: bool
             Whether each index should match at least one directory.
-            If True, raise an error when an index does not match any directory.
-            Defaults to True.
+            If `True`, raise an error when an index does not match any directory.
+            Defaults to `True`.
 
         unique: bool
             Whether each index should match at most one directory.
-            If True, raise an error when an index matches several directories.
-            Defaults to True.
+            If `True`, raise an error when an index matches several directories.
+            Defaults to `True`.
+
+        check_empty: bool
+            Whether to raise an exception if no structure directory was found with
+            defined indices. Also raises with a different message if no structure
+            directory was found at all in `base_dir`. Defaults to `True`.
 
         workers: int, optional
             Number of processes to use in parallel. If not given, will use default of
@@ -174,8 +180,9 @@ class VaspParser:
 
         Raises
         ------
-        - `FileNotFoundError` if match_all is True and an index does not match any directory.
-        - `FileExistsError` if unique is True and an index matches several directories.
+        - `FileNotFoundError` if `match_all` is `True` and an index does not match any directory.
+        - `FileExistsError` if `unique` is `True` and an index matches several directories.
+        - `FileNotFoundError` if `check_empty` is `True` and no directory matched the indices.
 
         Notes
         -----
@@ -190,6 +197,10 @@ class VaspParser:
         # Match all existing structure directories in base directory
         subtree = list(self.base_dir.iterdir())
         matching_dirs = sorted(filter(self.is_struct_dir, subtree))
+
+        if check_empty and matching_dirs == []:
+            raise FileNotFoundError(f"No VASP run directory found in {base_dir!r}.")
+
         struct_indices = [int(dir.name.split("_")[0]) for dir in matching_dirs]
 
         struct_dirs_dict = defaultdict(list)
@@ -199,7 +210,7 @@ class VaspParser:
         # Setup indices
         if indices is None:
             indices = list(
-                range(max(struct_indices) + 1) if max_index is None else range(max_index + 1)
+                range(max(struct_indices, default=-1) + 1) if max_index is None else range(max_index + 1)
             )
         else:
             assert all(isinstance(idx, int) for idx in indices)
@@ -207,39 +218,20 @@ class VaspParser:
         self.indices = sorted(indices)
         self.match_all = match_all
         self.unique = unique
+        self.check_empty = check_empty
         self.workers = workers
         self._all_struct_dirs = struct_dirs_dict
         self._struct_dirs = self._match_struct_dirs_indices()
 
     @staticmethod
-    def is_struct_dir(path: PathLike, strict: bool = True) -> bool:
+    def is_struct_dir(path: PathLike) -> bool:
         """
-        Checks whether given path is a directory having naming convention of a structure directory.
-
-        Parameters
-        ----------
-        path: str | Path
-            File to check.
-
-        strict: bool
-            Use a stricter matching pattern that does not authorize letters that never appear
-            in the symbols of the 118 elements (i.e. 'J', 'Q', 'j', 'q', 'w', 'x', 'z').
-            Defaults to True.
-
-        Returns
-        -------
-        bool
-        - `True` if given path is a directory following structure directory naming.
-        - `False` otherwise.
+        Checks whether given path is a directory having naming convention
+        of a structure directory.
         """
         # NOTE: Here 'path' must be a Path object, do not change for os.path.
         path = Path(path)
-        elt_w_idx = r"[A-IK-PR-Z][a-ik-pr-vy]?\d*" if strict else r"[A-Z][a-z]?\d*"
-        pattern = fr"\A\d+_(?:{elt_w_idx}|\((?:{elt_w_idx})+\)\d*)+\Z"
-        return (
-            path.is_dir()
-            and re.fullmatch(pattern, path.name) is not None
-        )
+        return path.is_dir() and is_genmat_name(path.name)
 
     @property
     def all_struct_dirs(self) -> list[Path]:
@@ -276,6 +268,11 @@ class VaspParser:
         matching_dirs = list(itt.chain.from_iterable(
             [self._all_struct_dirs.get(idx, []) for idx in self.indices]
         ))
+        if self.check_empty and matching_dirs == []:
+            str_indices = ', '.join(map(str, self.indices))
+            raise FileNotFoundError(
+                f"No directory in {self.base_dir!r} matched any of defined indices: {str_indices}."
+            )
         return matching_dirs
 
     @staticmethod
@@ -382,23 +379,21 @@ class VaspParser:
         `VaspParsingError` if none of the attempts were successful and `on_error`
         is set to "raise".
         """
-        check_file_or_dir(run_dir, "dir")
+        check_file_or_dir(run_dir, "dir", check_empty=True)
 
         if try_vasprun:
             try:
-                file = os.path.join(run_dir, "vasprun.xml")
                 vasprun = self.get_safe_vasprun(
-                    file,
+                    run_dir,
                     converged=False,
                     parse_dos=False,
                     parse_eigen=False,
                     parse_potcar_file=False
                 )
-            except FileNotFoundError:
-                pass
-            else:
                 if vasprun is not None:
                     return vasprun.final_structure
+            except FileNotFoundError:
+                pass  
 
         if try_contcar:
             try:
@@ -426,7 +421,7 @@ class VaspParser:
         
         msg = (
             f"{self.get_struct_from_run_dir.__qualname__}: "
-            f"Unable to extract a structure from '{run_dir}'.\n"
+            f"Unable to extract a structure from {run_dir!r}.\n"
             "Tried files:\n"
             f"- vasprun.xml: {try_vasprun}\n"
             f"- CONTCAR: {try_contcar}\n"
@@ -545,7 +540,7 @@ class VaspExtractor:
             Name of the JSON file summarizing the runs results, and containing a boolean value for
             each run saying if it passed or failed the computation step filter. Avoids to load
             structures from runs that failed the filter. If not given, all run directories will be
-            parsed. The file must be located inside the base diretory pointed by the VaspIO object.
+            parsed. The file must be located inside the base diretory pointed by `vasp_parser`.
 
         summary_key: str, optional
             Name of the key to check the filter bool value inside the summary file. If `summary_name`
@@ -583,16 +578,14 @@ class VaspExtractor:
                 "Please provide a key to match inside the summmary file."
             )
 
-        if workers is not None:
-            assert workers >= 0, ValueError(
-                f"'workers' must be positive or zero, got {workers}."
-            )
+        if workers is not None and workers < 0:
+            raise ValueError(f"'workers' must be positive or zero, got {workers}.")
 
         self.parser = vasp_parser
         self.extractor = self._get_extractor(method, summary_path, summary_key, on_error)
         self.struct_dirs = self.parser.struct_dirs
 
-        if workers is not None and workers == 0: # Sequential execution
+        if workers == 0: # Sequential execution
             structs_data_list = list(filter(
                 None, [self.extractor(struct_dir) for struct_dir in self.struct_dirs]
             ))
@@ -655,13 +648,14 @@ class VaspExtractor:
                     summary_path=summary_path, summary_key=summary_key, on_error=on_error
                 )
             case str():
+                supported_methods = "', '".join([method.value for method in ExtractMethod])
                 raise NotImplementedError(
                     f"Provided method ({method}) is not supported. "
-                    "Supported methods are: 'convex_hull', 'delta_sol_init', 'delta_sol_calc'."
+                    f"Supported methods are: {supported_methods!r}."
                 )
             case _:
                 raise TypeError(
-                    f"'method' expected a type 'str', got {type(method).__name__}."
+                    f"'method' expected a type 'str', got {type(method).__name__!r}."
                 )
 
     @staticmethod

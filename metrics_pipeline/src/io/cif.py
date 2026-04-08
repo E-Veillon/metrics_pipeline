@@ -282,13 +282,15 @@ class CIFFile:
         if self.special_keys:
             saved_data = []
             for key in self.special_keys:
+                if (value:=structure.properties.get(key)) is None:
+                    continue
                 if key == "header":
-                    cif_block.header = structure.properties[key].replace(" ", "_")
+                    cif_block.header = value.replace(" ", "_")
                 else:
-                    saved_data.append((key, structure.properties[key]))
+                    saved_data.append((key, value))
             saved_data.extend(list(cif_block.data.items()))
             cif_block.data = dict(saved_data)
-        
+
         return str(cif_block)
 
     def add_structures(

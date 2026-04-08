@@ -10,14 +10,16 @@ import typing_extensions as tpe
 from .common_asserts import raise_or_warn
 
 
-class VisualIterator:
+T = tp.TypeVar("T")
+
+class VisualIterator(tp.Generic[T], tp.Iterable[T]):
     """
     A minimalist way to visualize progression while iterating through long sequences.
     Possibility to custom printed messages.
     """
     def __init__(
         self: tpe.Self,
-        iterable: tp.Iterable[tp.Any],
+        iterable: tp.Iterable[T],
         desc: str | None = None,
         unit: str | None = None,
         end_desc: str | None = None,
@@ -135,7 +137,7 @@ class VisualIterator:
     def __len__(self: tpe.Self) -> int:
         return self.length
 
-    def __iter__(self: tpe.Self) -> tp.Any:
+    def __iter__(self: tpe.Self) -> tp.Iterator[T]:
         for idx, obj in enumerate(self.iterable, start=1):
             maxlen = "Unknown" if self.length < 0 else self.length
             counter = f"{self.desc}: {idx}/{maxlen} {self.unit}"
@@ -167,7 +169,7 @@ class VisualIterator:
 
     @classmethod
     def from_iterator(
-        cls, iterator: tp.Iterator|tp.Generator, **kwargs
+        cls, iterator: tp.Iterator[T]|tp.Generator[T], **kwargs
     ) -> tpe.Self:
         """
         Get a VisualIterator wrapping a lazy iterator instead of an explicit sequence.
@@ -192,7 +194,7 @@ class VisualIterator:
 
     @classmethod
     def from_big_iterator(
-        cls, iterator: tp.Iterator|tp.Generator, n_elts: int | None = None, **kwargs
+        cls, iterator: tp.Iterator[T]|tp.Generator[T], n_elts: int | None = None, **kwargs
     ) -> tpe.Self:
         """
         Get a VisualIterator wrapping a lazy iterator instead of an explicit sequence.

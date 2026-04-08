@@ -85,7 +85,8 @@ def check_file_or_dir(
         allowed_formats: str | tuple[str]
             If the path should lead to a file with a specific format extension, provide here
             wanted extension without the dot separator (e.g. "txt" and not ".txt").
-            If several formats are possible, give a tuple of them.
+            If several formats are possible, give a tuple of them. Raises `ValueError` if the
+            file exists but is not of the right format.
     """
     assert isinstance(path, (str, Path)), TypeError(
         f"'filename' expected a type 'str' or 'Path', got {type(path).__name__!r}."

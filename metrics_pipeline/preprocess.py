@@ -19,7 +19,8 @@ from src.utils import (
     parse_input_args, check_type, check_num_value,
     ALL_ELTS_CATEGORIES,
     get_elts_from_symbol_or_z, get_elts_in_categories,
-    filter_by_elements
+    filter_by_elements,
+    generate_genmat_names
 )
 from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile
 
@@ -308,12 +309,11 @@ def main(standalone: bool = True, **kwargs) -> None:
     print(f"{len(structures)} structures with valid composition were successfully parsed.")
 
     # Generate unique indexed names as headers
-    for idx, structure in enumerate(structures):
-        name = f"{idx}_{structure.properties.get('header', structure.reduced_formula)}"
-        structure.properties["header"] = name
+    structures = generate_genmat_names(structures)
 
-    if "header" not in args["special_keys"]:
-        args["special_keys"].append("header")
+    for key in ("header", "_original_header"):
+        if key not in args["special_keys"]:
+            args["special_keys"].append(key)
 
     # Symmetrize and write standardized CIF file
     if args["symmetrize"]:
@@ -323,8 +323,9 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     if args["input_file"].endswith(".cif"):
         cif_file.clear()
+        cif_file.special_keys = args["special_keys"]
     else:
-        cif_file = CIFFile(special_keys=args.get("special_keys"), workers=args.get("workers"))
+        cif_file = CIFFile(special_keys=args["special_keys"], workers=args.get("workers"))
 
     cif_file.add_structures(
         structures,

@@ -12,7 +12,7 @@ import argparse as ap
 
 from pymatgen.io.vasp import VaspInput
 
-from src.utils import parse_input_args, check_type, check_num_value
+from src.utils import parse_input_args, check_type, check_num_value, check_genmat_name, get_genmat_name_idx
 from src.io import (
     check_file_or_dir, load_yaml_as_dict, CIFFile,
     VaspWriter, VaspParser, VaspExtractor, ExtractMethod, CONFIGPATH, EmptyDirectoryError
@@ -30,13 +30,13 @@ def _get_command_line_args() -> ap.Namespace:
         "input_file",
         help=(
             "Path to the file containing structure data to read. "
-            "It can be a CIF file to read structure data directly, or "
+            "It can be a preprocssed CIF file to read structure data directly, or "
             "a JSON summary file from a previous pipeline step to extract "
             "structure data from a previous VASP run."
         )
     )
     parser.add_argument(
-        "--output", "-o", metavar="outdir",
+        "--output", "-o",
         help=(
             "Path to the output directory where VASP files will be written. "
             "A subdirectory will be created in output directory "
@@ -50,9 +50,8 @@ def _get_command_line_args() -> ap.Namespace:
     parser.add_argument(
         "--indices", "-i", nargs="*", type=int, metavar="int",
         help=(
-            "If only a few specific structures need to be parsed, pass here their respective index "
-            "(0-based position in CIF file order or name index in JSON summary). If not given, all "
-            "structures in input_file are parsed normally."
+            "If only a few specific structures need to be parsed, pass here their respective "
+            "preprocessing indices. If not given, all structures in input_file are parsed."
         ),
     )
     parser.add_argument(
@@ -73,9 +72,8 @@ def _get_command_line_args() -> ap.Namespace:
     parser.add_argument(
         "--user-settings", "-u",
         help=(
-            "Name of the YAML file containing tags to override the PMG preset. "
-            f"Given filename must be located in {CONFIGPATH} to be found. "
-            "Defaults to %(default)s."
+            "Name of the optional YAML file containing tags to override in the preset. "
+            f"Given filename must be located in {CONFIGPATH} to be found."
         )
     )
     parser.add_argument(
@@ -134,7 +132,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     assert str(args_dict.get("preset", "")).lower() in ALL_PRESETS_NAMES_LOWER, (
         "Provided preset must be one of the following (case insensitive): "
-        f"{', '.join(ALL_PRESETS_NAMES_LOWER)}."
+        f"{', '.join(ALL_PRESETS_NAMES_LOWER)}, got {str(args_dict.get('preset', '')).lower()!r}."
     )
     if args_dict.get("user_settings"):
         config_path = os.path.join(CONFIGPATH, args_dict["user_settings"])
@@ -221,23 +219,22 @@ def main(standalone: bool = True, **kwargs):
         # Convert CIF data into Structure objects
         structures, _ = CIFFile.from_file(
             input_file,
+            special_keys=["header"],
             workers=args.get("workers")
         ).parse_structures()
+
+        for structure in structures:
+            check_genmat_name(structure.properties["header"])
 
         # Get structures of interest
         if indices is None:
             structs_data = [
-                (
-                    f"{struct_idx}_{structure.composition.reduced_formula}",
-                    structure
-                ) for struct_idx, structure in enumerate(structures)
+                (structure.properties["header"], structure) for structure in structures
             ]
         else:
             structs_data = [
-                (
-                    f"{struct_idx}_{structures[struct_idx].composition.reduced_formula}",
-                    structures[struct_idx]
-                ) for struct_idx in indices
+                (structure.properties["header"], structure) for structure in structures
+                if get_genmat_name_idx(structure.properties["header"]) in indices
             ]
 
     elif input_file.endswith(".json"):
@@ -246,17 +243,6 @@ def main(standalone: bool = True, **kwargs):
             base_dir=base_dir,
             indices=indices
         )
-        if not vparser.struct_dirs:
-            if indices is None:
-                raise EmptyDirectoryError(
-                    f"{base_dir}: No run directory found in this directory."
-                )
-            else:
-                raise ValueError(
-                    f"None of given indices ({', '.join(sorted(map(str, indices)))}) correspond "
-                    f"to a run directory inside {base_dir}."
-                )
-
         data_dict = VaspExtractor(
             vparser, method=ExtractMethod.FINAL_STATE,
             summary_name=summary_name,
@@ -265,11 +251,10 @@ def main(standalone: bool = True, **kwargs):
         ).get_data()
 
         if not data_dict: # No Structure passed last step
-            print(
+            raise ValueError(
                 "None of parsed structures passed previous step filter. "
                 "Therefore, no VASP run directory is being written."
             )
-            exit(0)
 
         structs_data = [
             (os.path.basename(dir_path), structure_data["structure"])
