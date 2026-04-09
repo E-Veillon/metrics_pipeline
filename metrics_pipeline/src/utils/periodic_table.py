@@ -121,14 +121,14 @@ def has_elements(
 
     Parameters
     ----------
-    struccture: Structure | str
+    structure: Structure | str
         The structure data to search into.
 
     elements: list[str]
         List of element symbols to search for.
 
     format: str, optional
-        If `data` is passed as a str, precise the formatting ("cif" or "poscar").
+        If `structure` is passed as a str, precise the formatting ("cif" or "poscar").
 
     Returns
     -------
@@ -144,7 +144,6 @@ def has_elements(
         )
     if not elements:
         return False
-
 
     match format:
         case "cif":
@@ -309,42 +308,47 @@ def discard_rare_earth_structures(
     return kept_structs, nbr_discarded
 
 
-def get_elements(elts_data: FormulaLike) -> list[Element|Species|DummySpecies]:
+def get_elements(elts_data: FormulaLike) -> list[Element]:
     """
     Flexible converter to get a list of unique Element objects from a single string or any 
     iterable providing valid element symbols, atomic numbers, Element objects, or a mixture 
     of the three.
 
-    Parameters:
-        elts_data (str|[str|int|Element]):  The data to parse Elements objects from.
-                                            If a single string is provided, it can either 
-                                            be a raw formula (eg. "FePO4") or a composition 
-                                            string containing element symbols separated by 
-                                            "-" (eg. "Fe-P-O").
-                                            If an iterable is given, it can contain valid 
-                                            element symbols, atomic numbers and/or Element 
-                                            objects.
+    Parameters
+    ----------
+    elts_data: str|[str|int|Element]
+        The data to parse Elements objects from. If a single string is provided, it can either
+        be a raw formula (eg. "FePO4") or a composition string containing element symbols
+        separated by "-" (eg. "Fe-P-O"). If an iterable is given, it can contain valid
+        element symbols, atomic numbers and/or Element objects.
 
-    Raises: 
-        ValueError if some of the given data does not represents valid elements.
+    Raises
+    ------
+    `ValueError`: if some of the given data does not represents valid elements.
 
-    Returns: 
+    Returns
+    -------
+    list[Element]
         A list of parsed Element objects.
     """
     check_type(elts_data, "elts_data", (str, tp.Sequence))
 
     if isinstance(elts_data, str):
-        return Composition(
+        elements = Composition(
             "".join(elts_data.split(sep="-")), strict=True
         ).element_composition.elements
 
     else:
         for idx, data in enumerate(elts_data):
             check_type(data, f"elts_data[{idx}]", (str, int, Element))
-
-        return Composition(
+        elements = Composition(
             [(elt, 1) for elt in elts_data], strict=True
         ).element_composition.elements
+
+    converter: Callable[[Element|Species], Element] = (
+        lambda elt: elt.element if isinstance(elt, Species) else elt
+    )
+    return [converter(elt) for elt in elements]
 
 
 def get_elemental_subsets(
@@ -356,15 +360,18 @@ def get_elemental_subsets(
     of same elements as the given main formula. The atomic fractions are not taken into 
     account, only presence and absence of the elements are checked.
 
-    Parameters:
-        main_elts_set (str|Iterable):   The reference formula to get sub-formulas from.
-                                        Only formulas containing only elements that are 
-                                        present in this one will be returned.
+    Parameters
+    ----------
+    main_elts_set: str | Iterable[str | int | Element]
+        The reference formula to get sub-formulas from. Only formulas containing
+        only elements that are present in this one will be returned.
         
-        elts_subsets ([str|Iterable]):  The pool of formulas from which subformulas must
-                                        be extracted.
+    elts_subsets: list[str | Iterable[str | int | Element]]
+        The pool of formulas from which subformulas must be extracted.
                 
-    Returns:
+    Returns
+    -------
+    list[str | Iterable[str | int | Element]]
         List of the formulas fully included in the main one.
     """
     check_type(elts_subsets, "elts_subsets", (str, tp.Sequence))
