@@ -8,11 +8,9 @@ Preprocess generated structures data for further pipeline steps:
 """
 
 import os
-import re
-import ast
 from pathlib import Path
 import typing as tp
-from datetime import datetime
+from time import time
 import argparse as ap
 
 from src.utils import (
@@ -23,6 +21,9 @@ from src.utils import (
     generate_genmat_names
 )
 from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile
+
+if tp.TYPE_CHECKING:
+    from pymatgen.core import Structure
 
 
 def _get_command_line_args() -> ap.Namespace:
@@ -50,16 +51,15 @@ def _get_command_line_args() -> ap.Namespace:
     parser.add_argument(
         "--special-keys", "-sk", nargs="*",
         help=(
-            "By default, each structure will be attributed a unique name in output file for "
-            "easy data tracking throughout the pipeline, composed of a unique index followed "
-            "by the reduced formula of the structure. Pass 'header' here to keep structure "
-            "header lines content (comment line for POSCARs) as name instead of the formula. "
-            "For a CIF formatted file, also pass any non-looping CIF Label to keep in output data. "
-            "Even if 'header' is passed, the unique index is still generated to avoid name clashes."
+            "Each structure will be attributed a unique name in output file for easy data "
+            "tracking throughout the pipeline, composed of a unique index followed by the reduced "
+            "formula of the structure. Pass 'header' here to keep original header line content "
+            "(comment line for POSCARs) in '_original_header' label in output CIFs. "
+            "For a CIF formatted file, also pass any non-looping CIF Label to keep in output data."
         )
     )
     parser.add_argument(
-        "--workers", "-w", type=int, metavar="int",
+        "-w", "--workers", type=int, metavar="int",
         help=(
             "Number of processes to use in parallel. If not given, will use default of "
             "`tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()` "
@@ -203,7 +203,73 @@ def _print_config(args_dict: dict) -> None:
     print(" ")
 
 
-########################################
+def _get_structures_from_cif(args_dict: dict[str, tp.Any]) -> tuple[list[Structure], int, int, int]:
+    cif_file = CIFFile.from_file(
+        args_dict["input_file"],
+        special_keys=args_dict.get("special_keys"),
+        workers=args_dict.get("workers")
+    )
+    cifs = cif_file.get_cifs()
+    nbr_loaded_data = len(cifs)
+    assert nbr_loaded_data > 0, "No structure could be parsed from given data"
+    print(f"{nbr_loaded_data} structures detected in total")
+
+    # Remove structures containing unwanted elements
+    if len(args_dict["forbidden_elts"]) > 0:
+        cifs, nbr_discarded = filter_by_elements(
+            cifs, list(args_dict["forbidden_elts"].keys()), format="cif"
+        )
+        print(f"{nbr_discarded} CIFs containing forbidden elements were discarded.")
+
+    cif_file.clear()
+    cif_file.add_cifs(cifs)
+    structures, invalid_indices = cif_file.parse_structures()
+    nbr_invalid = len(invalid_indices)
+    print(f"{nbr_invalid} CIFs could not be loaded and will not be saved in output.")
+    return structures, nbr_loaded_data, nbr_discarded, nbr_invalid
+
+
+def _get_structures_from_poscar(args_dict: dict[str, tp.Any]) -> tuple[list[Structure], int, int]:
+    pfile = PoscarFile(args_dict["input_file"], workers=args_dict.get("workers"))
+    nbr_loaded_data = len(pfile)
+    assert nbr_loaded_data > 0, "No structure could be parsed from given data"
+    print(f"{nbr_loaded_data} structures detected in total")
+
+    # Remove structures containing unwanted elements
+    if len(args_dict["forbidden_elts"]) > 0:
+        poscars, nbr_discarded = filter_by_elements(
+            pfile.data, list(args_dict["forbidden_elts"].keys()), format="poscar"
+        )
+        pfile = PoscarFile.from_str("\n".join(poscars), strict=False, workers=args_dict.get("workers"))
+        print(f"{nbr_discarded} POSCARs containing forbidden elements were discarded.")
+
+    structures = pfile.parse_structures()
+    if args_dict["special_keys"] and "header" in args_dict["special_keys"]:
+        for header, structure in zip(pfile.headers, structures):
+            structure.properties["header"] = header
+    return structures, nbr_loaded_data, nbr_discarded
+
+
+def _print_computation_summary(args_dict: dict[str, tp.Any], counters: dict[str, int | float]) -> None:
+    nbr_loaded_data = counters.pop("nbr_loaded_data", 0)
+    nbr_written_data = counters.pop("nbr_written_data", 0)
+    nbr_discarded = counters.pop("nbr_discarded", 0)
+    nbr_invalid = counters.pop("nbr_invalid", 0)
+    computation_time = counters.pop("computation_time", 0)
+
+    print("\n------------------------------")
+    print("\nSUMMARY OF THE PREPROCESSING")
+    print(f"{nbr_loaded_data} structures processed in total, including:")
+    print(f"- {nbr_written_data} structure(s) written in output")
+
+    if len(args_dict["forbidden_elts"]) > 0:
+        print(f"- {nbr_discarded} structure(s) containing forbidden elements")
+    
+    if args_dict["input_file"].endswith("cif") and nbr_invalid > 0:
+        print(f"- {nbr_invalid} structure(s) that could not be parsed")
+
+    print(f"\nOutput results written in {args_dict['output']}")
+    print(f"elapsed time: {computation_time}")
 
 
 def main(standalone: bool = True, **kwargs) -> None:
@@ -230,12 +296,11 @@ def main(standalone: bool = True, **kwargs) -> None:
         added.
 
     special_keys: list[str], optional
-        By default, each structure will be attributed a unique name in output file for
-        easy data tracking throughout the pipeline, composed of a unique index followed
-        by the reduced formula of the structure. Pass 'header' here to keep structure
-        header lines content (comment line for POSCARs) as name instead of the formula.
+        Each structure will be attributed a unique name in output file for easy data
+        tracking throughout the pipeline, composed of a unique index followed by the reduced
+        formula of the structure. Pass 'header' here to keep original header line content
+        (comment line for POSCARs) in '_original_header' label in output CIFs.
         For a CIF formatted file, also pass any non-looping CIF Label to keep in output data.
-        Even if 'header' is passed, the unique index is still generated to avoid name clashes.
 
     workers: int, optional
         Number of processes to use in parallel. If not given, will use default of
@@ -259,52 +324,17 @@ def main(standalone: bool = True, **kwargs) -> None:
         Pass valid element categories to eliminate structures containing any element from
         these categories.
     """
-    start = datetime.now()
+    start = time()
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
     _print_config(args)
 
     # Data extraction and conversion to structures
     if args["input_file"].endswith(".cif"):
-        cif_file = CIFFile.from_file(
-            args["input_file"],
-            special_keys=args.get("special_keys"),
-            workers=args.get("workers")
-        )
-        cifs = cif_file.get_cifs()
-        nbr_loaded_data = len(cifs)
-        assert nbr_loaded_data > 0, "No structure could be parsed from given data"
-        print(f"{nbr_loaded_data} structures detected in total")
-
-        # Remove structures containing unwanted elements
-        if len(args["forbidden_elts"]) > 0:
-            cifs, nbr_discarded = filter_by_elements(
-                cifs, list(args["forbidden_elts"].keys()), format="cif"
-            )
-            print(f"{nbr_discarded} CIFs containing forbidden elements were discarded.")
-
-        cif_file.clear()
-        cif_file.add_cifs(cifs)
-        structures, invalid_indices = cif_file.parse_structures()
-        print(f"{len(invalid_indices)} CIFs could not be loaded and will not be saved in output.")
+        structures, nbr_loaded_data, nbr_discarded, nbr_invalid = _get_structures_from_cif(args)
 
     elif args["input_file"].endswith(".poscar"):
-        pfile = PoscarFile(args["input_file"], workers=args.get("workers"))
-        nbr_loaded_data = len(pfile)
-        assert nbr_loaded_data > 0, "No structure could be parsed from given data"
-        print(f"{nbr_loaded_data} structures detected in total")
-
-        # Remove structures containing unwanted elements
-        if len(args["forbidden_elts"]) > 0:
-            poscars, nbr_discarded = filter_by_elements(
-                pfile.data, list(args["forbidden_elts"].keys()), format="poscar"
-            )
-            pfile = PoscarFile.from_str("\n".join(poscars), strict=False, workers=args.get("workers"))
-            print(f"{nbr_discarded} POSCARs containing forbidden elements were discarded.")
-
-        structures = pfile.parse_structures()
-        if args["special_keys"] and "header" in args["special_keys"]:
-            for header, structure in zip(pfile.headers, structures):
-                structure.properties["header"] = header
+        structures, nbr_loaded_data, nbr_discarded = _get_structures_from_poscar(args)
+        nbr_invalid = 0
 
     print(f"{len(structures)} structures with valid composition were successfully parsed.")
 
@@ -321,12 +351,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     else:
         print("Symmetrization is deactivated, now writing CIF file...")
 
-    if args["input_file"].endswith(".cif"):
-        cif_file.clear()
-        cif_file.special_keys = args["special_keys"]
-    else:
-        cif_file = CIFFile(special_keys=args["special_keys"], workers=args.get("workers"))
-
+    cif_file = CIFFile(special_keys=args["special_keys"], workers=args.get("workers"))
     cif_file.add_structures(
         structures,
         symmetrize=args["symmetrize"],
@@ -336,21 +361,15 @@ def main(standalone: bool = True, **kwargs) -> None:
     cif_file.write_file(args["output"])
 
     # Time of the preprocessing
-    stop = datetime.now()
-
-    print("\n------------------------------")
-    print("\nSUMMARY OF THE PREPROCESSING")
-    print(f"{nbr_loaded_data} structures processed in total, including:")
-    print(f"- {len(structures)} structure(s) written in output")
-
-    if len(args["forbidden_elts"]) > 0:
-        print(f"- {nbr_discarded} structure(s) containing forbidden elements")
-    
-    if args["input_file"].endswith("cif") and len(invalid_indices) > 0:
-        print(f"- {len(invalid_indices)} structure(s) that could not be parsed")
-
-    print(f"\nOutput results written in {args['output']}")
-    print(f"elapsed time: {stop-start}")
+    stop = time()
+    counters: dict[str, int | float] = {
+        "nbr_loaded_data": nbr_loaded_data,
+        "nbr_written_data": len(structures),
+        "nbr_discarded": nbr_discarded,
+        "nbr_invalid": nbr_invalid,
+        "computation_time": stop-start,
+    }
+    _print_computation_summary(args, counters)
 
 
 if __name__ == "__main__":
