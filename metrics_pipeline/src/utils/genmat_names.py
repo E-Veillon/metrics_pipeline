@@ -22,7 +22,7 @@ def is_genmat_name(name: str) -> bool:
 
 def check_genmat_name(name: str) -> None:
     """
-    Verify that given name corrresponds to preprocessed structure naming convention.
+    Verify that given name follows GenMat preprocessed structure naming convention.
     Raises a `ValueError` if it does not.
     """
     if is_genmat_name(name):

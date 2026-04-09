@@ -23,7 +23,8 @@ from pymatgen.core import Structure
 from src.utils import (
     parse_input_args, check_type, check_num_value,
     ALL_ELTS_CATEGORIES, get_elts_from_symbol_or_z, get_elts_in_categories,
-    filter_by_elements
+    filter_by_elements,
+    check_genmat_name
 )
 from src.io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
@@ -361,6 +362,9 @@ def main(standalone: bool = True, **kwargs) -> None:
     )
     gen_cifs = gen_file.get_cifs()
     generated, _ = gen_file.parse_structures()
+    
+    for structure in generated:
+        check_genmat_name(structure.properties["header"])
 
     print("Generated structures loaded.")
 
@@ -399,7 +403,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         print("Loading relaxations summary file...")
         base_dir, summary_name = os.path.split(args["relax_summary"])
         relax_structures_dict = VaspExtractor(
-            vasp_parser=VaspParser(base_dir),
+            vasp_parser=VaspParser(base_dir, workers=args.get("workers")),
             method=ExtractMethod.RELAXATION,
             summary_name=summary_name,
             summary_key="converged",
