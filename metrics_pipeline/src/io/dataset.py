@@ -1,8 +1,5 @@
-#!/usr/bin/python
 """Downloads and manages remote databases API and data."""
 
-import os
-import json
 import typing as tp
 import typing_extensions as tpe
 from dataclasses import dataclass
@@ -10,7 +7,6 @@ import itertools as itt
 
 from mp_api.client import MPRester
 from emmet.core.types.enums import ThermoType
-from emmet.core.thermo import ThermoDoc
 
 from pymatgen.core import SETTINGS, Composition
 from pymatgen.analysis.phase_diagram import PDEntry
@@ -20,63 +16,62 @@ from .json import JsonLoader, JsonWriter
 
 from src.utils import ALL_ELT_SYMBOL_TO_Z
 
+
 @dataclass
 class PDEntryParser:
     """Parse structure data to get corresponding PDEntry object."""
-    id: str
-    composition: Composition | None = None
+    entry_id: str
+    composition: Composition | dict[str, float] | None = None
     formula: str | None = None
     natoms: int | None = None
     energy: float | None = None
     energy_per_atom: float | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.id, str):
+        if not isinstance(self.entry_id, str):
             raise TypeError(
-                f"'id' expected a type 'str', got {type(self.id).__name__}."
+                f"'entry_id' expected a type 'str', got {type(self.entry_id).__name__}."
         )
-
-        # Get composition from formula and natoms
-        if self.composition is None:
-            if not (self.formula is not None and self.natoms is not None):
+        # Check composition args validity
+        if self.composition is None and (self.formula is None or self.natoms is None):
                 raise ValueError(
                     f"Either 'composition' or 'formula' and 'natoms' must be given."
             )
-            formula_unit = Composition(self.formula, strict=True)
-            if formula_unit.num_atoms != self.natoms:
-                mult_factor = self.natoms / formula_unit.num_atoms
-                self.composition = formula_unit * mult_factor
-
-        elif isinstance(self.composition, dict):
-            self.composition = Composition(self.composition, strict=True)
-
-        else:
-            if not isinstance(self.composition, Composition):
+        elif not isinstance(self.composition, (Composition, dict)):
                 raise TypeError(
-                    "'composition' expected a type 'Composition', "
-                    f"got {type(self.composition).__name__}."
+                    "'composition' expected a type 'Composition' or 'dict', "
+                    f"got {type(self.composition).__name__!r}."
             )
-
-        # Get total energy from energy per atom and composition atoms
-        if self.energy is None:
-            if self.energy_per_atom is None:
+        # Check energy args validity
+        if self.energy is None and self.energy_per_atom is None:
                 raise ValueError(
                     f"Either 'energy' or 'energy_per_atom' must be given."
             )
-            assert self.composition is not None, "Type checker assertion."
-            self.energy = self.energy_per_atom * self.composition.num_atoms
 
-    @classmethod
-    def from_composition_dict(cls, id: str, composition: dict[str, float], **kwargs) -> tpe.Self:
-        """Build PDEntryParser with a composition dict instead of Composition object."""
-        return cls(id, Composition(composition), **kwargs)
+    @property
+    def true_composition(self) -> Composition:
+        """Composition parsed from data, as Composition object."""
+        if self.composition is None:
+            formula_unit = Composition(self.formula, strict=True)
+            natoms = tp.cast(int, self.natoms)
+            if formula_unit.num_atoms != natoms:
+                mult_factor = natoms / formula_unit.num_atoms
+                return formula_unit * mult_factor
+
+        return Composition(self.composition, strict=True)
+
+    @property
+    def true_energy(self) -> float:
+        """Total energy parsed from data, in eV."""
+        if self.energy is None:
+            assert self.energy_per_atom is not None, "Type checker assertion."
+            return self.energy_per_atom * self.true_composition.num_atoms
+
+        return self.energy
 
     def get_entry(self) -> PDEntry:
         """Build PDEntry from data."""
-        assert isinstance(self.composition, Composition), "Type checker assertion."
-        assert self.energy is not None, "Type checker assertion."
-
-        return PDEntry(self.composition, self.energy, self.id)
+        return PDEntry(self.true_composition, self.true_energy, self.entry_id)
 
 
 class PDDataset:
@@ -119,10 +114,10 @@ class PDDataset:
             `composition_key` must be given.
 
         energy_key: str, optional
-            Key used to store structure total energy in eV. If not given, `energy_per_atom_key`
-            must be given.
+            Key used to store structure total energy in eV. If not given,
+            `energy_per_atom_key` must be given.
 
-        energy_per_atom: str, optional
+        energy_per_atom_key: str, optional
             Key used to store structure energy per atom in eV/atom. If not given,
             `energy_key` must be given.
 
@@ -138,40 +133,22 @@ class PDDataset:
 
             Defaults to `False`.
         """
-        if not isinstance(data, dict):
-            raise TypeError(
-                f"'data' expected a type 'dict', got {type(data).__name__}."
+        self._check_input_data_and_ids(data, id_key)
+        self._check_keys_combinations(
+            composition_key, formula_key, natoms_key,
+            energy_key, energy_per_atom_key
         )
-        val_types = ", ".join(sorted(set(type(val).__name__ for val in data.values())))
-        if not all(isinstance(val, dict) for val in data.values()):
-            raise TypeError(
-                f"'data' values must contain only dict, got following types: {val_types}."
-        )
-        if not all(isinstance(val.get(id_key), str) for val in data.values()):
-            raise TypeError(
-                f"Given 'id_key' ({id_key}) does not always match a string ID in the data."
-        )
-        if not (composition_key or (formula_key and natoms_key)):
-            raise ValueError(
-                f"Either 'composition_key' or 'formula_key' and 'natoms_key' must be given."
-        )
-        if not (energy_key or energy_per_atom_key):
-            raise ValueError(
-                f"Either 'energy_key' or 'energy_per_atom_key' must be given."
-        )
-
         self._data: dict[str, PDEntry] = {}
         self._elements: set[str] = set()
         self._computable_elements: set[str] = set()
         self.key_dict = {
-            "id": id_key,
+            "entry_id": id_key,
             "composition": composition_key,
             "formula": formula_key,
             "natoms": natoms_key,
             "energy": energy_key,
             "energy_per_atom": energy_per_atom_key,
         }
-
         if compact:
             # Regenerate parsed structures data dicts
             parsed_data = {k: data.get(v, itt.repeat(None)) for k, v in self.key_dict.items()}
@@ -192,6 +169,38 @@ class PDDataset:
             for entry in self._data.values():
                 entry.attribute = attribute
 
+    @staticmethod
+    def _check_input_data_and_ids(data: dict[str, dict[str, tp.Any]], id_key: str) -> None:
+        """Check whether the input data dict is correctly formatted and has valid IDs."""
+        if not isinstance(data, dict):
+            raise TypeError(
+                f"'data' expected a type 'dict', got {type(data).__name__}."
+        )
+        if not all(isinstance(val, dict) for val in data.values()):
+            val_types = ", ".join(sorted(set(type(val).__name__ for val in data.values())))
+            raise TypeError(
+                f"'data' values must contain only dict, got following types: {val_types}."
+        )
+        if not all(isinstance(val.get(id_key), str) for val in data.values()):
+            raise TypeError(
+                f"Given 'id_key' ({id_key}) does not always match a string ID in the data."
+        )
+
+    @staticmethod
+    def _check_keys_combinations(
+        composition_key: str | None, formula_key: str | None, natoms_key: str | None,
+        energy_key: str | None, energy_per_atom_key: str | None
+    ) -> None:
+        """Check whether given keys combinations are valid."""
+        if not (composition_key or (formula_key and natoms_key)):
+            raise ValueError(
+                f"Either 'composition_key' or 'formula_key' and 'natoms_key' must be given."
+        )
+        if not (energy_key or energy_per_atom_key):
+            raise ValueError(
+                f"Either 'energy_key' or 'energy_per_atom_key' must be given."
+        )
+
     def _process_structure_data(self, struct_data: dict) -> None:
         """
         Process and store a single structure data dictionary.
@@ -203,7 +212,7 @@ class PDDataset:
         """
         entry_parser = PDEntryParser(**struct_data)
         entry = entry_parser.get_entry()
-        self._data[entry_parser.id] = entry
+        self._data[entry_parser.entry_id] = entry
         self._elements.update(
             set(entry.composition.get_el_amt_dict().keys())
         )
@@ -212,20 +221,23 @@ class PDDataset:
                 set(entry.composition.get_el_amt_dict().keys())
             )
 
-    def get_all_entries(self) -> dict[str, PDEntry]:
-        """Get dataset dict of all phase diagram entries."""
+    @property
+    def all_entries(self) -> dict[str, PDEntry]:
+        """Dataset dict of all phase diagram entries."""
         return self._data
 
-    def get_computable_entries(self) -> dict[str, PDEntry]:
+    @property
+    def computable_entries(self) -> dict[str, PDEntry]:
         """
-        Get dataset dict of entries with element dimension at most 10, which is the maximum
+        Dataset dict of entries with element dimension at most 10, which is the maximum
         supported by the phase diagram constructor.
         """
         return {name: entry for name, entry in self._data.items() if len(entry.composition) < 11}
 
-    def get_uncomputable_entries(self) -> dict[str, PDEntry]:
+    @property
+    def uncomputable_entries(self) -> dict[str, PDEntry]:
         """
-        Get dataset dict of entries with element dimension greater than 10, which is the maximum
+        Dataset dict of entries with element dimension greater than 10, which is the maximum
         supported by the phase diagram constructor.
         """
         return {name: entry for name, entry in self._data.items() if len(entry.composition) > 10}
@@ -240,12 +252,12 @@ class PDDataset:
         ----------
         elts: set[str], optional
             Set of elements the entries compositions must fit in.
-            Only entries containing only elements in the list are returned.
+            Only entries containing exclusively elements in the list are returned.
             If not given, no restriction is applied.
 
         dims: set[int], optional
             Set of accepted element dimensions.
-            Only entries having a composition of these dimensions will be returned.
+            Only entries having a composition of these element dimensions will be returned.
             If not given, no restriction is applied.
 
         Returns
@@ -254,37 +266,31 @@ class PDDataset:
             Dataset dict of entries corresponding to given conditions.
         """
         if elts is None and dims is None:
-            return self.get_all_entries()
+            return self.all_entries
 
-        data_tuples = list(self._data.items())
+        data_tuples = self.all_entries.items()
 
         if elts is not None:
-            data_tuples = list(
-                filter(
-                    lambda data_tup: data_tup[1].composition.chemical_system_set.issubset(elts),
-                    data_tuples
-                )
+            data_tuples = filter(
+                lambda data_tup: data_tup[1].composition.chemical_system_set.issubset(elts),
+                data_tuples
             )
-
         if dims is not None:
-            data_tuples = list(
-                filter(
-                    lambda data_tup: len(data_tup[1].composition) in dims,
-                    data_tuples
-                )
+            data_tuples = filter(
+                lambda data_tup: len(data_tup[1].composition) in dims,
+                data_tuples
             )
-
         return dict(data_tuples)
 
     @property
     def max_dim(self) -> int:
         """Max number of distinct elements in all entries."""
-        return max(len(entry.elements) for entry in self.get_all_entries().values())
+        return max(len(entry.elements) for entry in self.all_entries.values())
 
     @property
     def max_computable_dim(self) -> int:
         """Max number of distinct elements in computable entries."""
-        return max(len(entry.elements) for entry in self.get_computable_entries().values())
+        return max(len(entry.elements) for entry in self.computable_entries.values())
 
     @property
     def elements(self) -> set[str]:
@@ -366,7 +372,7 @@ class PDDataset:
         """
         if compact:
             # Ensure data ordering with a list
-            data_list = list(self._data.items())
+            data_list = list(self.all_entries.items())
             data = {
                 "entry_id": [entry_id for entry_id, _ in data_list],
                 "composition": [entry.composition.get_el_amt_dict() for _, entry in data_list],
@@ -378,27 +384,28 @@ class PDDataset:
                     "entry_id": entry_id,
                     "composition": entry.composition.get_el_amt_dict(),
                     "final_energy": entry.energy
-                } for entry_id, entry in self._data.items()
+                } for entry_id, entry in self.all_entries.items()
             }
         JsonWriter(filepath, data).write_as_dict()
 
 
 class APIKeyNotFoundError(Exception):
     """
-    An Error ocurring when an API key is not defined while trying to access an API.
+    An Error occurring when an API key is not defined while trying to access an API.
     """
 
 
 class MPDatasetDownloader:
     """
     Download the Materials Project phase diagram dataset and format the data
-    for compatibility with local phase diagram computations.
+    for compatibility with GenMat phase diagram computations.
     """
     def __init__(
         self, save_file: PathLike, api_key: str | None = None, download: bool = True
     ) -> None:
         """
-        Download Materials Project dataset and format the data for compatibility with GenMat.
+        Download Materials Project dataset and format the data for compatibility with GenMat
+        phase diagram computations.
 
         Parameters
         ----------
@@ -426,15 +433,15 @@ class MPDatasetDownloader:
         Check whether the MP API key is defined either in .pmgrc.yaml or manually.
         If it is found, the key string is returned. Otherwise, an exception is raised.
         """
-        if api_key is not None:
-            assert isinstance(api_key, str), TypeError(
-                f"'api_key' expected a type 'str', got {type(api_key).__name__}."
-            )
-        api_key = api_key or SETTINGS.get("PMG_MAPI_KEY")
+        api_key = SETTINGS.get("PMG_MAPI_KEY") if api_key is None else api_key
         if not api_key:
             raise APIKeyNotFoundError(
                 "An API key must be given to access MP API. "
                 "Configure it in .pmgrc.yaml in 'PMG_MAPI_KEY' keyword or pass it manually."
+            )
+        if not isinstance(api_key, str):
+            raise TypeError(
+                f"'api_key' expected a type 'str', got {type(api_key).__name__!r}."
             )
         return api_key
 

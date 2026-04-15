@@ -259,10 +259,10 @@ def main(standalone: bool = True, **kwargs):
     true_max_dim = generated_dataset.max_dim
     if true_max_dim > 10:
         max_dim_generated = generated_dataset.max_computable_dim
-        gen_entries = generated_dataset.get_computable_entries()
+        gen_entries = generated_dataset.computable_entries
     else: # Save filtering computation
         max_dim_generated = true_max_dim
-        gen_entries = generated_dataset.get_all_entries()
+        gen_entries = generated_dataset.all_entries
 
     used_elts = generated_dataset.computable_elements
 
@@ -310,8 +310,7 @@ def main(standalone: bool = True, **kwargs):
         results[entry.name] = dct
 
     # Too high dimension structures are added as not stable in results
-    high_dim_entries = generated_dataset.get_uncomputable_entries()
-    for name, entry in high_dim_entries.items():
+    for name, entry in generated_dataset.uncomputable_entries.items():
         msg = f"Uncomputable due to its too high dimension ({len(entry.composition)} > 10)."
         results[name] = {
                 "name": entry.name,

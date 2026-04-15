@@ -44,8 +44,8 @@ def get_lacking_elts_entries(
     entries: Sequence[PDEntry]
         Entries to check elemental entries in.
 
-    ref_elts Sequence[Elements] | set[Elements]
-        Reference Elements defining the wanted entry space.
+    ref_elts: Sequence[Element] | set[Element]
+        Reference Element objects defining the wanted chemical space.
 
     Returns
     -------
