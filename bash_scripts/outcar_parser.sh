@@ -58,27 +58,27 @@ for file in "$@"; do
 	echo " "
 	echo "$file:"
 	echo "Last iteration:"
-	grep Iteration $file > "grep_iter.tmp"
+	grep "Iteration" "$file" > "grep_iter.tmp"
 	tail -n 1 "grep_iter.tmp" > "tail_iter.tmp"
 	echo "Ionic: $(cut -c 53-56 "tail_iter.tmp")"
 	echo "Electronic: $(cut -c 58-61 "tail_iter.tmp")"
 	echo "Last total energy:"
-	grep TOTEN $file > "grep_toten.tmp"
+	grep TOTEN "$file" > "grep_toten.tmp"
 	tail -n 1 "grep_toten.tmp"
-	grep "energy(sigma->0)" $file > "grep_sigma_0.tmp"
+	grep "energy(sigma->0)" "$file" > "grep_sigma_0.tmp"
 	tail -n 1 "grep_sigma_0.tmp"
 	total_warn_count=$(grep -c "WW  WW" $file)
 	echo "Number of Warnings: $total_warn_count"
 	if [ $total_warn_count -gt 0 ]; then
-		WarningCounter "Small interatomic distances" "distance between some ions" $file
+		WarningCounter "Small interatomic distances" "distance between some ions" "$file"
 		cumul_warn_count=$(($cumul_warn_count + $warn_count))
-		WarningCounter "Electronic not converged" "electronic self-consistency" $file
+		WarningCounter "Electronic not converged" "electronic self-consistency" "$file"
 		cumul_warn_count=$(($cumul_warn_count + $warn_count))
-		WarningCounter "Lattice symmetry not consistent" "reciprocal lattice and k-lattice" $file
+		WarningCounter "Lattice symmetry not consistent" "reciprocal lattice and k-lattice" "$file"
 		cumul_warn_count=$(($cumul_warn_count + $warn_count))
-		WarningCounter "Fermi occu variations with Tetrahedron" "Tetrahedron method does not include" $file
+		WarningCounter "Fermi occu variations with Tetrahedron" "Tetrahedron method does not include" "$file"
 		cumul_warn_count=$(($cumul_warn_count + $warn_count))
-		WarningCounter "Lattice length over 50A" "lattice vectors is very long (>50 A)" $file
+		WarningCounter "Lattice length over 50A" "lattice vectors is very long (>50 A)" "$file"
 		cumul_warn_count=$(($cumul_warn_count + $warn_count))
 		warns_left=$(($total_warn_count - $cumul_warn_count))
 		if [ $warns_left -gt 0 ]; then
@@ -87,7 +87,7 @@ for file in "$@"; do
 	fi
 	FinishedOnError $file
 	echo "Finished on VASP Error: $has_error"
-	if [ "$has_error" == "yes" ]; then
+	if [ "$has_error" = "yes" ]; then
 		grep -B 2 -A 30 -m 1 "EEEEEEE" $file
 	fi
 done

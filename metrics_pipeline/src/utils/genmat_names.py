@@ -3,8 +3,7 @@
 import re
 import typing as tp
 
-if tp.TYPE_CHECKING:
-    from pymatgen.core import Structure
+from pymatgen.core import Structure
 
 from .visual_iterator import VisualIterator
 

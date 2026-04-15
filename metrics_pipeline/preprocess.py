@@ -10,8 +10,10 @@ Preprocess generated structures data for further pipeline steps:
 import os
 from pathlib import Path
 import typing as tp
-from time import time
+from datetime import datetime
 import argparse as ap
+
+from pymatgen.core import Structure
 
 from src.utils import (
     parse_input_args, check_type, check_num_value,
@@ -21,9 +23,6 @@ from src.utils import (
     generate_genmat_names
 )
 from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile
-
-if tp.TYPE_CHECKING:
-    from pymatgen.core import Structure
 
 
 def _get_command_line_args() -> ap.Namespace:
@@ -220,7 +219,8 @@ def _get_structures_from_cif(args_dict: dict[str, tp.Any]) -> tuple[list[Structu
             cifs, list(args_dict["forbidden_elts"].keys()), format="cif"
         )
         print(f"{nbr_discarded} CIFs containing forbidden elements were discarded.")
-
+    else:
+        nbr_discarded = 0
     cif_file.clear()
     cif_file.add_cifs(cifs)
     structures, invalid_indices = cif_file.parse_structures()
@@ -242,7 +242,8 @@ def _get_structures_from_poscar(args_dict: dict[str, tp.Any]) -> tuple[list[Stru
         )
         pfile = PoscarFile.from_str("\n".join(poscars), strict=False, workers=args_dict.get("workers"))
         print(f"{nbr_discarded} POSCARs containing forbidden elements were discarded.")
-
+    else:
+        nbr_discarded = 0
     structures = pfile.parse_structures()
     if args_dict["special_keys"] and "header" in args_dict["special_keys"]:
         for header, structure in zip(pfile.headers, structures):
@@ -324,7 +325,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         Pass valid element categories to eliminate structures containing any element from
         these categories.
     """
-    start = time()
+    start = datetime.now()
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
     _print_config(args)
 
@@ -361,7 +362,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     cif_file.write_file(args["output"])
 
     # Time of the preprocessing
-    stop = time()
+    stop = datetime.now()
     counters: dict[str, int | float] = {
         "nbr_loaded_data": nbr_loaded_data,
         "nbr_written_data": len(structures),

@@ -169,7 +169,7 @@ class VisualIterator(tp.Generic[T], tp.Iterable[T]):
 
     @classmethod
     def from_iterator(
-        cls, iterator: tp.Iterator[T]|tp.Generator[T], **kwargs
+        cls, iterator: tp.Iterator[T], **kwargs
     ) -> tpe.Self:
         """
         Get a VisualIterator wrapping a lazy iterator instead of an explicit sequence.
@@ -194,7 +194,7 @@ class VisualIterator(tp.Generic[T], tp.Iterable[T]):
 
     @classmethod
     def from_big_iterator(
-        cls, iterator: tp.Iterator[T]|tp.Generator[T], n_elts: int | None = None, **kwargs
+        cls, iterator: tp.Iterator[T], n_elts: int | None = None, **kwargs
     ) -> tpe.Self:
         """
         Get a VisualIterator wrapping a lazy iterator instead of an explicit sequence.

@@ -93,9 +93,15 @@ class GenMatRelaxSet(MPRelaxSet):
     VASP input set derived from pymatgen MPRelaxSet for GenMat relaxation step.
     """
     def __post_init__(self) -> None:
-        self.CONFIG: dict[str, tp.Any]
+        self.CONFIG: dict[str, tp.Any] = super().CONFIG
         self._GENMAT_SETTINGS: dict[str, tp.Any] = _get_genmat_settings()
-        self.CONFIG.update(self._GENMAT_SETTINGS)
+
+        for key in self.CONFIG:
+            if isinstance(self.CONFIG[key], dict):
+                self.CONFIG[key].update(self._GENMAT_SETTINGS.get(key, {}))
+            elif key in self._GENMAT_SETTINGS:
+                self.CONFIG[key] = self._GENMAT_SETTINGS[key]
+
         super().__post_init__()
 
     @property
@@ -114,9 +120,15 @@ class GenMatStaticSet(MPStaticSet):
     VASP input set derived from pymatgen MPStaticSet for GenMat static step.
     """
     def __post_init__(self) -> None:
-        self.CONFIG: dict[str, tp.Any]
+        self.CONFIG: dict[str, tp.Any] = super().CONFIG
         self._GENMAT_SETTINGS: dict[str, tp.Any] = _get_genmat_settings()
-        self.CONFIG.update(self._GENMAT_SETTINGS)
+
+        for key in self.CONFIG:
+            if isinstance(self.CONFIG[key], dict):
+                self.CONFIG[key].update(self._GENMAT_SETTINGS.get(key, {}))
+            elif key in self._GENMAT_SETTINGS:
+                self.CONFIG[key] = self._GENMAT_SETTINGS[key]
+
         super().__post_init__()
 
     @property

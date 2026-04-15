@@ -7,8 +7,10 @@ and relaxation runs.
 
 import os
 import typing as tp
-from time import time
+from datetime import datetime
 import argparse as ap
+
+from pymatgen.io.vasp import VaspInput
 
 from src.utils import parse_input_args, check_type, check_num_value, check_genmat_name, get_genmat_name_idx
 from src.io import (
@@ -19,9 +21,6 @@ from src.computations.local import DSolCalcType
 from src.computations.vasp import (
     init_vasp_settings, dsol_calc_init, ALL_PRESETS_NAMES, ALL_PRESETS_NAMES_LOWER
 )
-
-if tp.TYPE_CHECKING:
-    from pymatgen.io.vasp import VaspInput
 
 
 def _get_command_line_args() -> ap.Namespace:
@@ -211,7 +210,7 @@ def main(standalone: bool = True, **kwargs):
         `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
         and execute sequentially.
     """
-    start = time()
+    start = datetime.now()
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
     input_file: str = args["input_file"]
     indices: list[int] | None = args.get("indices")
@@ -293,7 +292,7 @@ def main(standalone: bool = True, **kwargs):
 
     print(f"{len(vasp_inputs)} run directories were successfully written in {args['output']}.")
 
-    stop = time()
+    stop = datetime.now()
     print(f"Elapsed time: {stop-start}")
 
 
