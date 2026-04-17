@@ -310,7 +310,7 @@ class VaspParser:
 
         try:
             vasprun = Vasprun(filename=vasprun_path, **kwargs)
-        except ET.ParseError:
+        except (ET.ParseError, ValueError):
             return None
         except UnicodeDecodeError:
             warnings.warn(
