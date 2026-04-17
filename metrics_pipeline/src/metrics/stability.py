@@ -150,7 +150,7 @@ class Stability(Metric):
     @staticmethod
     def get_elements(structures: list[Structure] | list[PDEntry]) -> set[str]:
         """Get a set of all unique elements present in given structures or entries."""
-        return set(*(struct.composition.get_el_amt_dict().keys() for struct in structures))
+        return set.union(*(set(struct.composition.get_el_amt_dict()) for struct in structures))
 
     def _init_settings(self, stable_tol: float, workers: int | None, verbose: bool) -> None:
         """Verify and initialize settings arguments."""
@@ -195,6 +195,8 @@ class Stability(Metric):
             print(f"Comparing entry {entry} to convex hull {pd_system}:")
             print(f"{entry.energy_per_atom=}")
         e_above_hull = pd.get_e_above_hull(entry, allow_negative=True, check_stable=False)
+        if entry.attribute is None:
+            entry.attribute = {}
         entry.attribute[self._delta_e_attr] = e_above_hull # type: ignore
         if self.verbose:
             print(f"{e_above_hull=}")
