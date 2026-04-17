@@ -18,7 +18,7 @@ Algorithm:
 """
 
 import os
-import argparse as argp
+import argparse as ap
 import typing as tp
 from datetime import datetime
 
@@ -26,16 +26,17 @@ from pymatgen.core import Element
 
 from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
-    VaspParser, VaspExtractor, ExtractMethod, PDDataset, JsonWriter,
+    VaspParser, VaspExtractor, ExtractMethod, PDDataset, JsonWriter, CIFFile,
     check_file_or_dir, check_file_format
 )
 from src.metrics import Stability
 from src.computations.local import get_lacking_elts_entries
+from src.computations.models import vectors_from_alignn
 
 
-def _get_command_line_args() -> argp.Namespace:
+def _get_command_line_args() -> ap.Namespace:
     """Command Line Interface (CLI)."""
-    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
+    parser = ap.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument(
         "base_dir",
         help="Base directory containing VASP run directories."
@@ -73,11 +74,27 @@ def _get_command_line_args() -> argp.Namespace:
         )
     )
     parser.add_argument(
+        "-w", "--workers", type=int, metavar="int",
+        help=(
+            "Number of processes to use in parallel. If not given, will use default of "
+            "`tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()` "
+            "and execute sequentially."
+        )
+    )
+    parser.add_argument(
         "-l", "--limit", type=float, default=0.1,
         help=(
             "Maximum value of ΔH (in eV/atom) above which structures are considered too "
             "unstable and rejected. Defaults to 0.1 eV/atom, as it is commonly assumed "
             "to be sufficient."
+        )
+    )
+    parser.add_argument(
+        "--alignn", action=ap.BooleanOptionalAction, default=False,
+        help=(
+            "Whether to predict generated data energies with ALIGNN instead of extracting them "
+            "from VASP runs. Defaults to %(default)s. If enabled, 'base_dir' must be a path "
+            "to a preprocessed CIF file instead of a VASP base directory."
         )
     )
     parser.add_argument(
@@ -92,11 +109,11 @@ def _get_command_line_args() -> argp.Namespace:
         )
     )
     parser.add_argument(
-        "-w", "--workers", type=int, metavar="int",
+        "--match-all", action=ap.BooleanOptionalAction, default=True,
         help=(
-            "Number of processes to use in parallel. If not given, will use default of "
-            "`tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()` "
-            "and execute sequentially."
+            "Whether to raise an error if some run indices do not match any structure directory "
+            "in base directory. Defaults to %(default)s. Deactivate it if some structures "
+            "could not be written as VASP input when using 'vasp_rundir_writer.py' script."
         )
     )
     parser.add_argument(
@@ -107,7 +124,7 @@ def _get_command_line_args() -> argp.Namespace:
         "--pause-after-init", action="store_true",
         help="Pauses the program after finishing data preparations. Press Enter to unpause."
     )
-    args: argp.Namespace = parser.parse_args()
+    args: ap.Namespace = parser.parse_args()
     return args
 
 
@@ -122,7 +139,9 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
     args_dict.setdefault("summary", "stability_summary.json")
     args_dict.setdefault("limit", 0.1)
+    args_dict.setdefault("alignn", False)
     args_dict.setdefault("compact", False)
+    args_dict.setdefault("match_all", False)
     args_dict.setdefault("verbose", False)
     args_dict.setdefault("pause_after_init", False)
 
@@ -208,6 +227,11 @@ def main(standalone: bool = True, **kwargs):
         Name of output JSON summary file indicating calculation results for this step. Also usable
         by further steps to filter out structures rejected in this step. The file will be
         automatically written in the 'base_dir' directory.
+        
+    workers: int, optional
+        Number of parallel processes to spawn for parallelized steps. If not given, default value
+        is the 'max_workers' default value from `tqdm.contrib.concurrent.process_map()` function.
+        Pass 0 to disable the use of `process_map()` and execute sequentially.
 
     limit: float, optional
         Maximum value of ΔH (in eV/atom) above which structures are considered too unstable and
@@ -224,10 +248,10 @@ def main(standalone: bool = True, **kwargs):
             ...
         }. Defaults to False.
 
-    workers: int, optional
-        Number of parallel processes to spawn for parallelized steps. If not given, default value
-        is the 'max_workers' default value from `tqdm.contrib.concurrent.process_map()` function.
-        Pass 0 to disable the use of `process_map()` and execute sequentially.
+    match_all: bool
+        Whether to raise an error if some run indices do not match any structure directory
+        in base directory. Defaults to %(default)s. Deactivate it if some structures
+        could not be written as VASP input when using 'vasp_rundir_writer.py' script.
 
     verbose: bool
         Whether to print each reference entry used when building a phase diagram.
@@ -240,14 +264,28 @@ def main(standalone: bool = True, **kwargs):
     start = datetime.now()
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
-    # Extract generated data
-    gen_data = VaspExtractor(
-        vasp_parser=VaspParser(args["base_dir"]),
-        method=ExtractMethod.CONVEX_HULL,
-        summary_name=args.get("prev_summary"),
-        summary_key=args.get("summary_key"),
-        workers=args.get("workers")
-    ).get_data()
+    if args["alignn"]:
+        # Predict generated data energies with ALIGNN
+        gen_data, _ = CIFFile.from_file(
+            args["input_file"], special_keys=["header"], workers=args.get("workers")
+        ).parse_structures()
+        alignn_results = vectors_from_alignn(gen_data, output="energy")
+        gen_data = {
+            f"{idx}_{struct.properties['header']}": {
+                "entry_id": f"{idx}_{struct.properties['header']}",
+                "composition": struct.composition,
+                "final_energy": energy.item()
+            } for idx, (struct, energy) in enumerate(zip(gen_data, alignn_results))
+        }
+    else:
+        # Extract generated data from VASP runs
+        gen_data = VaspExtractor(
+            vasp_parser=VaspParser(args["base_dir"], match_all=args["match_all"]),
+            method=ExtractMethod.CONVEX_HULL,
+            summary_name=args.get("prev_summary"),
+            summary_key=args.get("summary_key"),
+            workers=args.get("workers")
+        ).get_data()
 
     generated_dataset = PDDataset(
         gen_data,
