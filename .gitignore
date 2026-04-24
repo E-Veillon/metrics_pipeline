@@ -12,9 +12,11 @@ poetry.lock
 *.poscar
 *.kpoints
 *_test.py
-*.slurm
 *.json
+*.slurm
 slurm-*
+slurm_*
 .local
 .cache
 tests.py
+

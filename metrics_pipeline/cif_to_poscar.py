@@ -2,21 +2,18 @@
 
 import os
 import typing as tp
-import argparse as argp
+import argparse as ap
+import warnings
+
 from pymatgen.io.vasp import Poscar
 
-from . import _parse_input_args
-from .utils import (
-    check_type, check_file_or_dir, check_file_format, check_num_value,
-    read_cif, VisualIterator
-)
+from src.utils import parse_input_args, check_type, check_num_value, VisualIterator
+from src.io import check_file_or_dir, check_file_format, CIFFile
 
-########################################
-# ARGUMENTS HANDLING
 
-def _get_command_line_args() -> argp.Namespace:
+def _get_command_line_args() -> ap.Namespace:
     """Command Line Interface (CLI)."""
-    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
+    parser = ap.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument(
         "input_file", help="Path to the CIF file containing structure data to process."
     )
@@ -29,8 +26,7 @@ def _get_command_line_args() -> argp.Namespace:
         )
     )
     parser.add_argument(
-        "--save-header", "-sh",
-        action="store_true",
+        "--save-header", "-sh", action="store_true",
         help=(
             "Save the header of CIF data into the comment line of POSCAR format. "
             "If not passed, the pymatgen default is applied, i.e. writing full "
@@ -38,31 +34,18 @@ def _get_command_line_args() -> argp.Namespace:
         )
     )
     parser.add_argument(
-        "--significant-figures", "-sf",
-        type=int,
-        help="Number of significant digits to output all quantities. Defaults to 16."
+        "--significant-figures", "-sf", type=int, default=16,
+        help="Number of significant digits to output all quantities. Defaults to %(default)s."
     )
     parser.add_argument(
-        "--workers", "-w",
-        type=int,
+        "--workers", "-w", type=int, metavar="int",
         help=(
-            "Number of parallel processes to spawn for parallelized steps. "
-            "If not given, If not given, default value is the 'max_workers' "
-            "default value from tqdm.contrib.concurrent.process_map function."
-        ),
-        metavar="int",
-    )
-    parser.add_argument(
-        "--sequential", "-S",
-        action="store_true",
-        help=(
-            "Pass this flag to deactivate multiprocessing handling and switch to "
-            "sequential computation. Generally, multiprocess is faster, but sometimes "
-            "(e.g. when data is very big) it can softlock into resource distribution. "
-            "Switch to more stable sequential computing if such problem  were to arise."
+            "Number of processes to use in parallel. If not given, will use default of "
+            "`tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()` "
+            "and execute sequentially."
         )
     )
-    args: argp.Namespace = parser.parse_args()
+    args: ap.Namespace = parser.parse_args()
     return args
 
 
@@ -79,22 +62,21 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict.setdefault("output", default_output)
     args_dict.setdefault("save_header", False)
     args_dict.setdefault("significant_figures", 16)
-    args_dict.setdefault("sequential", False)
 
     # Assert set arguments conformity
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="cif")
     check_file_format(args_dict.get("output"), allowed_formats="poscar")
     check_type(args_dict.get("save_header"), "save_header", (bool,))
-    check_type(args_dict.get("significant_figures"), "significant_figures", (int,))
-    check_num_value(args_dict.get("significant_figures"), "significant_figures", ">=", 4)
-    check_num_value(args_dict.get("significant_figures"), "significant_figures", "<=", 20)
+    check_type(args_dict["significant_figures"], "significant_figures", (int,))
+    check_num_value(args_dict["significant_figures"], "significant_figures", ">=", 4)
+    check_num_value(args_dict["significant_figures"], "significant_figures", "<=", 20)
 
     args_dict["input_file"] = os.path.abspath(os.path.realpath(args_dict["input_file"]))
     args_dict["output"] = os.path.abspath(os.path.realpath(args_dict["output"]))
 
     if args_dict.get("workers") is not None and not args_dict.get("sequential", False):
-        check_type(args_dict.get("workers"), "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">", 0)
+        check_type(args_dict["workers"], "workers", (int,))
+        check_num_value(args_dict["workers"], "workers", ">", 0)
 
     # Print final configuration
     print(" ")
@@ -113,7 +95,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     print(
         "NUMBER OF WORKERS: "
         f"{'auto' if args_dict.get('workers') is None else args_dict.get('workers')} "
-        f"{'(ignored)' if args_dict.get('sequential') else ''}"
+        f"{'(sequential)' if args_dict.get('workers') == 0 else ''}"
     )
     print(" ")
     print("------------------------------")
@@ -122,56 +104,54 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     return args_dict
 
 
-########################################
-
-
 def main(standalone: bool = True, **kwargs) -> None:
     """
     Convert CIF formatted structures to POSCAR format.
 
-    Args:
-        standalone (bool):          Whether parsed script is used directly through
-                                    command-line (stand-alone script) or in an external
-                                    pipeline script.
+    Parameters
+    ----------
+    standalone: bool
+        Whether parsed script is used directly through command-line (stand-alone script)
+        or in an external pipeline script.
 
-        input_file (str|Path):      Path to the CIF file containing structure data to process.
+    input_file: str | Path
+        Path to the CIF file containing structure data to process.
 
-        output (str|Path):          Path to the file to write POSCAR files in. If not given,
-                                    output file is written in input file directory with the
-                                    same name but with a '.poscar' extension instead of '.cif'.
+    output: str | Path
+        Path to the file to write POSCAR files in. If not given, output file is written in
+        input file directory with the same name but with a '.poscar' extension instead of '.cif'.
 
-        save_header (bool):         Save the header of CIF data into the comment line of POSCAR
-                                    format. If not passed, the pymatgen default is applied, i.e.
-                                    writing full composition of the crystal in the comment line.
+    save_header: bool
+        Save the header of CIF data into the comment line of POSCAR format. If not passed,
+        the pymatgen default is applied, i.e. writing full composition of the crystal in the
+        comment line.
 
-        significant_figures (int):  Number of significant digits to output all quantities.
-                                    Defaults to 16.
+    significant_figures: int
+        Number of significant digits to output all quantities. Defaults to 16.
 
-        workers (int):              Number of parallel processes to spawn for parallelized steps.
-                                    If not given, If not given, default value is the 'max_workers'
-                                    default value from tqdm.contrib.concurrent.process_map function.
-
-        sequential (bool):          Pass this flag to deactivate multiprocessing handling and
-                                    switch to sequential computation. Generally, multiprocess
-                                    is faster, but sometimes (e.g. when data is very big) it
-                                    can softlock into resource distribution. Switch to more
-                                    stable sequential computing if such problem  were to arise.
+    workers: int, optional
+        Number of processes to use in parallel. If not given, will use default of
+        `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
+        and execute sequentially.
     """
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
-    structures, *_ = read_cif(
-        filename=args["input_file"],
-        keep_rare_gases=True,
-        keep_rare_earths=True,
+    structures, _ = CIFFile.from_file(
+        args["input_file"],
         special_keys=(["header"] if args.get("save_header") else None),
-        workers=args.get("workers"),
-        sequential=args["sequential"]
+        workers=args.get("workers")
+    ).parse_structures()
+
+    structures = VisualIterator(
+        structures, desc="Converting to Poscar", unit="converted", percent=True
     )
-    structures = VisualIterator(structures, desc="Converting to Poscar")
     outfile_content = [
         Poscar(
             structure=struct,
-            comment=f"# {struct.properties['header']}" if args.get("save_header") else None
+            comment=(
+                f"# {struct.properties['header']}" if args.get("save_header")
+                else f"# {struct.reduced_formula}"
+            )
         ).get_str(significant_figures=args["significant_figures"]) for struct in structures
     ]
     with open(args["output"], "wt", encoding="utf-8") as fp:

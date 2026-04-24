@@ -17,105 +17,114 @@ Algorithm:
     5 - Reject structures too much above reference convex hull.
 """
 
-
 import os
-import json
-import argparse as argp
+import argparse as ap
 import typing as tp
 from datetime import datetime
 
-# LOCAL IMPORTS
-from . import _parse_input_args
-from .utils import (
-    check_type, check_file_format, check_file_or_dir, check_num_value,
-    get_max_dim, init_entries_from_dict, filter_database_entries,
-    get_elements_from_entries, get_lacking_elts_entries,
-    group_by_composition, batch_compute_e_above_hull,
-    batch_extract_vasp_data, load_phase_diagram_entries,
+from pymatgen.core import Element
+
+from src.utils import parse_input_args, check_type, check_num_value
+from src.io import (
+    VaspParser, VaspExtractor, ExtractMethod, PDDataset, JsonWriter, CIFFile,
+    check_file_or_dir, check_file_format
 )
+from src.metrics import Stability
+from src.computations.local import get_lacking_elts_entries
+from src.computations.models import vectors_from_alignn
 
 
-########################################
-# ARGUMENTS HANDLING
-
-def _get_command_line_args() -> argp.Namespace:
+def _get_command_line_args() -> ap.Namespace:
     """Command Line Interface (CLI)."""
-    parser = argp.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
+    parser = ap.ArgumentParser(prog=os.path.basename(__file__), description=__doc__)
     parser.add_argument(
-        "run_dir",
-        help="Base directory containing structure directories with VASP runs inside.",
+        "base_dir",
+        help="Base directory containing VASP run directories."
     )
     parser.add_argument(
-        "-r", "--reference",
+        "-r", "--reference", metavar="<path>",
         help=(
-            "Dataset of already known structure to construct a reference convex hull "
-            "and compare generated structure against it (json format).\n"
-            "If not given, the default reference hull will be defined only with "
-            "elemental entries of energy 0.0 eV/atom."
+            "JSON dataset file of already known structure to construct a reference "
+            "convex hull and compare generated structure against it. If not given, "
+            "the default reference hull will be defined only with elemental entries "
+            "of energy 0.0 eV/atom."
         ),
     )
     parser.add_argument(
-        "-R", "--read-previous-summary",
+        "-p", "--prev-summary", metavar="<path>",
         help=(
-            "Path to a JSON summary file produced by a previous screening step.\n"
+            "Path to a JSON summary file produced by a previous screening step. "
             "If given, the file will be checked to filter out structures that are "
             "already rejected."
-        ),
-        metavar="<path>",
-        dest="prev_summary"
+        )
     )
     parser.add_argument(
-        "-k", "--key-to-check",
+        "-k", "--summary-key",
         help=(
-            "The dict key associated to the bool used to verify eligibility "
-            "in the previous summary file.\n"
-            "If --read-previous-summary is given, it must be given too."
-        ),
-        metavar="<str>"
+            "The dict key associated to the bool used to verify eligibility in previous "
+            "summary file. If --prev-summary is given, it must be given too."
+        )
     )
     parser.add_argument(
-        "-s", "--summary",
-        default="summary.json",
+        "-s", "--summary", default="stability_summary.json",
         help=(
-            "Output file indicating calculation results for this step (json format).\n"
-            "Also usable by further steps to filter out structures rejected in this step."
-            "This argument only affects the name of the file, it is automatically written "
-            "at the location given by the 'run_dir' argument."
-        ),
-        metavar="<str>"
+            "Name of output JSON summary file indicating calculation results for this step. "
+            "Also usable by further steps to filter out structures rejected in this step. "
+            "The file will be automatically written in the 'base_dir' directory."
+        )
     )
     parser.add_argument(
-        "-l", "--limit",
-        type=float,
-        default=0.1,
+        "-w", "--workers", type=int, metavar="int",
         help=(
-            "Maximum value of ΔH (in eV/atom) above which structures "
-            "are considered too unstable and rejected.\n"
-            "Defaults to 0.1 eV/atom, as it is commonly assumed to be sufficient.\n"
-        ),
-        metavar="<float>",
+            "Number of processes to use in parallel. If not given, will use default of "
+            "`tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()` "
+            "and execute sequentially."
+        )
     )
     parser.add_argument(
-        "-w", "--workers",
-        type=int,
+        "-l", "--limit", type=float, default=0.1,
         help=(
-            "Number of parallel processes to spawn for parallelized steps. "
-            "If not given, If not given, default value is the 'max_workers' "
-            "default value from tqdm.contrib.concurrent.process_map function."
-        ),
-        metavar="<int>",
+            "Maximum value of ΔH (in eV/atom) above which structures are considered too "
+            "unstable and rejected. Defaults to 0.1 eV/atom, as it is commonly assumed "
+            "to be sufficient."
+        )
     )
     parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
+        "--alignn", action=ap.BooleanOptionalAction, default=False,
+        help=(
+            "Whether to predict generated data energies with ALIGNN instead of extracting them "
+            "from VASP runs. Defaults to %(default)s. If enabled, 'base_dir' must be a path "
+            "to a preprocessed CIF file instead of a VASP base directory."
+        )
+    )
+    parser.add_argument(
+        "--compact", action="store_true",
+        help=(
+            "Flag to pass if reference dataset is organized by data type instead of by structure. "
+            "By default, dataset is assumed to be organized by structure, i.e. "
+            "{'struct_name_1': struct_dict_1, 'struct_name_2': struct_dict_2, ...}. "
+            "If the flag is passed, dataset is instead assumed to be organized by data key, i.e. "
+            "{'entry_id': [struct_name_1, struct_name_2, ...], "
+            "'composition': [struct_comp_1, struct_comp_2, ...], ...}."
+        )
+    )
+    parser.add_argument(
+        "--match-all", action=ap.BooleanOptionalAction, default=True,
+        help=(
+            "Whether to raise an error if some run indices do not match any structure directory "
+            "in base directory. Defaults to %(default)s. Deactivate it if some structures "
+            "could not be written as VASP input when using 'vasp_rundir_writer.py' script."
+        )
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true",
         help="Whether to print each reference entry used when building a phase diagram."
     )
     parser.add_argument(
-        "--pause-after-init",
-        action="store_true",
+        "--pause-after-init", action="store_true",
         help="Pauses the program after finishing data preparations. Press Enter to unpause."
     )
-    args: argp.Namespace = parser.parse_args()
+    args: ap.Namespace = parser.parse_args()
     return args
 
 
@@ -128,39 +137,43 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     # Set default values for unset optional arguments
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
-    args_dict.setdefault("summary", "summary.json")
+    args_dict.setdefault("summary", "stability_summary.json")
     args_dict.setdefault("limit", 0.1)
+    args_dict.setdefault("alignn", False)
+    args_dict.setdefault("compact", False)
+    args_dict.setdefault("match_all", False)
     args_dict.setdefault("verbose", False)
     args_dict.setdefault("pause_after_init", False)
 
     # Assert set arguments conformity
-    check_file_or_dir(args_dict.get("run_dir"), "dir")
+    check_file_or_dir(args_dict.get("base_dir"), "dir")
     if args_dict.get("reference") is not None:
         check_file_or_dir(args_dict.get("reference"), "file", allowed_formats="json")
 
     if args_dict.get("prev_summary") is not None:
         check_file_or_dir(args_dict.get("prev_summary"), "file", allowed_formats="json")
 
-        if args_dict.get("key_to_check") is None:
+        if args_dict.get("summary_key") is None:
             raise ValueError(
                 f"'prev_summary' argument was provided ({args_dict.get('prev_summary')}), "
                 "therefore 'key-to-check' argument has to be given as well."
             )
 
-    if args_dict.get("key_to_check") is not None:
-        check_type(args_dict.get("key_to_check"), "key_to_check", (str,))
+    if args_dict.get("summary_key") is not None:
+        check_type(args_dict.get("summary_key"), "summary_key", (str,))
 
     check_file_format(args_dict.get("summary"), allowed_formats="json")
-    check_type(args_dict.get("limit"), "limit", (float,))
-    check_num_value(args_dict.get("limit"), "limit", ">=", 0.0)
+    check_type(args_dict["limit"], "limit", (float,))
+    check_num_value(args_dict["limit"], "limit", ">=", 0.0)
+    check_type(args_dict.get("compact"), "compact", (bool,))
 
     if args_dict.get("workers") is not None:
-        check_type(args_dict.get("workers"), "workers", (int,))
-        check_num_value(args_dict.get("workers"), "workers", ">", 0)
+        check_type(args_dict["workers"], "workers", (int,))
+        check_num_value(args_dict["workers"], "workers", ">=", 0)
 
     # Additional arguments processing
     args_dict["limit"] = round(args_dict["limit"], 8)
-    args_dict["summarypath"] = os.path.join(args_dict["run_dir"], args_dict["summary"])
+    args_dict["summarypath"] = os.path.join(args_dict["base_dir"], args_dict["summary"])
 
     return args_dict
 
@@ -174,143 +187,184 @@ def main(standalone: bool = True, **kwargs):
     of given structures by comparing their energy with a convex hull of
     energies of reference structures.
 
-    Algorithm:
+    Algorithm
+    ---------
+    1 - Group structures by dimension and composition.
+    2 - For each group, search in the dataset all corresponding structures.
+    3 - Build the phase diagram corresponding to dataset structures.
+    4 - Compute ΔH for all generated structures of the group.
+    5 - Reject structures too much above reference convex hull.
 
-        1 - Group structures by dimension and composition.
-        2 - For each group, search in the dataset all corresponding structures.
-        3 - Build the phase diagram corresponding to dataset structures.
-        4 - Compute ΔH for all generated structures of the group.
-        5 - Reject structures too much above reference convex hull.
+    Notes
+    -----
+    This script assumes that loaded reference dataset is already properly formatted for
+    phase diagram computations. Make sure to pass a compatible dataset file.
+    JSON dataset files can be made compatible by using the 'dataset_loader.py' script.
 
-    Args:
-        standalone (bool):          Whether parsed script is used directly through
-                                    command-line (stand-alone script) or in an external
-                                    pipeline script.
+    Parameters
+    ----------
+    standalone: bool
+        Whether parsed script is used directly through command-line (stand-alone script)
+        or in an external pipeline script.
 
-        run_dir (str|Path):         Base directory containing structure directories with VASP runs
-                                    inside.
+    base_dir: str | Path
+        Base directory containing structure directories with VASP runs inside.
 
-        reference (str|Path):       Dataset of already known structure to construct a reference
-                                    convex hull and compare generated structure against it
-                                    (json format). If not given, the default reference hull will
-                                    be defined only with elemental entries of energy 0.0 eV/atom.
+    reference: str | Path, optional
+        JSON dataset file of already known structure to construct a reference  convex hull
+        and compare generated structure against it. If not given, the default reference hull
+        will be defined only with elemental entries of energy 0.0 eV/atom.
 
-        prev_summary (str|Path):    Path to a JSON summary file produced by a previous screening
-                                    step. If given, the file will be checked to filter out
-                                    structures that are already rejected.
+    prev_summary: str | Path, optional
+        Path to a JSON summary file produced by a previous screening step. If given, the file
+        will be checked to filter out structures that are already rejected.
 
-        key_to_check (str):         The dict key associated to the bool used to verify eligibility
-                                    in the previous summary file. If prev_summary is given, it must
-                                    be given too.
+    summary_key: str, optional
+        The dict key associated to the bool used to verify eligibility in previous summary file.
+        If --prev-summary is given, it must be given too.
 
-        summary (str|Path):         Output file indicating calculation results for this step
-                                    (json format). Also usable by further steps to filter out
-                                    structures rejected in this step. This argument only affects
-                                    the name of the file, it is automatically written at the
-                                    location given by the 'run_dir' argument.
+    summary: str | Path, optional
+        Name of output JSON summary file indicating calculation results for this step. Also usable
+        by further steps to filter out structures rejected in this step. The file will be
+        automatically written in the 'base_dir' directory.
+        
+    workers: int, optional
+        Number of parallel processes to spawn for parallelized steps. If not given, default value
+        is the 'max_workers' default value from `tqdm.contrib.concurrent.process_map()` function.
+        Pass 0 to disable the use of `process_map()` and execute sequentially.
 
-        limit (float):              Maximum value of ΔH (in eV/atom) above which structures are
-                                    considered too unstable and rejected. Defaults to 0.1 eV/atom,
-                                    as it is commonly assumed to be sufficient.
+    limit: float, optional
+        Maximum value of ΔH (in eV/atom) above which structures are considered too unstable and
+        rejected. Defaults to 0.1 eV/atom, as it is commonly assumed to be sufficient.
 
-        workers (int):              Number of parallel processes to spawn for parallelized steps.
-                                    If not given, default value is the 'max_workers' default value
-                                    from tqdm.contrib.concurrent.process_map function.
+    compact: bool
+        Whather reference dataset is organized by data type instead of by structure.
+        By default, dataset is assumed to be organized by structure, i.e.
+        {'struct_name_1': struct_dict_1, 'struct_name_2': struct_dict_2, ...}.
+        If the flag is passed, dataset is instead assumed to be organized by data key, i.e.
+        {
+            'entry_id': [struct_name_1, struct_name_2, ...],
+            'composition': [struct_comp_1, struct_comp_2, ...],
+            ...
+        }. Defaults to False.
 
-        verbose (bool):             Whether to print each reference entry used when building a
-                                    phase diagram.
+    match_all: bool
+        Whether to raise an error if some run indices do not match any structure directory
+        in base directory. Defaults to %(default)s. Deactivate it if some structures
+        could not be written as VASP input when using 'vasp_rundir_writer.py' script.
 
-        pause_after_init (bool):    Pauses the program after finishing data preparations.
-                                    Press Enter to unpause.
+    verbose: bool
+        Whether to print each reference entry used when building a phase diagram.
+        Defaults to False.
+
+    pause_after_init: bool
+        Pauses the program after finishing data preparations. Press Enter to unpause.
+        Defaults to False.
 """
     start = datetime.now()
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
-    # Extract generated data
-    structs_data = batch_extract_vasp_data(
-        method="convex_hull",
-        base_dir=args["run_dir"],
-        path_to_summary=args.get("prev_summary"),
-        key_to_check=args.get("key_to_check"),
-        workers=args.get("workers"),
+    if args["alignn"]:
+        # Predict generated data energies with ALIGNN
+        gen_data, _ = CIFFile.from_file(
+            args["input_file"], special_keys=["header"], workers=args.get("workers")
+        ).parse_structures()
+        alignn_results = vectors_from_alignn(gen_data, output="energy")
+        gen_data = {
+            f"{idx}_{struct.properties['header']}": {
+                "entry_id": f"{idx}_{struct.properties['header']}",
+                "composition": struct.composition,
+                "final_energy": energy.item()
+            } for idx, (struct, energy) in enumerate(zip(gen_data, alignn_results))
+        }
+    else:
+        # Extract generated data from VASP runs
+        gen_data = VaspExtractor(
+            vasp_parser=VaspParser(args["base_dir"], match_all=args["match_all"]),
+            method=ExtractMethod.CONVEX_HULL,
+            summary_name=args.get("prev_summary"),
+            summary_key=args.get("summary_key"),
+            workers=args.get("workers")
+        ).get_data()
+
+    generated_dataset = PDDataset(
+        gen_data,
+        composition_key="composition",
+        energy_key="final_energy",
+        attribute="generated"
     )
-    generated_entries = init_entries_from_dict(
-        entries_dict=structs_data, attribute="generated"
-    )
+
     # Eliminate high dimension structures (> 10) from computations to avoid softlock
-    gen_entries = list(
-        filter(
-            lambda entry: len(entry.composition) < 11,
-            generated_entries
-        )
-    )
+    true_max_dim = generated_dataset.max_dim
+    if true_max_dim > 10:
+        max_dim_generated = generated_dataset.max_computable_dim
+        gen_entries = generated_dataset.computable_entries
+    else: # Save filtering computation
+        max_dim_generated = true_max_dim
+        gen_entries = generated_dataset.all_entries
 
-    max_dim_generated = get_max_dim(gen_entries)
-    used_elts = get_elements_from_entries(gen_entries)
+    used_elts = generated_dataset.computable_elements
 
     # Extract reference dataset
     if args.get("reference") is not None:
-        ref_data = load_phase_diagram_entries(args["reference"])
-        ref_entries = init_entries_from_dict(
-            entries_dict=ref_data, attribute="ref_structs"
+        ref_dataset = PDDataset.from_file(
+            filepath=args["reference"],
+            composition_key="composition",
+            energy_key="final_energy",
+            attribute="reference",
+            compact=args["compact"]
         )
-        ref_entries = filter_database_entries(
-            entries=ref_entries,
-            max_dim=max_dim_generated,
-            ref_elts=used_elts
+        ref_entries = ref_dataset.get_filtered_entries(
+            elts=used_elts,
+            dims=set(range(max_dim_generated + 1))
         )
     else:
-        ref_entries = []
+        ref_entries = {}
 
     if args.get("pause_after_init"):
         input("Tap Enter to continue:")
 
     # Generate and add default elemental references if they are not in the reference dataset
-    auto_elts_entries = get_lacking_elts_entries(ref_entries, ref_elts=used_elts)
-    ref_entries += auto_elts_entries
-
-    # Group generated entries by composition
-    grouped_entries = group_by_composition(comps=gen_entries)
-
-    # Compute energy above hulls in each group
-    screening_results = batch_compute_e_above_hull(
-        entries=grouped_entries,
-        ref_entries=ref_entries,
-        stable_limit=args["limit"],
-        workers=args.get("workers"),
-        verbose=args.get("verbose", False)
+    used_elts_pmg = set(Element(elt) for elt in used_elts)
+    auto_elts_entries = get_lacking_elts_entries(
+        list(ref_entries.values()), ref_elts=used_elts_pmg
     )
+    ref_entries.update({f"auto_{entry.elements[0].symbol}": entry for entry in auto_elts_entries})
 
-    for dct in screening_results:
-        path = os.path.join(args["run_dir"], dct["name"]) # type: ignore
-        dct.update({"path": os.path.abspath(path)})
+    # Compute Stability
+    stability = Stability.from_entries(
+        entries=list(gen_entries.values()),
+        ref_entries=list(ref_entries.values()),
+        stable_tol=args["limit"],
+        workers=args.get("workers"),
+        verbose=args["verbose"]
+    )
+    results = {}
+    stable_names = set(entry.name for entry in stability.stable_entries)
+    computed_entries = stability.stable_entries + stability.unstable_entries
+    for entry in computed_entries:
+        dct = {
+            "name": entry.name,
+            "path": os.path.join(args["base_dir"], entry.name),
+            "e_above_hull": entry.attribute[stability._delta_e_attr], # type: ignore
+            "stable": entry.name in stable_names
+        }
+        results[entry.name] = dct
 
     # Too high dimension structures are added as not stable in results
-    high_dim_entries = list(
-        filter(
-            lambda entry: len(entry.composition) >= 11,
-            generated_entries
-        )
-    )
-    for entry in high_dim_entries:
+    for name, entry in generated_dataset.uncomputable_entries.items():
         msg = f"Uncomputable due to its too high dimension ({len(entry.composition)} > 10)."
-        screening_results.append(
-            {
+        results[name] = {
                 "name": entry.name,
-                "path": os.path.abspath(os.path.join(args["run_dir"], entry.name)),
+                "path": os.path.abspath(os.path.join(args["base_dir"], entry.name)),
                 "e_above_hull": None, # type: ignore
                 "stable": False,
                 "comment": msg
             }
-        )
 
-    def sort_by_path(dct: dict) -> str:
-        return dct["path"]
+    sorted_results = dict(sorted(results.items(), key=lambda tup: tup[1]["path"]))
 
-    screening_results = sorted(screening_results, key=sort_by_path)
-
-    with open(args["summarypath"], mode="wt", encoding="utf-8") as fp:
-        json.dump(screening_results, fp, indent=4)
+    JsonWriter(args["summarypath"], data=sorted_results, indent=4).write_as_dict()
 
     stop = datetime.now()
     print(f"elapsed time: {stop-start}")

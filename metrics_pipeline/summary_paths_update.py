@@ -4,17 +4,12 @@ Update paths keys in a summary json file when the corresponding structure direct
 """
 
 import os
-import json
 import typing as typ
 import argparse as argp
 
-# LOCAL IMPORTS
-from . import _parse_input_args
-from .utils import check_type, check_file_or_dir
+from src.utils import parse_input_args, check_type
+from src.io import check_file_or_dir, JsonLoader, JsonWriter
 
-
-########################################
-# ARGUMENTS HANDLING
 
 def _get_command_line_args() -> argp.Namespace:
     """Command Line Interface (CLI)."""
@@ -53,35 +48,34 @@ def _process_input_args(args_dict: dict[str, typ.Any]) -> dict[str, typ.Any]:
     return args_dict
 
 
-########################################
-
-
 def main(standalone: bool = True, **kwargs) -> None:
     """
-    Update paths keys in a summary json file when the corresponding structure directories are moved.
+    Update paths keys in a summary json file when the corresponding structure directories
+    are moved.
 
-    Args:
-        standalone (bool):      Whether parsed script is used directly through
-                                command-line (stand-alone script) or in an external
-                                pipeline script.
+    Parameters
+    ----------
+    standalone: bool
+        Whether parsed script is used directly through command-line (stand-alone script)
+        or in an external pipeline script.
 
-        input_file (str|Path):  Path to the JSON file to update paths in.
+    input_file: str | Path
+        Path to the JSON file to update paths in.
 
-        new_path (str|Path):    Path to the directory where structure directories are actually
-                                stored.
+    new_path: str | Path
+        Path to the directory where structure directories are actually stored.
 
-        absolute (bool):        If set to True, the new path is absolutized before replacing
-                                the old one. Defaults to False.
+    absolute: bool
+        If set to True, the new path is absolutized before replacing the old one.
+        Defaults to False.
     """
-    args = _parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
+    args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 
-    with open(args["input_file"], "rt", encoding="utf-8") as fp:
-        data = json.load(fp)
+    data = JsonLoader(args["input_file"]).load_as_list()
 
-    assert (
-        isinstance(data, list)
-        and all(isinstance(struct, dict) for struct in data)
-    ), "The data inside the JSON file must be a list of structure dicts."
+    assert all(isinstance(struct, dict) for struct in data), (
+        "The data inside the JSON file must be a list of structure dicts."
+    )
 
     if args.get("absolute"):
         new_path = os.path.realpath(args["new_path"])
@@ -93,8 +87,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         struct_name = os.path.basename(old_path)
         struct["path"] = os.path.join(new_path, struct_name)
 
-    with open(args["input_file"], "wt", encoding="utf-8") as fp:
-        json.dump(data, fp, indent=4)
+    JsonWriter(args["input_file"], data, indent=4).write_as_list()
 
     file = args["input_file"]
     print(f"the file '{os.path.basename(file)}' was successfully modified.")
