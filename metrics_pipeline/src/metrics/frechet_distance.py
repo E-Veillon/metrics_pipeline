@@ -1,12 +1,14 @@
 """Compute Fréchet Distance metric."""
 
+import typing as tp
 import functools as ft
 
 import numpy as np
 
 from pymatgen.core import Structure
 
-from .metric_base import Metric, StructureDistribution
+from .metric_base import StructureDistribution, Metric, MetricsData
+from src.utils import GenMatStructure
 
 
 class FrechetDistance(Metric):
@@ -19,7 +21,7 @@ class FrechetDistance(Metric):
     """
     def __init__(
         self,
-        structures: list[Structure],
+        structures: list[GenMatStructure],
         ref_structs: list[Structure],
         transform: StructureDistribution,
         **kwargs
@@ -29,14 +31,14 @@ class FrechetDistance(Metric):
         
         Parameters
         ----------
-        structures: list[Structure]
+        structures: list[GenMatStructure]
             Structures to calculate Fréchet Distance metric on.
 
         ref_structs: list[Structure]
             Known structures to use as reference distribution.
 
         transform: StructureDistribution
-            Any callable taking a list of Structure objects and eventual keyword arguments
+            Any callable taking a list of GenMatStructure objects and eventual keyword arguments
             and returning a numpy array representation of the structures distribution.
     
         kwargs: Any
@@ -45,6 +47,7 @@ class FrechetDistance(Metric):
         super().__init__(structures)
         self.ref_structs = ref_structs
         self.transform = ft.partial(transform, **kwargs)
+        self.kwargs = kwargs
 
         self._compute()
 
@@ -70,6 +73,15 @@ class FrechetDistance(Metric):
 
         return fid.item()
 
+    def _get_metric_settings(self) -> dict[str, dict[str, tp.Any]]:
+        """Get a dict of initialized parameters for this metric."""
+        return {
+            f"{type(self).__name__}_settings": {
+                "transform": self.transform,
+                "kwargs": self.kwargs
+            }
+        }
+
     def _compute(self) -> None:
         computed_array = self.transform(self.structures)
         ref_array = self.transform(self.ref_structs)
@@ -79,6 +91,21 @@ class FrechetDistance(Metric):
     def computed_distance(self) -> float:
         """Get computed Fréchet Distance value."""
         return self._distance
+
+    @property
+    def fd_data(self) -> list[MetricsData]:
+        """
+        List of computed `MetricsData` objects containing structures from tested distribution
+        and Fréchet Distance computation details (same values for all structures).
+        """
+        data = self._get_metric_settings()
+        data[f"{type(self).__name__}_values"].update({"frechet_distance": self.computed_distance})
+        return [
+            MetricsData(
+                struct,
+                additional_data=data
+            ) for struct in self.structures
+        ]
 
     def write_result(self, filename: str, decimals: int = 6) -> None:
         text = "===== Fréchet Distance Results ====="

@@ -1,13 +1,16 @@
 """Compute Earth Mover's Distance (or Wasserstein-1 Distance) metric."""
 
+import typing as tp
 import warnings
+import functools as ft
 
 import numpy as np
 from scipy.stats import wasserstein_distance
 
 from pymatgen.core import Structure
 
-from .metric_base import Metric, StructureDistribution
+from .metric_base import StructureDistribution, Metric, MetricsData
+from src.utils import GenMatStructure, StructureLike
 
 
 class EMD(Metric):
@@ -27,7 +30,7 @@ class EMD(Metric):
     """
     def __init__(
         self,
-        structures: list[Structure],
+        structures: list[GenMatStructure],
         ref_structs: list[Structure],
         transform: StructureDistribution | None = None,
         computed_property: str | None = None,
@@ -38,21 +41,21 @@ class EMD(Metric):
 
         Parameters
         ----------
-        structures: list[Structure]
+        structures: list[GenMatStructure]
             Structures to calculate Earth Mover's Distance metric on.
 
         ref_structs: list[Structure]
             Known structures to use as reference distribution.
 
         transform: StructureDistribution, optional
-            Any callable taking a list of Structure objects and eventual keyword arguments
+            Any callable taking a list of GenMatStructure objects and eventual keyword arguments
             and returning a numpy array representation of the structures 1D distribution
             of the computed property. If not given, `computed_property` must be given.
 
         computed_property: str, optional
-            Structures property to compare. The property must be stored under this name
-            as a numerical value (int or float) in structures `properties` attribute.
-            If not given, `transform` must be given.
+            GenMatStructure property to compare. The property must be one of property attributes
+            of GenMatStructure objects and must be defined for all computed and reference
+            structures. If not given, `transform` must be given.
 
         kwargs: Any
             Additional keyword arguments to pass to `transform` (if used).
@@ -66,20 +69,23 @@ class EMD(Metric):
         """
         super().__init__(structures)
 
-        def has_property(struct: Structure) -> bool:
-            return struct.properties.get(computed_property) is not None
+        def has_property(struct: StructureLike, property_name: str) -> bool:
+            return (
+                getattr(struct, property_name, None) is not None or
+                struct.properties.get(property_name) is not None
+            )
 
         if transform is None and computed_property is None:
             raise ValueError("Either 'transform' or 'computed_property' must be given.")
 
         if computed_property is not None:
             try:
-                if not all(has_property(struct) for struct in self.structures):
+                if not all(has_property(struct, computed_property) for struct in self.structures):
                     raise KeyError(
                         "Some computed structures do not have the property "
                         f"{computed_property!r} defined."
                     )
-                if not all(has_property(struct) for struct in ref_structs):
+                if not all(has_property(struct, computed_property) for struct in ref_structs):
                     raise KeyError(
                         "Some reference structures do not have the property "
                         f"{computed_property!r} defined."
@@ -88,34 +94,66 @@ class EMD(Metric):
                 if transform is None:
                     raise exc
                 else:
-                    warn_msg = str(exc) + " Provided 'transform' callable will be used instead."
+                    warn_msg = (
+                        "Caught following exception while checking property "
+                        f"'{computed_property}': {type(exc).__name__}: {exc} "
+                        "Provided 'transform' callable will be used instead."
+                    )
                     warnings.warn(warn_msg)
                     computed_property = None
 
         self.ref_structs = ref_structs
-        self.transform = transform
+        self.transform = ft.partial(transform, **kwargs) if transform is not None else None
         self.computed_property = computed_property
         self.kwargs = kwargs
 
         self._compute()
 
+    def _get_metric_settings(self) -> dict[str, dict[str, tp.Any]]:
+        """Get a dict of initialized parameters for this metric."""
+        return {
+            f"{type(self).__name__}_settings": {
+                "property": self.computed_property,
+                "transform": self.transform,
+                "kwargs": self.kwargs
+            }
+        }
+
     def _compute(self) -> None:
         if self.computed_property is None:
             if self.transform is None:
                 raise RuntimeError("Type checker assertion.")
-            computed_values = self.transform(self.structures, **self.kwargs)
-            ref_values = self.transform(self.ref_structs, **self.kwargs)
+            computed_values = self.transform(self.structures)
+            ref_values = self.transform(self.ref_structs)
 
         else:
-            computed_values = np.array([struct.properties[self.computed_property] for struct in self.structures])
-            ref_values = np.array([struct.properties[self.computed_property] for struct in self.ref_structs])
-
+            computed_values = np.array(
+                [getattr(struct, self.computed_property) for struct in self.structures]
+            )
+            ref_values = np.array(
+                [struct.properties[self.computed_property] for struct in self.ref_structs]
+            )
         self._distance = wasserstein_distance(ref_values, computed_values)
 
     @property
     def computed_distance(self) -> float:
         """Get computed EMD value."""
         return self._distance
+
+    @property
+    def emd_data(self) -> list[MetricsData]:
+        """
+        List of computed MetricsData objects containing structures from tested distribution
+        and EMD computation details (same details for all structures).
+        """
+        data = self._get_metric_settings()
+        data[f"{type(self).__name__}_values"] = {"distance": self.computed_distance}
+        return [
+            MetricsData(
+                struct,
+                additional_data=data
+            ) for struct in self.structures
+        ]
 
     def write_result(self, filename: str, decimals: int = 6) -> None:
         text = "===== Earth Mover's Distance Results ====="

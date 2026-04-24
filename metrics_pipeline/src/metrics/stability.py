@@ -10,28 +10,43 @@ from tqdm.contrib.concurrent import process_map
 from pymatgen.core import Structure
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
-from .metric_base import Metric
-from src.utils import flatten, VisualIterator
+from .metric_base import Metric, MetricsData, NoneMetric
+from src.utils import (
+    GenMatPDEntry, GenMatStructure, is_genmat_name, PDEntryLike, StructureLike,
+    flatten, VisualIterator
+)
 
+# TODO: extend flexibility to allow for seemless computations of:
+# - Element Metastability (Ehull <= 0.0, element refs only) => MetricsData.is_element_metastable
+# - Metastability (Ehull <= stable_tol) => MetricsData.is_metastable
+# - Stability (Ehull <= 0.0) => MetricsData.is_stable
 class Stability(Metric):
     """
     Compute Stability metric.
     
     Definition
     ----------
-    Structures are considered stable if their relative formation energy is lower or equal to
+    Structures are considered:
+    - **Stable** if their relative formation energy is lower or equal to
     the convex hull energy of a reference dataset of known entries in their chemical space.
-    The formation energy of a crystal is assumed to be the total energy of the unit cell divided
-    by the number of atoms in it, and is measured in eV/atom.
+    - **Metastable** if the difference between their relative formation energy and the convex hull
+    energy is lower than a threshold (generally 0.1 eV/atom).
 
-    NOTE: Given structures (both computed and references) must have their total energy
-    in eV stored in their properties under the 'energy' key.
+    Notes
+    -----
+    - The formation energy of a crystal is assumed to be the total energy of the unit cell divided
+    by the number of atoms in it, and is measured in eV/atom (See reference for theoretical
+    discussion).
+    - Given structures must have a defined energy value in the `energy` attribute.
+
+    References
+    ----------
+    S. P. Ong, L. Wang, B. Kang, and G. Ceder, Li-Fe-P-O2 Phase Diagram from First Principles
+    Calculations. Chem. Mater., 2008, 20(5), 1798-1807. doi:10.1021/cm702327g
     """
-    _struct_attr = f"{__qualname__}_structure"
-    _delta_e_attr = f"{__qualname__}_e_above_hull"
     def __init__(
         self,
-        structures: list[Structure],
+        structures: list[GenMatStructure],
         ref_entries: list[PDEntry],
         stable_tol: float = 0.1,
         workers: int | None = None,
@@ -42,7 +57,7 @@ class Stability(Metric):
 
         Parameters
         ----------
-        structures: list[Structure]
+        structures: list[GenMatStructure]
             Structures to calculate Stability on.
 
         ref_entries: list[PDEntry]
@@ -59,62 +74,90 @@ class Stability(Metric):
 
         verbose: bool
             Whether to print entries used to build convex hulls with their energies,
-            and computed energies above hull from tested entries.
+            and computed energies above hull from tested entries. Defaults to False.
         """
-        super().__init__(structures)
-        self._init_settings(stable_tol, workers, verbose)
+        super().__init__(structures, workers)
+        if stable_tol < 0.0:
+            raise ValueError(
+                f"'stable_tol' must be positive or zero, got {stable_tol}."
+            )
+        if any(struct.energy is None for struct in self.structures):
+            raise ValueError(
+                "All structures must have a defined energy value "
+                f"to compute {type(self).__name__}."
+            )
         self._check_lacking_elts(structures, ref_entries)
-        if not all(
-            isinstance(struct.properties.get("header"), str)
-            for struct in self.structures
-        ):
-            raise ValueError(
-                "All structures must have a 'header' string property "
-                "to be used as an identifier in results."
-            )
-        if not all(
-            isinstance(struct.properties.get("energy"), float)
-            for struct in self.structures
-        ):
-            raise ValueError(
-                "All structures must have an 'energy' value in properties."
-            )
-        # Convert all structures to lightweight PDEntry objects
-        entries = [
-            PDEntry(
-                struct.composition, struct.properties["energy"], struct.properties["header"]
-            ) for struct in self.structures
-        ]
+
+        self.stable_tol = stable_tol
+        self.verbose = verbose
+
         # Sort all entries by chemical system
-        self.entries = self.sort_by_chemical_system(entries)
+        self._sorted_structs = self.sort_by_chemical_system(self.structures)
         self.ref_entries = self.sort_by_chemical_system(ref_entries)
 
         self._compute()
 
     @staticmethod
-    def _make_dummy_structure(entry: PDEntry) -> Structure:
-        """Make a dummy structure to store a PDEntry object in its properties."""
+    def get_elements(structures: list[StructureLike] | list[PDEntry]) -> set[str]:
+        """Get a set of all unique elements present in given structures or entries."""
+        return set.union(*(set(struct.composition.get_el_amt_dict()) for struct in structures))
+
+    def _check_lacking_elts(
+        self,
+        structures: list[StructureLike] | list[PDEntry],
+        ref_entries: list[PDEntry]
+    ) -> None:
+        """Verify that no element present in candidates is lacking in references."""
+        used_elts = self.get_elements(structures)
+        ref_elts = self.get_elements(ref_entries)
+        lacking_elts = used_elts - ref_elts
+        if lacking_elts:
+            raise ValueError(
+                "Following elements are present in structures but lacking in references: "
+                f"{', '.join(sorted(lacking_elts))}."
+        )
+
+    @tp.overload
+    def sort_by_chemical_system(self, entries: list[GenMatStructure]) -> dict[str, list[GenMatStructure]]:
+        ...
+    @tp.overload
+    def sort_by_chemical_system(self, entries: list[GenMatPDEntry]) -> dict[str, list[GenMatPDEntry]]:
+        ...
+    @tp.overload
+    def sort_by_chemical_system(self, entries: list[PDEntry]) -> dict[str, list[PDEntry]]:
+        ...
+    def sort_by_chemical_system(self, entries: list) -> dict:
+        """Sort entries by chemical system."""
+        chemical_systems: dict[str, list[PDEntry]] = defaultdict(list[PDEntry])
+        for entry in entries:
+            chemical_systems[entry.composition.chemical_system].append(entry)
+        return chemical_systems
+
+    @staticmethod
+    def _make_dummy_structure(entry: GenMatPDEntry) -> GenMatStructure:
+        """Make a dummy GenMatStructure from a named PDEntry object."""
         species_iter = itt.chain.from_iterable(
             [[elt] * int(amt) for elt, amt in entry.composition.get_el_amt_dict().items()]
         )
-        return Structure(
+        return GenMatStructure(
+            name=entry.name,
+            energy=entry.energy,
             lattice=[[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]],
             species=list(species_iter),
-            coords=[[0., 0., 0.]] * int(entry.composition.num_atoms),
-            properties={"header": entry.name, "energy": entry.energy}
+            coords=[[0., 0., 0.]] * int(entry.composition.num_atoms)
         )
 
     @classmethod
     def from_entries(
-        cls, entries: list[PDEntry], ref_entries: list[PDEntry], **kwargs
+        cls, entries: list[GenMatPDEntry], ref_entries: list[PDEntry], **kwargs
     ) -> tpe.Self:
         """
-        Initialize from PDEntry objects instead of structures.
+        Initialize from `GenMatPDEntry` objects instead of structures.
         This method wraps entries inside dummy structures to initialize the class.
 
         Parameters
         ----------
-        entries: list[PDEntry]
+        entries: list[GenMatPDEntry]
             Entries to compute stability on.
 
         ref_entries: list[PDEntry]
@@ -128,8 +171,8 @@ class Stability(Metric):
         Stability
             Stability class instance.
 
-        Warning
-        -------
+        Warnings
+        --------
         - The dummy structures are NOT valid in any physical sense. Original entries can be
         accessed after computation inside the dummy structures properties at the 'PDEntry'
         key, or using the `stable_entries` and `unstable_entries` attributes instead of
@@ -139,78 +182,96 @@ class Stability(Metric):
         of the dummy structures and not the corresponding entries, making it unsuitable
         to use directly to print actual entries lists.
         """
-        if not all(isinstance(entry.name, str) for entry in entries):
-            raise ValueError(
-                "All entries must have a defined string name to be used "
-                "as an identifier in results."
-            )
         structures = [cls._make_dummy_structure(entry) for entry in entries]
         return cls(structures, ref_entries, **kwargs)
 
-    @staticmethod
-    def get_elements(structures: list[Structure] | list[PDEntry]) -> set[str]:
-        """Get a set of all unique elements present in given structures or entries."""
-        return set.union(*(set(struct.composition.get_el_amt_dict()) for struct in structures))
+    def is_stable(
+        self, pd: PhaseDiagram, entry: GenMatStructure | PDEntryLike, strict: bool = False
+    ) -> bool:
+        """
+        Whether `entry` is stable compared to given convex hull.
+        Compatible with standard `PDEntry` and `GenMatPDEntry` objects, but only return
+        a bool instead of a computed `MetricsData` object with metric results.
+        Computed energy above hull is not saved.
 
-    def _init_settings(self, stable_tol: float, workers: int | None, verbose: bool) -> None:
-        """Verify and initialize settings arguments."""
-        if stable_tol < 0.0:
-            raise ValueError(
-                f"'stable_tol' must be positive or zero, got {stable_tol}."
-            )
-        if workers is not None and workers < 0:
-            raise ValueError(
-                f"'workers must be positive or zero, got {workers}."
-            )
-        self.stable_tol = stable_tol
-        self.workers = workers
-        self.verbose = verbose
+        Parameters
+        ----------
+        pd: PhaseDiagram
+            Reference diagram to use as convex hull.
 
-    def _check_lacking_elts(
-        self,
-        structures: list[Structure] | list[PDEntry],
-        ref_entries: list[PDEntry]
-    ) -> None:
-        """Verify that no element present in candidates is lacking in references."""
-        used_elts = self.get_elements(structures)
-        ref_elts = self.get_elements(ref_entries)
-        lacking_elts = used_elts - ref_elts
-        if lacking_elts:
-            raise ValueError(
-                "Following elements are present in structures but lacking in references: "
-                f"{', '.join(sorted(lacking_elts))}."
-        )
+        entry: GenMatStructure | PDEntry
+            The entry to compute stability on.
 
-    def sort_by_chemical_system(self, entries: list[PDEntry]) -> dict[str, list[PDEntry]]:
-        """Sort entries by chemical system."""
-        chemical_systems: dict[str, list[PDEntry]] = defaultdict(list[PDEntry])
-        for entry in entries:
-            chemical_systems[entry.composition.chemical_system].append(entry)
-        return chemical_systems
+        strict: bool
+            Whether to compute strict stability or metastability using initialized tolerance.
+            Defaults to False.
+        """
+        if isinstance(entry, GenMatStructure):
+            entry = entry.entry
 
-    def is_stable(self, pd: PhaseDiagram, entry: PDEntry) -> bool:
-        """Whether entry is stable compared to the convex hull, within initialized tolerance."""
         if self.verbose:
             pd_system = '-'.join(map(str, pd.elements))
-            print(f"Comparing entry {entry} to convex hull {pd_system}:")
+            entry_name = entry.name or entry.formula
+            print(f"Comparing entry {entry_name} to convex hull {pd_system}:")
             print(f"{entry.energy_per_atom=}")
+
         e_above_hull = pd.get_e_above_hull(entry, allow_negative=True, check_stable=False)
-        if entry.attribute is None:
-            entry.attribute = {}
-        entry.attribute[self._delta_e_attr] = e_above_hull # type: ignore
+        stable_tol = 0.0 if strict else self.stable_tol
+        is_stable = e_above_hull is not None and e_above_hull <= stable_tol
+
         if self.verbose:
+            stable_type = "stable" if strict else "metastable"
             print(f"{e_above_hull=}")
-        if e_above_hull is None or e_above_hull > self.stable_tol:
-            if self.verbose:
-                print(f"stable: False")
-            return False
-        if self.verbose:
-            print("stable: True")
-        return True
+            print(f"{stable_type}: {is_stable}")
+
+        return is_stable
+
+    def get_stability(self, pd: PhaseDiagram, structure: GenMatStructure) -> MetricsData:
+        """
+        Compute Stability of a structure on a phase diagram, within initialized tolerance.
+        The structure `energy_above_hull` attribute is populated with computed energy
+        above hull, and a computed `MetricsData` containing metric results is returned.
+
+        Parameters
+        ----------
+        pd: PhaseDiagram
+            Reference diagram to use as convex hull.
+
+        structure: GenMatStructure
+            The structure to compute Stability on.
+
+        Returns
+        -------
+        MetricsData
+            Computed metric results containing the structure with updated energy above hull.
+        """
+        structure.compute_energy_above_hull(pd, allow_negative=True, check_stable=False)
+        is_metastable = (
+            structure.energy_above_hull is not None and
+            structure.energy_above_hull <= self.stable_tol
+        )
+        is_stable = (
+            structure.energy_above_hull is not None and
+            structure.energy_above_hull <= 0.0
+        )
+        return MetricsData(
+            structure,
+            is_metastable=is_metastable,
+            is_stable=is_stable,
+            additional_data=self._get_metric_settings()
+        )
+
+    def _get_metric_settings(self) -> dict[str, tp.Any]:
+        """Get a dict of initialized parameters for this metric."""
+        return {
+            f"{type(self).__name__}_settings": {
+                "stable_tol": self.stable_tol
+            }
+        }
 
     def _compute_system(
-        self, system: str, entries: list[PDEntry]
-    ) -> tuple[list[PDEntry], list[PDEntry]]:
+        self, system: str, structs: list[GenMatStructure]
+    ) -> list[MetricsData]:
         """Compute stability inside a chemical system."""
         if self.verbose:
             print(f"Computing system {system}")
@@ -230,87 +291,107 @@ class Stability(Metric):
             for entry in hull_entries:
                 print(f"{entry=}, {entry.energy_per_atom=} eV/atom")
         # Compute energy above hull of evaluated entries
-        stable_entries, unstable_entries = [], []
-        for entry in entries:
-            (stable_entries if self.is_stable(pd, entry) else unstable_entries).append(entry)
-
-        return stable_entries, unstable_entries
+        return [self.get_stability(pd, struct) for struct in structs]
 
     def _compute(self) -> None:
-        desc="Computing Stability"
         if self.workers == 0:
-            self._stable_entries: list[PDEntry] = []
-            self._unstable_entries: list[PDEntry] = []
-            iterator = VisualIterator(
-                self.entries.items(), desc=desc, unit="computed", percent=True
-            )
-            for system, entries in iterator:
-                stable_entries, unstable_entries = self._compute_system(system, entries)
-                self._stable_entries.extend(stable_entries)
-                self._unstable_entries.extend(unstable_entries)
-        else:
-            stable_entries, unstable_entries = zip(
-                *process_map(
-                    self._compute_system,
-                    *zip(*self.entries.items()),
-                    max_workers=self.workers,
-                    chunksize=min(10, len(self.entries) // 100 + 1),
-                    desc=desc
+            self._computed_data: list[MetricsData] = list(itt.chain.from_iterable(
+                self._sequential_compute(
+                    self._compute_system, self._sorted_structs.items(), unpack=True
                 )
-            )
-            self._stable_entries = flatten(stable_entries)
-            self._unstable_entries = flatten(unstable_entries)
+            ))
+        else:
+            self._computed_data: list[MetricsData] = list(itt.chain.from_iterable(
+                self._parallel_compute(
+                    self._compute_system, zip(*self._sorted_structs.items()), unpack=True
+                )
+            ))
 
     @property
-    def stable_entries(self) -> list[PDEntry]:
-        """List of stable phase diagram entries."""
-        return self._stable_entries
+    def computed_data(self) -> list[MetricsData]:
+        """List of all computed `MetricsData` objects."""
+        return self._computed_data
 
     @property
-    def unstable_entries(self) -> list[PDEntry]:
-        """List of unstable phase diagram entries."""
-        return self._unstable_entries
+    def stable_data(self) -> list[MetricsData]:
+        """List of computed `MetricsData` containing a strictly stable structure."""
+        return [data for data in self.computed_data if data.is_stable]
+
+    @property
+    def metastable_data(self) -> list[MetricsData]:
+        """List of computed `MetricsData` containing a metastable structure."""
+        return [data for data in self.computed_data if data.is_metastable]
+
+    @property
+    def unstable_data(self) -> list[MetricsData]:
+        """List of computed `MetricsData` containing an unstable structure."""
+        return [data for data in self.computed_data if data.is_metastable is False]
+
+    @property
+    def stable_structs(self) -> list[GenMatStructure]:
+        """List of strictly stable structures."""
+        return [data.structure for data in self.computed_data if data.is_stable]
+
+    @property
+    def metastable_structs(self) -> list[GenMatStructure]:
+        """List of metastable structures."""
+        return [data.structure for data in self.computed_data if data.is_metastable]
+
+    @property
+    def unstable_structs(self) -> list[GenMatStructure]:
+        """List of unstable structures."""
+        return [data.structure for data in self.computed_data if data.is_metastable is False]
 
     @property
     def stable_names(self) -> list[str]:
-        """List of identifiers of stable structures."""
-        return [entry.name for entry in self.stable_entries]
+        """List of names of strictly stable structures."""
+        return [data.structure.name for data in self.computed_data if data.is_stable]
+
+    @property
+    def metastable_names(self) -> list[str]:
+        """List of names of metastable structures."""
+        return [data.structure.name for data in self.computed_data if data.is_metastable]
 
     @property
     def unstable_names(self) -> list[str]:
-        """List of identifiers of unstable structures."""
-        return [entry.name for entry in self.unstable_entries]
+        """List of names of unstable structures."""
+        return [data.structure.name for data in self.computed_data if data.is_metastable is False]
 
     @property
     def stable_names_set(self) -> set[str]:
-        """Set of identifiers of stable structures."""
-        return set(entry.name for entry in self.stable_entries)
+        """Set of names of strictly stable structures."""
+        return {data.structure.name for data in self.computed_data if data.is_stable}
+
+    @property
+    def metastable_names_set(self) -> set[str]:
+        """Set of names of metastable structures."""
+        return {data.structure.name for data in self.computed_data if data.is_metastable}
 
     @property
     def unstable_names_set(self) -> set[str]:
-        """Set of identifiers of unstable structures."""
-        return set(entry.name for entry in self.unstable_entries)
+        """Set of names of unstable structures."""
+        return {data.structure.name for data in self.computed_data if data.is_metastable is False}
 
     @property
-    def stable_structs(self) -> list[Structure]:
-        """List of stable structures."""
-        return [
-            struct for struct in self.structures
-            if struct.properties["header"] in self.stable_names_set
-        ]
+    def stable_entries(self) -> list[GenMatPDEntry]:
+        """List of the `GenMatPDEntry` associated with stable structures."""
+        return [data.structure.entry for data in self.computed_data if data.is_stable]
 
     @property
-    def unstable_structs(self) -> list[Structure]:
-        """List of unstable structures."""
-        return [
-            struct for struct in self.structures
-            if struct.properties["header"] in self.unstable_names_set
-        ]
+    def metastable_entries(self) -> list[GenMatPDEntry]:
+        """List of the `GenMatPDEntry` associated with metastable structures."""
+        return [data.structure.entry for data in self.computed_data if data.is_metastable]
+
+    @property
+    def unstable_entries(self) -> list[GenMatPDEntry]:
+        """List of the `GenMatPDEntry` associated with unstable structures."""
+        return [data.structure.entry for data in self.computed_data if data.is_metastable is False]
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
-        subsets: OrderedDict[str, list[Structure]] = OrderedDict(
+        subsets: OrderedDict[str, list[GenMatStructure]] = OrderedDict(
             [
                 ("Stable", self.stable_structs),
+                ("Metastable", self.metastable_structs),
                 ("Unstable", self.unstable_structs)
             ]
         )

@@ -1,5 +1,7 @@
 """Compute Root Mean Squared Displacement (RMSD) metric."""
 
+from typing import Any
+
 import numpy as np
 
 import torch
@@ -8,7 +10,8 @@ from torch_scatter import scatter_mean
 
 from pymatgen.core import Structure
 
-from .metric_base import Metric
+from .metric_base import Metric, MetricsData
+from src.utils import GenMatStructure
 
 
 class RMSD(Metric):
@@ -45,13 +48,17 @@ class RMSD(Metric):
             cls._offsets_cache[device] = cls._offsets_cpu.to(device)
         return cls._offsets_cache[device]
 
-    def __init__(self, structures: list[Structure], relaxed_structs: list[Structure]) -> None:
+    def __init__(
+        self,
+        structures: list[GenMatStructure],
+        relaxed_structs: list[Structure]
+    ) -> None:
         """
         Compute Root Mean Squared Displacement (RMSD) metric.
         
         Parameters
         ----------
-        structures: list[Structure]
+        structures: list[GenMatStructure]
             Structures to calculate Root Mean Squared Displacement metric on.
 
         relaxed_structs: list[Structure]
@@ -59,18 +66,21 @@ class RMSD(Metric):
             but after geometry optimization.
         """
         super().__init__(structures)
-        assert len(self.structures) == len(relaxed_structs), (
-            f"'structures' ({len(self.structures)}) and 'relaxed_structs' "
-            f"({len(relaxed_structs)}) must have same length."
-        )
+        if not len(self.structures) == len(relaxed_structs):
+            raise ValueError(
+                f"'structures' ({len(self.structures)}) and 'relaxed_structs' "
+                f"({len(relaxed_structs)}) must have same length."
+            )
         num_atoms = torch.tensor([len(struct) for struct in self.structures], dtype=torch.long)
         num_relaxed_atoms = torch.tensor(
                 [len(struct) for struct in relaxed_structs], dtype=torch.long
             )
-        assert (num_atoms == num_relaxed_atoms).all(), (
-            "Some structures do not have matching number of atoms before and after relaxation, "
-            "check that each matching index contain the same structure before and after relaxation."
-        )
+        if not (num_atoms == num_relaxed_atoms).all():
+            ValueError(
+                "Some structures do not have matching number of atoms before and after "
+                "relaxation, please check that each matching index contain the same structure "
+                "before and after relaxation."
+            )
         self.num_atoms = num_atoms
         self.relaxed_structs = relaxed_structs
 
@@ -145,13 +155,13 @@ class RMSD(Metric):
         Parameters
         ----------
         x_src: Tensor
-            Positions before optimization.
+            Fractional positions before optimization.
 
         cell_src: Tensor
             Lattice vectors matrix of the non-optimized structure.
 
         x_dst: Tensor
-            Positions after optimization.
+            Fractional positions after optimization.
 
         cell_dst: Tensor
             Lattice vectors matrix of the optimized structure.
@@ -177,6 +187,12 @@ class RMSD(Metric):
             distance, batch_atoms, dim=0, dim_size=self.num_atoms.shape[0]
         ).sqrt()
 
+    def _get_metric_settings(self) -> dict[str, Any]:
+        """Get a dict of initialized parameters for this metric."""
+        return {
+            f"{type(self).__name__}_settings": {}
+        }
+
     def _compute(self) -> None:
         x_src = torch.cat(
             [torch.tensor(struct.frac_coords, dtype=torch.float32) for struct in self.structures],
@@ -192,7 +208,7 @@ class RMSD(Metric):
         cell_dst = torch.tensor(
             [struct.lattice.matrix for struct in self.relaxed_structs], dtype=torch.float32
         )
-        self._distances = self.compute_rmsd(x_src, cell_src, x_dst, cell_dst).numpy()
+        self._distances = self.compute_rmsd(x_src, cell_src, x_dst, cell_dst).numpy(force=True)
 
     @property
     def average_rmsd(self) -> float:
@@ -204,9 +220,22 @@ class RMSD(Metric):
         """Get 1D array of computed RMSD values for all structures."""
         return self._distances
 
+    @property
+    def rmsd_data(self) -> list[MetricsData]:
+        """
+        List of computed `MetricsData` objects each containing an unrelaxed structure,
+        its associated RMSD value, and its relaxed version as additional data.
+        """
+        return [
+            MetricsData(struct, rmsd=rmsd_val, additional_data={"relaxed_structure": relaxed})
+            for struct, relaxed, rmsd_val in zip(
+                self.structures, self.relaxed_structs, self.all_rmsd
+            )
+        ]
+
     def get_rmsd_from_index(self, idx: int) -> float:
         """Get computed RMSD value of a specific structure from its index."""
-        return float(self._distances[idx])
+        return float(self.all_rmsd[idx])
 
     def write_result(self, filename: str, decimals: int = 6, verbose: bool = False) -> None:
         text = "===== Root Mean Squared Displacement Results ====="

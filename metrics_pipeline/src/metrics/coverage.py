@@ -1,5 +1,6 @@
 """Compute Coverage (Precision) and Coverage (Recall) metrics."""
 
+import typing as tp
 import functools as ft
 
 import numpy as np
@@ -9,7 +10,8 @@ from torch_cluster import knn
 
 from pymatgen.core import Structure
 
-from .metric_base import Metric, StructureDistribution
+from .metric_base import StructureDistribution, Metric, MetricsData
+from src.utils import GenMatStructure
 
 
 class Coverage(Metric):
@@ -38,7 +40,7 @@ class Coverage(Metric):
     """
     def __init__(
         self,
-        structures: list[Structure],
+        structures: list[GenMatStructure],
         ref_structs: list[Structure],
         transform: StructureDistribution,
         compute_precision: bool = True,
@@ -51,7 +53,7 @@ class Coverage(Metric):
         
         Parameters
         ----------
-        structures: list[Structure]
+        structures: list[GenMatStructure]
             Structures to calculate Coverage metrics on.
 
         ref_structs: list[Structure]
@@ -77,6 +79,7 @@ class Coverage(Metric):
         super().__init__(structures)
         self.ref_structs = ref_structs
         self.transform = ft.partial(transform, **kwargs)
+        self.kwargs = kwargs
         self.compute_precision = compute_precision
         self.compute_recall = compute_recall
         self.threshold = threshold
@@ -114,6 +117,17 @@ class Coverage(Metric):
         mask = distance < threshold
         return mask.astype(np.float32).mean().item()
 
+
+    def _get_metric_settings(self) -> dict[str, dict[str, tp.Any]]:
+        """Get a dict of initialized parameters for this metric."""
+        return {
+            f"{type(self).__name__}_settings": {
+                "threshold": self.threshold,
+                "transform": self.transform,
+                "kwargs": self.kwargs
+            }
+        }
+
     def _compute(self) -> None:
         computed_fp = self.transform(self.structures)
         ref_fp = self.transform(self.ref_structs)
@@ -137,6 +151,23 @@ class Coverage(Metric):
     def recall(self) -> float | None:
         """Get computed Recall (COV-R) metric as a percentage."""
         return self._recall if self._recall is None else self._recall * 100
+
+    @property
+    def coverage_data(self) -> list[MetricsData]:
+        """
+        List of computed MetricsData objects containing structures from tested distribution
+        and Coverage computation details (same values for all structures).
+        """
+        data = self._get_metric_settings()
+        data[f"{type(self).__name__}_values"] = {
+            "precision_percent": self.precision, "recall_percent": self.recall
+        }
+        return [
+            MetricsData(
+                struct,
+                additional_data=data
+            ) for struct in self.structures
+        ]
 
     def write_result(self, filename: str, decimals: int = 6) -> None:
         if self._precision is None:

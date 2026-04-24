@@ -1,7 +1,10 @@
 """Helper functionalities for other packages."""
 
 from .common_asserts import check_type, check_num_value, raise_or_warn
-from .genmat_names import is_genmat_name, check_genmat_name, get_genmat_name_idx, generate_genmat_names
+from .genmat_data import (
+    is_genmat_name, check_genmat_name, get_genmat_name_idx, generate_genmat_names,
+    GenMatPDEntry, GenMatStructure, PDEntryLike, StructureLike, generate_genmat_structures
+)
 from .visual_iterator import VisualIterator
 from .flattener import flatten
 from .redirect import redirect_c_stdout, redirect_c_stderr
@@ -22,6 +25,7 @@ from .parse_args import parse_input_args
 __all__ = [
     "check_type", "check_num_value", "raise_or_warn",
     "is_genmat_name", "check_genmat_name", "get_genmat_name_idx", "generate_genmat_names",
+    "GenMatPDEntry", "GenMatStructure", "PDEntryLike", "StructureLike", "generate_genmat_structures",
     "VisualIterator",
     "flatten",
     "redirect_c_stdout", "redirect_c_stderr",
