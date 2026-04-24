@@ -18,9 +18,14 @@ def _mass_g(structure: Structure) -> float:
     return sum(s.atomic_mass.to("g") for s in structure.species)
 
 
+def get_density(structure: Structure) -> float:
+    """Get the structure volumic mass in g.cm⁻³."""
+    return _mass_g(structure) / _volume_cm3(structure)
+
+
 def get_densities(structures: list[Structure]) -> np.ndarray:
-    """Computes structure volumic mass in g / cm³."""
+    """Computes structure volumic masses in g.cm⁻³."""
     for idx, struct in enumerate(structures):
         check_type(struct, f"structures[{idx}]", (Structure,))
 
-    return np.array([_mass_g(s)/_volume_cm3(s) for s in structures])
+    return np.array([get_density(s) for s in structures])

@@ -310,8 +310,6 @@ class VaspParser:
 
         try:
             vasprun = Vasprun(filename=vasprun_path, **kwargs)
-        except (ET.ParseError, ValueError):
-            return None
         except UnicodeDecodeError:
             warnings.warn(
                 f"{filename} file at {run_dir} contains "
@@ -319,6 +317,8 @@ class VaspParser:
                 "Associated data is therefore considered erroneous "
                 "and is not parsed further."
             )
+            return None
+        except (ET.ParseError, ValueError):
             return None
 
         if converged and not vasprun.converged:

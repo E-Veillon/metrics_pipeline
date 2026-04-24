@@ -103,6 +103,14 @@ def _get_command_line_args() -> ap.Namespace:
             "and execute sequentially."
         )
     )
+    parser.add_argument(
+        "--match-all", action=ap.BooleanOptionalAction, default=True,
+        help=(
+            "Whether to raise an error if some run indices do not match any structure directory "
+            "in base directory. Defaults to %(default)s. Deactivate it if some structures "
+            "could not be written as VASP input when using this script before."
+        )
+    )
     args: ap.Namespace = parser.parse_args()
     return args
 
@@ -209,6 +217,11 @@ def main(standalone: bool = True, **kwargs):
         Number of processes to use in parallel. If not given, will use default of
         `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
         and execute sequentially.
+
+    match_all: bool
+        Whether to raise an error if some run indices do not match any structure directory
+        in base directory. Defaults to %(default)s. Deactivate it if some structures
+        could not be written as VASP input when using 'vasp_rundir_writer.py' script.
     """
     start = datetime.now()
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
@@ -241,7 +254,8 @@ def main(standalone: bool = True, **kwargs):
         base_dir, summary_name = os.path.split(input_file)
         vparser = VaspParser(
             base_dir=base_dir,
-            indices=indices
+            indices=indices,
+            match_all=args["match_all"]
         )
         data_dict = VaspExtractor(
             vparser, method=ExtractMethod.FINAL_STATE,

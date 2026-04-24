@@ -1,8 +1,8 @@
 """Load and write JSON files with extra features."""
 
-import os
 import typing as tp
 import json
+from pathlib import Path
 
 from .io_base import check_file_or_dir, check_file_format, PathLike
 
@@ -19,13 +19,12 @@ class JsonLoader:
             Path to the file to load.
         """
         check_file_or_dir(filepath, "file", allowed_formats="json")
-        self.filepath = filepath
+        self.filepath = Path(filepath)
 
     def load(self) -> tp.Any:
         """Load the JSON data as-is."""
-        with open(self.filepath, "rt", encoding="utf-8") as fp:
+        with self.filepath.open("rt", encoding="utf-8") as fp:
             data = json.load(fp)
-        
         return data
 
     def load_as_dict(self) -> dict[tp.Any, tp.Any]:
@@ -90,7 +89,7 @@ class JsonWriter:
             Additional keyword arguments to pass to `json.dump()`.
         """
         check_file_format(filepath, allowed_formats="json")
-        self.filepath = filepath
+        self.filepath = Path(filepath)
         self.data = data
         self.kwargs = kwargs
 
@@ -112,10 +111,8 @@ class JsonWriter:
 
     def write(self) -> None:
         """Write the JSON data as-is."""
-        filedir = os.path.dirname(self.filepath)
-        write_dir = filedir if filedir else os.getcwd()
-        os.makedirs(write_dir, exist_ok=True)
-        with open(self.filepath, "wt", encoding="utf-8") as fp:
+        self.filepath.parent.mkdir(parents=True, exist_ok=True)
+        with self.filepath.open("wt", encoding="utf-8") as fp:
             json.dump(self._data, fp, **self.kwargs)
 
     def write_as_dict(self) -> None:

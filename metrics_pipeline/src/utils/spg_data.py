@@ -1,6 +1,8 @@
 """
 Crystallographic spacegroup symmetry classification data.
 """
+
+import typing_extensions as tpe
 from collections import OrderedDict
 
 ALL_CRYSTAL_FAMILIES = ("triclinic", "monoclinic", "orthorhombic", "tetragonal", "hexagonal", "cubic")
@@ -157,7 +159,8 @@ class Spacegroup:
     Attributes
     ----------
     int_number: int
-        The spacegroup international number, between 1 and 230.
+        The spacegroup international number, between 0 and 230,
+        with 0 representing an undetermined spacegroup.
     symbol: str
         The spacegroup Hermann-Mauguin symbol.
     point_group: str
@@ -168,21 +171,25 @@ class Spacegroup:
         The crystal family corresponding to this spacegroup
         (same as crystal system except trigonal system is of hexagonal family).
     """
-    def __init__(self, int_number: int) -> None:
+    def __init__(self, int_number: int, *, is_uncomputable: bool = False) -> None:
         """
         A crystallographic spacegroup with its classification data.
 
         Parameters
         ----------
         int_number: int
-            The spacegroup international number, between 1 and 230.
+            The spacegroup international number, between 0 and 230,
+            with 0 representing an undetermined spacegroup.
+        is_uncomputable: bool
+            Whether the spacegroup is uncomputable. Defaults to False.
         """
         if not isinstance(int_number, int):
             raise TypeError(f"Spacegroup number must be an integer, got {type(int_number).__name__!r}.")
-        if not 1 <= int_number <= 230:
-            raise ValueError(f"Spacegroup number must be between 1 and 230, got {int_number}.")
+        if not 0 <= int_number <= 230:
+            raise ValueError(f"Spacegroup number must be between 0 and 230, got {int_number}.")
 
         self._int_number = int_number
+        self._is_uncomputable = is_uncomputable
 
     @property
     def int_number(self) -> int:
@@ -194,23 +201,34 @@ class Spacegroup:
         """Set the international number of the spacegroup."""
         if not isinstance(value, int):
             raise TypeError(f"Spacegroup number must be an integer, got {type(value).__name__!r}.")
-        if not 1 <= value <= 230:
-            raise ValueError(f"Spacegroup number must be between 1 and 230, got {value}.")
+        if self.is_uncomputable:
+            raise ValueError(
+                "This spacegroup is set as uncomputable and cannot be modified unless"
+                "'is_uncomputable' is set to False."
+            )
+        if not 0 <= value <= 230:
+            raise ValueError(f"Spacegroup number must be between 0 and 230, got {value}.")
         self._int_number = value
 
     @property
     def symbol(self) -> str:
         """Get the Hermann-Mauguin symbol of the spacegroup."""
-        return ALL_SPACEGROUPS[self._int_number - 1]
+        if self.int_number == 0:
+            return "Undetermined"
+        return ALL_SPACEGROUPS[self.int_number - 1]
 
     @property
     def point_group(self) -> str:
         """Get the point group corresponding to this spacegroup."""
-        return SPG_NUM_TO_PG[self._int_number]
+        if self.int_number == 0:
+            return "Undetermined"
+        return SPG_NUM_TO_PG[self.int_number]
     
     @property
     def crystal_system(self) -> str:
         """Get the crystal system corresponding to this spacegroup."""
+        if self.int_number == 0:
+            return "Undetermined"
         return PG_TO_SYSTEM[self.point_group]
     
     @property
@@ -219,3 +237,52 @@ class Spacegroup:
         if self.crystal_system == "trigonal":
             return "hexagonal"
         return self.crystal_system
+    
+    @property
+    def is_uncomputable(self) -> bool:
+        """
+        Whether the spacegroup is uncomputable
+        (i.e., SpacegroupAnalyzer could not determine a spacegroup).
+        """
+        return self._is_uncomputable
+    
+    @is_uncomputable.setter
+    def is_uncomputable(self, value: bool) -> None:
+        """
+        Set the spacegroup as uncomputable (i.e., SpacegroupAnalyzer could not determine
+        a spacegroup).
+        Setting it to `True` automatically freezes the spacegroup number to 0 (undetermined).
+        """
+        if not isinstance(value, bool):
+            raise TypeError(f"is_uncomputable must be a boolean, got {type(value).__name__!r}.")
+        self._is_uncomputable = value
+        if value:
+            self._int_number = 0
+
+    def as_dict(self, verbose: bool = False) -> dict:
+        """
+        Return a dictionary representation of the spacegroup.
+        
+        Parameters
+        ----------
+        verbose: bool
+            Whether to add classification details to the dict.
+            The default (False) only saves necessary data to rebuild the object.
+        """
+        dct = {
+            "int_number": self.int_number,
+            "is_uncomputable": self.is_uncomputable
+        }
+        if verbose:
+            dct.update({
+                "symbol": self.symbol,
+                "point_group": self.point_group,
+                "crystal_system": self.crystal_system,
+                "crystal_family": self.crystal_family
+            })
+        return dct
+
+    @classmethod
+    def from_dict(cls, dct: dict) -> tpe.Self:
+        """Create a Spacegroup object from a dictionary representation."""
+        return cls(int_number=dct["int_number"], is_uncomputable=dct["is_uncomputable"])
