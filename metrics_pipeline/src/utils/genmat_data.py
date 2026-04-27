@@ -4,8 +4,9 @@ import re
 import typing as tp
 import typing_extensions as tpe
 from pathlib import Path
+from collections import defaultdict
 
-from pymatgen.core.structure import Structure, Composition
+from pymatgen.core.structure import Structure, Composition, Lattice
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 from .spg_data import Spacegroup
@@ -280,9 +281,12 @@ class GenMatStructure(Structure):
         computed_entry.compute_energy_above_hull(pdiagram, **kwargs)
         self.energy_above_hull = computed_entry.energy_above_hull
 
-    def as_dict(self, *args, **kwargs) -> dict:
-        """Get a dictionary representation of the GenMatStructure object."""
-        struct_dct = super().as_dict(*args, **kwargs)
+    def as_dict(self, **kwargs) -> dict:
+        """
+        Get a dictionary representation of the GenMatStructure object.
+        Additional keyword arguments are directly passed to `Structure.as_dict()`.
+        """
+        struct_dct = super().as_dict(**kwargs)
         del struct_dct["@module"]
         del struct_dct["@class"]
         dct = {
@@ -368,16 +372,22 @@ def generate_genmat_structures(
 
 class GenMatFile:
     """
-    Lightweight wrapper to load and write JSON files containing structure data for
+    I/O class to load and write JSON files containing structure data for
     the GenMat library.
     """
-    _genmat_keys = (
+    _genmat_file_keys = (
+        "name", "special_keys", "spacegroup", "energy", "energy_above_hull",
+        "a", "b", "c", "alpha", "beta", "gamma", "charge", "properties",
+        "species", "site_a", "site_b", "site_c", "site_properties"
+    )
+    _genmat_struct_keys = (
         "name", "special_keys", "spacegroup", "energy", "energy_above_hull", "structure"
     )
+    _data: dict[str, list[tp.Any]]
 
     def __init__(self, filepath: PathLike | None = None) -> None:
         """
-        Lightweight wrapper to load and write JSON files containing structure data for
+        I/O class to load and write JSON files containing structure data for
         the GenMat library.
 
         Parameters
@@ -387,44 +397,208 @@ class GenMatFile:
             that can be filled with data to write.
         """
         if filepath is None:
-            self._data = {}
-            for key in self._genmat_keys:
+            self._data = defaultdict(list)
+            for key in self._genmat_struct_keys:
                 self._data[key] = []
         else:
             data = JsonLoader(filepath).load_as_dict()
             assert data.get("@module") == type(self).__module__
             assert data.get("@class") == type(self).__name__
-            assert all(key in data for key in self._genmat_keys)
-            assert len({len(data[key]) for key in self._genmat_keys}) == 1
+            assert all(key in data for key in self._genmat_file_keys)
+            assert len({len(data[key]) for key in self._genmat_file_keys}) == 1
 
-            self._data = {k: data[k] for k in self._genmat_keys}
+            self._data = self._reorganize_data(data, algo="uncompress")
+
+    def __len__(self) -> int:
+        return len(self.all_names)
+
+    def __getitem__(self, index: int) -> GenMatStructure:
+        """Get a GenMatStructure from the data at given index."""
+        check_type(index, "index", (int,))
+        if index < 0:
+            index += len(self)
+        if not 0 <= index < len(self):
+            raise IndexError(f"{type(self).__name__}: index out of range.")
+
+        dct = {k: self._data[k][index] for k in self._genmat_struct_keys}
+        return GenMatStructure.from_dict(dct)
+
+    def __iter__(self) -> tp.Iterator[GenMatStructure]:
+        return iter(
+            GenMatStructure.from_dict({k: self._data[k][i] for k in self._genmat_struct_keys})
+            for i in range(len(self))
+        )
 
     def __getattr__(self, name: str) -> tp.Any:
         if (attr_data:=self._data.get(name)) is not None:
             return attr_data
         raise AttributeError(f"{type(self).__name__!r} has no attribute {name!r}.")
 
+    def _check_ordering(self, structure: GenMatStructure) -> None:
+        """Check that passed structure is ordered."""
+        if not structure.is_ordered:
+            raise ValueError(
+                f"{type(self).__name__!r} only supports ordered structures, "
+                "i.e. with only one species with occupancy 1.0 per site. "
+                f"Disordered structure {structure.name!r} is not supported."
+            )
+
+    def _reorganize_data(
+        self, data: dict[str, tp.Any], *, algo: tp.Literal["compress", "uncompress"]
+    ) -> dict[str, tp.Any]:
+        """
+        Reorganize data between storage-efficient and object reconstruction-friendly formats.
+        """
+        if algo == "compress":
+            parser_fn = _compress_struct_dict
+            init_key_list = self._genmat_struct_keys
+            target_key_list = self._genmat_file_keys
+        elif algo == "uncompress":
+            parser_fn = _uncompress_struct_dict
+            init_key_list = self._genmat_file_keys
+            target_key_list = self._genmat_struct_keys
+        else:
+            raise ValueError(f"'algo' must be either 'compress' or 'uncompress', got {algo!r}.")
+
+        # Use lazy generators to avoid storing pointer copies of all file data
+        ordered_data = (data[k] for k in init_key_list)
+        parsed_data = (
+            parser_fn({k: v for k, v in zip(init_key_list, struct_data, strict=True)})
+            for struct_data in zip(*ordered_data, strict=True)
+        )
+        reorganized_data = {}
+        for key in target_key_list:
+            reorganized_data[key] = [struct_dict[key] for struct_dict in parsed_data]
+        
+        return reorganized_data
+
     def parse_structures(self) -> list[GenMatStructure]:
         """Build GenMatStructure objects from file data."""
         return [
-            GenMatStructure.from_dict(dict(zip(self._genmat_keys, values)))
-            for values in zip(*(self._data[k] for k in self._genmat_keys))
+            GenMatStructure.from_dict(dict(zip(self._genmat_struct_keys, values)))
+            for values in zip(*(self._data[k] for k in self._genmat_struct_keys))
         ]
 
     def add_structure(self, structure: GenMatStructure) -> None:
         """Add a GenMatStructure data to the file."""
-        dct = structure.as_dict()
-        for key in self._genmat_keys:
+        self._check_ordering(structure)
+        dct = structure.as_dict(verbosity=0)
+        for key in self._genmat_struct_keys:
             self._data[key].append(dct[key])
 
     def add_structures(self, structures: list[GenMatStructure]) -> None:
         """Add several GenMatStructures to the file. Order is preserved."""
-        for key in self._genmat_keys:
+        for structure in structures:
+            self._check_ordering(structure)
+
+        for key in self._genmat_struct_keys:
             self._data[key].extend(getattr(struct, key) for struct in structures)
+
+    @property
+    def all_names(self) -> list[str]:
+        """List of all stored structure names."""
+        return self._data["name"]
+
+    @property
+    def all_special_keys(self) -> list[dict[str, tp.Any]]:
+        """List of all stored special keys dictionaries."""
+        return self._data["special_keys"]
+
+    @property
+    def all_spacegroups(self) -> list[Spacegroup]:
+        """List of all stored spacegroups, converted into Spacegroup objects on the fly."""
+        return [Spacegroup.from_dict(dct) for dct in self._data["spacegroup"]]
+
+    @property
+    def all_energies(self) -> list[float | None]:
+        """List of all stored energy values."""
+        return self._data["energy"]
+
+    @property
+    def all_energies_above_hull(self) -> list[float | None]:
+        """List of all stored energy above hull values."""
+        return self._data["energy_above_hull"]
+
+    @property
+    def all_structures(self) -> list[Structure]:
+        """
+        List of all stored structure data
+        (Warning: builds all structure objects on the fly at each call).
+        """
+        return [Structure.from_dict(dct) for dct in self._data["structure"]]
 
     def write_file(self, filepath: PathLike) -> None:
         """Write stored data to a compact JSON file."""
-        data = self._data.copy()
-        data["@module"] = type(self).__module__
-        data["@class"] = type(self).__name__
-        JsonWriter(filepath, data).write_as_dict()
+        written_data = self._reorganize_data(self._data, algo="compress")
+        written_data["@module"] = type(self).__module__
+        written_data["@class"] = type(self).__name__
+        JsonWriter(filepath, written_data).write_as_dict()
+
+
+def _compress_struct_dict(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
+    """
+    Reorganize structure data into flatter and more storage-efficient organization.
+    Exact reverse operation of `_uncompres_struct_dict()`.
+    """
+    struct_dict = dct.pop("structure")
+    dct["charge"] = struct_dict["charge"]
+    dct["properties"] = struct_dict["properties"]
+
+    # Flatten lattice parameters
+    lattice = Lattice.from_dict(struct_dict["lattice"])
+    dct["a"] = lattice.a
+    dct["b"] = lattice.b
+    dct["c"] = lattice.c
+    dct["alpha"] = lattice.alpha
+    dct["beta"] = lattice.beta
+    dct["gamma"] = lattice.gamma
+
+    # Flatten sites data
+    dct["species"] = []
+    dct["site_a"], dct["site_b"], dct["site_c"] = [], [], []
+    dct["site_properties"] = []
+    for site_dict in struct_dict["sites"]:
+        dct["species"].append(site_dict["species"]["element"])
+        dct["site_a"].append(site_dict["abc"][0])
+        dct["site_b"].append(site_dict["abc"][1])
+        dct["site_c"].append(site_dict["abc"][2])
+        dct["site_properties"].append(site_dict["properties"])
+
+    return dct
+
+
+def _uncompress_struct_dict(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
+    """
+    Reorganize structure data into hierarchical organization instead of storage-efficient
+    organization. Exact reverse operation of `_compress_struct_dict()`.
+    """
+    struct_dict = dict.fromkeys(("lattice", "charge", "properties", "sites"))
+    struct_dict["charge"] = dct.pop("charge")
+    struct_dict["properties"] = dct.pop("properties")
+
+    # Rebuild pymatgen-style lattice dict
+    struct_dict["lattice"] = Lattice.from_parameters(
+        a=dct.pop("a"), b=dct.pop("b"), c=dct.pop("c"),
+        alpha=dct.pop("alpha"), beta=dct.pop("beta"), gamma=dct.pop("gamma")
+    ).as_dict()
+
+    # Rebuild pymatgen-style site dict
+    site_iter = zip(
+        dct.pop("species"),
+        dct.pop("site_a"),
+        dct.pop("site_b"),
+        dct.pop("ste_c"),
+        dct.pop("site_properties"),
+        strict=True
+    )
+    struct_dict["sites"] = [
+        {
+            "species": [{"element": site_data[0], "occu": 1.0}],
+            "abc": [site_data[1], site_data[2], site_data[3]],
+            "properties": site_data[4]
+        } for site_data in site_iter
+    ]
+
+    dct["structure"] = struct_dict
+
+    return dct
