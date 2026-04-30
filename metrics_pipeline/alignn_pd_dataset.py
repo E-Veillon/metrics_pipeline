@@ -5,9 +5,8 @@ Compute structures energies using ALIGNN to build a phase diagram reference data
 import argparse as ap
 import typing as tp
 from pathlib import Path
-from collections import defaultdict
 
-from src.utils import parse_input_args, check_type, check_num_value, VisualIterator
+from src.utils import parse_input_args, check_type, check_num_value
 from src.io import check_file_or_dir, check_file_format, CIFFile, JsonWriter
 from src.computations.models import vectors_from_alignn
 

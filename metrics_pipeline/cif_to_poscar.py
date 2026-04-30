@@ -3,7 +3,6 @@
 import os
 import typing as tp
 import argparse as ap
-import warnings
 
 from pymatgen.io.vasp import Poscar
 
