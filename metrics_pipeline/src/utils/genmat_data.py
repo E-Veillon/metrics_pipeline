@@ -9,9 +9,7 @@ from pymatgen.core.structure import Structure, Composition, Lattice
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 from .spg_data import Spacegroup
-from .visual_iterator import VisualIterator
 from .common_asserts import check_type
-from src.computations.local import get_density
 from src.io import JsonLoader, JsonWriter, PathLike
 
 
@@ -276,7 +274,7 @@ class GenMatStructure(Structure):
     @property
     def density(self) -> float:
         """Volumic mass of the structure in g.cm⁻³."""
-        return get_density(self)
+        return _get_density(self)
 
     def compute_energy_above_hull(self, pdiagram: PhaseDiagram, **kwargs: tp.Any) -> None:
         """
@@ -376,6 +374,10 @@ class GenMatStructure(Structure):
             properties = structure.properties
         )
 
+
+def _get_density(structure: Structure) -> float:
+    """Get the structure volumic mass in g.cm⁻³."""
+    return sum(s.atomic_mass.to("g") for s in structure.species) / structure.volume*1e-24
 
 PDEntryLike: tp.TypeAlias = PDEntry | GenMatPDEntry
 StructureLike: tp.TypeAlias = Structure | GenMatStructure
