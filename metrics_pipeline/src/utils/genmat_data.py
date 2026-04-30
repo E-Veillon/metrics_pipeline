@@ -1,4 +1,4 @@
-"""GenMat pipeline specific functionnalities."""
+"""GenMat pipeline specific functionalities."""
 
 import re
 import typing as tp
@@ -40,35 +40,6 @@ def check_genmat_name(name: str) -> None:
         "Please make sure your data was preprocessed with the 'preprocess.py' "
         "script before going further."
     )
-
-
-def get_genmat_name_idx(name: str) -> int:
-    """
-    Extract the index part of a GenMat name.
-    """
-    check_genmat_name(name)
-    match = _GENMAT_NAME_PATTERN.match(name)
-    if match is None:
-        raise ValueError(f"Failed to extract index from {name!r}")
-    return int(match.group(1))
-
-
-def generate_genmat_names(structures: list[Structure]) -> list[Structure]:
-    """
-    Generate GenMat indexed names based on the position of each structure in the list.
-    The new name is stored inside the 'header' key of structures 'properties' attribute.
-    If another name already exists in 'header', it is moved to the '_original_header' key.
-    """
-    iterator: VisualIterator[tuple[int, Structure]] = VisualIterator.from_big_iterator(
-        enumerate(structures), n_elts=len(structures),
-        desc="Generating GenMat names", unit="generated", percent=True
-    )
-    for idx, structure in iterator:
-        if old_header:=structure.properties.get('header'):
-            structure.properties["_original_header"] = old_header
-        structure.properties["header"] = f"{idx}_{structure.reduced_formula}"
-
-    return structures
 
 
 class GenMatPDEntry(PDEntry):
@@ -162,6 +133,34 @@ class GenMatPDEntry(PDEntry):
         kwargs.setdefault("check_stable", False)
         e_above_hull = pdiagram.get_e_above_hull(self, **kwargs)
         self.energy_above_hull = e_above_hull
+
+    def as_pdentry(self) -> PDEntry:
+        """Rebuild standard `PDEntry` object from data."""
+        return PDEntry(self.composition, self.energy, self.name, self.attribute)
+    
+    @classmethod
+    def from_pdentry(
+        cls, entry: PDEntry, name: str | None = None, energy_above_hull: float | None = None
+    ) -> tpe.Self:
+        """
+        Build a `GenMatPDEntry` object from a standard `PDEntry` object.
+        
+        Parameters
+        ----------
+        name: str, optional
+            The GenMat name of the entry. If not given, current name of the entry
+            will be checked and kept if it follows GenMat naming convention.
+
+        energy_above_hull: float, optional
+            Computed energy above hull of the entry when compared to a `PhaseDiagram` object.
+        """
+        return cls(
+            composition=entry.composition,
+            energy=entry.energy,
+            name=name if name is not None else entry.name,
+            energy_above_hull=energy_above_hull,
+            attribute=entry.attribute
+        )
 
 
 class GenMatStructure(Structure):
@@ -524,21 +523,21 @@ class GenMatFile:
             )
 
     def parse_structures(self) -> list[GenMatStructure]:
-        """Build all `GenMatStructure` objects from file data."""
+        """Build all `GenMatStructure` objects from file data, in order."""
         return list(self)
 
     def parse_pmg_structures(self) -> list[Structure]:
-        """Build all standard pymatgen `Structure` objects from file data."""
+        """Build all standard pymatgen `Structure` objects from file data, in order."""
         return [gstruct.as_structure() for gstruct in self]
 
     def add_structure(self, structure: GenMatStructure) -> None:
         """Add a `GenMatStructure` data to the file."""
         self._check_ordering(structure)
         dct = structure.as_dict(verbosity=0)
-        compressed_dct = _compress_struct_dict(dct)
-        _check_dict_keys(compressed_dct, self._genmat_file_keys)
+        dct = _compress_struct_dict(dct)
+        _check_dict_keys(dct, self._genmat_file_keys)
         for key in self._genmat_file_keys:
-            self._data[key].append(compressed_dct[key])
+            self._data[key].append(dct[key])
 
     def add_structures(self, structures: tp.Iterable[GenMatStructure]) -> None:
         """

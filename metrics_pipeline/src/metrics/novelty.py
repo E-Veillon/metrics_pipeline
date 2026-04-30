@@ -5,13 +5,11 @@ import itertools as itt
 from collections import OrderedDict, defaultdict
 import warnings
 
-from tqdm.contrib.concurrent import process_map
-
 from pymatgen.core import Structure
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 from .metric_base import Metric, MetricsData
-from src.utils import GenMatStructure, StructureLike, VisualIterator
+from src.utils import GenMatStructure, StructureLike
 
 
 class Novelty(Metric):

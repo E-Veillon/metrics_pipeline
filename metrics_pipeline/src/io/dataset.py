@@ -14,7 +14,7 @@ from pymatgen.analysis.phase_diagram import PDEntry
 from .io_base import PathLike
 from .json import JsonLoader, JsonWriter
 
-from src.utils import ALL_ELT_SYMBOL_TO_Z
+from src.utils import ALL_ELT_SYMBOL_TO_Z, GenMatPDEntry, check_genmat_name
 
 
 @dataclass
@@ -387,6 +387,62 @@ class PDDataset:
                 } for entry_id, entry in self.all_entries.items()
             }
         JsonWriter(filepath, data).write_as_dict()
+
+
+class GenMatPDDataset(PDDataset):
+    """
+    Simple extension to `PDDataset` class to build and store `GenMatPDEntry` objects
+    instead of standard `PDEntry` objects.
+    """
+    _data: dict[str, GenMatPDEntry]
+    def __init__(
+        self,
+        data: dict,
+        id_key: str = "entry_id",
+        composition_key: str | None = None,
+        formula_key: str | None = None,
+        natoms_key: str | None = None,
+        energy_key: str | None = None,
+        energy_per_atom_key: str | None = None,
+        attribute: str | None = None,
+        compact: bool = False
+    ) -> None:
+        for _, entry_data in data.items():
+            check_genmat_name(entry_data[id_key])
+
+        super().__init__(
+            data, id_key, composition_key, formula_key, natoms_key,
+            energy_key, energy_per_atom_key, attribute, compact
+        )
+
+        for name, entry in self._data.items():
+            self._data[name] = GenMatPDEntry.from_pdentry(entry)
+
+    @property
+    @tpe.override
+    def all_entries(self) -> dict[str, GenMatPDEntry]:
+        return self._data
+
+    @property
+    @tpe.override
+    def computable_entries(self) -> dict[str, GenMatPDEntry]:
+        return tp.cast(dict[str, GenMatPDEntry], super().computable_entries)
+    
+    @property
+    @tpe.override
+    def uncomputable_entries(self) -> dict[str, GenMatPDEntry]:
+        return tp.cast(dict[str, GenMatPDEntry], super().uncomputable_entries)
+
+    @tpe.override
+    def get_filtered_entries(
+        self, elts: set[str] | None = None, dims: set[int] | None = None
+    ) -> dict[str, GenMatPDEntry]:
+        return tp.cast(dict[str, GenMatPDEntry], super().get_filtered_entries(elts, dims))
+
+    @property
+    def energies_above_hull(self) -> dict[str, float | None]:
+        """Dict of computed energy above hull for all stored entries."""
+        return {name: entry.energy_above_hull for name, entry in self.all_entries.items()}
 
 
 class APIKeyNotFoundError(Exception):

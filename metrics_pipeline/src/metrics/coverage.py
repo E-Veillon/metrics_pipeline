@@ -143,19 +143,9 @@ class Coverage(Metric):
             self._recall = None
 
     @property
-    def precision(self) -> float | None:
-        """Get computed Precision (COV-P) metric as a percentage."""
-        return self._precision if self._precision is None else self._precision * 100
-
-    @property
-    def recall(self) -> float | None:
-        """Get computed Recall (COV-R) metric as a percentage."""
-        return self._recall if self._recall is None else self._recall * 100
-
-    @property
-    def coverage_data(self) -> list[MetricsData]:
+    def computed_data(self) -> list[MetricsData]:
         """
-        List of computed MetricsData objects containing structures from tested distribution
+        List of all computed `MetricsData` objects containing structures from tested distribution
         and Coverage computation details (same values for all structures).
         """
         data = self._get_metric_settings()
@@ -168,6 +158,16 @@ class Coverage(Metric):
                 additional_data=data
             ) for struct in self.structures
         ]
+
+    @property
+    def precision(self) -> float | None:
+        """Get computed Precision (COV-P) metric as a percentage."""
+        return self._precision if self._precision is None else self._precision * 100
+
+    @property
+    def recall(self) -> float | None:
+        """Get computed Recall (COV-R) metric as a percentage."""
+        return self._recall if self._recall is None else self._recall * 100
 
     def write_result(self, filename: str, decimals: int = 6) -> None:
         if self._precision is None:

@@ -5,7 +5,7 @@ from .io_base import (
     EmptyDirectoryError
 )
 from .cif import CIFFile, CIFParsingError
-from .dataset import PDEntryParser, PDDataset, MPDatasetDownloader
+from .dataset import PDEntryParser, PDDataset, GenMatPDDataset, MPDatasetDownloader
 from .json import JsonLoader, JsonWriter
 from .poscar import PoscarBlock, PoscarFile
 from .slurm import SlurmWriter
@@ -17,7 +17,7 @@ __all__ = [
     "PathLike", "ROOT", "SRCPATH", "CONFIGPATH", "EmptyDirectoryError",
     "check_file_format", "check_file_or_dir",
     "CIFFile", "CIFParsingError",
-    "PDEntryParser", "PDDataset", "MPDatasetDownloader",
+    "PDEntryParser", "PDDataset", "GenMatPDDataset", "MPDatasetDownloader",
     "JsonLoader", "JsonWriter",
     "PoscarBlock", "PoscarFile",
     "SlurmWriter",

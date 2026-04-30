@@ -11,7 +11,7 @@ import numpy as np
 from tqdm.contrib.concurrent import process_map
 
 from src.utils import VisualIterator, check_type, check_num_value
-from src.utils.genmat_data import GenMatStructure, StructureLike
+from src.utils.genmat_data import GenMatPDEntry, GenMatStructure, StructureLike
 
 
 class StructureDistribution(tp.Protocol):
@@ -294,6 +294,14 @@ class MetricsData:
     additional_data: dict
         A dictionary to store any additional data related to metrics computations.
     """
+    METRIC_SLOTS = (
+        "is_valid", "is_viable", "is_symmetric",
+        "is_element_metastable", "is_metastable", "is_stable",
+        "is_unique", "is_novel", "is_unmatchable",
+        "rmsd"
+    )
+    __slots__ = ("structure", *METRIC_SLOTS, "additional_data")
+
     structure: GenMatStructure
     is_valid: bool | None = None
     is_viable: bool | None = None
@@ -317,37 +325,72 @@ class MetricsData:
             self.is_unique = True
             self.is_novel = True
 
-    def update(self, data: tpe.Self) -> None:
+    def update(self, other: tpe.Self) -> None:
         """Update the current MetricsData attributes using another MetricsData object."""
-        check_type(data, "data", (type(self),))
-
-        if self.structure.name != data.structure.name:
+        check_type(other, "other", (type(self),))
+        if self.name != other.name:
             raise ValueError(
-                f"Cannot update MetricsData with different structure names: "
-                f"{self.structure.name} and {data.structure.name}."
+                f"Cannot update MetricsData with different names: "
+                f"{self.name!r} and {other.name!r}."
             )
-        for field_name in self.__dict__:
-            if field_name == "structure":
-                continue
-            if field_name == "additional_data":
-                self.additional_data.update(data.additional_data)
-            elif (new_value := getattr(data, field_name, None)) is not None:
+        for field_name in self.METRIC_SLOTS:
+            if (new_value := getattr(other, field_name, None)) is not None:
                 setattr(self, field_name, new_value)
 
+    def copy(self) -> tpe.Self:
+        """Create a new instance with same structure and metrics values."""
+        cls = type(self)
+        new = cls(self.structure)
+
+        for metric_slot in self.METRIC_SLOTS:
+            setattr(new, metric_slot, getattr(self, metric_slot))
+        
+        new.additional_data |= self.additional_data
+
+        return new
+
+    def __or__(self, other: tpe.Self) -> tpe.Self:
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        
+        new = self.copy()
+        new.update(other)
+        return new
+
+    def __ior__(self, other: tpe.Self)-> tpe.Self:
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        
+        self.update(other)
+        return self
+
     @property
-    def entry(self) -> tp.Any:
-        """The PDEntry object associated with the structure."""
-        return self.structure.entry
+    def typed_structure(self) -> GenMatStructure:
+        """
+        The internal structure, equivalent to `structure` attribute.
+        Only redefined to get more explicit type checking.
+        """
+        return self.structure
+
+    @property
+    def name(self) -> str:
+        """The name associated with the structure."""
+        return self.typed_structure.name
+
+    @property
+    def entry(self) -> GenMatPDEntry:
+        """The `GenMatPDEntry` object associated with the structure."""
+        return self.typed_structure.entry
 
     @property
     def energy_per_atom(self) -> float | None:
         """The energy per atom of the structure, in eV/atom."""
-        return self.structure.energy_per_atom
+        return self.typed_structure.energy_per_atom
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, tp.Any]:
         """Get a dictionary representation of the MetricsData object."""
         dct = asdict(self)
-        dct["structure"] = self.structure.as_dict()
+        dct["structure"] = self.typed_structure.as_dict()
         return dct
 
     @classmethod

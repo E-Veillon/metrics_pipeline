@@ -1,23 +1,18 @@
 """Compute Viability metric."""
 
-import os
-import json
 import itertools as itt
 from collections import OrderedDict
 from typing import Any
 
 import numpy as np
 from scipy.spatial.distance import pdist
-from tqdm.contrib.concurrent import process_map
-
-from pymatgen.core import Structure
 
 from .metric_base import Metric, MetricsData
 from .backend import (
     slater_radii_table_pm_1,
     clementi_et_al_radii_table_pm
 )
-from src.utils import ALL_ELT_SYMBOL_TO_Z, VisualIterator
+from src.utils import ALL_ELT_SYMBOL_TO_Z
 from src.utils.genmat_data import GenMatStructure, StructureLike
 from src.io import JsonLoader
 

@@ -24,9 +24,9 @@ from datetime import datetime
 
 from pymatgen.core import Element
 
-from src.utils import parse_input_args, check_type, check_num_value
+from src.utils import parse_input_args, check_type, check_num_value, GenMatFile
 from src.io import (
-    VaspParser, VaspExtractor, ExtractMethod, PDDataset, JsonWriter, CIFFile,
+    VaspParser, VaspExtractor, ExtractMethod, PDDataset, GenMatPDDataset, JsonWriter,
     check_file_or_dir, check_file_format
 )
 from src.metrics import Stability
@@ -94,7 +94,7 @@ def _get_command_line_args() -> ap.Namespace:
         help=(
             "Whether to predict generated data energies with ALIGNN instead of extracting them "
             "from VASP runs. Defaults to %(default)s. If enabled, 'base_dir' must be a path "
-            "to a preprocessed CIF file instead of a VASP base directory."
+            "to a preprocessed JSON file instead of a VASP base directory."
         )
     )
     parser.add_argument(
@@ -237,8 +237,13 @@ def main(standalone: bool = True, **kwargs):
         Maximum value of ΔH (in eV/atom) above which structures are considered too unstable and
         rejected. Defaults to 0.1 eV/atom, as it is commonly assumed to be sufficient.
 
+    alignn: bool
+        Whether to predict generated data energies with ALIGNN instead of extracting them
+        from VASP runs. Defaults to False. If enabled, 'base_dir' must be a path
+        to a preprocessed JSON file instead of a VASP base directory.
+
     compact: bool
-        Whather reference dataset is organized by data type instead of by structure.
+        Whether reference dataset is organized by data type instead of by structure.
         By default, dataset is assumed to be organized by structure, i.e.
         {'struct_name_1': struct_dict_1, 'struct_name_2': struct_dict_2, ...}.
         If the flag is passed, dataset is instead assumed to be organized by data key, i.e.
@@ -266,20 +271,18 @@ def main(standalone: bool = True, **kwargs):
 
     if args["alignn"]:
         # Predict generated data energies with ALIGNN
-        gen_data, _ = CIFFile.from_file(
-            args["input_file"], special_keys=["header"], workers=args.get("workers")
-        ).parse_structures()
-        alignn_results = vectors_from_alignn(gen_data, output="energy")
-        gen_data = {
-            f"{idx}_{struct.properties['header']}": {
-                "entry_id": f"{idx}_{struct.properties['header']}",
+        gfile = GenMatFile.from_file(args["input_file"])
+        alignn_results = vectors_from_alignn(gfile.parse_pmg_structures(), output="energy")
+        structures = {
+            struct.name: {
+                "entry_id": struct.name,
                 "composition": struct.composition,
                 "final_energy": energy.item()
-            } for idx, (struct, energy) in enumerate(zip(gen_data, alignn_results))
+            } for struct, energy in zip(gfile, alignn_results)
         }
     else:
         # Extract generated data from VASP runs
-        gen_data = VaspExtractor(
+        structures = VaspExtractor(
             vasp_parser=VaspParser(args["base_dir"], match_all=args["match_all"]),
             method=ExtractMethod.CONVEX_HULL,
             summary_name=args.get("prev_summary"),
@@ -287,8 +290,8 @@ def main(standalone: bool = True, **kwargs):
             workers=args.get("workers")
         ).get_data()
 
-    generated_dataset = PDDataset(
-        gen_data,
+    generated_dataset = GenMatPDDataset(
+        structures,
         composition_key="composition",
         energy_key="final_energy",
         attribute="generated"
@@ -340,16 +343,15 @@ def main(standalone: bool = True, **kwargs):
         verbose=args["verbose"]
     )
     results = {}
-    stable_names = set(entry.name for entry in stability.stable_entries)
-    computed_entries = stability.stable_entries + stability.unstable_entries
-    for entry in computed_entries:
+    for data in stability.computed_data:
         dct = {
-            "name": entry.name,
-            "path": os.path.join(args["base_dir"], entry.name),
-            "e_above_hull": entry.attribute[stability._delta_e_attr], # type: ignore
-            "stable": entry.name in stable_names
+            "name": data.entry.name,
+            "path": os.path.join(args["base_dir"], data.entry.name),
+            "e_above_hull": data.entry.energy_above_hull,
+            "stable": data.is_stable,
+            "metastable": data.is_metastable
         }
-        results[entry.name] = dct
+        results[data.entry.name] = dct
 
     # Too high dimension structures are added as not stable in results
     for name, entry in generated_dataset.uncomputable_entries.items():
@@ -357,8 +359,9 @@ def main(standalone: bool = True, **kwargs):
         results[name] = {
                 "name": entry.name,
                 "path": os.path.abspath(os.path.join(args["base_dir"], entry.name)),
-                "e_above_hull": None, # type: ignore
+                "e_above_hull": None,
                 "stable": False,
+                "metastable": False,
                 "comment": msg
             }
 

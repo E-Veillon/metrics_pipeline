@@ -17,6 +17,7 @@ import json
 import argparse as ap
 import typing as tp
 import warnings
+from collections.abc import Callable
 
 from pymatgen.core import Structure
 
@@ -24,17 +25,18 @@ from src.utils import (
     parse_input_args, check_type, check_num_value,
     ALL_ELTS_CATEGORIES, get_elts_from_symbol_or_z, get_elts_in_categories,
     filter_by_elements,
-    check_genmat_name
+    generate_genmat_structures, GenMatFile, GenMatStructure
 )
 from src.io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
-    JsonLoader, JsonWriter, CIFFile, PathLike, CONFIGPATH, VaspParser, VaspExtractor, ExtractMethod
+    JsonLoader, JsonWriter, CIFFile, PoscarFile, PathLike, CONFIGPATH,
+    VaspParser, VaspExtractor, ExtractMethod
 )
 from src.computations.models import get_crystalnn_fingerprints, vectors_from_alignn
 from src.computations.local import get_densities
 from src.metrics import (
-    StructValidity, Viability, Symmetry, Unicity, SUN,
-    Coverage, EMD, RMSD, FrechetDistance
+    StructValidity, Viability, SymmetryClassifier, Unicity, SUN,
+    Coverage, EMD, RMSD, FrechetDistance, MetricsData
 )
 
 
@@ -46,7 +48,7 @@ def _get_command_line_args() -> ap.Namespace:
     )
     parser.add_argument(
         "generated",
-        help="Preprocessed CIF file containing all generated structures."
+        help="Preprocessed JSON file containing all generated structures."
     )
     parser.add_argument(
         "-c", "--config", default="metrics_defaults.yaml",
@@ -61,8 +63,16 @@ def _get_command_line_args() -> ap.Namespace:
     parser.add_argument(
         "-d", "--dataset",
         help=(
-            "CIF file containing the list of known structures. "
-            "Necessary for: Novelty part of S.U.N. metrics, COV-P, COV-R, FAD, EMD(density), EMD(energy)."
+            "CIF file containing a set of reference structures for distribution comparisons. "
+            "Necessary for: COV-P, COV-R, FAD, EMD(density), EMD(energy)."
+        )
+    )
+    parser.add_argument(
+        "-D", "--database",
+        help=(
+            "POSCAR or CIF formatted file containing structure data from a reference database "
+            "of known structures. Necessary for: Novelty part of the S.U.N. metrics. "
+            "POSCAR formatted database file must have a '.poscar' extension."
         )
     )
     parser.add_argument(
@@ -122,6 +132,14 @@ def _get_command_line_args() -> ap.Namespace:
             "unlikely to have a lot of duplicates."
         )
     )
+    parser.add_argument(
+        "--detailed", action=ap.BooleanOptionalAction, default=True,
+        help=(
+            "Additionally to the metrics values summary file, whether to also output a JSON "
+            "file listing individual metrics status for each tested structure, making any "
+            "further metrics compounding doable without any extra expensive computations."
+        )
+    )
     args = parser.parse_args()
     return args
 
@@ -142,22 +160,26 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict.setdefault("unique_dataset", True)
     args_dict.setdefault("remove_elts", [])
     args_dict.setdefault("remove_elt_categories", [])
+    args_dict.setdefault("detailed", True)
 
     # Assert set arguments conformity
-    check_file_or_dir(args_dict.get("generated"), "file", allowed_formats="cif")
+    check_file_or_dir(args_dict["generated"], "file", allowed_formats="json")
     config_file = os.path.join(CONFIGPATH, args_dict["config"])
     check_file_or_dir(config_file, "file", allowed_formats=("yml","yaml"))
 
     if args_dict.get("dataset") is not None:
-        check_file_or_dir(args_dict.get("dataset"), "file", allowed_formats="cif")
+        check_file_or_dir(args_dict["dataset"], "file", allowed_formats="cif")
+
+    if args_dict.get("database") is not None:
+        check_file_or_dir(args_dict["database"], "file", allowed_formats=("poscar", "cif"))
 
     if args_dict.get("sun_summary") is not None:
-        check_file_or_dir(args_dict.get("sun_summary"), "file", allowed_formats="json")
+        check_file_or_dir(args_dict["sun_summary"], "file", allowed_formats="json")
 
     if args_dict.get("relax_summary") is not None:
-        check_file_or_dir(args_dict.get("relax_summary"), "file", allowed_formats="json")
+        check_file_or_dir(args_dict["relax_summary"], "file", allowed_formats="json")
 
-    check_file_format(args_dict.get("output"), allowed_formats="json")
+    check_file_format(args_dict["output"], allowed_formats="json")
 
     if args_dict.get("workers") is not None:
         check_type(args_dict["workers"], "workers", (int,))
@@ -177,6 +199,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     check_num_value(args_dict["threshold"], "threshold", ">", 0.0)
 
     check_type(args_dict["unique_dataset"], "unique_dataset", (bool,))
+    check_type(args_dict["detailed"], "detailed", (bool,))
 
     # Parse forbidden elements
     forbidden_elts = get_elts_in_categories(args_dict["remove_elt_categories"])
@@ -289,14 +312,14 @@ def main(standalone: bool = True, **kwargs) -> None:
         provide the one needed here.
 
     dataset: str | Path
-        Cif file containing the list of known structures. Necessary for: Elementary Metastability, S.U.N.,
-        COV-P, COV-R, FAD, EMD(density), EMD(energy).
+        Cif file containing the list of known structures. Necessary for:
+        Novelty part of S.U.N. metrics,  COV-P, COV-R, FAD, EMD(density), EMD(energy).
 
     sun_summary: str | Path
         JSON file containing the summary of phase diagrams instability energies.
         The file must be located inside the directory where corresponding VASP run
         directories are stored for the runs to be found and properly parsed.
-        Necessary for: S.U.N.
+        Necessary for: Stability part of S.U.N. metrics.
 
     relax_summary: str | Path
         JSON file containing a summary for the relaxation step.
@@ -318,7 +341,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         contain elements that were removed from the generation at preprocessing.
         Elements to track can be specified by their symbol, atomic number, or a mix of both.
 
-    remve_elt_categories: list[str], optional
+    remove_elt_categories: list[str], optional
         Pass valid element categories to eliminate reference dataset structures containing
         any element from these categories.
 
@@ -339,32 +362,23 @@ def main(standalone: bool = True, **kwargs) -> None:
     # SUN section activation boolean
     CONFIG["SUN"] = any(CONFIG.get(metric, False) for metric in ("Stability", "Unicity", "Novelty"))
     dataset_needed: bool = (
-        CONFIG.get("Stability", False)
-        or CONFIG.get("Novelty", False)
-        or CONFIG.get("COV-P", False)
+        CONFIG.get("COV-P", False)
         or CONFIG.get("COV-R", False)
         or CONFIG.get("FAD", False)
         or CONFIG.get("EMD_energy", False)
         or CONFIG.get("EMD_density", False)
     )
-    sun_summary_needed = CONFIG.get("Stability", False)
-    relax_summary_needed = CONFIG.get("RMSD", False)
+    database_needed: bool = CONFIG.get("Novelty", False)
+    sun_summary_needed: bool = CONFIG.get("Stability", False)
+    relax_summary_needed: bool = CONFIG.get("RMSD", False)
 
     _print_metrics_config(CONFIG)
 
     print("===== LOAD NECESSARY DATA FILES =====")
 
     print("Loading generated structures...")
-    gen_file = CIFFile.from_file(
-        args["generated"],
-        special_keys=["header"],
-        workers=args.get("workers")
-    )
-    gen_cifs = gen_file.get_cifs()
-    generated, _ = gen_file.parse_structures()
-    
-    for structure in generated:
-        check_genmat_name(structure.properties["header"])
+    gen_file = GenMatFile.from_file(args["generated"])
+    generated = gen_file.parse_structures()
 
     print("Generated structures loaded.")
 
@@ -389,16 +403,38 @@ def main(standalone: bool = True, **kwargs) -> None:
         print("Dataset loaded.")
         # remove duplicate structures from the dataset
         if args["unique_dataset"]:
-            dataset = Unicity(dataset, workers=args.get("workers")).unique_structs
+            dataset = generate_genmat_structures(dataset)
+            dataset = [
+                struct.as_structure() for struct in Unicity(
+                    dataset, workers=args.get("workers")
+                ).unique_structs
+            ]
+    
+    database: list[Structure] = []
+    if _match_file_arg_need("database", args.get("database", None), database_needed):
+        _print_elements_removal(args)
+        print("Loading database file...")
+        if args["database"].endswith(".cif"):
+            database, _ = CIFFile.from_file(
+                args["database"],
+                special_keys=["header"],
+                workers=args.get("workers")
+            ).parse_structures()
+        else:
+            database = PoscarFile(
+                args["database"], workers=args.get("workers")
+            ).parse_structures()
 
+    metastable_names: list[str] = []
     stable_names: list[str] = []
     if _match_file_arg_need("sun-summary", args.get("sun_summary", None), sun_summary_needed):
         print("Loading stability summary file...")
         sun_summary = JsonLoader(args["sun_summary"]).load_as_dict()
+        metastable_names = [name for name, s_data in sun_summary.items() if s_data["metastable"]]
         stable_names = [name for name, s_data in sun_summary.items() if s_data["stable"]]
         print("Stability data loaded.")
 
-    relax_structures: list[tuple[Structure, Structure]] = []
+    relax_structures: list[tuple[GenMatStructure, Structure]] = []
     if _match_file_arg_need("relax-summary", args.get("relax_summary", None), relax_summary_needed):
         print("Loading relaxations summary file...")
         base_dir, summary_name = os.path.split(args["relax_summary"])
@@ -414,8 +450,7 @@ def main(standalone: bool = True, **kwargs) -> None:
             _warn_summary_location(args["relax_summary"])
 
         for name, s_data in relax_structures_dict.items():
-            init_struct = s_data["in_struct"]
-            init_struct.properties["header"] = name
+            init_struct = GenMatStructure(name, s_data["in_struct"])
             final_struct = s_data["out_struct"]
             final_struct.properties["header"] = name
             relax_structures.append((init_struct, final_struct))
@@ -438,7 +473,9 @@ def main(standalone: bool = True, **kwargs) -> None:
             "num_unique", "percent_unique",
             "num_novel", "percent_novel",
             "num_unique_novel", "percent_unique_novel",
+            "num_metastable", "percent_metastable",
             "num_stable", "percent_stable",
+            "num_MSUN", "percent_MSUN",
             "num_SUN", "percent_SUN",
             "RMSD"
         )
@@ -450,39 +487,60 @@ def main(standalone: bool = True, **kwargs) -> None:
     print("\n===== COMPUTE ACTIVATED METRICS =====")
 
     # total number of generated structures
-    num_generated = len(gen_cifs)
+    num_generated = len(gen_file)
     round_digits = len(str(num_generated)) - 2
     general_metrics["num_generated"] = num_generated
     general_metrics["num_not_loaded"] = num_generated - len(generated)
 
+    # Generate metrics details dict
+    metrics_details: dict[str, MetricsData] | None = {} if args["detailed"] else None
+    if metrics_details is not None:
+        for struct in generated:
+            metrics_details[struct.name] = MetricsData(struct)
+    
+    def _update_metrics_details(new_data: tp.Iterable[MetricsData]) -> None:
+        """Update the detailed dict with newly computed data."""
+        if metrics_details is None:
+            return
+        for data in new_data:
+            metrics_details[data.name] |= data
+
+
     if CONFIG.get("Validity", False):
         # Validity metric
         print("Computing Validity metric...")
-        num_valid = len(StructValidity(generated).valid_structs)
+        validity = StructValidity(generated)
+        num_valid = len(validity.valid_structs)
         percent_valid = round(num_valid / num_generated * 100, round_digits)
         general_metrics["num_valid"] = num_valid
         general_metrics["percent_valid"] = percent_valid
         print(f"Validity = {percent_valid}%")
 
+        _update_metrics_details(validity.computed_data)
+
     if CONFIG.get("Viability", False):
         # Viability metric
         print("Computing Viability metric...")
-        num_viable = len(Viability(generated).viable_structs)
+        viability = Viability(generated)
+        num_viable = len(viability.viable_structs)
         percent_viable = round(num_viable / num_generated * 100, round_digits)
         general_metrics["num_viable"] = num_viable
         general_metrics["percent_viable"] = percent_viable
         print(f"Viability = {percent_viable}%")
 
+        _update_metrics_details(viability.computed_data)
+
     if CONFIG.get("Symmetry", False):
         # Symmetry metric
         print("Computing Symmetry metric...")
-        num_symmetric = len(
-            Symmetry(generated, workers=args.get("workers")).symmetric_structs
-        )
+        symmetrizer = SymmetryClassifier(generated, workers=args.get("workers"))
+        num_symmetric = len([data.is_symmetric for data in symmetrizer.computed_data])
         percent_symmetric = round(num_symmetric / num_generated * 100, round_digits)
         general_metrics["num_symmetric"] = num_symmetric
         general_metrics["percent_symmetric"] = percent_symmetric
         print(f"Symmetry = {general_metrics.get('percent_symmetric')}%")
+
+        _update_metrics_details(symmetrizer.computed_data)
 
     if CONFIG.get("SUN", False):
         # S.U.N. metrics
@@ -497,7 +555,7 @@ def main(standalone: bool = True, **kwargs) -> None:
 
         # We already have the stability summary, thus we deactivate stability computing
         sun_wo_stability = SUN(
-            generated, dataset,
+            generated, database,
             compute_stability=False,
             compute_unicity=compute_unicity,
             compute_novelty=compute_novelty,
@@ -529,18 +587,38 @@ def main(standalone: bool = True, **kwargs) -> None:
             dft_metrics["num_unique_novel"] = num_unique_novel
             dft_metrics["percent_unique_novel"] = percent_unique_novel
 
+        computed_data = sun_wo_stability.computed_data
+
         if compute_stability:
+            num_metastable = len(metastable_names)
             num_stable = len(stable_names)
+            percent_metastable = round(num_metastable / num_generated * 100, round_digits)
             percent_stable = round(num_stable / num_generated * 100, round_digits)
+            dft_metrics["num_metastable"] = num_metastable
+            dft_metrics["percent_metastable"] = percent_metastable
             dft_metrics["num_stable"] = num_stable
             dft_metrics["percent_stable"] = percent_stable
 
+            for data in computed_data:
+                data.is_metastable = data.name in metastable_names
+                data.is_stable = data.name in stable_names
+
+        _update_metrics_details(computed_data)
+
         if compute_sun:
-            sun_structs = [
-                struct for struct in unique_novel if struct.properties["header"] in stable_names
-            ]
-            num_SUN = len(sun_structs)
+            # Predicates return False if any attribute is None (should never happen)
+            msun_predicate: Callable[[MetricsData], bool] = lambda data: (
+                bool(data.is_metastable) and bool(data.is_novel) and bool(data.is_unique)
+            )
+            sun_predicate: Callable[[MetricsData], bool] = lambda data: (
+                bool(data.is_stable) and bool(data.is_novel) and bool(data.is_unique)
+            )
+            num_MSUN = len([data for data in computed_data if msun_predicate(data)])
+            num_SUN = len([data for data in computed_data if sun_predicate(data)])
+            percent_MSUN = round(num_MSUN / num_generated * 100, round_digits)
             percent_SUN = round(num_SUN / num_generated * 100, round_digits)
+            dft_metrics["num_MSUN"] = num_MSUN
+            dft_metrics["percent_MSUN"] = percent_MSUN
             dft_metrics["num_SUN"] = num_SUN
             dft_metrics["percent_SUN"] = percent_SUN
 
@@ -553,10 +631,13 @@ def main(standalone: bool = True, **kwargs) -> None:
         # RMSD metric
         print("Computing RMSD metric...")
         _in_structs, _out_structs = zip(*relax_structures)
-        in_structs: list[Structure] = list(_in_structs)
+        in_structs: list[GenMatStructure] = list(_in_structs)
         out_structs: list[Structure] = list(_out_structs)
-        dft_metrics["RMSD"] = round(RMSD(in_structs, out_structs).average_rmsd, round_digits)
+        rmsd = RMSD(in_structs, out_structs)
+        dft_metrics["RMSD"] = round(rmsd.average_rmsd, round_digits)
         print(f"RMSD = {dft_metrics['RMSD']}")
+
+        _update_metrics_details(rmsd.computed_data)
 
     if CONFIG.get("COV-P", False) or CONFIG.get("COV-R", False):
         # Compute Coverage (Precision, Recall)
@@ -572,6 +653,8 @@ def main(standalone: bool = True, **kwargs) -> None:
         ml_metrics["precision"] = coverage.precision
         ml_metrics["recall"] = coverage.recall
 
+        _update_metrics_details(coverage.computed_data)
+
     if CONFIG.get("FAD", False):
         # Compute Fréchet ALIGNN Distance
         print("Computing Fréchet ALIGNN Distance metric...")
@@ -581,9 +664,11 @@ def main(standalone: bool = True, **kwargs) -> None:
             transform=vectors_from_alignn,
             device="cpu",
             output="latent"
-        ).computed_distance
-        ml_metrics["frechet_distance"] = frechet_distance
-        print(f"Frechet Distance = {frechet_distance}")
+        )
+        ml_metrics["frechet_distance"] = frechet_distance.computed_distance
+        print(f"Frechet Distance = {frechet_distance.computed_distance}")
+
+        _update_metrics_details(frechet_distance.computed_data)
 
     if CONFIG.get("EMD_energy", False):
         # Compute Earth Mover's Distance on energy distributions
@@ -594,9 +679,11 @@ def main(standalone: bool = True, **kwargs) -> None:
             transform=vectors_from_alignn,
             device="cpu",
             output="energy"
-        ).computed_distance
-        ml_metrics["EMD_energy"] = emd_energy
-        print(f"Energy EMD = {emd_energy}")
+        )
+        ml_metrics["EMD_energy"] = emd_energy.computed_distance
+        print(f"Energy EMD = {emd_energy.computed_distance}")
+
+        _update_metrics_details(emd_energy.computed_data)
 
     if CONFIG.get("EMD_density", False):
         # Compute Earth Mover's Distance on density distributions
@@ -605,9 +692,11 @@ def main(standalone: bool = True, **kwargs) -> None:
             structures=generated,
             ref_structs=dataset,
             transform=get_densities
-        ).computed_distance
-        ml_metrics["EMD_density"] = emd_density
-        print(f"Density EMD = {emd_density}")
+        )
+        ml_metrics["EMD_density"] = emd_density.computed_distance
+        print(f"Density EMD = {emd_density.computed_distance}")
+
+        _update_metrics_details(emd_density.computed_data)
 
     metrics = {"general": general_metrics, "dft": dft_metrics, "ml": ml_metrics}
 
@@ -617,6 +706,20 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     print(f"Output file successfully written at location {args['output']}.")
     print(json.dumps(metrics, indent=4))
+
+    if metrics_details is not None:
+        print("Writing metrics details file...")
+        def _parse_metrics_data(data: MetricsData) -> dict[str, tp.Any]:
+            """Remove heavy and useless structure details but keep the name."""
+            dct = data.as_dict()
+            dct["name"] = dct["structure"]["name"]
+            dct.pop("structure", None)
+            return dct
+
+        results_dict = {name: _parse_metrics_data(data) for name, data in metrics_details.items()}
+        details_output = args["output"].replace(".json", "_details.json")
+        JsonWriter(details_output, results_dict, indent=0).write_as_dict()
+        print(f"Details file successfully written at location {details_output}.")
 
 
 if __name__ == "__main__":

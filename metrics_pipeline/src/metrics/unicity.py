@@ -5,14 +5,9 @@ import itertools as itt
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 
-from tqdm.contrib.concurrent import process_map
-
-from pymatgen.core import Structure
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 from .metric_base import Metric, MetricsData
-from .backend import group_compositions
-from src.utils import VisualIterator, check_type
 from src.utils.genmat_data import GenMatStructure, StructureLike
 
 

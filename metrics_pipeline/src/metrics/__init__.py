@@ -1,6 +1,7 @@
 """Package storing all supported metrics as classes."""
 
 # Filter metrics
+from .metric_base import MetricsData
 from .structural_validity import StructValidity
 from .viability import Viability
 from .symmetry_dist import SymmetryClassifier
@@ -17,6 +18,7 @@ from .frechet_distance import FrechetDistance
 from .rmsd import RMSD
 
 __all__ = [
+    "MetricsData",
     "StructValidity", "Viability", "SymmetryClassifier", "ElementMetastability",
     "Stability", "Unicity", "Novelty", "SUN",
     "Coverage", "EMD", "FrechetDistance", "RMSD"

@@ -1,10 +1,11 @@
 #!/usr/bin/python
 """
 Preprocess generated structures data for further pipeline steps:
-- Convert POSCAR and CIF input data into standardized CIF for format compatibility with the pipeline;
+- Convert POSCAR and CIF input data into JSON data for format compatibility with the pipeline;
 - Generate a unique indexed name for each structure for data tracking throughout computations;
 - (optional) Eliminate data containing specific unwanted elements;
 - (optional) Compute spacegroup symmetry and add symmetry infos into standardized output data.
+NOTE: If legacy conversion to standardized CIF is chosen, GenMat names will NOT be generated.
 """
 
 import os
@@ -20,10 +21,10 @@ from src.utils import (
     ALL_ELTS_CATEGORIES,
     get_elts_from_symbol_or_z, get_elts_in_categories,
     filter_by_elements,
-    generate_genmat_names
+    generate_genmat_structures, GenMatFile
 )
 from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile
-
+from src.metrics import SymmetryClassifier
 
 def _get_command_line_args() -> ap.Namespace:
     """Command Line Interface (CLI)."""
@@ -36,15 +37,22 @@ def _get_command_line_args() -> ap.Namespace:
         help=(
             "Path to the CIF or POSCAR formatted file containing structure data to process. "
             "If POSCAR format, it must have the extension '.poscar', and each structure must "
-            "have a header comment line."
+            "have a header comment line starting with '#'."
         )
     )
     parser.add_argument(
         "-o", "--output",
         help=(
-            "Path to wanted CIF output file where processed structures "
-            "will be stored. If not given, output file is written in input file "
-            "directory with the same name but a '_preproc' suffix is added."
+            "Path to JSON or CIF output file to write processed structures data. "
+            "If not given, JSON output file is written in input file "
+            "directory with the same name as input file but with a '_preproc' suffix."
+        )
+    )
+    parser.add_argument(
+        "--to-cif", action="store_true",
+        help=(
+            "Default output is JSON format for accurate storage of preprocessed structure data. "
+            "Pass this flag to write a standardized CIF instead (version 2.x.x algorithm)."
         )
     )
     parser.add_argument(
@@ -53,8 +61,9 @@ def _get_command_line_args() -> ap.Namespace:
             "Each structure will be attributed a unique name in output file for easy data "
             "tracking throughout the pipeline, composed of a unique index followed by the reduced "
             "formula of the structure. Pass 'header' here to keep original header line content "
-            "(comment line for POSCARs) in '_original_header' label in output CIFs. "
-            "For a CIF formatted file, also pass any non-looping CIF Label to keep in output data."
+            "(comment line for POSCARs) in 'header' special key in output JSON. "
+            "For a CIF formatted input file, also pass any non-looping CIF Label to keep in "
+            "output file 'special_keys' data."
         )
     )
     parser.add_argument(
@@ -108,10 +117,12 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats=("cif", "poscar"))
     args_dict["input_file"] = str(Path(args_dict["input_file"]).resolve(strict=True))
 
-    default_output = os.path.splitext(args_dict["input_file"])[0] + "_preproc.cif"
+    output_fmt = "cif" if args_dict.get("to_cif", False) else "json"
+    default_output = os.path.splitext(args_dict["input_file"])[0] + f"_preproc.{output_fmt}"
     args_dict.setdefault("output", default_output)
     args_dict["output"] = str(Path(args_dict["output"]).resolve())
 
+    args_dict.setdefault("to_cif", False)
     args_dict.setdefault("special_keys", [])
     args_dict.setdefault("symmetrize", False)
     args_dict.setdefault("symprec", 0.1)
@@ -120,7 +131,10 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict.setdefault("remove_elt_categories", [])
 
     # Assert set arguments conformity
-    check_file_format(args_dict["output"], allowed_formats="cif")
+    if args_dict["to_cif"]:
+        check_file_format(args_dict["output"], allowed_formats="cif")
+    else:
+        check_file_format(args_dict["output"], allowed_formats="json")
 
     if args_dict.get("special_keys") is not None:
         check_type(args_dict["special_keys"], "special_keys", (list,))
@@ -276,10 +290,11 @@ def _print_computation_summary(args_dict: dict[str, tp.Any], counters: dict[str,
 def main(standalone: bool = True, **kwargs) -> None:
     """
     Preprocess generated structures data for further pipeline steps:
-    - Convert POSCAR and CIF input data into standardized CIF for format compatibility with the pipeline;
+    - Convert POSCAR and CIF input data into JSON data for format compatibility with the pipeline;
     - Generate a unique indexed name for each structure for data tracking throughout computations;
     - (optional) Eliminate data containing specific unwanted elements;
     - (optional) Compute spacegroup symmetry and add symmetry infos into standardized output data.
+    NOTE: If legacy conversion to standardized CIF is chosen, GenMat names will NOT be generated.
 
     Parameters
     ----------
@@ -288,20 +303,27 @@ def main(standalone: bool = True, **kwargs) -> None:
         or in an external pipeline script.
 
     input_file: str | Path
-        Path to the CIF or POSCAR file containing structure data to process.
-        If POSCAR format, it must have extension '.poscar'.
+        Path to the CIF or POSCAR formatted file containing structure data to process.
+        If POSCAR format, it must have the extension '.poscar', and each structure must
+        have a header comment line starting with '#'.
 
     output: str | Path
-        Path to wanted CIF output file where processed structures will be stored. If not given,
-        output file is written in input file directory with the same name with a '_out' suffix
-        added.
+        Path to JSON or CIF output file to write processed structures data.
+        If not given, JSON output file is written in input file
+        directory with the same name as input file but with a '_preproc' suffix.
+
+    to_cif: bool
+        Default output is JSON format for accurate storage of preprocessed structure data.
+        Set to True to write a standardized CIF instead (version 2.x.x algorithm).
+        Defaults to False.
 
     special_keys: list[str], optional
         Each structure will be attributed a unique name in output file for easy data
         tracking throughout the pipeline, composed of a unique index followed by the reduced
         formula of the structure. Pass 'header' here to keep original header line content
-        (comment line for POSCARs) in '_original_header' label in output CIFs.
-        For a CIF formatted file, also pass any non-looping CIF Label to keep in output data.
+        (comment line for POSCARs) in 'header' special key in output JSON.
+        For a CIF formatted input file, also pass any non-looping CIF Label to keep in
+        output file 'special_keys' data.
 
     workers: int, optional
         Number of processes to use in parallel. If not given, will use default of
@@ -337,33 +359,47 @@ def main(standalone: bool = True, **kwargs) -> None:
         structures, nbr_loaded_data, nbr_discarded = _get_structures_from_poscar(args)
         nbr_invalid = 0
 
+    else:
+        _, fmt = os.path.splitext(args["input_file"])
+        raise ValueError(f"{fmt!r} is not a supported file format for the input file.")
+
     print(f"{len(structures)} structures with valid composition were successfully parsed.")
 
-    # Generate unique indexed names as headers
-    structures = generate_genmat_names(structures)
+    if args["to_cif"]:
+        # Symmetrize and write standardized CIF file
+        if args["symmetrize"]:
+            print("Symmetrization is activated, now symmetrizing and writing CIF file...")
+        else:
+            print("Symmetrization is deactivated, now writing CIF file...")
 
-    for key in ("header", "_original_header"):
-        if key not in args["special_keys"]:
-            args["special_keys"].append(key)
+        cif_file = CIFFile(special_keys=args["special_keys"], workers=args.get("workers"))
+        cif_file.add_structures(
+            structures,
+            symmetrize=args["symmetrize"],
+            symprec=args["symprec"],
+            angleprec=args["angleprec"]
+        )
+        cif_file.write_file(args["output"])
 
-    # Symmetrize and write standardized CIF file
-    if args["symmetrize"]:
-        print("Symmetrization is activated, now symmetrizing and writing CIF file...")
     else:
-        print("Symmetrization is deactivated, now writing CIF file...")
+        structures = generate_genmat_structures(structures, special_keys=args["special_keys"])
 
-    cif_file = CIFFile(special_keys=args["special_keys"], workers=args.get("workers"))
-    cif_file.add_structures(
-        structures,
-        symmetrize=args["symmetrize"],
-        symprec=args["symprec"],
-        angleprec=args["angleprec"]
-    )
-    cif_file.write_file(args["output"])
+        if args["symmetrize"]:
+            symmetrizer = SymmetryClassifier(
+                structures,
+                symprec=args["symprec"],
+                angleprec=args["angleprec"],
+                workers=args["workers"]
+            )
+            structures = [data.structure for data in symmetrizer.computed_data]
+
+        gfile = GenMatFile()
+        gfile.add_structures(structures)
+        gfile.write_file(args["output"])
 
     # Time of the preprocessing
     stop = datetime.now()
-    counters: dict[str, int | float] = {
+    counters = {
         "nbr_loaded_data": nbr_loaded_data,
         "nbr_written_data": len(structures),
         "nbr_discarded": nbr_discarded,

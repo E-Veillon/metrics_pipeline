@@ -88,14 +88,9 @@ class FrechetDistance(Metric):
         self._distance = self.get_frechet_distance(computed_array, ref_array)
 
     @property
-    def computed_distance(self) -> float:
-        """Get computed Fréchet Distance value."""
-        return self._distance
-
-    @property
-    def fd_data(self) -> list[MetricsData]:
+    def computed_data(self) -> list[MetricsData]:
         """
-        List of computed `MetricsData` objects containing structures from tested distribution
+        List of all computed `MetricsData` objects containing structures from tested distribution
         and Fréchet Distance computation details (same values for all structures).
         """
         data = self._get_metric_settings()
@@ -106,6 +101,11 @@ class FrechetDistance(Metric):
                 additional_data=data
             ) for struct in self.structures
         ]
+
+    @property
+    def computed_distance(self) -> float:
+        """Get computed Fréchet Distance value."""
+        return self._distance
 
     def write_result(self, filename: str, decimals: int = 6) -> None:
         text = "===== Fréchet Distance Results ====="

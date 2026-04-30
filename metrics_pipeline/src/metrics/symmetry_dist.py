@@ -3,12 +3,10 @@
 import typing as tp
 from collections import OrderedDict
 
-from tqdm.contrib.concurrent import process_map
-
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmetryUndeterminedError
 
 from .metric_base import Metric, MetricsData
-from src.utils import raise_or_warn, VisualIterator, check_type
+from src.utils import raise_or_warn, check_type
 from src.utils.genmat_data import GenMatStructure
 from src.utils.spg_data import (
     ALL_CRYSTAL_FAMILIES, ALL_CRYSTAL_SYSTEMS, ALL_POINT_GROUPS, ALL_SPACEGROUPS, Spacegroup

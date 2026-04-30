@@ -4,13 +4,11 @@ import typing as tp
 import itertools as itt
 from collections import defaultdict, OrderedDict
 
-from tqdm.contrib.concurrent import process_map
-
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 from .metric_base import Metric, MetricsData
 from src.utils import (
-    GenMatPDEntry, GenMatStructure, PDEntryLike, StructureLike, VisualIterator, flatten
+    GenMatPDEntry, GenMatStructure, PDEntryLike, StructureLike
 )
 
 

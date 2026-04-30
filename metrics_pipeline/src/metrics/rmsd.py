@@ -211,17 +211,7 @@ class RMSD(Metric):
         self._distances = self.compute_rmsd(x_src, cell_src, x_dst, cell_dst).numpy(force=True)
 
     @property
-    def average_rmsd(self) -> float:
-        """Get computed average RMSD value over all structures."""
-        return float(np.mean(self._distances).item())
-
-    @property
-    def all_rmsd(self) -> np.ndarray:
-        """Get 1D array of computed RMSD values for all structures."""
-        return self._distances
-
-    @property
-    def rmsd_data(self) -> list[MetricsData]:
+    def computed_data(self) -> list[MetricsData]:
         """
         List of computed `MetricsData` objects each containing an unrelaxed structure,
         its associated RMSD value, and its relaxed version as additional data.
@@ -232,6 +222,16 @@ class RMSD(Metric):
                 self.structures, self.relaxed_structs, self.all_rmsd
             )
         ]
+
+    @property
+    def average_rmsd(self) -> float:
+        """Get computed average RMSD value over all structures."""
+        return float(np.mean(self._distances).item())
+
+    @property
+    def all_rmsd(self) -> np.ndarray:
+        """Get 1D array of computed RMSD values for all structures."""
+        return self._distances
 
     def get_rmsd_from_index(self, idx: int) -> float:
         """Get computed RMSD value of a specific structure from its index."""

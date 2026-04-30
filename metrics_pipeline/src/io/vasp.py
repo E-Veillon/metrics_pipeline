@@ -1,18 +1,15 @@
 """Management of VASP files for quantum simulations."""
 
 import os
-import re
 from pathlib import Path
 import typing as tp
 from collections import defaultdict
 from collections.abc import Callable
-import json
 import warnings
 import itertools as itt
 import functools as ft
 from enum import Enum
 
-from monty.os import cd
 import xml.etree.ElementTree as ET
 from tqdm.contrib.concurrent import process_map
 
@@ -681,6 +678,12 @@ class VaspExtractor:
                 stacklevel=2
             )
             return False
+        
+        if prev_struct_data.get(summary_key) is None:
+            raise KeyError(
+                f"Summary key {summary_key!r} was not found in structure "
+                f"{prev_struct_name!r} data."
+            )
 
         return prev_struct_data[summary_key]
 

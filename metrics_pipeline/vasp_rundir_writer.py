@@ -12,14 +12,15 @@ import argparse as ap
 
 from pymatgen.io.vasp import VaspInput
 
-from src.utils import parse_input_args, check_type, check_num_value, check_genmat_name, get_genmat_name_idx
+from src.utils import parse_input_args, check_type, check_num_value, GenMatFile
 from src.io import (
-    check_file_or_dir, load_yaml_as_dict, CIFFile,
+    check_file_or_dir, load_yaml_as_dict,
     VaspWriter, VaspParser, VaspExtractor, ExtractMethod, CONFIGPATH
 )
 from src.computations.local import DSolCalcType
 from src.computations.vasp import (
-    init_vasp_settings, dsol_calc_init, ALL_PRESETS_NAMES, ALL_PRESETS_NAMES_LOWER
+    init_vasp_settings, dsol_calc_init, ALL_PRESETS_NAMES, ALL_PRESETS_NAMES_LOWER,
+    STATIC_PRESETS_NAMES_NO_DSOL_LOWER, GenMatSet
 )
 
 
@@ -29,14 +30,15 @@ def _get_command_line_args() -> ap.Namespace:
     parser.add_argument(
         "input_file",
         help=(
-            "Path to the file containing structure data to read. "
-            "It can be a preprocssed CIF file to read structure data directly, or "
-            "a JSON summary file from a previous pipeline step to extract "
-            "structure data from a previous VASP run."
+            "Path to the JSON file containing structure data to read. "
+            "It can be either a preprocessed structure data file to read directly, "
+            "or a summary file from a previous pipeline step to extract "
+            "structure data from a previous VASP run. It will be assumed to be a "
+            "summary file only if the --summary-key argument is passed."
         )
     )
     parser.add_argument(
-        "--output", "-o",
+        "-o", "--output",
         help=(
             "Path to the output directory where VASP files will be written. "
             "A subdirectory will be created in output directory "
@@ -48,21 +50,21 @@ def _get_command_line_args() -> ap.Namespace:
         help="Path to a file to create and store all created run directories paths."
     )
     parser.add_argument(
-        "--indices", "-i", nargs="*", type=int, metavar="int",
+        "-i", "--indices", nargs="*", type=int, metavar="int",
         help=(
             "If only a few specific structures need to be parsed, pass here their respective "
             "preprocessing indices. If not given, all structures in input_file are parsed."
         ),
     )
     parser.add_argument(
-        "--summary-key", "-k",
+        "-k", "--summary-key",
         help=(
             "If a JSON summary file is given as input_file, pass here the name of the key "
             "containing a boolean value telling if said structure passed previous step filter."
         )
     )
     parser.add_argument(
-        "--preset", "-p",
+        "-p", "--preset",
         help=(
             "Name of the pymatgen preset to use as a base to write the VASP input files "
             "(case insensitive). More info on possible presets in pymatgen documentation: "
@@ -70,7 +72,7 @@ def _get_command_line_args() -> ap.Namespace:
         )
     )
     parser.add_argument(
-        "--user-settings", "-u",
+        "-u", "--user-settings",
         help=(
             "Name of the optional YAML file containing tags to override in the preset. "
             f"Given filename must be located in {CONFIGPATH} to be found."
@@ -88,15 +90,15 @@ def _get_command_line_args() -> ap.Namespace:
     parser.add_argument(
         "--dsol-uncertainty", action="store_true",
         help=(
-            "If 'delta-sol' flag is passed, pass this flag to enable computations of delta-sol"
-            "uncertainties on the band gap value, generating 7 sub-runs instead of 3."
+            "If 'delta-sol' flag is passed, pass this flag to enable computations of delta-sol "
+            "uncertainties on the band gap value, generating 7 sub-runs instead of 3. "
             "Ignored if 'delta-sol' flag is not passed. WARNING: uncertainty computations were "
             "not rigorously tested yet and might give weird results in some cases. To interpret "
             "with caution."
         )
     )
     parser.add_argument(
-        "--workers", "-w", type=int, metavar="int",
+        "-w", "--workers", type=int, metavar="int",
         help=(
             "Number of processes to use in parallel. If not given, will use default of "
             "`tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()` "
@@ -123,25 +125,30 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     # Set default values for unset optional arguments
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
-    default_output = os.path.join(os.path.dirname(args_dict.get("input_file", "")), "Relaxations")
-    args_dict.setdefault("output", default_output)
     args_dict.setdefault("delta_sol", False)
     args_dict.setdefault("dsol_uncertainty", False)
+    args_dict.setdefault("match_all", True)
 
     # Assert set arguments conformity
-    check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats=("cif", "json"))
+    check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats="json")
 
     if args_dict.get("indices") is not None:
         for idx, struct_idx in enumerate(args_dict["indices"]):
             check_num_value(struct_idx, f"indices[{idx}]", ">=", 0)
 
-    if str(args_dict["input_file"]).endswith(".json") and not args_dict.get("summary_key"):
-        raise ValueError("Given input file is a JSON summary, but the summary key was not given.")
-
     assert str(args_dict.get("preset", "")).lower() in ALL_PRESETS_NAMES_LOWER, (
         "Provided preset must be one of the following (case insensitive): "
         f"{', '.join(ALL_PRESETS_NAMES)}, got {str(args_dict.get('preset', '')).lower()!r}."
     )
+    if args_dict["preset"].lower() == GenMatSet.DSOLSTATICSET.name.lower():
+        default_outdir = "Bandgaps"
+    elif args_dict["preset"].lower() in STATIC_PRESETS_NAMES_NO_DSOL_LOWER:
+        default_outdir = "Statics"
+    else:
+        default_outdir = "Relaxations"
+    default_output = os.path.join(os.path.dirname(args_dict.get("input_file", "")), default_outdir)
+    args_dict.setdefault("output", default_output)
+
     if args_dict.get("user_settings"):
         config_path = os.path.join(CONFIGPATH, args_dict["user_settings"])
         check_file_or_dir(config_path, "file", allowed_formats=("yml", "yaml"))
@@ -172,9 +179,10 @@ def main(standalone: bool = True, **kwargs):
         or in an external pipeline script.
 
     input_file: str | Path
-        Path to the file containing structure data to read. It can be a CIF file to read
-        structure data directly, or a JSON summary file from a previous pipeline step to
-        extract structure data from a previous VASP run.
+        Path to the JSON file containing structure data to read.
+        It can be either a preprocessed structure data file to read directly, or a summary
+        file from a previous pipeline step to extract structure data from a previous VASP run.
+        It will be assumed to be a summary file only if summary_key is passed.
 
     output: str | Path
         Path to the output directory where VASP files will be written. A subdirectory will
@@ -228,29 +236,19 @@ def main(standalone: bool = True, **kwargs):
     input_file: str = args["input_file"]
     indices: list[int] | None = args.get("indices")
 
-    if input_file.endswith(".cif"):
-        # Convert CIF data into Structure objects
-        structures, _ = CIFFile.from_file(
-            input_file,
-            special_keys=["header"],
-            workers=args.get("workers")
-        ).parse_structures()
-
-        for structure in structures:
-            check_genmat_name(structure.properties["header"])
+    if args.get("summary_key") is None:
+        # Load GenMatStructure data file
+        gfile = GenMatFile.from_file(input_file)
 
         # Get structures of interest
         if indices is None:
-            structs_data = [
-                (structure.properties["header"], structure) for structure in structures
-            ]
+            structs_data = [(structure.name, structure) for structure in gfile]
         else:
             structs_data = [
-                (structure.properties["header"], structure) for structure in structures
-                if get_genmat_name_idx(structure.properties["header"]) in indices
+                (structure.name, structure) for structure in gfile
+                if structure.name_index in indices
             ]
-
-    elif input_file.endswith(".json"):
+    else:
         base_dir, summary_name = os.path.split(input_file)
         vparser = VaspParser(
             base_dir=base_dir,

@@ -136,12 +136,7 @@ class EMD(Metric):
         self._distance = wasserstein_distance(ref_values, computed_values)
 
     @property
-    def computed_distance(self) -> float:
-        """Get computed EMD value."""
-        return self._distance
-
-    @property
-    def emd_data(self) -> list[MetricsData]:
+    def computed_data(self) -> list[MetricsData]:
         """
         List of computed MetricsData objects containing structures from tested distribution
         and EMD computation details (same details for all structures).
@@ -154,6 +149,11 @@ class EMD(Metric):
                 additional_data=data
             ) for struct in self.structures
         ]
+
+    @property
+    def computed_distance(self) -> float:
+        """Get computed EMD value."""
+        return self._distance
 
     def write_result(self, filename: str, decimals: int = 6) -> None:
         text = "===== Earth Mover's Distance Results ====="
