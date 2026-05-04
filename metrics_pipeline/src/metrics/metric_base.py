@@ -257,7 +257,7 @@ class NoneMetric:
         return sorted(self.__metric_properties__)
 
 
-@dataclass
+@dataclass(slots=True)
 class MetricsData:
     """
     Dataclass to store all metrics data associated with a tested structure.
@@ -294,14 +294,12 @@ class MetricsData:
     additional_data: dict
         A dictionary to store any additional data related to metrics computations.
     """
-    METRIC_SLOTS = (
+    METRIC_FIELDS = (
         "is_valid", "is_viable", "is_symmetric",
         "is_element_metastable", "is_metastable", "is_stable",
         "is_unique", "is_novel", "is_unmatchable",
         "rmsd"
     )
-    __slots__ = ("structure", *METRIC_SLOTS, "additional_data")
-
     structure: GenMatStructure
     is_valid: bool | None = None
     is_viable: bool | None = None
@@ -333,7 +331,7 @@ class MetricsData:
                 f"Cannot update MetricsData with different names: "
                 f"{self.name!r} and {other.name!r}."
             )
-        for field_name in self.METRIC_SLOTS:
+        for field_name in self.METRIC_FIELDS:
             if (new_value := getattr(other, field_name, None)) is not None:
                 setattr(self, field_name, new_value)
 
@@ -342,8 +340,8 @@ class MetricsData:
         cls = type(self)
         new = cls(self.structure)
 
-        for metric_slot in self.METRIC_SLOTS:
-            setattr(new, metric_slot, getattr(self, metric_slot))
+        for metric_field in self.METRIC_FIELDS:
+            setattr(new, metric_field, getattr(self, metric_field))
         
         new.additional_data |= self.additional_data
 
