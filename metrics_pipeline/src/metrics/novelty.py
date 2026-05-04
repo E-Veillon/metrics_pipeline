@@ -66,7 +66,7 @@ class Novelty(Metric):
             is way larger than the number of structures to match. Defaults to False.
         """
         super().__init__(structures, workers)
-        self.matcher = StructureMatcher(
+        self._matcher = StructureMatcher(
             ltol=ltol, stol=stol, angle_tol=angle_tol, scale=False, attempt_supercell=True
         )
         init_length = len(ref_structs)
@@ -77,10 +77,10 @@ class Novelty(Metric):
                 "an unphysical volume < 1 angstrom were removed at initialization to avoid "
                 "encountering bugs while matching."
             )
-        self.ref_structs = self.sort_by_formula(ref_structs)
+        self._ref_structs = self.sort_by_formula(ref_structs)
 
         if not database_mode:
-            self.sorted_structures = self.sort_by_formula(structures)
+            self._sorted_structs = self.sort_by_formula(structures)
             self._compute()
 
     @tp.overload
@@ -103,12 +103,12 @@ class Novelty(Metric):
         complete `MetricsData` result object. Note that unphysical structures of volume < 1
         angstrom³ cannot be matched and are considered novel by default.
         """
-        if structure.volume < 1 or structure.reduced_formula not in self.ref_structs:
+        if structure.volume < 1 or structure.reduced_formula not in self._ref_structs:
             return True
 
-        ref_structs = self.ref_structs[structure.reduced_formula]
+        ref_structs = self._ref_structs[structure.reduced_formula]
         return any(
-            self.matcher.fit(structure, ref_struct)
+            self._matcher.fit(structure, ref_struct)
             for ref_struct in ref_structs
         )
 
@@ -127,9 +127,9 @@ class Novelty(Metric):
         """Get a dict of initialized parameters for this metric."""
         return {
             f"{type(self).__name__}_settings": {
-                "ltol": self.matcher.ltol,
-                "stol": self.matcher.stol,
-                "angle_tol": self.matcher.angle_tol
+                "ltol": self._matcher.ltol,
+                "stol": self._matcher.stol,
+                "angle_tol": self._matcher.angle_tol
             }
         }
 
@@ -140,8 +140,8 @@ class Novelty(Metric):
         # Only structures with formula in reference and with valid volumes are matched
         computed_extend = self._computed_data.extend
         computed_append = self._computed_data.append
-        for formula, structs in self.sorted_structures.items():
-            if formula not in self.ref_structs:
+        for formula, structs in self._sorted_structs.items():
+            if formula not in self._ref_structs:
                 computed_extend(
                     MetricsData(
                         struct,
@@ -165,12 +165,12 @@ class Novelty(Metric):
 
         # Group by stoichiometry
         formula_groups = (
-            matched_structs[formula] + self.ref_structs[formula]
+            matched_structs[formula] + self._ref_structs[formula]
             for formula in matched_structs.keys()
         )
         # Group by matching equivalence
         num_groups = len(matched_structs)
-        grouper = self.matcher.group_structures
+        grouper = self._matcher.group_structures
         if self.workers == 0:
             groups: itt.chain[list[StructureLike]] = itt.chain.from_iterable(
                 self._sequential_compute(
@@ -232,49 +232,49 @@ class Novelty(Metric):
     @property
     def novel_structs(self) -> list[GenMatStructure]:
         """List of novel structures."""
-        return [data.structure for data in self.computed_data if data.is_novel]
+        return [data.typed_structure for data in self.computed_data if data.is_novel]
 
     @property
     def known_structs(self) -> list[GenMatStructure]:
         """List of structures equivalent to one in the reference dataset."""
-        return [data.structure for data in self.computed_data if data.is_novel is False]
+        return [data.typed_structure for data in self.computed_data if data.is_novel is False]
 
     @property
     def unmatchable_structs(self) -> list[GenMatStructure]:
         """List of structures that cannot be matched due to their unphysical volume."""
-        return [data.structure for data in self.computed_data if data.is_unmatchable]
+        return [data.typed_structure for data in self.computed_data if data.is_unmatchable]
 
     @property
     def novel_names(self) -> list[str]:
         """List of names of novel structures."""
-        return [data.structure.name for data in self.computed_data if data.is_novel]
+        return [data.typed_structure.name for data in self.computed_data if data.is_novel]
 
     @property
     def known_names(self) -> list[str]:
         """List of names of structures equivalent to one in the reference dataset."""
-        return [data.structure.name for data in self.computed_data if data.is_novel is False]
+        return [data.typed_structure.name for data in self.computed_data if data.is_novel is False]
 
     @property
     def unmatchable_names(self) -> list[str]:
         """
         List of names of of structures that cannot be matched due to their unphysical volume.
         """
-        return [data.structure.name for data in self.computed_data if data.is_unmatchable]
+        return [data.typed_structure.name for data in self.computed_data if data.is_unmatchable]
 
     @property
     def novel_names_set(self) -> set[str]:
         """Set of names of novel structures."""
-        return {data.structure.name for data in self.computed_data if data.is_novel}
+        return {data.typed_structure.name for data in self.computed_data if data.is_novel}
 
     @property
     def known_names_set(self) -> set[str]:
         """Set of names of structures equivalent to one in the reference dataset."""
-        return {data.structure.name for data in self.computed_data if data.is_novel is False}
+        return {data.typed_structure.name for data in self.computed_data if data.is_novel is False}
 
     @property
     def unmatchable_names_set(self) -> set[str]:
         """Set of names of structures that cannot be matched due to their unphysical volume."""
-        return {data.structure.name for data in self.computed_data if data.is_unmatchable}
+        return {data.typed_structure.name for data in self.computed_data if data.is_unmatchable}
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
         subsets: OrderedDict[str, list[GenMatStructure]] = OrderedDict(

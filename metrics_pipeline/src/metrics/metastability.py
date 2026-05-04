@@ -58,8 +58,8 @@ class ElementMetastability(Metric):
         self._check_lacking_elts(self.structures, ref_entries)
 
         self._sorted_structs = self.sort_by_chemical_system(self.structures)
-        self.ref_entries = self.sort_by_chemical_system(ref_entries)
-        self.verbose = verbose
+        self._ref_entries = self.sort_by_chemical_system(ref_entries)
+        self._verbose = verbose
 
         self._compute()
 
@@ -117,7 +117,7 @@ class ElementMetastability(Metric):
         if isinstance(entry, GenMatStructure):
             entry = entry.entry
 
-        if self.verbose:
+        if self._verbose:
             pd_system = '-'.join(map(str, pd.elements))
             entry_name = entry.name or entry.formula
             print(f"Comparing entry {entry_name} to convex hull {pd_system}:")
@@ -126,7 +126,7 @@ class ElementMetastability(Metric):
         e_above_hull = pd.get_e_above_hull(entry, allow_negative=True, check_stable=False)
         is_stable = e_above_hull is not None and e_above_hull <= 0.0
 
-        if self.verbose:
+        if self._verbose:
             print(f"{e_above_hull=}")
             print(f"element metastable: {is_stable}")
 
@@ -167,19 +167,19 @@ class ElementMetastability(Metric):
         self, system: str, structs: list[GenMatStructure]
     ) -> list[MetricsData]:
         """Compute stability inside a chemical system."""
-        if self.verbose:
+        if self._verbose:
             print(f"Computing system {system}")
         # Get relevant reference entries for this chemical system
         system_set = set(system.split("-"))
         ref_entries = list(
             itt.chain.from_iterable(
-                self.ref_entries[ref_system] for ref_system in self.ref_entries
+                self._ref_entries[ref_system] for ref_system in self._ref_entries
                 if set(ref_system.split("-")).issubset(system_set)
             )
         )
         # Build the reference phase diagram
         pd = PhaseDiagram(ref_entries)
-        if self.verbose:
+        if self._verbose:
             print("Built phase diagram with following stable entries:")
             hull_entries = tp.cast(tuple[PDEntry, ...], pd.qhull_entries)
             for entry in hull_entries:
@@ -219,42 +219,42 @@ class ElementMetastability(Metric):
     @property
     def elt_metastable_structs(self) -> list[GenMatStructure]:
         """List of element metastable structures."""
-        return [data.structure for data in self.computed_data if data.is_element_metastable]
+        return [data.typed_structure for data in self.computed_data if data.is_element_metastable]
 
     @property
     def elt_unstable_structs(self) -> list[GenMatStructure]:
         """List of element unstable structures."""
-        return [data.structure for data in self.computed_data if data.is_element_metastable is False]
+        return [data.typed_structure for data in self.computed_data if data.is_element_metastable is False]
 
     @property
     def elt_metastable_names(self) -> list[str]:
         """List of names of element metastable structures."""
-        return [data.structure.name for data in self.computed_data if data.is_element_metastable]
+        return [data.typed_structure.name for data in self.computed_data if data.is_element_metastable]
 
     @property
     def elt_unstable_names(self) -> list[str]:
         """List of names of element unstable structures."""
-        return [data.structure.name for data in self.computed_data if data.is_element_metastable is False]
+        return [data.typed_structure.name for data in self.computed_data if data.is_element_metastable is False]
 
     @property
     def elt_metastable_names_set(self) -> set[str]:
         """Set of names of element metastable structures."""
-        return {data.structure.name for data in self.computed_data if data.is_element_metastable}
+        return {data.typed_structure.name for data in self.computed_data if data.is_element_metastable}
 
     @property
     def elt_unstable_names_set(self) -> set[str]:
         """Set of names of element unstable structures."""
-        return {data.structure.name for data in self.computed_data if data.is_element_metastable is False}
+        return {data.typed_structure.name for data in self.computed_data if data.is_element_metastable is False}
 
     @property
     def elt_metastable_entries(self) -> list[GenMatPDEntry]:
         """List of `GenMatPDEntry` objects associated with element metastable structures."""
-        return [data.structure.entry for data in self.computed_data if data.is_element_metastable]
+        return [data.typed_structure.entry for data in self.computed_data if data.is_element_metastable]
 
     @property
     def elt_unstable_entries(self) -> list[GenMatPDEntry]:
         """List of `GenMatPDEntry` objects associated with element unstable structures."""
-        return [data.structure.entry for data in self.computed_data if data.is_element_metastable is False]
+        return [data.typed_structure.entry for data in self.computed_data if data.is_element_metastable is False]
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
         subsets: OrderedDict[str, list[GenMatStructure]] = OrderedDict(

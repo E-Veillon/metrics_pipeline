@@ -81,8 +81,8 @@ class RMSD(Metric):
                 "relaxation, please check that each matching index contain the same structure "
                 "before and after relaxation."
             )
-        self.num_atoms = num_atoms
-        self.relaxed_structs = relaxed_structs
+        self._num_atoms = num_atoms
+        self._relaxed_structs = relaxed_structs
 
         self._compute()
 
@@ -112,8 +112,8 @@ class RMSD(Metric):
         Tensor
             Shortest atoms trajectories between initial and optimized positions.
         """
-        idx = torch.arange(self.num_atoms.shape[0], dtype=torch.long, device=self.num_atoms.device)
-        batch = idx.repeat_interleave(self.num_atoms)
+        idx = torch.arange(self._num_atoms.shape[0], dtype=torch.long, device=self._num_atoms.device)
+        batch = idx.repeat_interleave(self._num_atoms)
 
         offset = self._get_offsets(x_src.device)
         offset_euc = torch.einsum("ij,ljk->lik", offset, cell_src)
@@ -167,7 +167,7 @@ class RMSD(Metric):
             Lattice vectors matrix of the optimized structure.
         """
         batch_atoms = torch.arange(cell_src.shape[0], dtype=torch.long).repeat_interleave(
-            self.num_atoms
+            self._num_atoms
         )
         _, cell_src = self._polar(cell_src)
         _, cell_dst = self._polar(cell_dst)
@@ -179,12 +179,12 @@ class RMSD(Metric):
 
         paths = self._get_shortest_paths(x_src_euc, cell_src, x_dst_euc)
 
-        avg_path = scatter_mean(paths, batch_atoms, dim=0, dim_size=self.num_atoms.shape[0])
+        avg_path = scatter_mean(paths, batch_atoms, dim=0, dim_size=self._num_atoms.shape[0])
 
         distance = (paths - avg_path[batch_atoms]).pow(2).sum(dim=1)
 
         return scatter_mean(
-            distance, batch_atoms, dim=0, dim_size=self.num_atoms.shape[0]
+            distance, batch_atoms, dim=0, dim_size=self._num_atoms.shape[0]
         ).sqrt()
 
     def _get_metric_settings(self) -> dict[str, Any]:
@@ -202,11 +202,11 @@ class RMSD(Metric):
             [struct.lattice.matrix for struct in self.structures], dtype=torch.float32
         )
         x_dst = torch.cat(
-            [torch.tensor(struct.frac_coords, dtype=torch.float32) for struct in self.relaxed_structs],
+            [torch.tensor(struct.frac_coords, dtype=torch.float32) for struct in self._relaxed_structs],
             dim=0
         )
         cell_dst = torch.tensor(
-            [struct.lattice.matrix for struct in self.relaxed_structs], dtype=torch.float32
+            [struct.lattice.matrix for struct in self._relaxed_structs], dtype=torch.float32
         )
         self._distances = self.compute_rmsd(x_src, cell_src, x_dst, cell_dst).numpy(force=True)
 
@@ -219,7 +219,7 @@ class RMSD(Metric):
         return [
             MetricsData(struct, rmsd=rmsd_val, additional_data={"relaxed_structure": relaxed})
             for struct, relaxed, rmsd_val in zip(
-                self.structures, self.relaxed_structs, self.all_rmsd
+                self.structures, self._relaxed_structs, self.all_rmsd
             )
         ]
 

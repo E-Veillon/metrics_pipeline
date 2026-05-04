@@ -45,9 +45,8 @@ class FrechetDistance(Metric):
             Any additional keyword arguments to pass to the `transform` callable.
         """
         super().__init__(structures)
-        self.ref_structs = ref_structs
-        self.transform = ft.partial(transform, **kwargs)
-        self.kwargs = kwargs
+        self._ref_structs = ref_structs
+        self._transform = ft.partial(transform, **kwargs)
 
         self._compute()
 
@@ -77,14 +76,14 @@ class FrechetDistance(Metric):
         """Get a dict of initialized parameters for this metric."""
         return {
             f"{type(self).__name__}_settings": {
-                "transform": self.transform,
-                "kwargs": self.kwargs
+                "transform": self._transform.func.__name__,
+                "kwargs": self._transform.keywords
             }
         }
 
     def _compute(self) -> None:
-        computed_array = self.transform(self.structures)
-        ref_array = self.transform(self.ref_structs)
+        computed_array = self._transform(self.structures)
+        ref_array = self._transform(self._ref_structs)
         self._distance = self.get_frechet_distance(computed_array, ref_array)
 
     @property
@@ -110,7 +109,7 @@ class FrechetDistance(Metric):
     def write_result(self, filename: str, decimals: int = 6) -> None:
         text = "===== Fréchet Distance Results ====="
         text += f"Total computed structures:  {len(self)}"
-        text += f"Total reference structures: {len(self.ref_structs)}"
+        text += f"Total reference structures: {len(self._ref_structs)}"
         text += f"Fréchet Distance: {self.computed_distance:.{decimals}f}"
 
         with open(filename, "wt", encoding="utf-8") as fp:

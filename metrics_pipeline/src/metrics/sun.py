@@ -29,6 +29,18 @@ class SUN(Metric):
     Claudio Zeni et al. “A generative model for inorganic materials design”.
     In: Nature 639.8055 (2025), pp. 624–632.
     """
+    _ref_structs: list[Structure]
+    _compute_stability: bool
+    _compute_unicity: bool
+    _compute_novelty: bool
+    _stable_tol: float
+    _ltol: float
+    _stol: float
+    _angle_tol: float
+    _stability: Stability | NoneMetric
+    _unicity: Unicity | NoneMetric
+    _novelty: Novelty | NoneMetric
+
     def __init__(
         self,
         structures: list[GenMatStructure],
@@ -85,14 +97,14 @@ class SUN(Metric):
         If neither Unicity nor Novelty is computed, all structures are assumed to be matchable.
         """
         super().__init__(structures, workers)
-        self.ref_structs = ref_structs
-        self.compute_stability = compute_stability
-        self.compute_unicity = compute_unicity
-        self.compute_novelty = compute_novelty
-        self.stable_tol = kwargs.pop("stable_tol", 0.1)
-        self.ltol = kwargs.pop("ltol", 0.2)
-        self.stol = kwargs.pop("stol", 0.3)
-        self.angle_tol = kwargs.pop("angle_tol", 5.0)
+        self._ref_structs = ref_structs
+        self._compute_stability = compute_stability
+        self._compute_unicity = compute_unicity
+        self._compute_novelty = compute_novelty
+        self._stable_tol = kwargs.pop("stable_tol", 0.1)
+        self._ltol = kwargs.pop("ltol", 0.2)
+        self._stol = kwargs.pop("stol", 0.3)
+        self._angle_tol = kwargs.pop("angle_tol", 5.0)
 
         self._compute()
 
@@ -100,19 +112,19 @@ class SUN(Metric):
         """Convert reference structures to `PDEntry` objects."""
         return [
             PDEntry(s.composition, s.properties["energy"], s.properties.get("header"))
-            for s in self.ref_structs
+            for s in self._ref_structs
         ]
 
     def _get_metric_settings(self) -> dict[str, tp.Any]:
         """Get a dict of initialized parameters for this metric."""
-        stability_settings = self.stability._get_metric_settings() if self.compute_stability else {}
-        unicity_settings = self.unicity._get_metric_settings() if self.compute_unicity else {}
-        novelty_settings = self.novelty._get_metric_settings() if self.compute_novelty else {}
+        stability_settings = self._stability._get_metric_settings() if self._compute_stability else {}
+        unicity_settings = self._unicity._get_metric_settings() if self._compute_unicity else {}
+        novelty_settings = self._novelty._get_metric_settings() if self._compute_novelty else {}
         return stability_settings | unicity_settings | novelty_settings
 
     def _compute(self) -> None:
         # Remove unmatchable structures directly to avoid internal bugs
-        if self.compute_unicity or self.compute_novelty:
+        if self._compute_unicity or self._compute_novelty:
             matchable_structs = []
             unmatchable_names = set()
             for struct in self.structures:
@@ -124,58 +136,49 @@ class SUN(Metric):
             matchable_structs = self.structures
             unmatchable_names = set()
 
-        self.stability = Stability(
-            self.structures, self._get_ref_entries(), self.stable_tol, workers=self.workers
-        ) if self.compute_stability else NoneMetric(Stability)
+        self._stability = Stability(
+            self.structures, self._get_ref_entries(), self._stable_tol, workers=self.workers
+        ) if self._compute_stability else NoneMetric(Stability)
 
-        self.unicity = Unicity(
-            matchable_structs, self.ltol, self.stol, self.angle_tol, self.workers
-        ) if self.compute_unicity else NoneMetric(Unicity)
+        self._unicity = Unicity(
+            matchable_structs, self._ltol, self._stol, self._angle_tol, self.workers
+        ) if self._compute_unicity else NoneMetric(Unicity)
 
-        self.novelty = Novelty(
-            matchable_structs, self.ref_structs, self.ltol, self.stol, self.angle_tol, self.workers
-        ) if self.compute_novelty else NoneMetric(Novelty)
+        self._novelty = Novelty(
+            matchable_structs, self._ref_structs, self._ltol, self._stol, self._angle_tol, self.workers
+        ) if self._compute_novelty else NoneMetric(Novelty)
 
-        metastable_names = self.stability.metastable_names_set if self.compute_stability else set()
-        stable_names = self.stability.stable_names_set if self.compute_stability else set()
-        unique_names = self.unicity.unique_names_set if self.compute_unicity else set()
-        novel_names = self.novelty.novel_names_set if self.compute_novelty else set()
+        metastable_names = self._stability.metastable_names_set if self._compute_stability else set()
+        stable_names = self._stability.stable_names_set if self._compute_stability else set()
+        unique_names = self._unicity.unique_names_set if self._compute_unicity else set()
+        novel_names = self._novelty.novel_names_set if self._compute_novelty else set()
 
         self._computed_data: list[MetricsData] = [
             MetricsData(
                 struct,
                 is_metastable=(
                     struct.name in metastable_names
-                    if self.compute_stability else None
+                    if self._compute_stability else None
                 ),
                 is_stable=(
                     struct.name in stable_names
-                    if self.compute_stability else None
+                    if self._compute_stability else None
                 ),
                 is_unique=(
                     struct.name in unique_names
-                    if self.compute_unicity else None
+                    if self._compute_unicity else None
                 ),
                 is_novel=(
                     struct.name in novel_names
-                    if self.compute_novelty else None
+                    if self._compute_novelty else None
                 ),
                 is_unmatchable=(
                     struct.name in unmatchable_names
-                    if self.compute_unicity or self.compute_novelty else None
+                    if self._compute_unicity or self._compute_novelty else None
                 ),
                 additional_data=self._get_metric_settings()
             ) for struct in self.structures
         ]
-
-    def __getattr__(self, attr: str) -> tp.Any:
-        if attr in self.stability.__metric_properties__:
-            return getattr(self.stability, attr)
-        if attr in self.unicity.__metric_properties__:
-            return getattr(self.unicity, attr)
-        if attr in self.novelty.__metric_properties__:
-            return getattr(self.novelty, attr)
-        raise AttributeError(f"{type(self).__name__} has no attribute {attr!r}.")
 
     @property
     def computed_data(self) -> list[MetricsData]:
@@ -195,7 +198,7 @@ class SUN(Metric):
         computation, thus the `unmatchable_data` property from internal metrics is always empty,
         and this global property is the only populated one.
         """
-        if self.compute_unicity or self.compute_novelty:
+        if self._compute_unicity or self._compute_novelty:
             return [data for data in self.computed_data if data.is_unmatchable]
         return NoneMetric(type(self)).unmatchable_data
 
@@ -211,8 +214,8 @@ class SUN(Metric):
         computation, thus the `unmatchable_structs` property from internal metrics is always empty,
         and this global property is the only populated one.
         """
-        if self.compute_unicity or self.compute_novelty:
-            return [data.structure for data in self.computed_data if data.is_unmatchable]
+        if self._compute_unicity or self._compute_novelty:
+            return [data.typed_structure for data in self.computed_data if data.is_unmatchable]
         return NoneMetric(type(self)).unmatchable_structs
 
     @property
@@ -227,8 +230,8 @@ class SUN(Metric):
         computation, thus the `unmatchable_names` property from internal metrics is always empty,
         and this global property is the only populated one.
         """
-        if self.compute_unicity or self.compute_novelty:
-            return [data.structure.name for data in self.computed_data if data.is_unmatchable]
+        if self._compute_unicity or self._compute_novelty:
+            return [data.typed_structure.name for data in self.computed_data if data.is_unmatchable]
         return NoneMetric(type(self)).unmatchable_names
 
     @property
@@ -243,9 +246,30 @@ class SUN(Metric):
         computation, thus the `unmatchable_names_set` property from internal metrics is always empty,
         and this global property is the only populated one.
         """
-        if self.compute_unicity or self.compute_novelty:
-            return {data.structure.name for data in self.computed_data if data.is_unmatchable}
+        if self._compute_unicity or self._compute_novelty:
+            return {data.typed_structure.name for data in self.computed_data if data.is_unmatchable}
         return NoneMetric(type(self)).unmatchable_names_set
+
+    @property
+    def stability(self) -> Stability | NoneMetric:
+        """
+        The computed Stability metric object, or `NoneMetric` placeholder if not computed.
+        """
+        return self._stability
+
+    @property
+    def unicity(self) -> Unicity | NoneMetric:
+        """
+        The computed Unicity metric object, or `NoneMetric` placeholder if not computed.
+        """
+        return self._unicity
+
+    @property
+    def novelty(self) -> Novelty | NoneMetric:
+        """
+        The computed Novelty metric object, or `NoneMetric` placeholder if not computed.
+        """
+        return self._novelty
 
     def get_computed_subset(
         self,
@@ -253,51 +277,51 @@ class SUN(Metric):
         unique: bool | None = None,
         novel: bool | None = None,
         unmatchable: bool | None = None
-    ) -> list[GenMatStructure]:
+    ) -> list[MetricsData]:
         """
-        Get a subset of computed structures according to given metrics flags.
+        Get a subset of computed data according to given metrics flags.
 
         Parameters
         ----------
         stable: bool or None
-            - If set to True, only return structures that passed the Stability metric.
-            - If set to False, only return structures that failed the Stability metric.
-            - If set to None, return structures indifferently for this metric.
+            - If set to True, only return data for structures that passed the Stability metric.
+            - If set to False, only return data for structures that failed the Stability metric.
+            - If set to None, return data for structures indifferently for this metric.
             Defaults to None.
 
         unique: bool or None
-            - If set to True, only return structures that passed the Unicity metric.
-            - If set to False, only return structures that failed the Unicity metric.
-            - If set to None, return structures indifferently for this metric.
+            - If set to True, only return data for structures that passed the Unicity metric.
+            - If set to False, only return data for structures that failed the Unicity metric.
+            - If set to None, return data for structures indifferently for this metric.
             Defaults to None.
 
         novel: bool or None
-            - If set to True, only return structures that passed the Novelty metric.
-            - If set to False, only return structures that failed the Novelty metric.
-            - If set to None, return structures indifferently for this metric.
+            - If set to True, only return data for structures that passed the Novelty metric.
+            - If set to False, only return data for structures that failed the Novelty metric.
+            - If set to None, return data for structures indifferently for this metric.
             Defaults to None.
 
         unmatchable: bool or None
-            - If set to True, only return structures that could not be matched.
-            - If set to False, only return structures that could be matched.
-            - If set to None, return structures indifferently for this metric.
+            - If set to True, only return data for structures that could not be matched.
+            - If set to False, only return data for structures that could be matched.
+            - If set to None, return data for structures indifferently for this metric.
             Defaults to None.
 
         Returns
         -------
-        list[Structure]
-            The list of computed structures with the queried metrics properties.
+        list[MetricsData]
+            The list of computed `MetricsData` with the queried metrics properties.
 
         Notes
         -----
         - Passing `None` to all metrics (default) is equivalent to calling the
-        `computed_structs` property.
+        `computed_data` property.
         """
         if stable is None and unique is None and novel is None and unmatchable is None:
-            return self.computed_structs
+            return self.computed_data
 
         return list(
-            data.structure for data in filter(
+            data for data in filter(
                 lambda s: (
                     (True if stable is None else s.is_stable is stable) and
                     (True if unique is None else s.is_unique is unique) and
@@ -306,18 +330,35 @@ class SUN(Metric):
                 ), self.computed_data
             )
         )
+    
+    def get_structs_subset(
+        self,
+        stable: bool | None = None,
+        unique: bool | None = None,
+        novel: bool | None = None,
+        unmatchable: bool | None = None
+    ) -> list[GenMatStructure]:
+        """
+        Get the subset of structures according to given metrics flags.
+        Behaves just like the `get_computed_subset()` method but returns
+        structures instead of `MetricsData` objects.
+        """
+        return [
+            data.typed_structure
+            for data in self.get_computed_subset(stable, unique, novel, unmatchable)
+        ]
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
         subsets: OrderedDict[str, list[GenMatStructure]] = OrderedDict(
             [
-                ("Stable", self.get_computed_subset(stable=True)),
-                ("Unique", self.get_computed_subset(unique=True)),
-                ("Novel",  self.get_computed_subset(novel=True)),
-                ("Stable Unique", self.get_computed_subset(stable=True, unique=True)),
-                ("Stable Novel", self.get_computed_subset(stable=True, novel=True)),
-                ("Unique Novel", self.get_computed_subset(unique=True, novel=True)),
-                ("S.U.N.", self.get_computed_subset(stable=True, unique=True, novel=True)),
-                ("Unmatchable", self.get_computed_subset(unmatchable=True))
+                ("Stable", self.get_structs_subset(stable=True)),
+                ("Unique", self.get_structs_subset(unique=True)),
+                ("Novel",  self.get_structs_subset(novel=True)),
+                ("Stable Unique", self.get_structs_subset(stable=True, unique=True)),
+                ("Stable Novel", self.get_structs_subset(stable=True, novel=True)),
+                ("Unique Novel", self.get_structs_subset(unique=True, novel=True)),
+                ("S.U.N.", self.get_structs_subset(stable=True, unique=True, novel=True)),
+                ("Unmatchable", self.get_structs_subset(unmatchable=True))
             ]
         )
         self._write_filter_metric_result(filename, subsets, verbose)

@@ -102,10 +102,9 @@ class EMD(Metric):
                     warnings.warn(warn_msg)
                     computed_property = None
 
-        self.ref_structs = ref_structs
-        self.transform = ft.partial(transform, **kwargs) if transform is not None else None
-        self.computed_property = computed_property
-        self.kwargs = kwargs
+        self._ref_structs = ref_structs
+        self._transform = ft.partial(transform, **kwargs) if transform is not None else None
+        self._computed_property = computed_property
 
         self._compute()
 
@@ -113,25 +112,25 @@ class EMD(Metric):
         """Get a dict of initialized parameters for this metric."""
         return {
             f"{type(self).__name__}_settings": {
-                "property": self.computed_property,
-                "transform": self.transform,
-                "kwargs": self.kwargs
+                "computed_property": self._computed_property,
+                "transform": self._transform.func.__name__ if self._transform is not None else None,
+                "kwargs": self._transform.keywords if self._transform is not None else None
             }
         }
 
     def _compute(self) -> None:
-        if self.computed_property is None:
-            if self.transform is None:
+        if self._computed_property is None:
+            if self._transform is None:
                 raise RuntimeError("Type checker assertion.")
-            computed_values = self.transform(self.structures)
-            ref_values = self.transform(self.ref_structs)
+            computed_values = self._transform(self.structures)
+            ref_values = self._transform(self._ref_structs)
 
         else:
             computed_values = np.array(
-                [getattr(struct, self.computed_property) for struct in self.structures]
+                [getattr(struct, self._computed_property) for struct in self.structures]
             )
             ref_values = np.array(
-                [struct.properties[self.computed_property] for struct in self.ref_structs]
+                [struct.properties[self._computed_property] for struct in self._ref_structs]
             )
         self._distance = wasserstein_distance(ref_values, computed_values)
 
@@ -158,8 +157,8 @@ class EMD(Metric):
     def write_result(self, filename: str, decimals: int = 6) -> None:
         text = "===== Earth Mover's Distance Results ====="
         text += f"Total computed structures:  {len(self)}"
-        text += f"Total reference structures: {len(self.ref_structs)}"
-        text += f"EMD ({self.computed_property}): {self.computed_distance:.{decimals}f}"
+        text += f"Total reference structures: {len(self._ref_structs)}"
+        text += f"EMD ({self._computed_property}): {self.computed_distance:.{decimals}f}"
 
         with open(filename, "wt", encoding="utf-8") as fp:
             fp.write("\n".join(text))

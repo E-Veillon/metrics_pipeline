@@ -77,12 +77,11 @@ class Coverage(Metric):
             Any additional keyword arguments to pass to the `transform` callable.
         """
         super().__init__(structures)
-        self.ref_structs = ref_structs
-        self.transform = ft.partial(transform, **kwargs)
-        self.kwargs = kwargs
-        self.compute_precision = compute_precision
-        self.compute_recall = compute_recall
-        self.threshold = threshold
+        self._ref_structs = ref_structs
+        self._transform = ft.partial(transform, **kwargs)
+        self._compute_precision = compute_precision
+        self._compute_recall = compute_recall
+        self._threshold = threshold
 
         self._compute()
 
@@ -122,23 +121,25 @@ class Coverage(Metric):
         """Get a dict of initialized parameters for this metric."""
         return {
             f"{type(self).__name__}_settings": {
-                "threshold": self.threshold,
-                "transform": self.transform,
-                "kwargs": self.kwargs
+                "threshold": self._threshold,
+                "transform": self._transform.func.__name__,
+                "kwargs": self._transform.keywords,
+                "compute_precision": self._compute_precision,
+                "compute_recall": self._compute_recall
             }
         }
 
     def _compute(self) -> None:
-        computed_fp = self.transform(self.structures)
-        ref_fp = self.transform(self.ref_structs)
+        computed_fp = self._transform(self.structures)
+        ref_fp = self._transform(self._ref_structs)
 
-        if self.compute_precision:
-            self._precision = self.get_precision(computed_fp, ref_fp, self.threshold)
+        if self._compute_precision:
+            self._precision = self.get_precision(computed_fp, ref_fp, self._threshold)
         else:
             self._precision = None
 
-        if self.compute_recall:
-            self._recall = self.get_recall(computed_fp, ref_fp, self.threshold)
+        if self._compute_recall:
+            self._recall = self.get_recall(computed_fp, ref_fp, self._threshold)
         else:
             self._recall = None
 
@@ -182,7 +183,7 @@ class Coverage(Metric):
 
         text = "===== Coverage Results ====="
         text += f"Total computed structures:  {len(self)}"
-        text += f"Total reference structures: {len(self.ref_structs)}"
+        text += f"Total reference structures: {len(self._ref_structs)}"
         text += f"Precision (COV-P): {precision_value}"
         text += f"Recall (COV-R):    {recall_value}"
 

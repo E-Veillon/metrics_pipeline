@@ -45,7 +45,7 @@ class StructValidity(Metric):
             pass 0 to disable `process_map()` and do it sequentially.
         """
         super().__init__(structures, workers)
-        self.valid_tol = valid_tol
+        self._valid_tol = valid_tol
 
         self._compute()
 
@@ -55,7 +55,7 @@ class StructValidity(Metric):
         Compatible with standard `Structure` objects, but only return a bool
         instead of a computed `MetricsData` object with metric results.
         """
-        return structure.is_valid(tol=self.valid_tol)
+        return structure.is_valid(tol=self._valid_tol)
 
     def get_validity(self, structure: GenMatStructure) -> MetricsData:
         """
@@ -72,7 +72,7 @@ class StructValidity(Metric):
         """Get a dict of initialized parameters for this metric."""
         return {
             f"{type(self).__name__}_settings": {
-                "valid_tol": self.valid_tol
+                "valid_tol": self._valid_tol
             }
         }
 
@@ -104,32 +104,32 @@ class StructValidity(Metric):
     @property
     def valid_structs(self) -> list[GenMatStructure]:
         """List of valid structures."""
-        return [data.structure for data in self.computed_data if data.is_valid]
+        return [data.typed_structure for data in self.computed_data if data.is_valid]
 
     @property
     def invalid_structs(self) -> list[GenMatStructure]:
         """List of invalid structures."""
-        return [data.structure for data in self.computed_data if data.is_valid is False]
+        return [data.typed_structure for data in self.computed_data if data.is_valid is False]
 
     @property
     def valid_names(self) -> list[str]:
         """List of names of valid structures."""
-        return [data.structure.name for data in self.computed_data if data.is_valid]
+        return [data.typed_structure.name for data in self.computed_data if data.is_valid]
     
     @property
     def invalid_names(self) -> list[str]:
         """List of names of invalid structures."""
-        return [data.structure.name for data in self.computed_data if data.is_valid is False]
+        return [data.typed_structure.name for data in self.computed_data if data.is_valid is False]
 
     @property
     def valid_names_set(self) -> set[str]:
         """Set of names of valid structures."""
-        return {data.structure.name for data in self.computed_data if data.is_valid}
+        return {data.typed_structure.name for data in self.computed_data if data.is_valid}
     
     @property
     def invalid_names_set(self) -> set[str]:
         """Set of names of invalid structures."""
-        return {data.structure.name for data in self.computed_data if data.is_valid is False}
+        return {data.typed_structure.name for data in self.computed_data if data.is_valid is False}
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
         subsets: OrderedDict[str, list[GenMatStructure]] = OrderedDict(

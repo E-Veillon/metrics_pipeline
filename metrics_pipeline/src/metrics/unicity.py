@@ -52,7 +52,7 @@ class Unicity(Metric):
             pass 0 to disable `process_map()` and do it sequentially.
         """
         super().__init__(structures, workers)
-        self.matcher = StructureMatcher(
+        self._matcher = StructureMatcher(
             ltol=ltol, stol=stol, angle_tol=angle_tol, scale=False, attempt_supercell=True
         )
         self._compute()
@@ -81,12 +81,12 @@ class Unicity(Metric):
         predicate: Callable[[MetricsData], bool] = lambda d: (
             not d.is_unmatchable and formula == d.structure.reduced_formula
         )
-        ref_structs = [data.structure for data in self.unique_data if predicate(data)]
+        ref_structs = [data.typed_structure for data in self.unique_data if predicate(data)]
         # If no structure with same reduced formula, it's unique
         if not ref_structs:
             return True
         # Match with structures with same reduced formula
-        return not any(self.matcher.fit(structure, struct) for struct in ref_structs)
+        return not any(self._matcher.fit(structure, struct) for struct in ref_structs)
 
     def get_unicity(self, structure: GenMatStructure, add_to_data: bool = False) -> MetricsData:
         """
@@ -121,9 +121,9 @@ class Unicity(Metric):
         """Get a dict of initialized parameters for this metric."""
         return {
             f"{type(self).__name__}_settings": {
-                "ltol": self.matcher.ltol,
-                "stol": self.matcher.stol,
-                "angle_tol": self.matcher.angle_tol
+                "ltol": self._matcher.ltol,
+                "stol": self._matcher.stol,
+                "angle_tol": self._matcher.angle_tol
             }
         }
 
@@ -149,13 +149,13 @@ class Unicity(Metric):
         if self.workers == 0:
             groups: itt.chain[list[GenMatStructure]] = itt.chain.from_iterable(
                 self._sequential_compute(
-                    self.matcher.group_structures, matched_structs.values()
+                    self._matcher.group_structures, matched_structs.values()
                 )
             )
         else:
             groups: itt.chain[list[GenMatStructure]] = itt.chain.from_iterable(
                 self._parallel_compute(
-                    self.matcher.group_structures, matched_structs.values()
+                    self._matcher.group_structures, matched_structs.values()
                 )
             )
         for group in groups:
@@ -203,47 +203,47 @@ class Unicity(Metric):
     @property
     def unique_structs(self) -> list[GenMatStructure]:
         """List of unique structures."""
-        return [data.structure for data in self.computed_data if data.is_unique]
+        return [data.typed_structure for data in self.computed_data if data.is_unique]
 
     @property
     def duplicate_structs(self) -> list[GenMatStructure]:
         """List of duplicate structures."""
-        return [data.structure for data in self.computed_data if data.is_unique is False]
+        return [data.typed_structure for data in self.computed_data if data.is_unique is False]
 
     @property
     def unmatchable_structs(self) -> list[GenMatStructure]:
         """List of structures that cannot be matched due to their unphysical volume."""
-        return [data.structure for data in self.computed_data if data.is_unmatchable]
+        return [data.typed_structure for data in self.computed_data if data.is_unmatchable]
 
     @property
     def unique_names(self) -> list[str]:
         """List of names of unique structures."""
-        return [data.structure.name for data in self.computed_data if data.is_unique]
+        return [data.typed_structure.name for data in self.computed_data if data.is_unique]
 
     @property
     def duplicate_names(self) -> list[str]:
         """List of names of duplicate structures."""
-        return [data.structure.name for data in self.computed_data if data.is_unique is False]
+        return [data.typed_structure.name for data in self.computed_data if data.is_unique is False]
 
     @property
     def unmatchable_names(self) -> list[str]:
         """List of names of structures that cannot be matched due to their unphysical volume."""
-        return [data.structure.name for data in self.computed_data if data.is_unmatchable]
+        return [data.typed_structure.name for data in self.computed_data if data.is_unmatchable]
 
     @property
     def unique_names_set(self) -> set[str]:
         """Set of names of unique structures."""
-        return {data.structure.name for data in self.computed_data if data.is_unique}
+        return {data.typed_structure.name for data in self.computed_data if data.is_unique}
 
     @property
     def duplicate_names_set(self) -> set[str]:
         """Set of names of duplicate structures."""
-        return {data.structure.name for data in self.computed_data if data.is_unique is False}
+        return {data.typed_structure.name for data in self.computed_data if data.is_unique is False}
 
     @property
     def unmatchable_names_set(self) -> set[str]:
         """Set of names of structures that cannot be matched due to their unphysical volume."""
-        return {data.structure.name for data in self.computed_data if data.is_unmatchable}
+        return {data.typed_structure.name for data in self.computed_data if data.is_unmatchable}
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
         subsets: OrderedDict[str, list[GenMatStructure]] = OrderedDict(

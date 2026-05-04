@@ -16,7 +16,7 @@ from src.utils.genmat_data import GenMatPDEntry, GenMatStructure, StructureLike
 
 class StructureDistribution(tp.Protocol):
     """
-    Any callable taking a list of Structure objects and eventual keyword arguments
+    Any callable taking a list of Structure objects and eventual arguments
     and returning a numpy array representation of the structures distribution.
     """
     def __call__(self, structures: list[StructureLike], *args, **kwargs) -> np.ndarray:
@@ -26,7 +26,9 @@ class StructureDistribution(tp.Protocol):
 class Metric(ABC):
     """Base class for implementing metrics classes. Do not call directly."""
     __metric_properties__: frozenset[str] = frozenset()
-    structures: list[GenMatStructure]
+    _structures: list[GenMatStructure]
+    _workers: int | None
+    _chunksize: int
 
     def __init_subclass__(cls, *args, **kwargs) -> None:
         super().__init_subclass__(*args, **kwargs)
@@ -50,21 +52,40 @@ class Metric(ABC):
         if workers is not None:
             check_num_value(workers, "workers", ">=", 0)
 
-        self.structures = structures
-        self.workers = workers
-        self.chunksize = min(len(structures) // 100 + 1, 10)
+        self._structures = structures
+        self._workers = workers
+        self._chunksize = min(len(structures) // 100 + 1, 10)
 
     def __len__(self) -> int:
-        return len(self.structures)
+        return len(self._structures)
 
     def __getitem__(self, idx: int) -> GenMatStructure:
-        return self.structures[idx]
+        return self._structures[idx]
 
     def __setattr__(self, name: str, value: tp.Any) -> None:
-        raise AttributeError(f"Cannot assign attributes ({type(self).__name__!r} is immutable).")
+        # Allow assignment of private attributes (starting with _)
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+        else:
+            raise AttributeError(f"Cannot assign attribute {name!r} ({type(self).__name__!r} is immutable).")
 
     def __delattr__(self, name: str) -> None:
-        raise AttributeError(f"Cannot delete attributes ({type(self).__name__!r} is immutable).")
+        raise AttributeError(f"Cannot delete attribute {name!r} ({type(self).__name__!r} is immutable).")
+
+    @property
+    def structures(self) -> list[GenMatStructure]:
+        """The list of structures to compute metrics on."""
+        return self._structures
+
+    @property
+    def workers(self) -> int | None:
+        """The number of workers for parallel computation."""
+        return self._workers
+
+    @property
+    def chunksize(self) -> int:
+        """The chunksize for parallel computation."""
+        return self._chunksize
 
     def _sequential_compute(
         self,
@@ -242,10 +263,10 @@ class NoneMetric:
         raise AttributeError(f"{self._wrapped_metric_name!r} has no attribute {name!r}.")
 
     def __setattr__(self, name: str, value: tp.Any) -> None:
-        raise AttributeError(f"Cannot assign attributes ({type(self).__name__!r} is immutable).")
+        raise AttributeError(f"Cannot assign attribute {name!r} ({type(self).__name__!r} is immutable).")
     
     def __delattr__(self, name: str) -> None:
-        raise AttributeError(f"Cannot delete attributes ({type(self).__name__!r} is immutable).")
+        raise AttributeError(f"Cannot delete attribute {name!r} ({type(self).__name__!r} is immutable).")
 
     def __bool__(self) -> bool:
         return False

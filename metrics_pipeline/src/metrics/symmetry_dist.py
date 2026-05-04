@@ -24,7 +24,7 @@ class SymmetryClassifier(Metric):
     of structures according to their symmetry, either at spacegroup, point group, crystal system
     or crystal family level.
     """
-    on_error: tp.Literal["raise", "warn", "ignore"]
+    _on_error: tp.Literal["raise", "warn", "ignore"]
 
     def __init__(
         self,
@@ -64,9 +64,9 @@ class SymmetryClassifier(Metric):
             raise ValueError(
                 f"'on_error' only supports 'raise', 'warn' or 'ignore', got {on_error!r}."
         )
-        self.symprec = symprec
-        self.angleprec = angleprec
-        self.on_error = on_error
+        self._symprec = symprec
+        self._angleprec = angleprec
+        self._on_error = on_error
 
         self._compute()
 
@@ -87,10 +87,10 @@ class SymmetryClassifier(Metric):
         """
         try:
             analyzer = SpacegroupAnalyzer(
-                structure, symprec=self.symprec, angle_tolerance=self.angleprec
+                structure, symprec=self._symprec, angle_tolerance=self._angleprec
             )
         except SymmetryUndeterminedError as exc:
-            raise_or_warn(self.on_error, type(exc), str(exc))
+            raise_or_warn(self._on_error, type(exc), str(exc))
             spg = Spacegroup(0, is_uncomputable=True)
         else:
             spg = Spacegroup(analyzer.get_space_group_number())
@@ -125,8 +125,8 @@ class SymmetryClassifier(Metric):
         """Get a dict of initialized parameters for this metric."""
         return {
             f"{type(self).__name__}_settings": {
-                "symprec": self.symprec,
-                "angleprec": self.angleprec
+                "symprec": self._symprec,
+                "angleprec": self._angleprec
             }
         }
 
@@ -154,7 +154,7 @@ class SymmetryClassifier(Metric):
         List of computed MetricsData containing structures whose spacegroup
         could be determined.
         """
-        return [data for data in self.computed_data if not data.structure.spacegroup.is_uncomputable]
+        return [data for data in self.computed_data if not data.typed_structure.spacegroup.is_uncomputable]
 
     @property
     def uncomputable_data(self) -> list[MetricsData]:
@@ -162,37 +162,37 @@ class SymmetryClassifier(Metric):
         List of computed MetricsData containing structures whose spacegroup
         could not be determined.
         """
-        return [data for data in self.computed_data if data.structure.spacegroup.is_uncomputable]
+        return [data for data in self.computed_data if data.typed_structure.spacegroup.is_uncomputable]
 
     @property
     def computable_structs(self) -> list[GenMatStructure]:
         """List of structures whose spacegroup symmetry could be determined."""
-        return [data.structure for data in self.computed_data if not data.structure.spacegroup.is_uncomputable]
+        return [data.typed_structure for data in self.computed_data if not data.typed_structure.spacegroup.is_uncomputable]
     
     @property
     def uncomputable_structs(self) -> list[GenMatStructure]:
         """List of structures whose spacegroup symmetry could not be determined."""
-        return [data.structure for data in self.computed_data if data.structure.spacegroup.is_uncomputable]
+        return [data.typed_structure for data in self.computed_data if data.typed_structure.spacegroup.is_uncomputable]
 
     @property
     def computable_names(self) -> list[str]:
         """List of names of structures whose spacegroup symmetry could be determined."""
-        return [data.structure.name for data in self.computed_data if not data.structure.spacegroup.is_uncomputable]
+        return [data.typed_structure.name for data in self.computed_data if not data.typed_structure.spacegroup.is_uncomputable]
 
     @property
     def uncomputable_names(self) -> list[str]:
         """List of names of structures whose spacegroup symmetry could not be determined."""
-        return [data.structure.name for data in self.computed_data if data.structure.spacegroup.is_uncomputable]
+        return [data.typed_structure.name for data in self.computed_data if data.typed_structure.spacegroup.is_uncomputable]
 
     @property
     def computable_names_set(self) -> set[str]:
         """Set of names of structures whose spacegroup symmetry could be determined."""
-        return {data.structure.name for data in self.computed_data if not data.structure.spacegroup.is_uncomputable}
+        return {data.typed_structure.name for data in self.computed_data if not data.typed_structure.spacegroup.is_uncomputable}
 
     @property
     def uncomputable_names_set(self) -> set[str]:
         """Set of names of structures whose spacegroup symmetry could not be determined."""
-        return {data.structure.name for data in self.computed_data if data.structure.spacegroup.is_uncomputable}
+        return {data.typed_structure.name for data in self.computed_data if data.typed_structure.spacegroup.is_uncomputable}
 
     def get_symmetry_subset(
         self, symmetry: str | int, family: bool = False

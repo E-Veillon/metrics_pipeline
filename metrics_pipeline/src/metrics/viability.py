@@ -36,7 +36,7 @@ class Viability(Metric):
         self,
         structures: list[GenMatStructure],
         table: str = "clementi",
-        min_dist: float = 0.5,
+        abs_min_dist: float = 0.5,
         workers: int | None = None
     ) -> None:
         """
@@ -55,7 +55,7 @@ class Viability(Metric):
             - Any file path to provide your own JSON file containing a dict of {'symbol': radius}
             with all 118 elements radii as integers in picometers.
 
-        min_dist: float
+        abs_min_dist: float
             Absolute minimal distance in angstroms to consider two atoms as too close,
             whatever their radii. Can be useful for unknown radii having a default value,
             to ensure at least a physical minimum distance comparison. Defaults to 0.5.
@@ -66,9 +66,9 @@ class Viability(Metric):
             pass 0 to disable `process_map()` and do it sequentially.
         """
         super().__init__(structures, workers)
-        self.radii_table = self._get_radii_table(table)
+        self._radii_table = self._get_radii_table(table)
         self._table_name = table
-        self.min_dist = min_dist
+        self._abs_min_dist = abs_min_dist
 
         self._compute()
 
@@ -109,7 +109,7 @@ class Viability(Metric):
     def _get_min_dist(self, radius1: float, radius2: float) -> float:
         """Compute minimal distance between two atoms with respect to their radii."""
         min_radii_dist = sum((radius1, radius2)) * 0.9 # 10% uncertainty tolerance
-        return max(self.min_dist, round(min_radii_dist, 3)) # round result to 0.1 pm scale
+        return max(self._abs_min_dist, round(min_radii_dist, 3)) # round result to 0.1 pm scale
 
     def is_viable(self, structure: StructureLike) -> bool:
         """
@@ -119,7 +119,7 @@ class Viability(Metric):
         if any(not (10 <= angle <= 170) for angle in structure.lattice.angles):
             return False
 
-        radii = [self.radii_table[elt.symbol] for elt in structure.species]
+        radii = [self._radii_table[elt.symbol] for elt in structure.species]
 
         if any(length < 2 * max(radii) for length in structure.lattice.lengths):
             return False
@@ -144,7 +144,7 @@ class Viability(Metric):
         """Get a dict of initialized parameters for this metric."""
         return {
             f"{type(self).__name__}_settings": {
-                "min_dist": self.min_dist,
+                "abs_min_dist": self._abs_min_dist,
                 "table_name": self._table_name
             }
         }
@@ -177,32 +177,32 @@ class Viability(Metric):
     @property
     def viable_structs(self) -> list[GenMatStructure]:
         """List of viable structures."""
-        return [data.structure for data in self.computed_data if data.is_viable]
+        return [data.typed_structure for data in self.computed_data if data.is_viable]
 
     @property
     def non_viable_structs(self) -> list[GenMatStructure]:
         """List of non-viable structures."""
-        return [data.structure for data in self.computed_data if data.is_viable is False]
+        return [data.typed_structure for data in self.computed_data if data.is_viable is False]
 
     @property
     def viable_names(self) -> list[str]:
         """List of names of viable structures."""
-        return [data.structure.name for data in self.computed_data if data.is_viable]
+        return [data.typed_structure.name for data in self.computed_data if data.is_viable]
 
     @property
     def non_viable_names(self) -> list[str]:
         """List of names of non-viable structures."""
-        return [data.structure.name for data in self.computed_data if data.is_viable is False]
+        return [data.typed_structure.name for data in self.computed_data if data.is_viable is False]
 
     @property
     def viable_names_set(self) -> set[str]:
         """Set of names of viable structures."""
-        return {data.structure.name for data in self.computed_data if data.is_viable}
+        return {data.typed_structure.name for data in self.computed_data if data.is_viable}
 
     @property
     def non_viable_names_set(self) -> set[str]:
         """Set of names of non-viable structures."""
-        return {data.structure.name for data in self.computed_data if data.is_viable is False}
+        return {data.typed_structure.name for data in self.computed_data if data.is_viable is False}
 
     def write_result(self, filename: str, verbose: bool = False) -> None:
         subsets: OrderedDict[str, list[GenMatStructure]] = OrderedDict(
