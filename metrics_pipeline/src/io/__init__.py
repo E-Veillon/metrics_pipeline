@@ -6,6 +6,7 @@ from .io_base import (
 )
 from .cif import CIFFile, CIFParsingError
 from .dataset import PDEntryParser, PDDataset, GenMatPDDataset, MPDatasetDownloader
+from .genmat_file import GenMatFile
 from .json import JsonLoader, JsonWriter
 from .poscar import PoscarBlock, PoscarFile
 from .slurm import SlurmWriter
@@ -18,6 +19,7 @@ __all__ = [
     "check_file_format", "check_file_or_dir",
     "CIFFile", "CIFParsingError",
     "PDEntryParser", "PDDataset", "GenMatPDDataset", "MPDatasetDownloader",
+    "GenMatFile",
     "JsonLoader", "JsonWriter",
     "PoscarBlock", "PoscarFile",
     "SlurmWriter",

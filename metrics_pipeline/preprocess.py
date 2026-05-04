@@ -21,9 +21,9 @@ from src.utils import (
     ALL_ELTS_CATEGORIES,
     get_elts_from_symbol_or_z, get_elts_in_categories,
     filter_by_elements,
-    generate_genmat_structures, GenMatFile
+    generate_genmat_structures
 )
-from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile
+from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile, GenMatFile
 from src.metrics import SymmetryClassifier
 
 def _get_command_line_args() -> ap.Namespace:

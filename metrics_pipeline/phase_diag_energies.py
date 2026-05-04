@@ -24,9 +24,9 @@ from datetime import datetime
 
 from pymatgen.core import Element
 
-from src.utils import parse_input_args, check_type, check_num_value, GenMatFile
+from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
-    VaspParser, VaspExtractor, ExtractMethod, PDDataset, GenMatPDDataset, JsonWriter,
+    VaspParser, VaspExtractor, ExtractMethod, PDDataset, GenMatPDDataset, JsonWriter, GenMatFile,
     check_file_or_dir, check_file_format
 )
 from src.metrics import Stability

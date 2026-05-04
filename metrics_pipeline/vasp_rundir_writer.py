@@ -12,10 +12,10 @@ import argparse as ap
 
 from pymatgen.io.vasp import VaspInput
 
-from src.utils import parse_input_args, check_type, check_num_value, GenMatFile
+from src.utils import parse_input_args, check_type, check_num_value
 from src.io import (
     check_file_or_dir, load_yaml_as_dict,
-    VaspWriter, VaspParser, VaspExtractor, ExtractMethod, CONFIGPATH
+    VaspWriter, VaspParser, VaspExtractor, ExtractMethod, CONFIGPATH, GenMatFile
 )
 from src.computations.local import DSolCalcType
 from src.computations.vasp import (

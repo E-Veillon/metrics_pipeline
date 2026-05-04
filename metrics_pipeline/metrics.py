@@ -25,12 +25,12 @@ from src.utils import (
     parse_input_args, check_type, check_num_value,
     ALL_ELTS_CATEGORIES, get_elts_from_symbol_or_z, get_elts_in_categories,
     filter_by_elements,
-    generate_genmat_structures, GenMatFile, GenMatStructure
+    generate_genmat_structures, GenMatStructure
 )
 from src.io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
     JsonLoader, JsonWriter, CIFFile, PoscarFile, PathLike, CONFIGPATH,
-    VaspParser, VaspExtractor, ExtractMethod
+    VaspParser, VaspExtractor, ExtractMethod, GenMatFile
 )
 from src.computations.models import get_crystalnn_fingerprints, vectors_from_alignn
 from src.computations.local import get_densities
