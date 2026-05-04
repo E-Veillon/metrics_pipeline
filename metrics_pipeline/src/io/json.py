@@ -4,6 +4,8 @@ import typing as tp
 import json
 from pathlib import Path
 
+import numpy as np
+
 from .io_base import check_file_or_dir, check_file_format, PathLike
 
 
@@ -72,7 +74,8 @@ class JsonWriter:
         self,
         filepath: PathLike,
         data: dict | list | tuple | int | float | bool | None = None,
-        **kwargs
+        numpy_safe: bool = True,
+        **kwargs: tp.Any
     ) -> None:
         """
         Write JSON files with extra features.
@@ -85,13 +88,30 @@ class JsonWriter:
         data: dict | list | tuple | int | float | bool | None, optional
             Data to write in the file. Can be added after initialization.
 
+        numpy_safe: bool
+            Whether to use a more flexible JSON encoder that auto-converts
+            numpy types into python native types before serialization.
+            Note that any valid custom encoder passed as keyword argument 'cls'
+            will take priority over any internal one.
+            Defaults to True.
+
         kwargs: Any
             Additional keyword arguments to pass to `json.dump()`.
         """
         check_file_format(filepath, allowed_formats="json")
         self.filepath = Path(filepath)
         self.data = data
+        self.encoder = NumpyJSONEncoder if numpy_safe else json.JSONEncoder
         self.kwargs = kwargs
+
+        custom_encoder = kwargs.pop("cls", None)
+        if custom_encoder is not None:
+            if not issubclass(custom_encoder, json.JSONEncoder):
+                raise TypeError(
+                    "'cls' expected a subclass of 'json.JSONEncoder', "
+                    f"got {type(custom_encoder).__name__!r}."
+                )
+            self.encoder = custom_encoder
 
     @property
     def data(self) -> tp.Any:
@@ -101,7 +121,7 @@ class JsonWriter:
     def data(self, data: tp.Any) -> None:
         if not isinstance(data, (dict, list, tuple, int, float, bool, type(None))):
             raise TypeError(
-                f"'data' type ({type(data).__qualname__}) is not JSON serializable."
+                f"'data' of type {type(data).__qualname__!r} is not JSON-serializable."
         )
         self._data = data
 
@@ -113,7 +133,7 @@ class JsonWriter:
         """Write the JSON data as-is."""
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
         with self.filepath.open("wt", encoding="utf-8") as fp:
-            json.dump(self._data, fp, **self.kwargs)
+            json.dump(self._data, fp, cls=self.encoder, **self.kwargs)
 
     def write_as_dict(self) -> None:
         """
@@ -131,7 +151,7 @@ class JsonWriter:
 
         else:
             written_data = {0: self._data}
-        
+
         self._data = written_data
         self.write()
 
@@ -154,3 +174,19 @@ class JsonWriter:
 
         self._data = written_data
         self.write()
+
+
+class NumpyJSONEncoder(json.JSONEncoder):
+    """Encode Numpy types like native python types."""
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.generic):
+            return obj.item()
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, (np.bool_,)):
+            return bool(obj)
+        return super().default(obj)
