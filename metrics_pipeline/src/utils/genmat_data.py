@@ -274,7 +274,7 @@ class GenMatStructure(Structure):
     @property
     def density(self) -> float:
         """Volumic mass of the structure in g.cm⁻³."""
-        return _get_density(self)
+        return sum(s.atomic_mass.to("g") for s in self.species) / self.volume*1e-24
 
     def compute_energy_above_hull(self, pdiagram: PhaseDiagram, **kwargs: tp.Any) -> None:
         """
@@ -373,11 +373,6 @@ class GenMatStructure(Structure):
             labels = structure.labels,
             properties = structure.properties
         )
-
-
-def _get_density(structure: Structure) -> float:
-    """Get the structure volumic mass in g.cm⁻³."""
-    return sum(s.atomic_mass.to("g") for s in structure.species) / structure.volume*1e-24
 
 PDEntryLike: tp.TypeAlias = PDEntry | GenMatPDEntry
 StructureLike: tp.TypeAlias = Structure | GenMatStructure
