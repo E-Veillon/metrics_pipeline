@@ -102,7 +102,6 @@ class JsonWriter:
         self.filepath = Path(filepath)
         self.data = data
         self.encoder = NumpyJSONEncoder if numpy_safe else json.JSONEncoder
-        self.kwargs = kwargs
 
         custom_encoder = kwargs.pop("cls", None)
         if custom_encoder is not None:
@@ -112,6 +111,8 @@ class JsonWriter:
                     f"got {type(custom_encoder).__name__!r}."
                 )
             self.encoder = custom_encoder
+
+        self.kwargs = kwargs
 
     @property
     def data(self) -> tp.Any:
