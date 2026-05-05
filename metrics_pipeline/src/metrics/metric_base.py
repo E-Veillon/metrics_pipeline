@@ -263,7 +263,10 @@ class NoneMetric:
         raise AttributeError(f"{self._wrapped_metric_name!r} has no attribute {name!r}.")
 
     def __setattr__(self, name: str, value: tp.Any) -> None:
-        raise AttributeError(f"Cannot assign attribute {name!r} ({type(self).__name__!r} is immutable).")
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+        else:
+            raise AttributeError(f"Cannot assign attribute {name!r} ({type(self).__name__!r} is immutable).")
     
     def __delattr__(self, name: str) -> None:
         raise AttributeError(f"Cannot delete attribute {name!r} ({type(self).__name__!r} is immutable).")

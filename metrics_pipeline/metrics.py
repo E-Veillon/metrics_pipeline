@@ -288,7 +288,6 @@ def main(standalone: bool = True, **kwargs) -> None:
     - Validity,
     - Viability,
     - Symmetry,
-    - Elementary Metastability,
     - Stability, Unicity, Novelty (S.U.N),
     - Average Root Mean Square Displacement (RMSD),
     - Coverage - Precision (COV-P) and Coverage - Recall (COV-R),
@@ -314,6 +313,11 @@ def main(standalone: bool = True, **kwargs) -> None:
     dataset: str | Path
         Cif file containing the list of known structures. Necessary for:
         Novelty part of S.U.N. metrics,  COV-P, COV-R, FAD, EMD(density), EMD(energy).
+
+    database: str | Path
+        POSCAR or CIF formatted file containing structure data from a reference database
+        of known structures. Necessary for: Novelty part of the S.U.N. metrics.
+        POSCAR formatted database file must have a '.poscar' extension.
 
     sun_summary: str | Path
         JSON file containing the summary of phase diagrams instability energies.
@@ -354,6 +358,11 @@ def main(standalone: bool = True, **kwargs) -> None:
         of duplicates can be removed, but can also take significant time to perform
         matching on a big dataset. Activated by default. Deactivate if your dataset is
         unlikely to have a lot of duplicates.
+
+    detailed: bool
+        Additionally to the metrics values summary file, whether to also output a JSON
+        file listing individual metrics status for each tested structure, making any
+        further metrics compounding doable without any extra expensive computations.
     """
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
 

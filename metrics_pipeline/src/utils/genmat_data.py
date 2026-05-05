@@ -329,13 +329,14 @@ class GenMatStructure(Structure):
     @classmethod
     def from_dict(cls, dct: dict[str, tp.Any]) -> tpe.Self:
         """Create a GenMatStructure object from a dictionary representation."""
-        return cls(
+        structure = Structure.from_dict(dct["structure"])
+        return cls.from_structure(
             name=dct["name"],
+            structure=structure,
             special_keys=dct.get("special_keys", {}),
             spacegroup=Spacegroup.from_dict(dct["spacegroup"]),
             energy=dct.get("energy"),
-            energy_above_hull=dct.get("energy_above_hull"),
-            **dct["structure"]
+            energy_above_hull=dct.get("energy_above_hull")
         )
 
     @classmethod

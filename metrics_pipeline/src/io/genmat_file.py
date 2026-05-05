@@ -6,6 +6,7 @@ way to avoid ambiguities in data communications between pipeline steps.
 import typing as tp
 import typing_extensions as tpe
 from collections.abc import Mapping
+import functools as ft
 
 from pymatgen.core import Structure, Lattice
 
@@ -30,44 +31,12 @@ class GenMatFile:
     )
     _data: dict[str, list[tp.Any]]
 
-    @classmethod
-    def _reorganize_data(
-        cls, data: Mapping[str, tp.Iterable[tp.Any]], *, algo: tp.Literal["compress", "uncompress"]
-    ) -> dict[str, list[tp.Any]]:
-        """
-        Reorganize data between storage-efficient and object reconstruction-friendly formats.
-        """
-        if algo == "compress":
-            parser_fn = _compress_struct_dict
-            init_key_list = cls._genmat_struct_keys
-            target_key_list = cls._genmat_file_keys
-        elif algo == "uncompress":
-            parser_fn = _uncompress_struct_dict
-            init_key_list = cls._genmat_file_keys
-            target_key_list = cls._genmat_struct_keys
-        else:
-            raise ValueError(f"'algo' must be either 'compress' or 'uncompress', got {algo!r}.")
-
-        ordered_data = (data[k] for k in init_key_list)
-
-        try:
-            parsed_data = [
-                parser_fn({k: v for k, v in zip(init_key_list, struct_data, strict=True)})
-                for struct_data in zip(*ordered_data, strict=True)
-            ]
-        except ValueError as exc:
-            raise ValueError(
-                "Data reorganization failed: some iterables in the data dict "
-                "do not have the same length."
-            ) from exc
-
-        reorganized_data: dict[str, list[tp.Any]] = {}
-        for key in target_key_list:
-            reorganized_data[key] = [struct_dict[key] for struct_dict in parsed_data]
-
-        return reorganized_data
-
-    def __init__(self, data: dict[str, list[tp.Any]] | None = None, compressed: bool = False) -> None:
+    def __init__(
+        self,
+        data: dict[str, list[tp.Any]] | None = None,
+        compressed: bool = False,
+        float_prec: tp.Literal["low", "medium", "high"] = "high"
+    ) -> None:
         """
         I/O class to load and write JSON files containing structure data for the GenMat library.
 
@@ -84,7 +53,18 @@ class GenMatFile:
             Whether given data already follows the storage-efficient dict formatting, which
             optimizes the `structure` attribute saved data into several easier-to-store values.
             Defaults to False.
+
+        float_prec: 'low', 'medium', 'high'
+            What level of precision to apply to lattice lengths and angles and site positions values
+            when storing structure data into the file:
+            - 'low' rounds to 4 decimal places (0.01 pm for lengths and positions, 1e-4 degree for angles);
+            - 'medium' rounds to 8 decimal places;
+            - 'high' rounds to 16 decimal places (numerical precision level).
+
+            WARNING: Lost precision is irreversible and will NOT be recovered when retrieving data.
+            Defaults to 'high' to avoid unintended precision loss.
         """
+        self.float_prec = float_prec
         if data is None:
             self._data = {}
             for key in self._genmat_file_keys:
@@ -118,6 +98,42 @@ class GenMatFile:
     def __iter__(self) -> tp.Iterator[GenMatStructure]:
         return iter(self._build_structure(i) for i in range(len(self)))
 
+    def _reorganize_data(
+        self, data: Mapping[str, tp.Iterable[tp.Any]], *, algo: tp.Literal["compress", "uncompress"]
+    ) -> dict[str, list[tp.Any]]:
+        """
+        Reorganize data between storage-efficient and object reconstruction-friendly formats.
+        """
+        if algo == "compress":
+            parser_fn = partial(_compress_struct_dict, float_prec=self.float_prec)
+            init_key_list = self._genmat_struct_keys
+            target_key_list = self._genmat_file_keys
+        elif algo == "uncompress":
+            parser_fn = _uncompress_struct_dict
+            init_key_list = self._genmat_file_keys
+            target_key_list = self._genmat_struct_keys
+        else:
+            raise ValueError(f"'algo' must be either 'compress' or 'uncompress', got {algo!r}.")
+
+        ordered_data = (data[k] for k in init_key_list)
+
+        try:
+            parsed_data = [
+                parser_fn({k: v for k, v in zip(init_key_list, struct_data, strict=True)})
+                for struct_data in zip(*ordered_data, strict=True)
+            ]
+        except ValueError as exc:
+            raise ValueError(
+                "Data reorganization failed: some iterables in the data dict "
+                "do not have the same length."
+            ) from exc
+
+        reorganized_data: dict[str, list[tp.Any]] = {}
+        for key in target_key_list:
+            reorganized_data[key] = [struct_dict[key] for struct_dict in parsed_data]
+
+        return reorganized_data
+
     def _build_structure(self, index: int) -> GenMatStructure:
         """Use data at given index to build corresponding GenMatStructure."""
         dct = self._reorganize_data(
@@ -148,7 +164,7 @@ class GenMatFile:
         """Add a `GenMatStructure` data to the file."""
         self._check_ordering(structure)
         dct = structure.as_dict(verbosity=0)
-        dct = _compress_struct_dict(dct)
+        dct = _compress_struct_dict(dct, float_prec=self.float_prec)
         _check_dict_keys(dct, self._genmat_file_keys)
         for key in self._genmat_file_keys:
             self._data[key].append(dct[key])
@@ -160,6 +176,22 @@ class GenMatFile:
         """
         for structure in structures:
             self.add_structure(structure)
+
+    @property
+    def float_prec(self) -> str:
+        """Initialized compressed float precision level."""
+        return self._float_prec
+
+    @float_prec.setter
+    def float_prec(self, value) -> None:
+        """Set a new float precision level. Only applies to further added data."""
+        match value:
+            case "low" | "medium" | "high":
+                self._float_prec = value
+            case _:
+                raise ValueError(
+                    f"'float_prec' only supports 'low', 'medium' and 'high', got {float_prec!r}."
+                )
 
     @property
     def all_names(self) -> list[str]:
@@ -223,33 +255,64 @@ def _check_dict_keys(dct: dict[str, tp.Any], keys_to_check: tp.Sequence[str]) ->
         raise KeyError(f"Some mandatory keys are not present in 'data': {lacking_keys}.")
 
 
-def _compress_struct_dict(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
+def _compress_struct_dict(
+    dct: dict[str, tp.Any], float_prec: tp.Literal["low", "medium", "high"] = "high"
+) -> dict[str, tp.Any]:
     """
     Reorganize structure data into more storage-efficient organization in place.
     Exact reverse operation of `_uncompress_struct_dict()`.
+
+    Parameters
+    ----------
+    dct: dict[str, Any]
+        Object reconstruction-friendly dict to compress to storage-efficient format.
+
+    float_prec: 'low', 'medium', 'high'
+        What level of precision to apply to lattice lengths and angles and site positions values.
+        - 'low' rounds to 4 decimal places (0.01 pm for lengths and positions, 1e-4 degree for angles);
+        - 'medium' rounds to 8 decimal places;
+        - 'high' rounds to 16 decimal places (numerical precision level).
+
+        WARNING: Lost precision is irreversible and will NOT be recovered by decompression.
+        Defaults to 'high' to avoid unintended precision loss.
+
+    Returns
+    -------
+    dcit[str, tp.Any]
+        Storage-efficient formatted structure dict.
     """
+    match float_prec:
+        case "low": ndigits = 4
+        case "medium": ndigits = 8
+        case "high": ndigits = 16
+        case _:
+            raise ValueError(
+                f"'float_prec' only supports 'low', 'medium' and 'high', got {float_prec!r}."
+            )
+    rounder = ft.partial(round, ndigits=ndigits)
+
     struct_dict = dct.pop("structure")
     dct["charge"] = struct_dict["charge"]
     dct["properties"] = struct_dict["properties"]
 
     # Flatten lattice parameters
     lattice = Lattice.from_dict(struct_dict["lattice"])
-    dct["a"] = lattice.a
-    dct["b"] = lattice.b
-    dct["c"] = lattice.c
-    dct["alpha"] = lattice.alpha
-    dct["beta"] = lattice.beta
-    dct["gamma"] = lattice.gamma
+    dct["a"] = rounder(lattice.a)
+    dct["b"] = rounder(lattice.b)
+    dct["c"] = rounder(lattice.c)
+    dct["alpha"] = rounder(lattice.alpha)
+    dct["beta"] = rounder(lattice.beta)
+    dct["gamma"] = rounder(lattice.gamma)
 
     # Flatten sites data
     dct["species"] = []
     dct["site_a"], dct["site_b"], dct["site_c"] = [], [], []
     dct["site_properties"] = []
     for site_dict in struct_dict["sites"]:
-        dct["species"].append(site_dict["species"]["element"])
-        dct["site_a"].append(site_dict["abc"][0])
-        dct["site_b"].append(site_dict["abc"][1])
-        dct["site_c"].append(site_dict["abc"][2])
+        dct["species"].append(site_dict["species"][0]["element"])
+        dct["site_a"].append(rounder(site_dict["abc"][0]))
+        dct["site_b"].append(rounder(site_dict["abc"][1]))
+        dct["site_c"].append(rounder(site_dict["abc"][2]))
         dct["site_properties"].append(site_dict["properties"])
 
     return dct
@@ -258,7 +321,7 @@ def _compress_struct_dict(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
 def _uncompress_struct_dict(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
     """
     Reorganize structure data into object reconstruction-friendly organization in place.
-    Exact reverse operation of `_compress_struct_dict()`.
+    Exact reverse operation of `_compress_struct_dict()` (except for float precision compression).
     """
     struct_dict = {}
     struct_dict["charge"] = dct.pop("charge")
