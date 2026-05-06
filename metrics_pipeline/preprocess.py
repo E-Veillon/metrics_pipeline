@@ -104,7 +104,7 @@ def _get_command_line_args() -> ap.Namespace:
         )
     )
     parser.add_argument(
-        "--save-charges", action=ap.BooleanOptionalAction, default=True,
+        "--save-charge", action=ap.BooleanOptionalAction, default=True,
         help=(
             "Only used if '--genmat-fmt' is disabled. Whether to save structures overall charges "
             "in output file. Disable if storage efficiency is critival and this optional data is "
@@ -152,7 +152,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict.setdefault("angleprec", 5.0)
     args_dict.setdefault("remove_elts", [])
     args_dict.setdefault("remove_elt_categories", [])
-    args_dict.setdefault("save_charges", True)
+    args_dict.setdefault("save_charge", True)
     args_dict.setdefault("save_properties", True)
     args_dict.setdefault("save_site_properties", True)
 
@@ -185,7 +185,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
         if not elt in ALL_ELTS_CATEGORIES:
             raise ValueError(f"The category {elt!r} is not supported.")
     
-    check_type(args_dict["save_charges"], "save_charges", (bool,))
+    check_type(args_dict["save_charge"], "save_charge", (bool,))
     check_type(args_dict["save_properties"], "save_properties", (bool,))
     check_type(args_dict["save_site_properties"], "save_site_properties", (bool,))
 
@@ -240,7 +240,7 @@ def _print_config(args_dict: dict) -> None:
         f"{', '.join(args_dict['forbidden_elts'].keys()) if args_dict['forbidden_elts'] != {} else None}."
     )
     print(
-        f"SAVE CHARGES: {args_dict['save_charges']} "
+        f"SAVE CHARGES: {args_dict['save_charge']} "
         f"{'(ignored)' if args_dict['genmat_fmt'] else ''}"
     )
     print(
@@ -386,7 +386,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         Pass valid element categories to eliminate structures containing any element from
         these categories.
 
-    save_charges: bool
+    save_charge: bool
         Only used if `genmat_fmt` is set to False.
         Whether to save the overall charge of structures in the file. Set to False if storage
         efficiency is critical (e.g. lot of structures) and this optional data is not useful
@@ -440,7 +440,7 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     else:
         sfile = StructureFile(
-            save_charges=args["save_charges"],
+            save_charge=args["save_charge"],
             save_properties=args["save_properties"],
             save_site_properties=args["save_site_properties"]
         )
