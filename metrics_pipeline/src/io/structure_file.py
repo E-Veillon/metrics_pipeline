@@ -35,7 +35,7 @@ class StructureFile:
         data: dict[str, list[tp.Any]] | None = None,
         compressed: bool = False,
         float_prec: tp.Literal["low", "medium", "high"] = "high",
-        save_charges: bool = True,
+        save_charge: bool = True,
         save_properties: bool = True,
         save_site_properties: bool = True,
         _from_file: bool = False
@@ -68,7 +68,7 @@ class StructureFile:
             WARNING: Lost precision is irreversible and will NOT be recovered when retrieving data.
             Defaults to 'high' to avoid unintended precision loss.
 
-        save_charges: bool
+        save_charge: bool
             Whether to save the overall charge of structures in the file. Set to False if storage
             efficiency is critical (e.g. lot of structures) and this optional data is not useful
             to you. Defaults to True.
@@ -87,7 +87,7 @@ class StructureFile:
             Internal flag to indicate that passed data was loaded from a file. Do not set manually.
         """
         self.float_prec = float_prec
-        self._save_charges = save_charges
+        self._save_charge = save_charge
         self._save_properties = save_properties
         self._save_site_properties = save_site_properties
 
@@ -107,7 +107,7 @@ class StructureFile:
             )
         data = data if compressed else self._reorganize_data(data, algo="compress")
 
-        if not save_charges:
+        if not save_charge:
             data.pop("charge", None)
         
         if not save_properties:
@@ -122,7 +122,7 @@ class StructureFile:
             # If a file was loaded without some optional keys but we now want to add
             # new data with these optional data saved, generate default values for
             # previously unsaved optional data to maintain file consistency
-            if save_charges and "charge" not in data:
+            if save_charge and "charge" not in data:
                 self._data["charge"] = list(
                     self._get_optional_key_default("charge")
                 )
@@ -146,7 +146,7 @@ class StructureFile:
             return cls(
                 subdata,
                 compressed=True,
-                save_charges=self._save_charges,
+                save_charge=self._save_charge,
                 save_properties=self._save_properties,
                 save_site_properties=self._save_site_properties
             )
@@ -169,7 +169,7 @@ class StructureFile:
 
         # Handle optional keys
         diff_keys = (
-            self._save_charges - other._save_charges,
+            self._save_charge - other._save_charge,
             self._save_properties - other._save_properties,
             self._save_site_properties - other._save_site_properties
         )
@@ -208,7 +208,7 @@ class StructureFile:
         return cls(
             new_data,
             compressed=True,
-            save_charges=self._save_charges,
+            save_charge=self._save_charge,
             save_properties=self._save_properties,
             save_site_properties=self._save_site_properties
         )
@@ -305,7 +305,7 @@ class StructureFile:
     def active_file_keys(self) -> tuple[str, ...]:
         """Get internal keys where data is actively saved."""
         file_keys = list(self._struct_file_keys)
-        if not self._save_charges:
+        if not self._save_charge:
             file_keys.remove("charge")
         if not self._save_properties:
             file_keys.remove("properties")
@@ -364,11 +364,11 @@ class StructureFile:
     @property
     def all_charges_iter(self) -> tp.Iterator[float]:
         """
-        Lazy iterator of all stored structure charges in order. If `save_charges` was set
-        to False, builds an iterator of default chargeses of 0.0 coherent with file data
+        Lazy iterator of all stored structure charges in order. If `save_charge` was set
+        to False, builds an iterator of default charges of 0.0 coherent with file data
         for file iteration consistency.
         """
-        if self._save_charges:
+        if self._save_charge:
             return iter(self._data["charge"])
         return self._get_optional_key_default("charge")
 
@@ -504,7 +504,7 @@ class StructureFile:
         data = tp.cast(dict, data)
 
         if match_optional_keys:
-            kwargs["save_charges"] = "charge" in data
+            kwargs["save_charge"] = "charge" in data
             kwargs["save_properties"] = "properties" in data
             kwargs["save_site_properties"] = "site_properties" in data
 
