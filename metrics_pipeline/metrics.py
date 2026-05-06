@@ -171,10 +171,10 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     check_file_or_dir(config_file, "file", allowed_formats=("yml","yaml"))
 
     if args_dict.get("dataset") is not None:
-        check_file_or_dir(args_dict["dataset"], "file", allowed_formats="cif")
+        check_file_or_dir(args_dict["dataset"], "file", allowed_formats="json")
 
     if args_dict.get("database") is not None:
-        check_file_or_dir(args_dict["database"], "file", allowed_formats=("poscar", "cif"))
+        check_file_or_dir(args_dict["database"], "file", allowed_formats="json")
 
     if args_dict.get("sun_summary") is not None:
         check_file_or_dir(args_dict["sun_summary"], "file", allowed_formats="json")
@@ -397,7 +397,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     if _match_file_arg_need("dataset", args.get("dataset", None), dataset_needed):
         _print_elements_removal(args)
         print("Loading dataset...")
-        dataset = StructureFile.from_file(args["dataset"]).parse_structures()
+        dataset = StructureFile.from_file(args["dataset"]).parse_structures(args.get("workers"))
         dataset, nbr_discarded = filter_by_elements(
             dataset, list(args["forbidden_elts"].keys())
         )
@@ -417,7 +417,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     if _match_file_arg_need("database", args.get("database", None), database_needed):
         _print_elements_removal(args)
         print("Loading database file...")
-        database = StructureFile.from_file(args["database"]).parse_structures()
+        database = StructureFile.from_file(args["database"]).parse_structures(args.get("workers"))
         database, nbr_discarded = filter_by_elements(
             database, list(args["forbidden_elts"].keys())
         )

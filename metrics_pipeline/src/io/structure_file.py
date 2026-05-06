@@ -9,11 +9,14 @@ from collections.abc import Mapping
 import functools as ft
 import itertools as itt
 
+from tqdm.contrib.concurrent import process_map
+
 from pymatgen.core import Structure, Lattice, PeriodicSite
 
 from .io_base import PathLike
 from .json import JsonLoader, JsonWriter
 from src.utils.common_asserts import check_type
+from src.utils.visual_iterator import VisualIterator
 
 
 class StructureFile:
@@ -280,9 +283,36 @@ class StructureFile:
             case x:
                 raise ValueError(f"{x!r} is not a valid optional key.")
 
-    def parse_structures(self) -> list[Structure]:
-        """Build all `Structure` objects from file data, in order."""
-        return list(self)
+    def parse_structures(self, workers: int | None = None) -> list[Structure]:
+        """
+        Build all Structure objects from file data, in order.
+        
+        Parameters
+        ----------
+        workers: int, optional
+            Number of processes to use in parallel. If not given, will use default of
+            `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
+            and execute sequentially.
+
+        Returns
+        -------
+        list[Structure]
+            List of Structure objects extracted from data.
+        """
+        desc = "Extracting Structures from file"
+        if workers == 0:
+            iterator = VisualIterator.from_big_iterator(
+                iter(self), n_elts=self.length, desc=desc, unit="extracted", percent=True
+            )
+            return [struct for struct in iterator]
+        else:
+            return process_map(
+                    self._build_structure,
+                    range(self.length),
+                    max_workers=workers,
+                    chunksize=min(self.length // 100 + 1, 10),
+                    desc=desc
+            )
 
     def add_structure(self, structure: Structure) -> None:
         """Add one Structure object data to the file."""
