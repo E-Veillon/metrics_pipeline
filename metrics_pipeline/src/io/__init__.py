@@ -10,6 +10,7 @@ from .genmat_file import GenMatFile
 from .json import JsonLoader, JsonWriter
 from .poscar import PoscarBlock, PoscarFile
 from .slurm import SlurmWriter
+from .structure_file import StructureFile
 from .vasp import VaspWriter, VaspParser, VaspExtractor, ExtractMethod
 from .yaml import load_yaml_as_dict
 
@@ -23,6 +24,7 @@ __all__ = [
     "JsonLoader", "JsonWriter",
     "PoscarBlock", "PoscarFile",
     "SlurmWriter",
+    "StructureFile",
     "VaspWriter", "VaspParser", "VaspExtractor", "ExtractMethod",
     "load_yaml_as_dict",
 ]

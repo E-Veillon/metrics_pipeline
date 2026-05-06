@@ -30,6 +30,7 @@ class GenMatFile:
         "name", "special_keys", "spacegroup", "energy", "energy_above_hull", "structure"
     )
     _data: dict[str, list[tp.Any]]
+    _float_prec: tp.Literal["low", "medium", "high"]
 
     def __init__(
         self,
@@ -105,7 +106,7 @@ class GenMatFile:
         Reorganize data between storage-efficient and object reconstruction-friendly formats.
         """
         if algo == "compress":
-            parser_fn = partial(_compress_struct_dict, float_prec=self.float_prec)
+            parser_fn = ft.partial(_compress_struct_dict, float_prec=self.float_prec)
             init_key_list = self._genmat_struct_keys
             target_key_list = self._genmat_file_keys
         elif algo == "uncompress":
@@ -178,12 +179,12 @@ class GenMatFile:
             self.add_structure(structure)
 
     @property
-    def float_prec(self) -> str:
+    def float_prec(self) -> tp.Literal["low", "medium", "high"]:
         """Initialized compressed float precision level."""
         return self._float_prec
 
     @float_prec.setter
-    def float_prec(self, value) -> None:
+    def float_prec(self, value: tp.Literal["low", "medium", "high"]) -> None:
         """Set a new float precision level. Only applies to further added data."""
         match value:
             case "low" | "medium" | "high":

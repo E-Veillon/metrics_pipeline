@@ -29,8 +29,8 @@ from src.utils import (
 )
 from src.io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
-    JsonLoader, JsonWriter, CIFFile, PoscarFile, PathLike, CONFIGPATH,
-    VaspParser, VaspExtractor, ExtractMethod, GenMatFile
+    JsonLoader, JsonWriter, PathLike, CONFIGPATH,
+    VaspParser, VaspExtractor, ExtractMethod, GenMatFile, StructureFile
 )
 from src.computations.models import get_crystalnn_fingerprints, vectors_from_alignn
 from src.computations.local import get_densities
@@ -63,22 +63,23 @@ def _get_command_line_args() -> ap.Namespace:
     parser.add_argument(
         "-d", "--dataset",
         help=(
-            "CIF file containing a set of reference structures for distribution comparisons. "
-            "Necessary for: COV-P, COV-R, FAD, EMD(density), EMD(energy)."
+            "Preprocessed JSON file containing a set of reference structures for distribution "
+            "comparisons. Necessary for: COV-P, COV-R, FAD, EMD(density), EMD(energy)."
         )
     )
     parser.add_argument(
         "-D", "--database",
         help=(
-            "POSCAR or CIF formatted file containing structure data from a reference database "
-            "of known structures. Necessary for: Novelty part of the S.U.N. metrics. "
-            "POSCAR formatted database file must have a '.poscar' extension."
+            "Preprocessed JSON file containing structure data from a reference database "
+            "of known structures. Necessary for: Novelty part of the S.U.N. metrics."
         )
     )
     parser.add_argument(
         "-ss", "--sun-summary",
         help=(
             "JSON file containing the summary of phase diagrams instability energies. "
+            "The file must be located inside the directory where corresponding VASP run "
+            "directories are stored for the runs to be found and properly parsed. "
             "Necessary for: Stability part of S.U.N. metrics."
         )
     )
@@ -86,6 +87,8 @@ def _get_command_line_args() -> ap.Namespace:
         "-rs", "--relax-summary",
         help=(
             "JSON file containing a summary for the relaxation step. "
+            "The file must be located inside the directory where corresponding VASP run "
+            "directories are stored for the runs to be found and properly parsed. "
             "Necessary for: RMSD."
         )
     )
@@ -301,7 +304,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         or in an external pipeline script.
 
     generated: str | Path
-        Preprocessed CIF file containing all generated structures.
+        Preprocessed JSON file containing all generated structures.
 
     config: str | Path
         Configuration file in Yaml format stating which metrics should be computed.
@@ -311,13 +314,12 @@ def main(standalone: bool = True, **kwargs) -> None:
         provide the one needed here.
 
     dataset: str | Path
-        Cif file containing the list of known structures. Necessary for:
-        Novelty part of S.U.N. metrics,  COV-P, COV-R, FAD, EMD(density), EMD(energy).
+        Preprocessed JSON file containing a set of reference structures for distribution
+        comparisons. Necessary for: COV-P, COV-R, FAD, EMD(density), EMD(energy).
 
     database: str | Path
-        POSCAR or CIF formatted file containing structure data from a reference database
+        Preprocessed JSON file containing structure data from a reference database
         of known structures. Necessary for: Novelty part of the S.U.N. metrics.
-        POSCAR formatted database file must have a '.poscar' extension.
 
     sun_summary: str | Path
         JSON file containing the summary of phase diagrams instability energies.
@@ -395,21 +397,13 @@ def main(standalone: bool = True, **kwargs) -> None:
     if _match_file_arg_need("dataset", args.get("dataset", None), dataset_needed):
         _print_elements_removal(args)
         print("Loading dataset...")
-        data_file = CIFFile.from_file(
-            args["dataset"],
-            special_keys=["header"],
-            workers=args.get("workers")
-        )
-        data_cifs = data_file.get_cifs()
-        data_cifs, nbr_discarded = filter_by_elements(
-            data_cifs, list(args["forbidden_elts"].keys()), format="cif"
+        dataset = StructureFile.from_file(args["dataset"]).parse_structures()
+        dataset, nbr_discarded = filter_by_elements(
+            dataset, list(args["forbidden_elts"].keys())
         )
         print(f"{nbr_discarded} reference structures containing forbidden elements were removed.")
-        data_file.clear()
-        data_file.add_cifs(data_cifs)
-        dataset, _ = data_file.parse_structures()
-
         print("Dataset loaded.")
+
         # remove duplicate structures from the dataset
         if args["unique_dataset"]:
             dataset = generate_genmat_structures(dataset)
@@ -418,21 +412,17 @@ def main(standalone: bool = True, **kwargs) -> None:
                     dataset, workers=args.get("workers")
                 ).unique_structs
             ]
-    
+
     database: list[Structure] = []
     if _match_file_arg_need("database", args.get("database", None), database_needed):
         _print_elements_removal(args)
         print("Loading database file...")
-        if args["database"].endswith(".cif"):
-            database, _ = CIFFile.from_file(
-                args["database"],
-                special_keys=["header"],
-                workers=args.get("workers")
-            ).parse_structures()
-        else:
-            database = PoscarFile(
-                args["database"], workers=args.get("workers")
-            ).parse_structures()
+        database = StructureFile.from_file(args["database"]).parse_structures()
+        database, nbr_discarded = filter_by_elements(
+            database, list(args["forbidden_elts"].keys())
+        )
+        print(f"{nbr_discarded} reference structures containing forbidden elements were removed.")
+        print("Database loaded.")
 
     metastable_names: list[str] = []
     stable_names: list[str] = []

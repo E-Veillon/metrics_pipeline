@@ -5,7 +5,6 @@ Preprocess generated structures data for further pipeline steps:
 - Generate a unique indexed name for each structure for data tracking throughout computations;
 - (optional) Eliminate data containing specific unwanted elements;
 - (optional) Compute spacegroup symmetry and add symmetry infos into standardized output data.
-NOTE: If legacy conversion to standardized CIF is chosen, GenMat names will NOT be generated.
 """
 
 import os
@@ -23,7 +22,7 @@ from src.utils import (
     filter_by_elements,
     generate_genmat_structures
 )
-from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile, GenMatFile
+from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile, GenMatFile, StructureFile
 from src.metrics import SymmetryClassifier
 
 def _get_command_line_args() -> ap.Namespace:
@@ -43,27 +42,28 @@ def _get_command_line_args() -> ap.Namespace:
     parser.add_argument(
         "-o", "--output",
         help=(
-            "Path to JSON or CIF output file to write processed structures data. "
-            "If not given, JSON output file is written in input file "
-            "directory with the same name as input file but with a '_preproc' suffix."
+            "Path to JSON output file to write processed structures data. "
+            "If not given, it is written in input file directory with the same name "
+            "as input file but with a '_preproc' suffix."
         )
     )
     parser.add_argument(
-        "--to-cif", action="store_true",
+        "--genmat-fmt", action=ap.BooleanOptionalAction, default=True,
         help=(
-            "Default output is JSON format for accurate storage of preprocessed structure data. "
-            "Pass this flag to write a standardized CIF instead (version 2.x.x algorithm)."
+            "Whether to build structure data with GenMat extended attributes or only use normal "
+            "pymatgen Structure data. Enable to preprocess a file of generated structures "
+            "to test in the pipeline, and disable to process a reference dataset file into "
+            "a controlled format for more efficient reading afterward. Defaults to %(default)s."
         )
     )
     parser.add_argument(
         "--special-keys", "-sk", nargs="*",
         help=(
-            "Each structure will be attributed a unique name in output file for easy data "
-            "tracking throughout the pipeline, composed of a unique index followed by the reduced "
-            "formula of the structure. Pass 'header' here to keep original header line content "
+            "Only used if '--genmat-fmt' is enabled. "
+            "Pass 'header' to keep original header line content from original structure data "
             "(comment line for POSCARs) in 'header' special key in output JSON. "
-            "For a CIF formatted input file, also pass any non-looping CIF Label to keep in "
-            "output file 'special_keys' data."
+            "For a CIF formatted input file, any non-looping CIF Label can also be passed to keep "
+            "its content in output file's 'special_keys' data."
         )
     )
     parser.add_argument(
@@ -76,7 +76,10 @@ def _get_command_line_args() -> ap.Namespace:
     )
     parser.add_argument(
         "-s", "--symmetrize", action="store_true",
-        help="Compute and add spacegroup symmetry data in output file."
+        help=(
+            "Only used if '--genmat-fmt' is enabled. "
+            "Compute and add spacegroup symmetry data in output file."
+        )
     )
     parser.add_argument(
         "--symprec", type=float, default=0.1, metavar="float",
@@ -100,6 +103,30 @@ def _get_command_line_args() -> ap.Namespace:
             f"these categories. Supported categories are: {', '.join(sorted(ALL_ELTS_CATEGORIES))}."
         )
     )
+    parser.add_argument(
+        "--save-charges", action=ap.BooleanOptionalAction, default=True,
+        help=(
+            "Only used if '--genmat-fmt' is disabled. Whether to save structures overall charges "
+            "in output file. Disable if storage efficiency is critival and this optional data is "
+            "not useful to you. Defaults to %(default)s."
+        )
+    )
+    parser.add_argument(
+        "--save-properties", action=ap.BooleanOptionalAction, default=True,
+        help=(
+            "Only used if '--genmat-fmt' is disabled. Whether to save the structures properties "
+            "dicts in the file. Disable if storage efficiency is critical and this optional data "
+            "is not useful to you. Defaults to %(default)s."
+        )
+    )
+    parser.add_argument(
+        "--save-site-properties", action=ap.BooleanOptionalAction, default=True,
+        help=(
+            "Only used if '--genmat-fmt' is disabled. Whether to save the structures site "
+            "properties dicts in the file. Disable if storage efficiency is critical and this "
+            "optional data is not useful to you. Defaults to %(default)s."
+        )
+    )
     args: ap.Namespace = parser.parse_args()
     return args
 
@@ -115,26 +142,22 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict = {k: v for k, v in args_dict.items() if v is not None}
 
     check_file_or_dir(args_dict.get("input_file"), "file", allowed_formats=("cif", "poscar"))
-    args_dict["input_file"] = str(Path(args_dict["input_file"]).resolve(strict=True))
 
-    output_fmt = "cif" if args_dict.get("to_cif", False) else "json"
-    default_output = os.path.splitext(args_dict["input_file"])[0] + f"_preproc.{output_fmt}"
+    default_output = os.path.splitext(args_dict["input_file"])[0] + f"_preproc.json"
     args_dict.setdefault("output", default_output)
-    args_dict["output"] = str(Path(args_dict["output"]).resolve())
-
-    args_dict.setdefault("to_cif", False)
+    args_dict.setdefault("genmat_fmt", True)
     args_dict.setdefault("special_keys", [])
     args_dict.setdefault("symmetrize", False)
     args_dict.setdefault("symprec", 0.1)
     args_dict.setdefault("angleprec", 5.0)
     args_dict.setdefault("remove_elts", [])
     args_dict.setdefault("remove_elt_categories", [])
+    args_dict.setdefault("save_charges", True)
+    args_dict.setdefault("save_properties", True)
+    args_dict.setdefault("save_site_properties", True)
 
     # Assert set arguments conformity
-    if args_dict["to_cif"]:
-        check_file_format(args_dict["output"], allowed_formats="cif")
-    else:
-        check_file_format(args_dict["output"], allowed_formats="json")
+    check_file_format(args_dict["output"], allowed_formats="json")
 
     if args_dict.get("special_keys") is not None:
         check_type(args_dict["special_keys"], "special_keys", (list,))
@@ -161,6 +184,10 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
         check_type(elt, f"remove_elt_categories[{idx}]", (str,))
         if not elt in ALL_ELTS_CATEGORIES:
             raise ValueError(f"The category {elt!r} is not supported.")
+    
+    check_type(args_dict["save_charges"], "save_charges", (bool,))
+    check_type(args_dict["save_properties"], "save_properties", (bool,))
+    check_type(args_dict["save_site_properties"], "save_site_properties", (bool,))
 
     # Parse forbidden elements
     forbidden_elts = get_elts_in_categories(args_dict["remove_elt_categories"])
@@ -177,6 +204,7 @@ def _print_config(args_dict: dict) -> None:
     print(" - I/O ARGUMENTS - ")
     print(f"INPUT FILE: {args_dict.get('input_file')}")
     print(f"OUTPUT FILE: {args_dict.get('output')}")
+    print(f"GENMAT FORMAT: {args_dict['genmat_fmt']}")
     print(f"SPECIAL KEYS: {'None' if args_dict.get('special_keys') is None else ''}")
     if args_dict.get("special_keys") is not None:
         keys_lst = '\n'.join(args_dict["special_keys"])
@@ -210,6 +238,18 @@ def _print_config(args_dict: dict) -> None:
     print(
         "ALL REMOVED ELEMENTS (parsed categories): "
         f"{', '.join(args_dict['forbidden_elts'].keys()) if args_dict['forbidden_elts'] != {} else None}."
+    )
+    print(
+        f"SAVE CHARGES: {args_dict['save_charges']} "
+        f"{'(ignored)' if args_dict['genmat_fmt'] else ''}"
+    )
+    print(
+        f"SAVE PROPERTIES: {args_dict['save_properties']} "
+        f"{'(ignored)' if args_dict['genmat_fmt'] else ''}"
+    )
+    print(
+        f"SAVE SITE PROPERTIES: {args_dict['save_site_properties']} "
+        f"{'(ignored)' if args_dict['genmat_fmt'] else ''}"
     )
     print(" ")
     print("------------------------------")
@@ -294,7 +334,6 @@ def main(standalone: bool = True, **kwargs) -> None:
     - Generate a unique indexed name for each structure for data tracking throughout computations;
     - (optional) Eliminate data containing specific unwanted elements;
     - (optional) Compute spacegroup symmetry and add symmetry infos into standardized output data.
-    NOTE: If legacy conversion to standardized CIF is chosen, GenMat names will NOT be generated.
 
     Parameters
     ----------
@@ -308,22 +347,21 @@ def main(standalone: bool = True, **kwargs) -> None:
         have a header comment line starting with '#'.
 
     output: str | Path
-        Path to JSON or CIF output file to write processed structures data.
-        If not given, JSON output file is written in input file
-        directory with the same name as input file but with a '_preproc' suffix.
+        Path to JSON output file to write processed structures data. If not given, it is written
+        in input file directory with the same name as input file but with a '_preproc' suffix.
 
-    to_cif: bool
-        Default output is JSON format for accurate storage of preprocessed structure data.
-        Set to True to write a standardized CIF instead (version 2.x.x algorithm).
-        Defaults to False.
+    genmat_fmt: bool
+        Whether to build structure data with GenMat extended attributes or only use normal
+        pymatgen Structure data. Set to True to preprocess a file of generated structures
+        to test in the pipeline, and set to False to process a reference dataset file into
+        a controlled format for more efficient reading afterward. Defaults to True.
 
     special_keys: list[str], optional
-        Each structure will be attributed a unique name in output file for easy data
-        tracking throughout the pipeline, composed of a unique index followed by the reduced
-        formula of the structure. Pass 'header' here to keep original header line content
+        Only used if `genmat_fmt` is set to True.
+        Pass 'header' to keep original header line content from original structure data
         (comment line for POSCARs) in 'header' special key in output JSON.
-        For a CIF formatted input file, also pass any non-looping CIF Label to keep in
-        output file 'special_keys' data.
+        For a CIF formatted input file, any non-looping CIF Label can also be passed to keep
+        its content in output file's 'special_keys' data.
 
     workers: int, optional
         Number of processes to use in parallel. If not given, will use default of
@@ -331,6 +369,7 @@ def main(standalone: bool = True, **kwargs) -> None:
         and execute sequentially.
 
     symmetrize: bool
+        Only used if `genmat_fmt` is set to True.
         Compute and add spacegroup symmetry data in output file.
 
     symprec: float
@@ -346,6 +385,24 @@ def main(standalone: bool = True, **kwargs) -> None:
     remove_elt_categories: list[str], optional
         Pass valid element categories to eliminate structures containing any element from
         these categories.
+
+    save_charges: bool
+        Only used if `genmat_fmt` is set to False.
+        Whether to save the overall charge of structures in the file. Set to False if storage
+        efficiency is critical (e.g. lot of structures) and this optional data is not useful
+        to you. Defaults to True.
+
+    save_properties: bool
+        Only used if `genmat_fmt` is set to False.
+        Whether to save the structures properties dicts in the file. Set to False if storage
+        efficiency is critical (e.g. lot of structures) and this optional data is not useful
+        to you. Defaults to True.
+
+    save_site_properties: bool
+        Only used if `genmat_fmt` is set to False.
+        Whether to save the structures site properties dicts in the file. Set to False if
+        storage efficiency is critical (e.g. lot of structures) and this optional data is
+        not useful to you. Defaults to True.
     """
     start = datetime.now()
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
@@ -365,23 +422,7 @@ def main(standalone: bool = True, **kwargs) -> None:
 
     print(f"{len(structures)} structures with valid composition were successfully parsed.")
 
-    if args["to_cif"]:
-        # Symmetrize and write standardized CIF file
-        if args["symmetrize"]:
-            print("Symmetrization is activated, now symmetrizing and writing CIF file...")
-        else:
-            print("Symmetrization is deactivated, now writing CIF file...")
-
-        cif_file = CIFFile(special_keys=args["special_keys"], workers=args.get("workers"))
-        cif_file.add_structures(
-            structures,
-            symmetrize=args["symmetrize"],
-            symprec=args["symprec"],
-            angleprec=args["angleprec"]
-        )
-        cif_file.write_file(args["output"])
-
-    else:
+    if args["genmat_fmt"]:
         structures = generate_genmat_structures(structures, special_keys=args["special_keys"])
 
         if args["symmetrize"]:
@@ -396,6 +437,15 @@ def main(standalone: bool = True, **kwargs) -> None:
         gfile = GenMatFile()
         gfile.add_structures(structures)
         gfile.write_file(args["output"])
+
+    else:
+        sfile = StructureFile(
+            save_charges=args["save_charges"],
+            save_properties=args["save_properties"],
+            save_site_properties=args["save_site_properties"]
+        )
+        sfile.add_structures(structures)
+        sfile.write_file(args["output"])
 
     # Time of the preprocessing
     stop = datetime.now()
