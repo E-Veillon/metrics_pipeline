@@ -105,6 +105,16 @@ def _get_command_line_args() -> ap.Namespace:
         )
     )
     parser.add_argument(
+        "--database-mode", action=ap.BooleanOptionalAction, default=False,
+        help=(
+            "Only used if Novelty metric computation is enabled. Computes Novelty in two steps, "
+            "first initializing the metric with references alone, then comparing each tested "
+            "structures one by one against it, instead of initializing and computing everything "
+            "at the same time. Can be more stable if '--database' is way bigger than the number "
+            "of tested structures. Defaults to %(default)s."
+        )
+    )
+    parser.add_argument(
         "-r", "--remove-elts", nargs="*",
         help=(
             "Structures containing given elements will be removed from reference dataset before "
@@ -159,6 +169,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
 
     args_dict.setdefault("config", "metrics_defaults.yaml")
     args_dict.setdefault("output", "metrics.json")
+    args_dict.setdefault("database_mode", False)
     args_dict.setdefault("threshold", 0.4)
     args_dict.setdefault("unique_dataset", True)
     args_dict.setdefault("remove_elts", [])
@@ -201,6 +212,7 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     check_type(args_dict["threshold"], "threshold", (float,))
     check_num_value(args_dict["threshold"], "threshold", ">", 0.0)
 
+    check_type(args_dict["database_mode"], "database_mode", (bool,))
     check_type(args_dict["unique_dataset"], "unique_dataset", (bool,))
     check_type(args_dict["detailed"], "detailed", (bool,))
 
@@ -340,6 +352,13 @@ def main(standalone: bool = True, **kwargs) -> None:
         Number of processes to use in parallel. If not given, will use default of
         `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
         and execute sequentially.
+
+    database_mode: bool
+        Only used if Novelty metric computation is enabled. Computes Novelty in two steps,
+        first initializing the metric with references alone, then comparing each tested
+        structures one by one against it, instead of initializing and computing everything
+        at the same time. Can be more stable if '--database' is way bigger than the number
+        of tested structures. Defaults to False.
 
     remove_elts: list[str], optional
         Structures containing given elements will be removed from reference dataset before
@@ -558,7 +577,8 @@ def main(standalone: bool = True, **kwargs) -> None:
             compute_stability=False,
             compute_unicity=compute_unicity,
             compute_novelty=compute_novelty,
-            workers=args.get("workers")
+            workers=args.get("workers"),
+            database_mode=args["database_mode"]
         )
 
         if compute_unmatchable:

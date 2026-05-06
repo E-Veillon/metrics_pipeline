@@ -105,6 +105,7 @@ class SUN(Metric):
         self._ltol = kwargs.pop("ltol", 0.2)
         self._stol = kwargs.pop("stol", 0.3)
         self._angle_tol = kwargs.pop("angle_tol", 5.0)
+        self._database_mode = kwargs.pop("database_mode", False)
 
         self._compute()
 
@@ -140,18 +141,29 @@ class SUN(Metric):
             self.structures, self._get_ref_entries(), self._stable_tol, workers=self.workers
         ) if self._compute_stability else NoneMetric(Stability)
 
+        metastable_names = self._stability.metastable_names_set if self._compute_stability else set()
+        stable_names = self._stability.stable_names_set if self._compute_stability else set()
+
         self._unicity = Unicity(
             matchable_structs, self._ltol, self._stol, self._angle_tol, self.workers
         ) if self._compute_unicity else NoneMetric(Unicity)
 
-        self._novelty = Novelty(
-            matchable_structs, self._ref_structs, self._ltol, self._stol, self._angle_tol, self.workers
-        ) if self._compute_novelty else NoneMetric(Novelty)
-
-        metastable_names = self._stability.metastable_names_set if self._compute_stability else set()
-        stable_names = self._stability.stable_names_set if self._compute_stability else set()
         unique_names = self._unicity.unique_names_set if self._compute_unicity else set()
-        novel_names = self._novelty.novel_names_set if self._compute_novelty else set()
+
+        if self._compute_novelty and self._database_mode:
+            self._novelty = Novelty(
+                [], self._ref_structs,
+                self._ltol, self._stol, self._angle_tol, self.workers, self._database_mode
+            )
+            novel_names = {
+                struct.name for struct in matchable_structs if self._novelty.is_novel(struct)
+            }
+        else:
+            self._novelty = Novelty(
+                matchable_structs, self._ref_structs,
+                self._ltol, self._stol, self._angle_tol, self.workers, self._database_mode
+            ) if self._compute_novelty else NoneMetric(Novelty)
+            novel_names = self._novelty.novel_names_set if self._compute_novelty else set()
 
         self._computed_data: list[MetricsData] = [
             MetricsData(
