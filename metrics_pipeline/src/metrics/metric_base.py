@@ -359,6 +359,8 @@ class MetricsData:
             if (new_value := getattr(other, field_name, None)) is not None:
                 setattr(self, field_name, new_value)
 
+        self.additional_data.update(other.additional_data)
+
     def copy(self) -> tpe.Self:
         """Create a new instance with same structure and metrics values."""
         cls = type(self)
