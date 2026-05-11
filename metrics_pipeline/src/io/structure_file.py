@@ -298,36 +298,30 @@ class StructureFile:
 
         return self
 
-    def parse_structures(self, workers: int | None = None) -> list[Structure]:
+    def parse_structures(self, verbose: bool = False) -> list[Structure]:
         """
         Build all Structure objects from file data, in order.
         
         Parameters
         ----------
-        workers: int, optional
-            Number of processes to use in parallel. If not given, will use default of
-            `tqdm.contrib.concurrent.process_map()`. Pass 0 to disable `process_map()`
-            and execute sequentially.
+        verbose: bool
+            Whether to show parsing progression with a VisualIterator.
+            Defaults to False.
 
         Returns
         -------
         list[Structure]
             List of Structure objects extracted from data.
         """
-        desc = "Extracting Structures from file"
-        if workers == 0:
+        if verbose:
+            desc = "Extracting structures from file"
             iterator = VisualIterator.from_big_iterator(
                 iter(self), n_elts=self.length, desc=desc, unit="extracted", percent=True
             )
-            return [struct for struct in iterator]
         else:
-            return process_map(
-                    self._build_structure,
-                    range(self.length),
-                    max_workers=workers,
-                    chunksize=min(self.length // 100 + 1, 10),
-                    desc=desc
-            )
+            iterator = iter(self)
+
+        return [struct for struct in iterator]
 
     def add_structure(self, structure: Structure) -> None:
         """Add one Structure object data to the file."""

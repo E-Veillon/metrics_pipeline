@@ -416,7 +416,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     if _match_file_arg_need("dataset", args.get("dataset", None), dataset_needed):
         _print_elements_removal(args)
         print("Loading dataset...")
-        dataset = StructureFile.from_file(args["dataset"]).parse_structures(args.get("workers"))
+        dataset = StructureFile.from_file(args["dataset"]).parse_structures()
         dataset, nbr_discarded = filter_by_elements(
             dataset, list(args["forbidden_elts"].keys())
         )
@@ -436,7 +436,7 @@ def main(standalone: bool = True, **kwargs) -> None:
     if _match_file_arg_need("database", args.get("database", None), database_needed):
         _print_elements_removal(args)
         print("Loading database file...")
-        database = StructureFile.from_file(args["database"]).parse_structures(args.get("workers"))
+        database = StructureFile.from_file(args["database"]).parse_structures()
         database, nbr_discarded = filter_by_elements(
             database, list(args["forbidden_elts"].keys())
         )

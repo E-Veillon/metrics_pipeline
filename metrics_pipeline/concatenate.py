@@ -14,14 +14,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    cat_file = None
+    cat_file = StructureFile.from_file(args.files[0])
 
-    for file in args.files:
+    for file in args.files[1:]:
         sfile = StructureFile.from_file(file)
-        if cat_file is None:
-            cat_file = sfile
-        else:
-            cat_file = cat_file + sfile
+        cat_file = cat_file + sfile
 
     cat_file.write_file(args.output)
 

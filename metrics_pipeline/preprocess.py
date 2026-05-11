@@ -439,10 +439,14 @@ def main(standalone: bool = True, **kwargs) -> None:
         gfile.write_file(args["output"])
 
     else:
+        saved_optional_keys = {
+            "charge" if args["save_charge"] else "",
+            "properties" if args["save_properties"] else "",
+            "site_properties" if args["save_site_properties"] else ""
+        }
+        saved_optional_keys.discard("")
         sfile = StructureFile(
-            save_charge=args["save_charge"],
-            save_properties=args["save_properties"],
-            save_site_properties=args["save_site_properties"]
+            saved_optional_keys=saved_optional_keys
         )
         sfile.add_structures(structures)
         sfile.write_file(args["output"])
