@@ -5,11 +5,13 @@ way to avoid ambiguities in data communications between pipeline steps.
 
 import typing as tp
 import typing_extensions as tpe
-from collections.abc import Mapping
+from collections.abc import Mapping, Callable
 import functools as ft
 import itertools as itt
+from enum import IntEnum
 
 from tqdm.contrib.concurrent import process_map
+import numpy as np
 
 from pymatgen.core import Structure, Lattice, PeriodicSite
 
@@ -19,29 +21,46 @@ from src.utils.common_asserts import check_type
 from src.utils.visual_iterator import VisualIterator
 
 
+class FloatPrecision(IntEnum):
+    """Enum of possible float values precisions."""
+    LOW = 4
+    MEDIUM = 8
+    HIGH = 16
+
+
 class StructureFile:
     """
     I/O class to load and write JSON files containing efficiently stored structure data.
     """
-    _struct_file_keys = (
+    _file_keys: tuple[str, ...] = (
         "a", "b", "c", "alpha", "beta", "gamma", "charge", "properties",
         "species", "site_a", "site_b", "site_c", "site_properties"
     )
-    _struct_dict_keys = (
+    _lattice_keys: tuple[str, ...] = (
+        "a", "b", "c", "alpha", "beta", "gamma"
+    )
+    _site_keys: tuple[str, ...] = (
+        "species", "site_a", "site_b", "site_c", "site_properties"
+    )
+    _dict_keys: tuple[str, ...] = (
         "lattice", "charge", "properties", "sites"
     )
+    _optional_keys: dict[str, Callable[[tpe.Self], tp.Iterator[tp.Any]]] = {
+        "charge": lambda self: itt.repeat(0.0, self.length), # Fastest, for immutable defaults
+        "properties": lambda self: iter({} for _ in range(self.length)), # mutable defaults
+        "site_properties": lambda self: iter( # site-wise attribute defaults
+            [{} for _ in range(n_sites)] for n_sites in self.num_sites_per_struct_iter
+        )
+    }
     _data: dict[str, list[tp.Any]]
-    _float_prec: tp.Literal["low", "medium", "high"]
+    _float_prec: FloatPrecision
 
     def __init__(
         self,
         data: dict[str, list[tp.Any]] | None = None,
         compressed: bool = False,
-        float_prec: tp.Literal["low", "medium", "high"] = "high",
-        save_charge: bool = True,
-        save_properties: bool = True,
-        save_site_properties: bool = True,
-        _from_file: bool = False
+        float_prec: FloatPrecision | str | int = FloatPrecision.HIGH,
+        saved_optional_keys: set[str] | None = None
     ) -> None:
         """
         I/O class to load and write JSON files containing efficiently stored structure data.
@@ -60,39 +79,35 @@ class StructureFile:
             optimizes the `structure.as_dict()` keys into several easier-to-store values.
             Defaults to False.
 
-        float_prec: 'low', 'medium', 'high'
-            What level of precision to apply to lattice lengths and angles and site positions
-            values when storing structure data into the file:
-            - 'low' rounds to 4 decimal places
+        float_prec: FloatPrecision | str | int
+            What level of precision to apply to lattice parameterss and site positions
+            values when writing structure data into a file:
+            - 'low' or 4: rounds to 4 decimal places
             (0.01 pm for lengths and positions, 1e-4 degree for angles);
-            - 'medium' rounds to 8 decimal places;
-            - 'high' rounds to 16 decimal places (numerical precision level).
+            - 'medium' or 8: rounds to 8 decimal places;
+            - 'high' or 16: rounds to 16 decimal places (numerical precision level).
 
             WARNING: Lost precision is irreversible and will NOT be recovered when retrieving data.
             Defaults to 'high' to avoid unintended precision loss.
 
-        save_charge: bool
-            Whether to save the overall charge of structures in the file. Set to False if storage
-            efficiency is critical (e.g. lot of structures) and this optional data is not useful
-            to you. Defaults to True.
+            Can be modified after initialization, and be applied explicitly on stored data without
+            writing to file by using the `.round()` method.
 
-        save_properties: bool
-            Whether to save the structures properties dicts in the file. Set to False if storage
-            efficiency is critical (e.g. lot of structures) and this optional data is not useful
-            to you. Defaults to True.
-
-        save_site_properties: bool
-            Whether to save the structures site properties dicts in the file. Set to False if
-            storage efficiency is critical (e.g. lot of structures) and this optional data is
-            not useful to you. Defaults to True.
-
-        _from_file: bool
-            Internal flag to indicate that passed data was loaded from a file. Do not set manually.
+        saved_optional_keys: set[str], optional
+            Pass optional data attributes that should be stored in this file. If not given,
+            all optional attributes are stored by default. Use this to shave off attributes that
+            are not used or computed in this file, increasing storage efficiency by avoiding
+            storage of empty attributes.
         """
         self.float_prec = float_prec
-        self._save_charge = save_charge
-        self._save_properties = save_properties
-        self._save_site_properties = save_site_properties
+
+        if saved_optional_keys is None:
+            saved_optional_keys = set(self._optional_keys)
+        else:
+            for key in saved_optional_keys:
+                self._get_optional_key_default(key) # test optional key existence
+
+        self._saved_optional_keys = saved_optional_keys
 
         if data is None:
             self._data = {}
@@ -100,7 +115,7 @@ class StructureFile:
                 self._data[key] = []
             return
 
-        keys_to_check = self.active_file_keys if compressed else self._struct_dict_keys
+        keys_to_check = self.active_file_keys if compressed else self._dict_keys
         _check_dict_keys(data, keys_to_check)
 
         if not len(len_set:={len(data[key]) for key in keys_to_check}) == 1:
@@ -110,48 +125,28 @@ class StructureFile:
             )
         data = data if compressed else self._reorganize_data(data, algo="compress")
 
-        if not save_charge:
-            data.pop("charge", None)
-        
-        if not save_properties:
-            data.pop("properties", None)
-        
-        if not save_site_properties:
-            data.pop("site_properties", None)
+        # Handle saved/unsaved optional keys
+        for opt_key in self._optional_keys:
+            if opt_key in self._saved_optional_keys and opt_key not in data:
+                data[opt_key] = list(self._get_optional_key_default(key))
+
+            elif opt_key not in self._saved_optional_keys:
+                data.pop(key, None)
 
         self._data = data
-
-        if _from_file:
-            # If a file was loaded without some optional keys but we now want to add
-            # new data with these optional data saved, generate default values for
-            # previously unsaved optional data to maintain file consistency
-            if save_charge and "charge" not in data:
-                self._data["charge"] = list(
-                    self._get_optional_key_default("charge")
-                )
-            if save_properties and "properties" not in data:
-                self._data["properties"] = list(
-                    self._get_optional_key_default("properties")
-                )
-            if save_site_properties and "site_properties" not in data:
-                self._data["site_properties"] = list(
-                    self._get_optional_key_default("site_properties")
-                )
 
     def __len__(self) -> int:
         return self.length
 
     def __getitem__(self, index: int | slice) -> Structure | tpe.Self:
-        """Get a Structure from the data at given index."""
+        """Get a Structure from the data at given index, or a sub-dataset from a slice."""
         if isinstance(index, slice):
             subdata = {key: self._data[key][index] for key in self.active_file_keys}
             cls = type(self)
             return cls(
                 subdata,
                 compressed=True,
-                save_charge=self._save_charge,
-                save_properties=self._save_properties,
-                save_site_properties=self._save_site_properties
+                saved_optional_keys=self._saved_optional_keys
             )
         elif isinstance(index, int):
             if index < 0:
@@ -167,53 +162,37 @@ class StructureFile:
         return iter(self._build_structure(i) for i in range(self.length))
 
     def __add__(self, other: tpe.Self) -> tpe.Self:
-        if not isinstance(other, type(self)):
+        cls = type(self)
+
+        if not isinstance(other, cls):
             return NotImplemented
 
-        # Handle optional keys
-        diff_keys = (
-            self._save_charge - other._save_charge,
-            self._save_properties - other._save_properties,
-            self._save_site_properties - other._save_site_properties
-        )
+        new_dataset = {}
 
-        for idx, key in enumerate(("charge", "properties", "site_properties")):
-            if diff_keys[idx] == 0: # Both have or don't have it
-                continue
-            if diff_keys[idx] == -1: # self does not have it but other does
-                self._data[key] = list(self._get_optional_key_default(key))
-                setattr(self, f"_save_{key}", True)
-            else: # self has it but not other
-                other._data[key] = list(other._get_optional_key_default(key))
-                setattr(other, f"_save_{key}", True)
+        # Handle data concatenation with possibly lacking optional keys
+        all_active_file_keys = set(self.active_file_keys) | set(other.active_file_keys)
+        self_lacking_keys = other._saved_optional_keys - self._saved_optional_keys
+        other_lacking_keys = self._saved_optional_keys - other._saved_optional_keys
 
-        # Safety check of keys (should never trigger)
-        if self.active_file_keys != other.active_file_keys:
-            self_supp_keys = ', '.join(sorted(
-                set(self.active_file_keys) - set(other.active_file_keys)
-            ))
-            other_supp_keys = ', '.join(sorted(
-                set(other.active_file_keys) - set(self.active_file_keys)
-            ))
-            raise AssertionError(
-                "Somehow databases have incompatible keys after processing optional keys, "
-                "this should not happen and is likely a bug. See problematic keys below:\n"
-                f"- left operand: {self_supp_keys}\n"
-                f"- right operand: {other_supp_keys}\n"
-            )
+        for key in all_active_file_keys: # No iteration over optional keys unsaved on both sides
+            if key in self_lacking_keys: # Optional key not in self but present in other
+                new_dataset[key] = list(self._get_optional_key_default(key)) + other._data[key]
+            elif key in other_lacking_keys: # Optional key present in self but not in other
+                new_dataset[key] = self._data[key] + list(other._get_optional_key_default(key))
+            else: # Mandatory or optional key present in both
+                new_dataset[key] = self._data[key] + other._data[key]
 
-        # Concatenate each data list
-        new_data = {
-            key: self._data[key] + other._data[key]
-            for key in self.active_file_keys
-        }
-        cls = type(self)
+        # Keep highest float precision to avoid unintended truncature
+        new_float_prec = max(self.float_prec, other.float_prec)
+
+        # Merge active optional keys from both datasets
+        new_saved_optional_keys = self._saved_optional_keys | other._saved_optional_keys
+
         return cls(
-            new_data,
+            new_dataset,
             compressed=True,
-            save_charge=self._save_charge,
-            save_properties=self._save_properties,
-            save_site_properties=self._save_site_properties
+            float_prec=new_float_prec,
+            saved_optional_keys=new_saved_optional_keys
         )
 
     def _reorganize_data(
@@ -223,13 +202,13 @@ class StructureFile:
         Reorganize data between storage-efficient and object reconstruction-friendly formats.
         """
         if algo == "compress":
-            parser_fn = ft.partial(_compress_struct_dict, float_prec=self.float_prec)
-            init_key_list = self._struct_dict_keys
+            parser_fn = _compress_struct_dict
+            init_key_list = self._dict_keys
             target_key_list = self.active_file_keys
         elif algo == "uncompress":
             parser_fn = _uncompress_struct_dict
             init_key_list = self.active_file_keys
-            target_key_list = self._struct_dict_keys
+            target_key_list = self._dict_keys
         else:
             raise ValueError(f"'algo' must be either 'compress' or 'uncompress', got {algo!r}.")
 
@@ -270,18 +249,54 @@ class StructureFile:
             )
 
     def _get_optional_key_default(self, key: str) -> tp.Iterator[tp.Any]:
-        match key:
-            case "charge":
-                return itt.repeat(0.0, self.length)
-            case "properties":
-                return iter({} for _ in range(self.length))
-            case "site_properties":
-                return iter(
-                    [{} for _ in range(n_sites)]
-                    for n_sites in self.num_sites_per_struct_iter
-                )
-            case x:
-                raise ValueError(f"{x!r} is not a valid optional key.")
+        """Get an iterator containing default values for an optional data key."""
+        if key not in self._optional_keys:
+            raise ValueError(f"{key!r} is not a valid optional key.")
+        return self._optional_keys[key](self)
+
+    def copy(self) -> tpe.Self:
+        """Get a shallow copy of this file instance."""
+        cls = type(self)
+        return cls(
+            data=self._data,
+            compressed=True,
+            float_prec=self._float_prec,
+            saved_optional_keys=self._saved_optional_keys
+        )
+
+    def round(self) -> tpe.Self:
+        """
+        Round all stored lattice parameters and site positions using stored `float_prec`.
+        This operation is irreversible and is done in place.
+        """
+        # Use numpy vectorized rounding for lattice parameters lists
+        lattice_array = np.array(
+            [self._data[key] for key in self._lattice_keys], dtype=np.float64
+        ).T
+        np.round(lattice_array, decimals=self.float_prec.value, out=lattice_array)
+        rounded_lists = lattice_array.T.tolist()
+
+        for key, rounded_list in zip(self._lattice_keys, rounded_lists):
+            self._data[key] = rounded_list
+
+        # Use python loop for site-wise rounding
+        site_coords_iter = zip(
+            self.all_site_a_coords_iter,
+            self.all_site_b_coords_iter,
+            self.all_site_c_coords_iter
+        )
+        for idx, (site_a_list, site_b_list, site_c_list) in enumerate(site_coords_iter):
+            self._data["site_a"][idx] = [
+                round(a, self.float_prec) for a in site_a_list
+            ]
+            self._data["site_b"][idx] = [
+                round(b, self.float_prec) for b in site_b_list
+            ]
+            self._data["site_c"][idx] = [
+                round(c, self.float_prec) for c in site_c_list
+            ]
+
+        return self
 
     def parse_structures(self, workers: int | None = None) -> list[Structure]:
         """
@@ -318,7 +333,7 @@ class StructureFile:
         """Add one Structure object data to the file."""
         self._check_ordering(structure)
         dct = structure.as_dict(verbosity=0)
-        dct = _compress_struct_dict(dct, float_prec=self.float_prec)
+        dct = _compress_struct_dict(dct)
         _check_dict_keys(dct, self.active_file_keys)
         for key in self.active_file_keys:
             self._data[key].append(dct[key])
@@ -334,13 +349,12 @@ class StructureFile:
     @property
     def active_file_keys(self) -> tuple[str, ...]:
         """Get internal keys where data is actively saved."""
-        file_keys = list(self._struct_file_keys)
-        if not self._save_charge:
-            file_keys.remove("charge")
-        if not self._save_properties:
-            file_keys.remove("properties")
-        if not self._save_site_properties:
-            file_keys.remove("site_properties")
+        file_keys = list(self._file_keys)
+
+        for opt_key in self._optional_keys:
+            if opt_key not in self._saved_optional_keys:
+                file_keys.remove(opt_key)
+
         return tuple(file_keys)
 
     @property
@@ -385,7 +399,7 @@ class StructureFile:
     @property
     def all_lattices_iter(self) -> tp.Iterator[Lattice]:
         """Lazy iterator of all Lattice objects rebuilt from data, in order."""
-        params_iter = zip(*(self._data[key] for key in ("a", "b", "c", "alpha", "beta", "gamma")))
+        params_iter = zip(*(self._data[key] for key in self._lattice_keys))
         return (
             Lattice.from_parameters(a, b, c, alpha, beta, gamma)
             for a, b, c, alpha, beta, gamma in params_iter
@@ -398,7 +412,7 @@ class StructureFile:
         to False, builds an iterator of default charges of 0.0 coherent with file data
         for file iteration consistency.
         """
-        if self._save_charge:
+        if "charge" in self._saved_optional_keys:
             return iter(self._data["charge"])
         return self._get_optional_key_default("charge")
 
@@ -409,7 +423,7 @@ class StructureFile:
         was set to False, builds an iterator of empty properties dicts coherent with file data
         for file iteration consistency.
         """
-        if self._save_properties:
+        if "properties" in self._saved_optional_keys:
             return iter(self._data["properties"])
         return self._get_optional_key_default("properties")
 
@@ -457,7 +471,7 @@ class StructureFile:
         in order. If `save_site_properties` was set to False, builds an iterator of lists
         of empty site properties dicts coherent with file data for file iteration consistency.
         """
-        if self._save_site_properties:
+        if "site_properties" in self._saved_optional_keys:
             return iter(self._data["site_properties"])
         return self._get_optional_key_default("site_properties")
 
@@ -467,8 +481,7 @@ class StructureFile:
         Lazy iterator of all lists of sites (one list per structure)
         rebuilt from data, in order.
         """
-        sites_keys = ("species", "site_a", "site_b", "site_c", "site_properties")
-        structs_iter = zip(*(self._data[key] for key in sites_keys))
+        structs_iter = zip(*(self._data[key] for key in self._site_keys))
         lattices_iter = self.all_lattices_iter
 
         for sites_data_tuple, lattice in zip(structs_iter, lattices_iter):
@@ -480,21 +493,28 @@ class StructureFile:
             ]
 
     @property
-    def float_prec(self) -> tp.Literal["low", "medium", "high"]:
-        """Initialized compressed float precision level."""
+    def float_prec(self) -> FloatPrecision:
+        """
+        Initialized float precision level. Only applied when writing data to file
+        or when the `.round()` method is used.
+        """
         return self._float_prec
 
     @float_prec.setter
-    def float_prec(self, value: tp.Literal["low", "medium", "high"]) -> None:
-        """Set a new float precision level. Only applies to further added data."""
-        match value:
-            case "low" | "medium" | "high":
-                self._float_prec = value
-            case _:
-                raise ValueError(
-                    "'float_prec' only supports 'low', 'medium' and 'high', "
-                    f"got {value!r}."
-                )
+    def float_prec(self, value: FloatPrecision | str | int) -> None:
+        if isinstance(value, FloatPrecision):
+            self._float_prec = value
+        elif isinstance(value, str) and value.upper() in {"LOW", "MEDIUM", "HIGH"}:
+            self._float_prec = FloatPrecision[value.upper()]
+        elif isinstance(value, int) and value in {4, 8, 16}:
+            self._float_prec = FloatPrecision(value)
+        else:
+            raise ValueError(
+                f"{value!r} is not a valid value for 'float_prec'. "
+                f"Valid values are: a {FloatPrecision.__name__} object, "
+                "the strings 'low', 'medium', or 'high' (case insensitive), "
+                "and the integers 4, 8, or 16."
+            )
 
     @classmethod
     def from_file(
@@ -509,11 +529,11 @@ class StructureFile:
             Path to the file to load.
 
         match_optional_keys: bool
-            Whether to pass optional data args automatically to match keys that are
+            Whether to build "saved_optional_keys" arg automatically to match keys that are
             present in file. Defaults to True. Avoids generating default empty data
-            at initialization by default whenever loading a file. Overrides any passed
-            optional data argument. Set to False to pass your own combination of optional
-            data as keyword arguments.
+            at initialization by default whenever loading a file. Set to False to generate
+            default values for all unsaved optional keys. Manually passed "saved_optional_keys"
+            keyword argument will override this argument behavior.
 
         kwargs: Any
             Additional keyword arguments to pass to the constructor, except "compressed"
@@ -533,19 +553,20 @@ class StructureFile:
         check_type(data:=file_data.get("data"), "data", (dict,))
         data = tp.cast(dict, data)
 
-        if match_optional_keys:
-            kwargs["save_charge"] = "charge" in data
-            kwargs["save_properties"] = "properties" in data
-            kwargs["save_site_properties"] = "site_properties" in data
+        kwargs["compressed"] = True
 
-        return cls(data, compressed=True, _from_file=True, **kwargs)
+        if match_optional_keys:
+            auto_saved_keys = set(filter(lambda key: key in data, cls._optional_keys))
+            kwargs.setdefault("saved_optional_keys", auto_saved_keys)
+
+        return cls(data, **kwargs)
 
     def write_file(self, filepath: PathLike) -> None:
         """Write stored data to a compact JSON file."""
         written_data = {
             "@module": type(self).__module__,
             "@class": type(self).__name__,
-            "data": self._data
+            "data": self.round()._data
         }
         JsonWriter(filepath, written_data).write_as_dict()
 
@@ -560,54 +581,23 @@ def _check_dict_keys(dct: dict[str, tp.Any], keys_to_check: tp.Sequence[str]) ->
         raise KeyError(f"Some mandatory keys are not present in 'data': {lacking_keys}.")
 
 
-def _compress_struct_dict(
-    dct: dict[str, tp.Any], float_prec: tp.Literal["low", "medium", "high"] = "high"
-) -> dict[str, tp.Any]:
+def _compress_struct_dict(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
     """
     Reorganize structure data into more storage-efficient organization.
     Exact reverse operation of `_uncompress_struct_dict()`.
-
-    Parameters
-    ----------
-    dct: dict[str, Any]
-        Object reconstruction-friendly dict to compress to storage-efficient format.
-
-    float_prec: 'low', 'medium', 'high'
-        What level of precision to apply to lattice lengths and angles and site positions values.
-        - 'low' rounds to 4 decimal places (0.01 pm for lengths and positions, 1e-4 degree for angles);
-        - 'medium' rounds to 8 decimal places;
-        - 'high' rounds to 16 decimal places (numerical precision level).
-
-        WARNING: Lost precision is irreversible and will NOT be recovered by decompression.
-        Defaults to 'high' to avoid unintended precision loss.
-
-    Returns
-    -------
-    dcit[str, tp.Any]
-        Storage-efficient formatted structure dict.
     """
-    match float_prec:
-        case "low": ndigits = 4
-        case "medium": ndigits = 8
-        case "high": ndigits = 16
-        case _:
-            raise ValueError(
-                f"'float_prec' only supports 'low', 'medium' and 'high', got {float_prec!r}."
-            )
-    rounder = ft.partial(round, ndigits=ndigits)
-
     file_dict = {}
     file_dict["charge"] = dct.pop("charge")
     file_dict["properties"] = dct.pop("properties")
 
     # Flatten lattice parameters
     lattice = Lattice.from_dict(dct["lattice"])
-    file_dict["a"] = rounder(lattice.a)
-    file_dict["b"] = rounder(lattice.b)
-    file_dict["c"] = rounder(lattice.c)
-    file_dict["alpha"] = rounder(lattice.alpha)
-    file_dict["beta"] = rounder(lattice.beta)
-    file_dict["gamma"] = rounder(lattice.gamma)
+    file_dict["a"] = lattice.a
+    file_dict["b"] = lattice.b
+    file_dict["c"] = lattice.c
+    file_dict["alpha"] = lattice.alpha
+    file_dict["beta"] = lattice.beta
+    file_dict["gamma"] = lattice.gamma
 
     # Flatten sites data
     file_dict["species"] = []
@@ -615,9 +605,9 @@ def _compress_struct_dict(
     file_dict["site_properties"] = []
     for site_dict in dct["sites"]:
         file_dict["species"].append(site_dict["species"][0]["element"])
-        file_dict["site_a"].append(rounder(site_dict["abc"][0]))
-        file_dict["site_b"].append(rounder(site_dict["abc"][1]))
-        file_dict["site_c"].append(rounder(site_dict["abc"][2]))
+        file_dict["site_a"].append(site_dict["abc"][0])
+        file_dict["site_b"].append(site_dict["abc"][1])
+        file_dict["site_c"].append(site_dict["abc"][2])
         file_dict["site_properties"].append(site_dict["properties"])
 
     return file_dict
@@ -626,7 +616,7 @@ def _compress_struct_dict(
 def _uncompress_struct_dict(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
     """
     Reorganize structure data into object reconstruction-friendly organization.
-    Exact reverse operation of `_compress_struct_dict()` (except for float precision compression).
+    Exact reverse operation of `_compress_struct_dict()`.
     """
     struct_dict = {}
     struct_dict["charge"] = dct.pop("charge", 0.0)
