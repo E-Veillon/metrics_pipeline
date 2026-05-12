@@ -123,14 +123,28 @@ class StructureFile:
             raise ValueError(
                 f"Some iterables in data do not have the same length, got {len_set_str}."
             )
-        data = data if compressed else self._reorganize_data(data, algo="compress")
+        
+        if not compressed:
+            # Reorganize keys for storage-efficient format
+            ordered_data = (data[k] for k in self._dict_keys)
+            parsed_data = (
+                _compress_struct_dict(
+                    {k: v for k, v in zip(self._dict_keys, struct_data, strict=True)}
+                ) for struct_data in zip(*ordered_data, strict=True)
+            )
+            compressed_data = {key: [] for key in self.active_file_keys}
+            for dct in parsed_data:
+                for key in self.active_file_keys:
+                    compressed_data[key].append(dct[key])
+
+            data = compressed_data
 
         # Handle saved/unsaved optional keys
         for opt_key in self._optional_keys:
-            if opt_key in self._saved_optional_keys and opt_key not in data:
+            if opt_key in self.saved_optional_keys and opt_key not in data:
                 data[opt_key] = list(self._get_optional_key_default(key))
 
-            elif opt_key not in self._saved_optional_keys:
+            elif opt_key not in self.saved_optional_keys:
                 data.pop(key, None)
 
         self._data = data
@@ -146,7 +160,7 @@ class StructureFile:
             return cls(
                 subdata,
                 compressed=True,
-                saved_optional_keys=self._saved_optional_keys
+                saved_optional_keys=self.saved_optional_keys
             )
         elif isinstance(index, int):
             if index < 0:
@@ -171,8 +185,8 @@ class StructureFile:
 
         # Handle data concatenation with possibly lacking optional keys
         all_active_file_keys = set(self.active_file_keys) | set(other.active_file_keys)
-        self_lacking_keys = other._saved_optional_keys - self._saved_optional_keys
-        other_lacking_keys = self._saved_optional_keys - other._saved_optional_keys
+        self_lacking_keys = other.saved_optional_keys - self.saved_optional_keys
+        other_lacking_keys = self.saved_optional_keys - other.saved_optional_keys
 
         for key in all_active_file_keys: # No iteration over optional keys unsaved on both sides
             if key in self_lacking_keys: # Optional key not in self but present in other
@@ -186,7 +200,7 @@ class StructureFile:
         new_float_prec = max(self.float_prec, other.float_prec)
 
         # Merge active optional keys from both datasets
-        new_saved_optional_keys = self._saved_optional_keys | other._saved_optional_keys
+        new_saved_optional_keys = self.saved_optional_keys | other.saved_optional_keys
 
         return cls(
             new_dataset,
@@ -195,49 +209,11 @@ class StructureFile:
             saved_optional_keys=new_saved_optional_keys
         )
 
-    def _reorganize_data(
-        self, data: Mapping[str, tp.Iterable[tp.Any]], *, algo: tp.Literal["compress", "uncompress"]
-    ) -> dict[str, list[tp.Any]]:
-        """
-        Reorganize data between storage-efficient and object reconstruction-friendly formats.
-        """
-        if algo == "compress":
-            parser_fn = _compress_struct_dict
-            init_key_list = self._dict_keys
-            target_key_list = self.active_file_keys
-        elif algo == "uncompress":
-            parser_fn = _uncompress_struct_dict
-            init_key_list = self.active_file_keys
-            target_key_list = self._dict_keys
-        else:
-            raise ValueError(f"'algo' must be either 'compress' or 'uncompress', got {algo!r}.")
-
-        ordered_data = (data[k] for k in init_key_list)
-
-        try:
-            parsed_data = [
-                parser_fn({k: v for k, v in zip(init_key_list, struct_data, strict=True)})
-                for struct_data in zip(*ordered_data, strict=True)
-            ]
-        except ValueError as exc:
-            raise ValueError(
-                "Data reorganization failed: some iterables in the data dict "
-                "do not have the same length."
-            ) from exc
-
-        reorganized_data: dict[str, list[tp.Any]] = {}
-        for key in target_key_list:
-            reorganized_data[key] = [struct_dict[key] for struct_dict in parsed_data]
-
-        return reorganized_data
-
     def _build_structure(self, index: int) -> Structure:
         """Use data at given index to build corresponding Structure."""
-        dct = self._reorganize_data(
-            {k: self._data[k][index:index+1] for k in self.active_file_keys},
-            algo="uncompress"
+        dct = _uncompress_struct_dict(
+            {k: self._data[k][index] for k in self.active_file_keys}
         )
-        dct = {k: v[0] for k, v in dct.items()}
         return Structure.from_dict(dct)
 
     def _check_ordering(self, structure: Structure) -> None:
@@ -260,8 +236,8 @@ class StructureFile:
         return cls(
             data=self._data,
             compressed=True,
-            float_prec=self._float_prec,
-            saved_optional_keys=self._saved_optional_keys
+            float_prec=self.float_prec,
+            saved_optional_keys=self.saved_optional_keys
         )
 
     def round(self) -> tpe.Self:
@@ -301,7 +277,7 @@ class StructureFile:
     def parse_structures(self, verbose: bool = False) -> list[Structure]:
         """
         Build all Structure objects from file data, in order.
-        
+
         Parameters
         ----------
         verbose: bool
@@ -341,12 +317,17 @@ class StructureFile:
             self.add_structure(structure)
 
     @property
+    def saved_optional_keys(self) -> set[str]:
+        """Set of active optional keys."""
+        return self._saved_optional_keys
+
+    @property
     def active_file_keys(self) -> tuple[str, ...]:
         """Get internal keys where data is actively saved."""
         file_keys = list(self._file_keys)
 
         for opt_key in self._optional_keys:
-            if opt_key not in self._saved_optional_keys:
+            if opt_key not in self.saved_optional_keys:
                 file_keys.remove(opt_key)
 
         return tuple(file_keys)
@@ -406,7 +387,7 @@ class StructureFile:
         to False, builds an iterator of default charges of 0.0 coherent with file data
         for file iteration consistency.
         """
-        if "charge" in self._saved_optional_keys:
+        if "charge" in self.saved_optional_keys:
             return iter(self._data["charge"])
         return self._get_optional_key_default("charge")
 
@@ -417,7 +398,7 @@ class StructureFile:
         was set to False, builds an iterator of empty properties dicts coherent with file data
         for file iteration consistency.
         """
-        if "properties" in self._saved_optional_keys:
+        if "properties" in self.saved_optional_keys:
             return iter(self._data["properties"])
         return self._get_optional_key_default("properties")
 
@@ -465,7 +446,7 @@ class StructureFile:
         in order. If `save_site_properties` was set to False, builds an iterator of lists
         of empty site properties dicts coherent with file data for file iteration consistency.
         """
-        if "site_properties" in self._saved_optional_keys:
+        if "site_properties" in self.saved_optional_keys:
             return iter(self._data["site_properties"])
         return self._get_optional_key_default("site_properties")
 
