@@ -313,15 +313,15 @@ class StructureFile:
         list[Structure]
             List of Structure objects extracted from data.
         """
+        iterator = iter(self)
+
         if verbose:
             desc = "Extracting structures from file"
             iterator = VisualIterator.from_big_iterator(
-                iter(self), n_elts=self.length, desc=desc, unit="extracted", percent=True
+                iterator, n_elts=self.length, desc=desc, unit="extracted", percent=True
             )
-        else:
-            iterator = iter(self)
 
-        return [struct for struct in iterator]
+        return list(iterator)
 
     def add_structure(self, structure: Structure) -> None:
         """Add one Structure object data to the file."""
