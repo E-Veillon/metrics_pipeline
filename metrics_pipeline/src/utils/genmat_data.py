@@ -306,9 +306,8 @@ class GenMatStructure(Structure):
             "special_keys": self.special_keys,
             "spacegroup": self.spacegroup.as_dict(),
             "energy": self.energy,
-            "energy_above_hull": self.energy_above_hull,
-            "structure": struct_dct
-        }
+            "energy_above_hull": self.energy_above_hull
+        } | struct_dct
         return dct
 
     def as_structure(self) -> Structure:
@@ -329,15 +328,27 @@ class GenMatStructure(Structure):
     @classmethod
     def from_dict(cls, dct: dict[str, tp.Any]) -> tpe.Self:
         """Create a GenMatStructure object from a dictionary representation."""
-        structure = Structure.from_dict(dct["structure"])
-        return cls.from_structure(
-            name=dct["name"],
-            structure=structure,
-            special_keys=dct.get("special_keys", {}),
-            spacegroup=Spacegroup.from_dict(dct["spacegroup"]),
-            energy=dct.get("energy"),
-            energy_above_hull=dct.get("energy_above_hull")
-        )
+        dct_copy = dct.copy()
+        dct_copy.pop("@module", None)
+        dct_copy.pop("@class", None)
+
+        # Build base structure
+        struct_dict = {
+            "@module": Structure.__module__,
+            "@class": Structure.__name__,
+            "lattice": dct_copy.pop("lattice"),
+            "sites": dct_copy.pop("sites"),
+            "charge": dct_copy.pop("charge", None),
+            "properties": dct_copy.pop("properties", None)
+        }
+        structure = Structure.from_dict(**struct_dict)
+
+        # Build spacegroup if defined
+        spg = None
+        if "spacegroup" in dct_copy:
+            spg = Spacegroup.from_dict(dct_copy.pop("spacegroup"))
+
+        return cls.from_structure(structure=structure, spacegroup=spg, **dct_copy)
 
     @classmethod
     def from_structure(cls, name: str, structure: Structure, **kwargs) -> tpe.Self:

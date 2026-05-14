@@ -3,6 +3,7 @@ Class handling specific JSON files containing structures data in a predictable a
 way to avoid ambiguities in data communications between pipeline steps.
 """
 
+from __future__ import annotations
 import typing as tp
 import typing_extensions as tpe
 from collections.abc import Callable
@@ -18,7 +19,10 @@ from src.utils.common_asserts import check_type
 from src.utils.visual_iterator import VisualIterator
 
 
-class StructureFile:
+S = tp.TypeVar("S", bound=Structure)
+
+
+class StructureFile(tp.Generic[S]):
     """
     I/O class to load and write JSON files containing efficiently stored structure data.
     Only supports ordered structures.
@@ -105,6 +109,10 @@ class StructureFile:
 
         self._saved_optional_keys = saved_optional_keys
         self._file_active_keys = set(self._file_mandatory_keys) | saved_optional_keys
+        active_optional_dict_keys = {
+            key for key in self._dict_optional_keys if key in saved_optional_keys
+        }
+        self._dict_active_keys = set(self._dict_mandatory_keys) | active_optional_dict_keys
 
         # No data, create new empty file
         if data is None:
@@ -153,7 +161,7 @@ class StructureFile:
     def __len__(self) -> int:
         return self.length
 
-    def __getitem__(self, index: int | slice) -> Structure | tpe.Self:
+    def __getitem__(self, index: int | slice) -> S | tpe.Self:
         """Get a Structure from the data at given index, or a sub-dataset from a slice."""
         if isinstance(index, slice):
             subdata = {key: self._data[key][index] for key in self.file_active_keys}
@@ -174,7 +182,7 @@ class StructureFile:
 
         check_type(index, "index", (int, slice))
 
-    def __iter__(self) -> tp.Iterator[Structure]:
+    def __iter__(self) -> tp.Iterator[S]:
         return iter(self._build_structure(i) for i in range(self.length))
 
     def __add__(self, other: tpe.Self) -> tpe.Self:
@@ -211,7 +219,7 @@ class StructureFile:
             saved_optional_keys=new_saved_optional_keys
         )
 
-    def _build_structure(self, index: int) -> Structure:
+    def _build_structure(self, index: int) -> S:
         """Use data at given index to build corresponding Structure."""
         dct = _uncompress_struct_dict(
             {k: self._data[k][index] for k in self.file_active_keys}
@@ -233,7 +241,7 @@ class StructureFile:
             f"Some lists in data do not have the same length, got {len_set_str}."
         )
 
-    def _check_ordering(self, structure: Structure) -> None:
+    def _check_ordering(self, structure: S) -> None:
         """Check that passed structure is ordered."""
         if not structure.is_ordered:
             raise ValueError(
@@ -295,7 +303,7 @@ class StructureFile:
 
         return self
 
-    def parse_structures(self, verbose: bool = False) -> list[Structure]:
+    def parse_structures(self, verbose: bool = False) -> list[S]:
         """
         Build all Structure objects from file data, in order.
 
@@ -320,7 +328,7 @@ class StructureFile:
 
         return list(iterator)
 
-    def add_structure(self, structure: Structure) -> None:
+    def add_structure(self, structure: S) -> None:
         """Add one Structure object data to the file."""
         self._check_ordering(structure)
         dct = structure.as_dict(verbosity=0)
@@ -329,7 +337,7 @@ class StructureFile:
         for key in self.file_active_keys:
             self._data[key].append(dct[key])
 
-    def add_structures(self, structures: tp.Iterable[Structure]) -> None:
+    def add_structures(self, structures: tp.Iterable[S]) -> None:
         """
         Convenient method to add a full iterable of structure data to the file.
         Order is preserved.
@@ -346,6 +354,11 @@ class StructureFile:
     def file_active_keys(self) -> set[str]:
         """Set of active internal keys containing data."""
         return self._file_active_keys
+
+    @property
+    def dict_active_keys(self) -> set[str]:
+        """Set of active structure dict representation keys."""
+        return self._dict_active_keys
 
     @property
     def length(self) -> int:
