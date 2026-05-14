@@ -37,27 +37,27 @@ class StructureFile:
     _float_prec: FloatPrecision
 
     # Categorization of dict representations keys
-    _mandatory_dict_keys: tuple[str, ...] = ("lattice", "charge", "sites")
-    _optional_dict_keys: tuple[str, ...] = ("properties",)
-    _dict_keys: tuple[str, ...] = _mandatory_dict_keys + _optional_dict_keys
+    _dict_mandatory_keys: tuple[str, ...] = ("lattice", "sites")
+    _dict_optional_keys: tuple[str, ...] = ("charge", "properties")
+    _dict_keys: tuple[str, ...] = _dict_mandatory_keys + _dict_optional_keys
 
     # Categorization of internal storage-efficient keys
-    _lattice_keys: tuple[str, ...] = ("a", "b", "c", "alpha", "beta", "gamma")
-    _mandatory_site_keys: tuple[str, ...] = ("species", "site_a", "site_b", "site_c")
-    _optional_site_keys: tuple[str, ...] = ("site_properties",)
-    _site_keys: tuple[str, ...] = _mandatory_site_keys + _optional_site_keys
-    _mandatory_file_keys: tuple[str, ...] = _lattice_keys + _mandatory_site_keys
+    _file_lattice_keys: tuple[str, ...] = ("a", "b", "c", "alpha", "beta", "gamma")
+    _file_mandatory_site_keys: tuple[str, ...] = ("species", "site_a", "site_b", "site_c")
+    _file_optional_site_keys: tuple[str, ...] = ("site_properties",)
+    _file_site_keys: tuple[str, ...] = _file_mandatory_site_keys + _file_optional_site_keys
+    _file_mandatory_keys: tuple[str, ...] = _file_lattice_keys + _file_mandatory_site_keys
 
-    # NOTE: '_optional_file_keys' MUST be a dict mapping optional keys to callables returning
+    # NOTE: '_file_optional_keys' MUST be a dict mapping optional keys to callables returning
     # a default iterator suitable for this key for '_get_optional_key_default()' to work properly
-    _optional_file_keys: dict[str, Callable[[tpe.Self], tp.Iterator[tp.Any]]] = {
+    _file_optional_keys: dict[str, Callable[[tpe.Self], tp.Iterator[tp.Any]]] = {
         "charge": lambda self: itt.repeat(0.0, self.length), # Fastest, for immutable defaults
         "properties": lambda self: iter({} for _ in range(self.length)), # mutable defaults
         "site_properties": lambda self: iter( # site-wise attribute defaults
             [{} for _ in range(n_sites)] for n_sites in self.num_sites_per_struct_iter
         )
     }
-    _file_keys: tuple[str, ...] = _mandatory_file_keys + tuple(_optional_file_keys)
+    _file_keys: tuple[str, ...] = _file_mandatory_keys + tuple(_file_optional_keys)
 
     def __init__(
         self,
@@ -108,21 +108,17 @@ class StructureFile:
         self.float_prec = float_prec
 
         if saved_optional_keys is None:
-            saved_optional_keys = set(self._optional_file_keys)
+            saved_optional_keys = set(self._file_optional_keys)
         else:
             for key in saved_optional_keys:
-                self._get_optional_key_default(key) # test optional key existence
+                self.check_optional_key(key)
 
         self._saved_optional_keys = saved_optional_keys
-        self._active_file_keys = set(self._mandatory_file_keys) | saved_optional_keys
-        active_optional_dict_keys = {
-            key for key in self._optional_dict_keys if key in saved_optional_keys
-        }
-        self._active_dict_keys = set(self._mandatory_dict_keys) | active_optional_dict_keys
+        self._file_active_keys = set(self._file_mandatory_keys) | saved_optional_keys
 
         # No data, create new empty file
         if data is None:
-            self._data = {key: [] for key in self.active_file_keys}
+            self._data = {key: [] for key in self.file_active_keys}
             return
 
         # Check input data conformity
@@ -130,40 +126,39 @@ class StructureFile:
             check_type(key, "data key", (str,))
             check_type(val, "data value", (list,))
 
-        active_keys = self.active_file_keys if compressed else self.active_dict_keys
-        if not len(len_set:={len(data[key]) for key in active_keys}) == 1:
-            len_set_str = ", ".join(sorted(map(str, len_set)))
-            raise ValueError(
-                f"Some lists in data do not have the same length, got {len_set_str}."
-            )
+        # Parse and check mandatory keys only
+        mandatory_keys = self._file_mandatory_keys if compressed else self._dict_mandatory_keys
+        mandatory_data = _parse_dict_keys(data, mandatory_keys)
+        mandatory_length = self._check_data_lengths(mandatory_data)
 
-        # FIXME: Conundrum in the order of operations to ensure proper data initialization
-        # Parse mandatory keys
-        mandatory_keys = self._mandatory_file_keys if compressed else self._mandatory_dict_keys
-        parsed_data = _parse_dict_keys(data, mandatory_keys)
-
-        # Add defined saved optional keys
-        for opt_key in self.saved_optional_keys:
-            if opt_key in data:
-                parsed_data[opt_key] = data[key]
-
-        # Reorganize keys for storage-efficient format
         if not compressed:
-            keys = tuple(parsed_data)
-            ordered_data = (parsed_data[k] for k in keys)
+            # Reorganize keys for storage-efficient format
+            ordered_data = (mandatory_data[k] for k in mandatory_keys)
             compressed_data_iter = (
                 _compress_struct_dict(
-                    {k: v for k, v in zip(keys, struct_data, strict=True)}
+                    {k: v for k, v in zip(mandatory_keys, struct_data, strict=True)}
                 ) for struct_data in zip(*ordered_data, strict=True)
             )
-            compressed_data = {key: [] for key in self.active_file_keys}
-            for dct in compressed_data:
-                for key in self.active_file_keys:
+            compressed_data = {key: [] for key in self._file_mandatory_keys}
+            for dct in compressed_data_iter:
+                for key in self._file_mandatory_keys:
                     compressed_data[key].append(dct[key])
 
-            parsed_data = compressed_data
+            mandatory_data = compressed_data
 
-        self._data = data
+        self._data = mandatory_data
+
+        # Add saved optional keys
+        for opt_key in self.saved_optional_keys:
+            if opt_key in data:
+                if not (opt_len:=len(data[opt_key])) == mandatory_length:
+                    raise ValueError(
+                        f"Saved optional key {opt_key!r} do not have expected length "
+                        f"{mandatory_length}, got {opt_len}."
+                    )
+                self._data[opt_key] = data[opt_key]
+            else:
+                self._data[opt_key] = list(self._get_optional_key_default(opt_key))
 
     def __len__(self) -> int:
         return self.length
@@ -171,7 +166,7 @@ class StructureFile:
     def __getitem__(self, index: int | slice) -> Structure | tpe.Self:
         """Get a Structure from the data at given index, or a sub-dataset from a slice."""
         if isinstance(index, slice):
-            subdata = {key: self._data[key][index] for key in self.active_file_keys}
+            subdata = {key: self._data[key][index] for key in self.file_active_keys}
             cls = type(self)
             return cls(
                 subdata,
@@ -201,7 +196,7 @@ class StructureFile:
         new_dataset = {}
 
         # Handle data concatenation with possibly lacking optional keys
-        all_active_file_keys = set(self.active_file_keys) | set(other.active_file_keys)
+        all_active_file_keys = set(self.file_active_keys) | set(other.file_active_keys)
         self_lacking_keys = other.saved_optional_keys - self.saved_optional_keys
         other_lacking_keys = self.saved_optional_keys - other.saved_optional_keys
 
@@ -229,9 +224,24 @@ class StructureFile:
     def _build_structure(self, index: int) -> Structure:
         """Use data at given index to build corresponding Structure."""
         dct = _uncompress_struct_dict(
-            {k: self._data[k][index] for k in self.active_file_keys}
+            {k: self._data[k][index] for k in self.file_active_keys}
         )
         return Structure.from_dict(dct)
+
+    def _check_data_lengths(self, data: dict[str, list[tp.Any]] | None = None) -> int:
+        """
+        Check that stored data lists have same length and return it.
+        If `data` is given, check lists inside `data` instead.
+        """
+        data = self._data if data is None else data
+
+        if len(len_set:={len(data[key]) for key in data.keys()}) == 1:
+            return len_set.pop()
+
+        len_set_str = ", ".join(sorted(map(str, len_set)))
+        raise ValueError(
+            f"Some lists in data do not have the same length, got {len_set_str}."
+        )
 
     def _check_ordering(self, structure: Structure) -> None:
         """Check that passed structure is ordered."""
@@ -243,9 +253,13 @@ class StructureFile:
 
     def _get_optional_key_default(self, key: str) -> tp.Iterator[tp.Any]:
         """Get an iterator containing default values for an optional data key."""
-        if key not in self._optional_file_keys:
-            raise ValueError(f"{key!r} is not a valid optional key.")
-        return self._optional_file_keys[key](self)
+        if key in self._file_optional_keys:
+            return self._file_optional_keys[key](self)
+        raise ValueError(f"{key!r} is not a valid optional key.")
+
+    def check_optional_key(self, key: str) -> None:
+        """Check that the key is a valid optional key."""
+        self._get_optional_key_default(key)
 
     def copy(self) -> tpe.Self:
         """Get a shallow copy of this file instance."""
@@ -264,12 +278,12 @@ class StructureFile:
         """
         # Use numpy vectorized rounding for lattice parameters lists
         lattice_array = np.array(
-            [self._data[key] for key in self._lattice_keys], dtype=np.float64
+            [self._data[key] for key in self._file_lattice_keys], dtype=np.float64
         ).T
         np.round(lattice_array, decimals=self.float_prec.value, out=lattice_array)
         rounded_lists = lattice_array.T.tolist()
 
-        for key, rounded_list in zip(self._lattice_keys, rounded_lists):
+        for key, rounded_list in zip(self._file_lattice_keys, rounded_lists):
             self._data[key] = rounded_list
 
         # Use python loop for site-wise rounding
@@ -320,9 +334,9 @@ class StructureFile:
         """Add one Structure object data to the file."""
         self._check_ordering(structure)
         dct = structure.as_dict(verbosity=0)
-        dct = _parse_dict_keys(dct, self.active_dict_keys)
+        dct = _parse_dict_keys(dct, self.dict_active_keys)
         dct = _compress_struct_dict(dct)
-        for key in self.active_file_keys:
+        for key in self.file_active_keys:
             self._data[key].append(dct[key])
 
     def add_structures(self, structures: tp.Iterable[Structure]) -> None:
@@ -339,23 +353,14 @@ class StructureFile:
         return self._saved_optional_keys
 
     @property
-    def active_file_keys(self) -> set[str]:
+    def file_active_keys(self) -> set[str]:
         """Set of active internal keys containing data."""
-        return self._active_file_keys
-
-    @property
-    def active_dict_keys(self) -> set[str]:
-        """Set of active structure dict representation keys."""
-        return self._active_dict_keys
+        return self._file_active_keys
 
     @property
     def length(self) -> int:
         """Number of structures contained in the file."""
-        assert len(len_set:={len(self._data[key]) for key in self.active_file_keys}) == 1, (
-            f"{type(self).length.__qualname__}: The lengths of data lists in the file "
-            "are not equal, some structure data must be incomplete or corrupted."
-        )
-        return len_set.pop()
+        return self._check_data_lengths()
 
     @property
     def all_a_params_iter(self) -> tp.Iterator[float]:
@@ -390,7 +395,7 @@ class StructureFile:
     @property
     def all_lattices_iter(self) -> tp.Iterator[Lattice]:
         """Lazy iterator of all Lattice objects rebuilt from data, in order."""
-        params_iter = zip(*(self._data[key] for key in self._lattice_keys))
+        params_iter = zip(*(self._data[key] for key in self._file_lattice_keys))
         return (
             Lattice.from_parameters(a, b, c, alpha, beta, gamma)
             for a, b, c, alpha, beta, gamma in params_iter
@@ -472,7 +477,7 @@ class StructureFile:
         Lazy iterator of all lists of sites (one list per structure)
         rebuilt from data, in order.
         """
-        structs_iter = zip(*(self._data[key] for key in self._site_keys))
+        structs_iter = zip(*(self._data[key] for key in self._file_site_keys))
         lattices_iter = self.all_lattices_iter
 
         for sites_data_tuple, lattice in zip(structs_iter, lattices_iter):
@@ -547,7 +552,7 @@ class StructureFile:
         kwargs["compressed"] = True
 
         if match_optional_keys:
-            auto_saved_keys = set(filter(lambda key: key in data, cls._optional_file_keys))
+            auto_saved_keys = set(filter(lambda key: key in data, cls._file_optional_keys))
             kwargs.setdefault("saved_optional_keys", auto_saved_keys)
 
         return cls(data, **kwargs)
@@ -565,13 +570,15 @@ class StructureFile:
 def _parse_dict_keys(dct: dict[str, tp.Any], needed_keys: tp.Iterable[str]) -> dict[str, tp.Any]:
     """Verify presence of needed keys and remove other ones."""
     needed_keys = tuple(needed_keys)
-    if not all(keys_in_data:=[key in dct for key in needed_keys]):
-        lacking_keys = ", ".join([
-            needed_keys[idx]
-            for idx, key_in_data in enumerate(keys_in_data) if not key_in_data
-        ])
-        raise KeyError(f"Some mandatory keys are not present in 'data': {lacking_keys}.")
-    return {k: dct[k] for k in needed_keys}
+
+    if all(keys_in_data:=[key in dct for key in needed_keys]):
+        return {k: dct[k] for k in needed_keys}
+
+    lacking_keys = ", ".join([
+        needed_keys[idx]
+        for idx, key_in_data in enumerate(keys_in_data) if not key_in_data
+    ])
+    raise KeyError(f"Some needed keys are not present: {lacking_keys}.")
 
 
 def _compress_lattice_data(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
@@ -596,7 +603,7 @@ def _uncompress_lattice_data(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
     Assemble lattice parameters data into a single 'lattice' key matching
     Lattice objects dict representation. Exact reverse operation of `_compress_lattice_data()`.
     """
-    parsed_dict = {key: dct[key] for key in dct if key not in StructureFile._lattice_keys}
+    parsed_dict = {key: dct[key] for key in dct if key not in StructureFile._file_lattice_keys}
 
     parsed_dict["lattice"] = Lattice.from_parameters(
         a=dct.pop("a"), b=dct.pop("b"), c=dct.pop("c"),
@@ -622,7 +629,7 @@ def _compress_sites_data(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
         parsed_dict["site_a"].append(site_dict["abc"][0])
         parsed_dict["site_b"].append(site_dict["abc"][1])
         parsed_dict["site_c"].append(site_dict["abc"][2])
-        parsed_dict["site_properties"].append(site_dict["properties"])
+        parsed_dict["site_properties"].append(site_dict.get("properties", {}))
 
     return parsed_dict
 
@@ -632,7 +639,7 @@ def _uncompress_sites_data(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
     Assemble all site-wise data into a single 'sites' key matching PeriodicSite
     dict representation. Exact reverse operation of '_compress_sites_data()'.
     """
-    parsed_dict = {key: dct[key] for key in dct if key not in StructureFile._site_keys}
+    parsed_dict = {key: dct[key] for key in dct if key not in StructureFile._file_site_keys}
 
     species_list = dct.pop("species")
     site_iter = zip(
@@ -640,7 +647,7 @@ def _uncompress_sites_data(dct: dict[str, tp.Any]) -> dict[str, tp.Any]:
         dct.pop("site_a"),
         dct.pop("site_b"),
         dct.pop("site_c"),
-        dct.pop("site_properties", [{} for _ in range(len(species_list))]),
+        dct.pop("site_properties", ({} for _ in range(len(species_list)))),
         strict=True
     )
     parsed_dict["sites"] = [
