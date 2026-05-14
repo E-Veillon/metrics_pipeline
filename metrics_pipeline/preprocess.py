@@ -27,9 +27,16 @@ from src.metrics import SymmetryClassifier
 
 def _get_command_line_args() -> ap.Namespace:
     """Command Line Interface (CLI)."""
+    sfile_keys = ", ".join(StructureFile._file_optional_keys.keys())
+    gfile_keys = ", ".join(GenMatFile._file_optional_keys.keys())
+    optional_keys_desc = (
+        f"Base structure file optional keys:\n{sfile_keys}.\n"
+        f"GenMat format file optional keys:\n{gfile_keys}."
+    )
     parser = ap.ArgumentParser(
         prog=os.path.basename(__file__), description=__doc__,
-        formatter_class=ap.RawDescriptionHelpFormatter
+        formatter_class=ap.RawDescriptionHelpFormatter,
+        epilog=optional_keys_desc
     )
     parser.add_argument(
         "input_file",
@@ -104,27 +111,13 @@ def _get_command_line_args() -> ap.Namespace:
         )
     )
     parser.add_argument(
-        "--save-charge", action=ap.BooleanOptionalAction, default=True,
+        "--saved-opt-keys", nargs="*", default=None,
         help=(
-            "Only used if '--genmat-fmt' is disabled. Whether to save structures overall charges "
-            "in output file. Disable if storage efficiency is critival and this optional data is "
-            "not useful to you. Defaults to %(default)s."
-        )
-    )
-    parser.add_argument(
-        "--save-properties", action=ap.BooleanOptionalAction, default=True,
-        help=(
-            "Only used if '--genmat-fmt' is disabled. Whether to save the structures properties "
-            "dicts in the file. Disable if storage efficiency is critical and this optional data "
-            "is not useful to you. Defaults to %(default)s."
-        )
-    )
-    parser.add_argument(
-        "--save-site-properties", action=ap.BooleanOptionalAction, default=True,
-        help=(
-            "Only used if '--genmat-fmt' is disabled. Whether to save the structures site "
-            "properties dicts in the file. Disable if storage efficiency is critical and this "
-            "optional data is not useful to you. Defaults to %(default)s."
+            "Optional structure data to save in output file. If not given, all optional "
+            "keys are stored by default. The value 'none' can be passed to not save any "
+            "optional data. Can shave off significant weight from the file if some optional "
+            "data are not used. Available optional keys depend on whether '--genmat-fmt' "
+            "is enabled or not. See the valid keys below."
         )
     )
     args: ap.Namespace = parser.parse_args()
@@ -152,9 +145,6 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
     args_dict.setdefault("angleprec", 5.0)
     args_dict.setdefault("remove_elts", [])
     args_dict.setdefault("remove_elt_categories", [])
-    args_dict.setdefault("save_charge", True)
-    args_dict.setdefault("save_properties", True)
-    args_dict.setdefault("save_site_properties", True)
 
     # Assert set arguments conformity
     check_file_format(args_dict["output"], allowed_formats="json")
@@ -185,9 +175,12 @@ def _process_input_args(args_dict: dict[str, tp.Any]) -> dict[str, tp.Any]:
         if not elt in ALL_ELTS_CATEGORIES:
             raise ValueError(f"The category {elt!r} is not supported.")
     
-    check_type(args_dict["save_charge"], "save_charge", (bool,))
-    check_type(args_dict["save_properties"], "save_properties", (bool,))
-    check_type(args_dict["save_site_properties"], "save_site_properties", (bool,))
+    if args_dict.get("saved_opt_keys") is not None:
+        check_type(args_dict["saved_opt_keys"], "saved_opt_keys", (tp.Iterable,))
+        saved_opt_keys = set(args_dict["saved_opt_keys"])
+        if "none" in saved_opt_keys:
+            saved_opt_keys = set()
+        args_dict["saved_opt_keys"] = saved_opt_keys
 
     # Parse forbidden elements
     forbidden_elts = get_elts_in_categories(args_dict["remove_elt_categories"])
@@ -239,17 +232,15 @@ def _print_config(args_dict: dict) -> None:
         "ALL REMOVED ELEMENTS (parsed categories): "
         f"{', '.join(args_dict['forbidden_elts'].keys()) if args_dict['forbidden_elts'] != {} else None}."
     )
+    if args_dict.get("saved_opt_keys") is None:
+        filetype = GenMatFile if args_dict["genmat_fmt"] else StructureFile
+        saved_opt_keys_str = ", ".join(filetype._file_optional_keys.keys())
+    elif args_dict["saved_opt_keys"] == set():
+        saved_opt_keys_str = f"{None}"
+    else:
+        saved_opt_keys_str = ", ".join(args_dict["saved_opt_keys"])
     print(
-        f"SAVE CHARGES: {args_dict['save_charge']} "
-        f"{'(ignored)' if args_dict['genmat_fmt'] else ''}"
-    )
-    print(
-        f"SAVE PROPERTIES: {args_dict['save_properties']} "
-        f"{'(ignored)' if args_dict['genmat_fmt'] else ''}"
-    )
-    print(
-        f"SAVE SITE PROPERTIES: {args_dict['save_site_properties']} "
-        f"{'(ignored)' if args_dict['genmat_fmt'] else ''}"
+        f"SAVED OPTIONAL DATA: {saved_opt_keys_str}. "
     )
     print(" ")
     print("------------------------------")
@@ -386,23 +377,12 @@ def main(standalone: bool = True, **kwargs) -> None:
         Pass valid element categories to eliminate structures containing any element from
         these categories.
 
-    save_charge: bool
-        Only used if `genmat_fmt` is set to False.
-        Whether to save the overall charge of structures in the file. Set to False if storage
-        efficiency is critical (e.g. lot of structures) and this optional data is not useful
-        to you. Defaults to True.
-
-    save_properties: bool
-        Only used if `genmat_fmt` is set to False.
-        Whether to save the structures properties dicts in the file. Set to False if storage
-        efficiency is critical (e.g. lot of structures) and this optional data is not useful
-        to you. Defaults to True.
-
-    save_site_properties: bool
-        Only used if `genmat_fmt` is set to False.
-        Whether to save the structures site properties dicts in the file. Set to False if
-        storage efficiency is critical (e.g. lot of structures) and this optional data is
-        not useful to you. Defaults to True.
+    saved_opt_keys: Iterable[str], optional
+        Optional structure data to save in output file. If not given, all optional
+        keys are stored by default. The value 'none' can be passed to not save any
+        optional data. Can shave off significant weight from the file if some optional
+        data are not used. Available optional keys depend on whether `genmat_fmt`
+        is enabled or not. See the valid keys in the '--help' command of this script.
     """
     start = datetime.now()
     args = parse_input_args(_get_command_line_args, _process_input_args, standalone, **kwargs)
@@ -434,22 +414,12 @@ def main(standalone: bool = True, **kwargs) -> None:
             )
             structures = [data.structure for data in symmetrizer.computed_data]
 
-        gfile = GenMatFile()
-        gfile.add_structures(structures)
-        gfile.write_file(args["output"])
-
-    else:
-        saved_optional_keys = {
-            "charge" if args["save_charge"] else "",
-            "properties" if args["save_properties"] else "",
-            "site_properties" if args["save_site_properties"] else ""
-        }
-        saved_optional_keys.discard("")
-        sfile = StructureFile(
-            saved_optional_keys=saved_optional_keys
-        )
-        sfile.add_structures(structures)
-        sfile.write_file(args["output"])
+    outfile_type = GenMatFile if args["genmat_fmt"] else StructureFile
+    outfile = outfile_type(
+        saved_optional_keys=args["saved_opt_keys"]
+    )
+    outfile.add_structures(structures)
+    outfile.write_file(args["output"])
 
     # Time of the preprocessing
     stop = datetime.now()
