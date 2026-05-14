@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 import typing as tp
-
+from enum import IntEnum
 
 PathLike = Path | str
 
@@ -110,3 +110,10 @@ def check_file_or_dir(
         )
     if file_or_dir == "file" and allowed_formats is not None:
         check_file_format(path, allowed_formats=allowed_formats)
+
+
+class FloatPrecision(IntEnum):
+    """Enum of possible float values precisions."""
+    LOW = 4
+    MEDIUM = 8
+    HIGH = 16

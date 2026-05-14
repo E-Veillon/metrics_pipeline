@@ -5,27 +5,17 @@ way to avoid ambiguities in data communications between pipeline steps.
 
 import typing as tp
 import typing_extensions as tpe
-from collections.abc import Mapping, Callable
-import functools as ft
+from collections.abc import Callable
 import itertools as itt
-from enum import IntEnum
 
-from tqdm.contrib.concurrent import process_map
 import numpy as np
 
 from pymatgen.core import Structure, Lattice, PeriodicSite
 
-from .io_base import PathLike
+from .io_base import PathLike, FloatPrecision
 from .json import JsonLoader, JsonWriter
 from src.utils.common_asserts import check_type
 from src.utils.visual_iterator import VisualIterator
-
-
-class FloatPrecision(IntEnum):
-    """Enum of possible float values precisions."""
-    LOW = 4
-    MEDIUM = 8
-    HIGH = 16
 
 
 class StructureFile:
