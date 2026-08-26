@@ -7,7 +7,7 @@ import argparse as ap
 import typing as tp
 
 from src.utils import parse_input_args, check_type, check_num_value
-from src.io import SlurmWriter, check_file_or_dir
+from src.genmat_io import SlurmWriter, check_file_or_dir
 
 
 def _get_cmd_line_args() -> ap.Namespace:

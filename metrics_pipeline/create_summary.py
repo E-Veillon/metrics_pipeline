@@ -6,7 +6,7 @@ import argparse as argp
 import typing as typ
 
 from src.utils import parse_input_args, check_type
-from src.io import check_file_or_dir, check_file_format, VaspParser, JsonWriter
+from src.genmat_io import check_file_or_dir, check_file_format, VaspParser, JsonWriter
 
 
 def _get_command_line_args() -> argp.Namespace:

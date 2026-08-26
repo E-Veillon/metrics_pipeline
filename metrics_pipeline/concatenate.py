@@ -2,7 +2,7 @@
 
 import argparse as ap
 
-from src.io import StructureFile
+from src.genmat_io import StructureFile
 
 
 def main() -> None:

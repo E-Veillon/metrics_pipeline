@@ -7,7 +7,7 @@ import argparse as ap
 from pymatgen.io.vasp import Poscar
 
 from src.utils import parse_input_args, check_type, check_num_value, VisualIterator
-from src.io import check_file_or_dir, check_file_format, CIFFile
+from src.genmat_io import check_file_or_dir, check_file_format, CIFFile
 
 
 def _get_command_line_args() -> ap.Namespace:

@@ -16,7 +16,7 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from src.utils import parse_input_args, check_type, check_num_value, VisualIterator
 from src.utils.spg_data import ALL_SYMMETRY_CLASSES, Spacegroup
-from src.io import CIFFile, check_file_or_dir
+from src.genmat_io import CIFFile, check_file_or_dir
 
 
 class SymmetryClass(Enum):

@@ -12,7 +12,7 @@ from src.utils import (
     parse_input_args, check_type, check_num_value,
     discard_rare_gas_structures, discard_rare_earth_structures
 )
-from src.io import CIFFile, check_file_or_dir, check_file_format
+from src.genmat_io import CIFFile, check_file_or_dir, check_file_format
 from src.metrics import StructValidity, Unicity
 
 

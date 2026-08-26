@@ -12,7 +12,7 @@ import typing as tp
 from datetime import datetime
 
 from src.utils import parse_input_args, check_type, check_num_value
-from src.io import (
+from src.genmat_io import (
     check_file_format, check_file_or_dir, VaspParser, VaspExtractor, ExtractMethod, JsonWriter
 )
 from src.computations.local import DSolStructure, batch_get_dsol_band_gaps

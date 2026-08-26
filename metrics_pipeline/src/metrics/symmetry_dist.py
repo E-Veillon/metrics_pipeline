@@ -11,7 +11,7 @@ from src.utils.genmat_data import GenMatStructure
 from src.utils.spg_data import (
     ALL_CRYSTAL_FAMILIES, ALL_CRYSTAL_SYSTEMS, ALL_POINT_GROUPS, ALL_SPACEGROUPS, Spacegroup
 )
-from src.io import JsonWriter
+from src.genmat_io import JsonWriter
 
 
 class SymmetryClassifier(Metric):

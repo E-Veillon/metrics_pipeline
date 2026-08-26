@@ -27,7 +27,7 @@ from src.utils import (
     filter_by_elements,
     generate_genmat_structures, GenMatStructure
 )
-from src.io import (
+from src.genmat_io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
     JsonLoader, JsonWriter, PathLike, CONFIGPATH,
     VaspParser, VaspExtractor, ExtractMethod, GenMatFile, StructureFile

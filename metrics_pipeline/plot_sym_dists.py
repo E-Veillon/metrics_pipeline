@@ -3,7 +3,7 @@
 import argparse as ap
 import matplotlib.pyplot as plt
 
-from src.io import JsonLoader, check_file_or_dir, check_file_format
+from src.genmat_io import JsonLoader, check_file_or_dir, check_file_format
 
 
 def main() -> None:

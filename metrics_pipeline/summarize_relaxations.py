@@ -8,7 +8,7 @@ import argparse as ap
 from pathlib import Path
 
 from src.utils import parse_input_args, check_type, check_num_value, VisualIterator
-from src.io import (
+from src.genmat_io import (
     check_file_or_dir, check_file_format,
     VaspParser, JsonWriter
 )

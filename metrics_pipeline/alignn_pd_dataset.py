@@ -7,7 +7,7 @@ import typing as tp
 from pathlib import Path
 
 from src.utils import parse_input_args, check_type, check_num_value
-from src.io import check_file_or_dir, check_file_format, CIFFile, JsonWriter
+from src.genmat_io import check_file_or_dir, check_file_format, CIFFile, JsonWriter
 from src.computations.models import vectors_from_alignn
 
 

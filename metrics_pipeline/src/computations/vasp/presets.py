@@ -12,7 +12,7 @@ from pymatgen.io.vasp.sets import (
     MPStaticSet, MPSOCSet, MatPESStaticSet, MPScanStaticSet
 )
 
-from src.io import load_yaml_as_dict
+from src.genmat_io import load_yaml_as_dict
 
 # TODO: temporary importation fix, to modify once new packages are built
 from src.utils.periodic_table import get_all_valence_electrons

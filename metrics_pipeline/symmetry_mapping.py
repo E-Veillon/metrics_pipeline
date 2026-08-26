@@ -7,7 +7,7 @@ import typing as tp
 import argparse as ap
 
 from src.utils import check_type, check_num_value, parse_input_args
-from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile
+from src.genmat_io import check_file_or_dir, check_file_format, CIFFile, PoscarFile
 from src.metrics import SymmetryClassifier
 
 

@@ -14,7 +14,7 @@ from .backend import (
 )
 from src.utils import ALL_ELT_SYMBOL_TO_Z
 from src.utils.genmat_data import GenMatStructure, StructureLike
-from src.io import JsonLoader
+from src.genmat_io import JsonLoader
 
 
 class BadTableError(ValueError):

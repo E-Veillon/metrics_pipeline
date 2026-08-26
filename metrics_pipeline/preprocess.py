@@ -22,7 +22,7 @@ from src.utils import (
     filter_by_elements,
     generate_genmat_structures
 )
-from src.io import check_file_or_dir, check_file_format, CIFFile, PoscarFile, GenMatFile, StructureFile
+from src.genmat_io import check_file_or_dir, check_file_format, CIFFile, PoscarFile, GenMatFile, StructureFile
 from src.metrics import SymmetryClassifier
 
 def _get_command_line_args() -> ap.Namespace:
