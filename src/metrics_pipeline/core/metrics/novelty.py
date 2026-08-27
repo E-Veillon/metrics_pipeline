@@ -9,7 +9,7 @@ from pymatgen.core import Structure
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 from .metric_base import Metric, MetricsData
-from core.utils import GenMatStructure, StructureLike
+from metrics_pipeline.core.utils.genmat_data import GenMatStructure, StructureLike
 
 
 class Novelty(Metric):

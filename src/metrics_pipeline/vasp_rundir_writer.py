@@ -12,13 +12,13 @@ import argparse as ap
 
 from pymatgen.io.vasp import VaspInput
 
-from core.utils import parse_input_args, check_type, check_num_value
-from core.genmat_io import (
+from metrics_pipeline.core.utils import parse_input_args, check_type, check_num_value
+from metrics_pipeline.core.genmat_io import (
     check_file_or_dir, load_yaml_as_dict,
     VaspWriter, VaspParser, VaspExtractor, ExtractMethod, CONFIGPATH, GenMatFile
 )
-from core.computations.local import DSolCalcType
-from core.computations.vasp import (
+from metrics_pipeline.core.computations.local import DSolCalcType
+from metrics_pipeline.core.computations.vasp import (
     init_vasp_settings, dsol_calc_init, ALL_PRESETS_NAMES, ALL_PRESETS_NAMES_LOWER,
     STATIC_PRESETS_NAMES_NO_DSOL_LOWER, GenMatSet
 )

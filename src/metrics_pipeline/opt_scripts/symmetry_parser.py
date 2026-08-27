@@ -14,9 +14,9 @@ from tqdm.contrib.concurrent import process_map
 from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-from core.utils import parse_input_args, check_type, check_num_value, VisualIterator
-from core.utils.spg_data import ALL_SYMMETRY_CLASSES, Spacegroup
-from core.genmat_io import CIFFile, check_file_or_dir
+from metrics_pipeline.core.utils import parse_input_args, check_type, check_num_value, VisualIterator
+from metrics_pipeline.core.utils.spg_data import ALL_SYMMETRY_CLASSES, Spacegroup
+from metrics_pipeline.core.genmat_io import CIFFile, check_file_or_dir
 
 
 class SymmetryClass(Enum):

@@ -6,9 +6,9 @@ import os
 import typing as tp
 import argparse as ap
 
-from core.utils import check_type, check_num_value, parse_input_args
-from core.genmat_io import check_file_or_dir, check_file_format, CIFFile, PoscarFile
-from core.metrics import SymmetryClassifier
+from metrics_pipeline.core.utils import check_type, check_num_value, parse_input_args
+from metrics_pipeline.core.genmat_io import check_file_or_dir, check_file_format, CIFFile, PoscarFile
+from metrics_pipeline.core.metrics import SymmetryClassifier
 
 
 def _get_cmd_line_args() -> ap.Namespace:

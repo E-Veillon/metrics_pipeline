@@ -11,7 +11,7 @@ from torch_scatter import scatter_mean
 from pymatgen.core import Structure
 
 from .metric_base import Metric, MetricsData
-from core.utils import GenMatStructure
+from metrics_pipeline.core.utils.genmat_data import GenMatStructure
 
 
 class RMSD(Metric):

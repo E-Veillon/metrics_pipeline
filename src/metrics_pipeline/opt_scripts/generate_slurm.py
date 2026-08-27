@@ -6,8 +6,8 @@ from pathlib import Path
 import argparse as ap
 import typing as tp
 
-from core.utils import parse_input_args, check_type, check_num_value
-from core.genmat_io import SlurmWriter, check_file_or_dir
+from metrics_pipeline.core.utils import parse_input_args, check_type, check_num_value
+from metrics_pipeline.core.genmat_io import SlurmWriter, check_file_or_dir
 
 
 def _get_cmd_line_args() -> ap.Namespace:
@@ -28,16 +28,16 @@ def _get_cmd_line_args() -> ap.Namespace:
         "--slurm-output",
         help=(
             "Name of the slurm output file capturing stdout output. "
-            "Defaults to 'slurm_%j.out', or 'slurm_%A_%a.out' if 'array' is given. "
-            "See Slurm documentation for more details about '%' shortcuts behaviors."
+            "Defaults to 'slurm_%%j.out', or 'slurm_%%A_%%a.out' if 'array' is given. "
+            "See Slurm documentation for more details about '%%' shortcuts behaviors."
         )
     )
     parser.add_argument(
         "--slurm-error",
         help=(
             "Name of the slurm error file capturing stderr output."
-            "Defaults to 'slurm_%j.err', or 'slurm_%A_%a.err' if 'array' is given. "
-            "See Slurm documentation for more details about '%' shortcuts behaviors."
+            "Defaults to 'slurm_%%j.err', or 'slurm_%%A_%%a.err' if 'array' is given. "
+            "See Slurm documentation for more details about '%%' shortcuts behaviors."
         )
     )
     parser.add_argument(

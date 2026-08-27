@@ -14,7 +14,8 @@ from tqdm.contrib.concurrent import process_map
 
 from pymatgen.core import Structure
 
-from core.utils import get_all_valence_electrons, VisualIterator
+from metrics_pipeline.core.utils.periodic_table import get_all_valence_electrons
+from metrics_pipeline.core.utils.visual_iterator import VisualIterator
 
 
 class DSolCalcType(Enum):

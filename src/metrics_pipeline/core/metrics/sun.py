@@ -10,7 +10,7 @@ from .metric_base import Metric, NoneMetric, MetricsData
 from .stability import Stability
 from .unicity import Unicity
 from .novelty import Novelty
-from core.utils import GenMatStructure
+from metrics_pipeline.core.utils.genmat_data import GenMatStructure
 
 
 # TODO: Tester le comportement des propriétés internes avant de lancer en production!

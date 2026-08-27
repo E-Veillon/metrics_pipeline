@@ -4,7 +4,7 @@ from collections import OrderedDict
 from typing import Any
 
 from .metric_base import Metric, MetricsData
-from core.utils import GenMatStructure, StructureLike
+from metrics_pipeline.core.utils.genmat_data import GenMatStructure, StructureLike
 
 
 class StructValidity(Metric):

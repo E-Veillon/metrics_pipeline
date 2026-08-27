@@ -2,7 +2,7 @@
 
 import argparse as ap
 
-from core.genmat_io import StructureFile
+from metrics_pipeline.core.genmat_io import StructureFile
 
 
 def main() -> None:

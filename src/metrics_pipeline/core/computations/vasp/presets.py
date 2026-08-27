@@ -12,10 +12,10 @@ from pymatgen.io.vasp.sets import (
     MPStaticSet, MPSOCSet, MatPESStaticSet, MPScanStaticSet
 )
 
-from core.genmat_io import load_yaml_as_dict
+from metrics_pipeline.core.genmat_io.yaml import load_yaml_as_dict
 
 # TODO: temporary importation fix, to modify once new packages are built
-from core.utils.periodic_table import get_all_valence_electrons
+from metrics_pipeline.core.utils.periodic_table import get_all_valence_electrons
 
 
 LOCAL_PRESETS_PATH = os.path.join(os.path.dirname(__file__), "presets_data")

@@ -15,15 +15,15 @@ import argparse as ap
 
 from pymatgen.core import Structure
 
-from core.utils import (
+from metrics_pipeline.core.utils import (
     parse_input_args, check_type, check_num_value,
     ALL_ELTS_CATEGORIES,
     get_elts_from_symbol_or_z, get_elts_in_categories,
     filter_by_elements,
     generate_genmat_structures
 )
-from core.genmat_io import check_file_or_dir, check_file_format, CIFFile, PoscarFile, GenMatFile, StructureFile
-from core.metrics import SymmetryClassifier
+from metrics_pipeline.core.genmat_io import check_file_or_dir, check_file_format, CIFFile, PoscarFile, GenMatFile, StructureFile
+from metrics_pipeline.core.metrics import SymmetryClassifier
 
 def _get_command_line_args() -> ap.Namespace:
     """Command Line Interface (CLI)."""

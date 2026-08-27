@@ -10,8 +10,9 @@ from dataclasses import dataclass, asdict, field
 import numpy as np
 from tqdm.contrib.concurrent import process_map
 
-from core.utils import VisualIterator, check_type, check_num_value
-from core.utils.genmat_data import GenMatPDEntry, GenMatStructure, StructureLike
+from metrics_pipeline.core.utils.common_asserts import check_type, check_num_value
+from metrics_pipeline.core.utils.visual_iterator import VisualIterator
+from metrics_pipeline.core.utils.genmat_data import GenMatPDEntry, GenMatStructure, StructureLike
 
 
 class StructureDistribution(tp.Protocol):

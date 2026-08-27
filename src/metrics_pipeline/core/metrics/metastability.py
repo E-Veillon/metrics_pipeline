@@ -7,7 +7,7 @@ from collections import defaultdict, OrderedDict
 from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram
 
 from .metric_base import Metric, MetricsData
-from core.utils import (
+from metrics_pipeline.core.utils.genmat_data import (
     GenMatPDEntry, GenMatStructure, PDEntryLike, StructureLike
 )
 

@@ -10,7 +10,7 @@ from scipy.stats import wasserstein_distance
 from pymatgen.core import Structure
 
 from .metric_base import StructureDistribution, Metric, MetricsData
-from core.utils import GenMatStructure, StructureLike
+from metrics_pipeline.core.utils.genmat_data import GenMatStructure, StructureLike
 
 
 class EMD(Metric):

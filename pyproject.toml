@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "metrics-pipeline"
-version = "4.0.1"
+version = "4.0.2"
 description = "Screening pipeline for metrics evaluation in Generative AI for materials"
 readme = "README.md"
 license-files = ["LICENSE"]
@@ -16,18 +16,27 @@ requires-python = ">=3.10,<4.0"
 dynamic = [ "dependencies" ]
 
 [project.scripts]
-cif_counter = 'metrics_pipeline.cif_counter:main'
-cif_to_poscar = 'metrics_pipeline.cif_to_poscar:main'
-dataset_loader = 'metrics_pipeline.dataset_loader:main'
-preprocess = 'metrics_pipeline.preprocess:main'
-vasp_static_sun = 'metrics_pipeline.vasp_static_sun:main'
-create_summary = 'metrics_pipeline.create_summary:main'
-phase_diag_energies = 'metrics_pipeline.phase_diag_energies:main'
-summary_paths_update = 'metrics_pipeline.summary_paths_update:main'
-vasp_relax = 'metrics_pipeline.vasp_relax:main'
-metrics = 'metrics_pipeline.metrics:main'
-vasp_static_dsol = 'metrics_pipeline.vasp_static_dsol:main'
-dsol_bandgap = 'metrics_pipeline.dsol_bandgap:main'
+# Main pipeline scripts
+preprocess = "metrics_pipeline.preprocess:main"
+concatenate = "metrics_pipeline.concatenate:main"
+dataset_loader = "metrics_pipeline.dataset_loader:main"
+vasp_rundir_writer = "metrics_pipeline.vasp_rundir_writer:main"
+phase_diag_energies = "metrics_pipeline.phase_diag_energies:main"
+summarize_relaxations = "metrics_pipeline.summarize_relaxations:main"
+metrics = "metrics_pipeline.metrics:main"
+
+# Optional scripts
+alignn_pd_dataset = "metrics_pipeline.opt_scripts.alignn_pd_dataset:main"
+cif_counter = "metrics_pipeline.opt_scripts.cif_counter:main"
+cif_to_poscar = "metrics_pipeline.opt_scripts.cif_to_poscar:main"
+create_summary = "metrics_pipeline.opt_scripts.create_summary:main"
+dsol_bandgap = "metrics_pipeline.opt_scripts.dsol_bandgap:main"
+generate_slurm = "metrics_pipeline.opt_scripts.generate_slurm:main"
+parse_csv = "metrics_pipeline.opt_scripts.parse_csv:main"
+plot_sym_dists = "metrics_pipeline.opt_scripts.plot_sym_dists:main"
+summary_paths_update = "metrics_pipeline.opt_scripts.summary_paths_update:main"
+symmetry_mapping = "metrics_pipeline.opt_scripts.symmetry_mapping:main"
+symmetry_parser = "metrics_pipeline.opt_scripts.symmetry_parser:main"
 
 [tool.poetry]
 packages = [

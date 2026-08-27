@@ -8,8 +8,8 @@ import os
 import argparse as argp
 import typing as typ
 
-from core.utils import parse_input_args, check_type
-from core.genmat_io import check_file_or_dir, PDDataset, MPDatasetDownloader
+from metrics_pipeline.core.utils import parse_input_args, check_type
+from metrics_pipeline.core.genmat_io import check_file_or_dir, PDDataset, MPDatasetDownloader
 
 
 def _get_command_line_args() -> argp.Namespace:

@@ -18,7 +18,9 @@ from pymatgen.io.vasp import VaspInput, Vasprun, Poscar, Xdatcar
 
 from .io_base import PathLike, check_file_or_dir
 from .json import JsonLoader
-from core.utils import raise_or_warn, VisualIterator, is_genmat_name
+from metrics_pipeline.core.utils.common_asserts import raise_or_warn
+from metrics_pipeline.core.utils.visual_iterator import VisualIterator
+from metrics_pipeline.core.utils.genmat_data import is_genmat_name
 
 
 class VaspParsingError(Exception):

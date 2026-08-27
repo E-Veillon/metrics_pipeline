@@ -6,12 +6,12 @@ from collections import OrderedDict
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmetryUndeterminedError
 
 from .metric_base import Metric, MetricsData
-from core.utils import raise_or_warn, check_type
-from core.utils.genmat_data import GenMatStructure
-from core.utils.spg_data import (
+from metrics_pipeline.core.utils import raise_or_warn, check_type
+from metrics_pipeline.core.utils.genmat_data import GenMatStructure
+from metrics_pipeline.core.utils.spg_data import (
     ALL_CRYSTAL_FAMILIES, ALL_CRYSTAL_SYSTEMS, ALL_POINT_GROUPS, ALL_SPACEGROUPS, Spacegroup
 )
-from core.genmat_io import JsonWriter
+from metrics_pipeline.core.genmat_io.json import JsonWriter
 
 
 class SymmetryClassifier(Metric):

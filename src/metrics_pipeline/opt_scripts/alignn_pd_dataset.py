@@ -6,9 +6,9 @@ import argparse as ap
 import typing as tp
 from pathlib import Path
 
-from core.utils import parse_input_args, check_type, check_num_value
-from core.genmat_io import check_file_or_dir, check_file_format, CIFFile, JsonWriter
-from core.computations.models import vectors_from_alignn
+from metrics_pipeline.core.utils import parse_input_args, check_type, check_num_value
+from metrics_pipeline.core.genmat_io import check_file_or_dir, check_file_format, CIFFile, JsonWriter
+from metrics_pipeline.core.computations.models import vectors_from_alignn
 
 
 def _get_cmd_line_args() -> ap.Namespace:

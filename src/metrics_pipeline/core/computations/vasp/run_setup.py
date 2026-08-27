@@ -13,8 +13,8 @@ from .presets import (
     ALL_STATIC_PRESETS_NAMES,
     ALL_STATIC_PRESETS_NAMES_LOWER
 )
-from core.utils import get_all_valence_electrons
-from core.computations.local import DSolInput
+from metrics_pipeline.core.utils.periodic_table import get_all_valence_electrons
+from metrics_pipeline.core.computations.local.delta_sol import DSolInput
 
 
 U_VALUES = {

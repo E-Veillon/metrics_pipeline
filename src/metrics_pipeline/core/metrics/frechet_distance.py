@@ -8,7 +8,7 @@ import numpy as np
 from pymatgen.core import Structure
 
 from .metric_base import StructureDistribution, Metric, MetricsData
-from core.utils import GenMatStructure
+from metrics_pipeline.core.utils.genmat_data import GenMatStructure
 
 
 class FrechetDistance(Metric):

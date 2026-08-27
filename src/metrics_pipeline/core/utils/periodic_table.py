@@ -9,7 +9,7 @@ import functools as ft
 import typing as tp
 from collections.abc import Callable
 
-from pymatgen.core import SiteCollection, Structure, Composition, Element, Species, DummySpecies
+from pymatgen.core import SiteCollection, Structure, Composition, Element, Species
 from pymatgen.core.periodic_table import ElementType
 from pymatgen.io.cif import CifBlock
 

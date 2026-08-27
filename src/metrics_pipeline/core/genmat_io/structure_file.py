@@ -15,8 +15,8 @@ from pymatgen.core import Structure, Lattice, PeriodicSite
 
 from .io_base import PathLike, FloatPrecision
 from .json import JsonLoader, JsonWriter
-from core.utils.common_asserts import check_type
-from core.utils.visual_iterator import VisualIterator
+from metrics_pipeline.core.utils.common_asserts import check_type
+from metrics_pipeline.core.utils.visual_iterator import VisualIterator
 
 
 S = tp.TypeVar("S", bound=Structure)

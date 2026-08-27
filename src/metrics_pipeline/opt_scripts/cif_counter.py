@@ -5,7 +5,7 @@ import os
 import argparse as ap
 import typing as tp
 
-from core.utils import parse_input_args, check_type
+from metrics_pipeline.core.utils import parse_input_args, check_type
 
 
 def _get_command_line_args() -> ap.Namespace:

@@ -6,8 +6,8 @@ import argparse as ap
 
 from pymatgen.io.vasp import Poscar
 
-from core.utils import parse_input_args, check_type, check_num_value, VisualIterator
-from core.genmat_io import check_file_or_dir, check_file_format, CIFFile
+from metrics_pipeline.core.utils import parse_input_args, check_type, check_num_value, VisualIterator
+from metrics_pipeline.core.genmat_io import check_file_or_dir, check_file_format, CIFFile
 
 
 def _get_command_line_args() -> ap.Namespace:

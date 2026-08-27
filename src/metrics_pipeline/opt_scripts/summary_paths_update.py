@@ -7,8 +7,8 @@ import os
 import typing as typ
 import argparse as argp
 
-from core.utils import parse_input_args, check_type
-from core.genmat_io import check_file_or_dir, JsonLoader, JsonWriter
+from metrics_pipeline.core.utils import parse_input_args, check_type
+from metrics_pipeline.core.genmat_io import check_file_or_dir, JsonLoader, JsonWriter
 
 
 def _get_command_line_args() -> argp.Namespace:

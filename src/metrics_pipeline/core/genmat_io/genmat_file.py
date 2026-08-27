@@ -15,8 +15,8 @@ from .structure_file import (
     StructureFile, _parse_dict_keys,
     _compress_struct_dict, _uncompress_struct_dict
 )
-from core.utils.genmat_data import GenMatStructure
-from core.utils.spg_data import Spacegroup
+from metrics_pipeline.core.utils.genmat_data import GenMatStructure
+from metrics_pipeline.core.utils.spg_data import Spacegroup
 
 
 G = tp.TypeVar("G", bound=GenMatStructure)

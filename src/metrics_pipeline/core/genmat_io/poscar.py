@@ -19,7 +19,8 @@ from pymatgen.core import Structure
 from pymatgen.io.vasp.inputs import Poscar
 
 from .io_base import PathLike
-from core.utils import ALL_ELT_SYMBOL_TO_Z, VisualIterator
+from metrics_pipeline.core.utils.periodic_table import ALL_ELT_SYMBOL_TO_Z
+from metrics_pipeline.core.utils.visual_iterator import VisualIterator
 
 
 @dataclass
@@ -340,6 +341,10 @@ class PoscarFile:
             positions_basis=self.positions_basis[idx],
             positions=self.positions[idx]
         )
+
+    def __iter__(self) -> tp.Iterator[PoscarBlock]:
+        for idx in range(len(self)):
+            yield self[idx]
 
     # ===== Internal helper methods =====
     @staticmethod

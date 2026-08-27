@@ -24,14 +24,14 @@ from datetime import datetime
 
 from pymatgen.core import Element
 
-from core.utils import parse_input_args, check_type, check_num_value
-from core.genmat_io import (
+from metrics_pipeline.core.utils import parse_input_args, check_type, check_num_value
+from metrics_pipeline.core.genmat_io import (
     VaspParser, VaspExtractor, ExtractMethod, PDDataset, GenMatPDDataset, JsonWriter, GenMatFile,
     check_file_or_dir, check_file_format
 )
-from core.metrics import Stability
-from core.computations.local import get_lacking_elts_entries
-from core.computations.models import vectors_from_alignn
+from metrics_pipeline.core.metrics import Stability
+from metrics_pipeline.core.computations.local import get_lacking_elts_entries
+from metrics_pipeline.core.computations.models import vectors_from_alignn
 
 
 def _get_command_line_args() -> ap.Namespace:

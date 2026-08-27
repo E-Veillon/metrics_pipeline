@@ -5,7 +5,7 @@ import typing as tp
 from pymatgen.core import Element, Species, DummySpecies, Composition
 from pymatgen.analysis.phase_diagram import PDEntry
 
-from core.utils import flatten
+from metrics_pipeline.core.utils.flattener import flatten
 
 
 def get_elements_from_entries(entries: tp.Sequence[PDEntry]) -> list[Element | Species | DummySpecies]:

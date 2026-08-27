@@ -11,11 +11,11 @@ import argparse as argp
 import typing as tp
 from datetime import datetime
 
-from core.utils import parse_input_args, check_type, check_num_value
-from core.genmat_io import (
+from metrics_pipeline.core.utils import parse_input_args, check_type, check_num_value
+from metrics_pipeline.core.genmat_io import (
     check_file_format, check_file_or_dir, VaspParser, VaspExtractor, ExtractMethod, JsonWriter
 )
-from core.computations.local import DSolStructure, batch_get_dsol_band_gaps
+from metrics_pipeline.core.computations.local import DSolStructure, batch_get_dsol_band_gaps
 
 
 ########################################

@@ -15,7 +15,8 @@ from pymatgen.symmetry.structure import SymmetrizedStructure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer, SymmOp
 
 from .io_base import PathLike
-from core.utils import VisualIterator, raise_or_warn
+from metrics_pipeline.core.utils.common_asserts import raise_or_warn
+from metrics_pipeline.core.utils.visual_iterator import VisualIterator
 
 
 class CIFParsingError(Exception):

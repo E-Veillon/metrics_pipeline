@@ -5,6 +5,7 @@ Crystallographic spacegroup symmetry classification data.
 import typing_extensions as tpe
 from collections import OrderedDict
 
+
 ALL_CRYSTAL_FAMILIES = ("triclinic", "monoclinic", "orthorhombic", "tetragonal", "hexagonal", "cubic")
 ALL_CRYSTAL_SYSTEMS = ("triclinic", "monoclinic", "orthorhombic", "tetragonal", "trigonal", "hexagonal", "cubic")
 ALL_POINT_GROUPS = (

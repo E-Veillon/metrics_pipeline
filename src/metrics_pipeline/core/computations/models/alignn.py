@@ -14,7 +14,7 @@ from materials_toolkit.models.alignn.pretrained import get_pretrained_alignn, mo
 
 from pymatgen.core import Structure, Element, Species
 
-from core.utils import VisualIterator
+from metrics_pipeline.core.utils.visual_iterator import VisualIterator
 
 
 def _species_to_tensor(elements: list[Element | Species]) -> torch.Tensor:

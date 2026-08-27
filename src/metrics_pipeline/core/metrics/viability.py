@@ -12,9 +12,9 @@ from .backend import (
     slater_radii_table_pm_1,
     clementi_et_al_radii_table_pm
 )
-from core.utils import ALL_ELT_SYMBOL_TO_Z
-from core.utils.genmat_data import GenMatStructure, StructureLike
-from core.genmat_io import JsonLoader
+from metrics_pipeline.core.utils.periodic_table import ALL_ELT_SYMBOL_TO_Z
+from metrics_pipeline.core.utils.genmat_data import GenMatStructure, StructureLike
+from metrics_pipeline.core.genmat_io.json import JsonLoader
 
 
 class BadTableError(ValueError):

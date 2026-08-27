@@ -21,20 +21,20 @@ from collections.abc import Callable
 
 from pymatgen.core import Structure
 
-from core.utils import (
+from metrics_pipeline.core.utils import (
     parse_input_args, check_type, check_num_value,
     ALL_ELTS_CATEGORIES, get_elts_from_symbol_or_z, get_elts_in_categories,
     filter_by_elements,
     generate_genmat_structures, GenMatStructure
 )
-from core.genmat_io import (
+from metrics_pipeline.core.genmat_io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
     JsonLoader, JsonWriter, PathLike, CONFIGPATH,
     VaspParser, VaspExtractor, ExtractMethod, GenMatFile, StructureFile
 )
-from core.computations.models import get_crystalnn_fingerprints, vectors_from_alignn
-from core.computations.local import get_densities
-from core.metrics import (
+from metrics_pipeline.core.computations.models import get_crystalnn_fingerprints, vectors_from_alignn
+from metrics_pipeline.core.computations.local import get_densities
+from metrics_pipeline.core.metrics import (
     StructValidity, Viability, SymmetryClassifier, Unicity, SUN,
     Coverage, EMD, RMSD, FrechetDistance, MetricsData
 )

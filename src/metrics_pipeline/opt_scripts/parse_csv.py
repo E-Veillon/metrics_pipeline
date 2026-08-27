@@ -8,12 +8,12 @@ from tqdm import tqdm
 
 import pandas as pd
 
-from core.utils import (
+from metrics_pipeline.core.utils import (
     parse_input_args, check_type, check_num_value,
     discard_rare_gas_structures, discard_rare_earth_structures
 )
-from core.genmat_io import CIFFile, check_file_or_dir, check_file_format
-from core.metrics import StructValidity, Unicity
+from metrics_pipeline.core.genmat_io import CIFFile, check_file_or_dir, check_file_format
+from metrics_pipeline.core.metrics import StructValidity, Unicity
 
 
 def _get_command_line_args() -> ap.Namespace:

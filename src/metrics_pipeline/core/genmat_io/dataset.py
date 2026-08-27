@@ -14,7 +14,8 @@ from pymatgen.analysis.phase_diagram import PDEntry
 from .io_base import PathLike
 from .json import JsonLoader, JsonWriter
 
-from core.utils import ALL_ELT_SYMBOL_TO_Z, GenMatPDEntry, check_genmat_name
+from metrics_pipeline.core.utils.periodic_table import ALL_ELT_SYMBOL_TO_Z
+from metrics_pipeline.core.utils.genmat_data import GenMatPDEntry, check_genmat_name
 
 
 @dataclass
