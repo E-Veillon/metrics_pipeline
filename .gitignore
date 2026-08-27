@@ -18,5 +18,3 @@ slurm-*
 slurm_*
 .local
 .cache
-tests.py
-
