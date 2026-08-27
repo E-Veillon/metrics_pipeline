@@ -211,7 +211,7 @@ def struct_to_cif_str(
 def simply_read_cif(
     filename: str,
     workers: int = 1
-) -> Tuple[List[Structure], int, int]:
+) -> List[Structure]:
     """
     Reads a cif file containing concatenated structures data and decode them using multiprocess.
     Simplified version of read_cif() that cannot do anything else than Structure conversion.
@@ -292,9 +292,14 @@ def flatten(sequence: Sequence[Any], level_of_flattening: int = 1) -> List:
     Returns:
         A list flattened the specified number of times.
     '''
+    sequence = list(sequence)
+
+    if level_of_flattening < 1:
+        return sequence
 
     for _ in range(1, level_of_flattening + 1):
         sequence = list(itertools.chain.from_iterable(sequence))
+
     return sequence
 
 
@@ -332,8 +337,9 @@ def get_perturbs_dict(
     Returns:
         A dict with a key for each individual parameter containing corresponding min and max possible perturbation.
     """
-
-    perturbs_dict = dict.fromkeys(("sites", "a", "b", "c", "alpha", "beta", "gamma"))
+    perturbs_dict: dict[str, dict[str, float] | None] = dict.fromkeys(
+        ("sites", "a", "b", "c", "alpha", "beta", "gamma")
+    )
 
     for param, mini, maxi in zip(parameters, min_perturbs, max_perturbs):
         match param:
@@ -391,33 +397,29 @@ def is_valid_lattice(lattice: Lattice) -> bool:
 
 
 def _perturb_lattice_parameters(
-        structure: Structure, perturbs_dict: Dict, retries: int = 4) -> Structure:
+        structure: Structure, perturbs_dict: Dict[str, Dict[str, float] | None], retries: int = 4) -> Structure:
     """
     Perturb randomly lattice parameters of a structure.
     Perturbations are ranging between values given in 'perturbs_dict'.
     Perturbations are expressed in angstroms for lengths and degrees for angles.
     """
-    old_lattice_params = structure.lattice.params_dict
-    new_lattice_params = dict.fromkeys(("a", "b", "c", "alpha", "beta", "gamma"))
+    # Init with unmodified lattice parameters
+    new_lattice_params = structure.lattice.params_dict
 
-    for param in old_lattice_params:
-        if perturbs_dict.get(param) is None:
-            new_lattice_params[param] = old_lattice_params[param]
-        else:
-            perturb = get_random_sign() * uniform(
-                perturbs_dict[param].get("min"),
-                perturbs_dict[param].get("max")
-            )
-            new_lattice_params[param] = old_lattice_params[param] + perturb
+    for param in new_lattice_params:
+        param_modif = perturbs_dict.get(param)
+        if param_modif is None:
+            continue
+
+        perturb = get_random_sign() * uniform(
+            param_modif["min"], param_modif["max"]
+        )
+        new_lattice_params[param] += perturb
 
     new_lattice = Lattice.from_parameters(
-        a=new_lattice_params["a"],
-        b=new_lattice_params["b"],
-        c=new_lattice_params["c"],
-        alpha=new_lattice_params["alpha"],
-        beta=new_lattice_params["beta"],
-        gamma=new_lattice_params["gamma"]
+        **new_lattice_params, vesta=False, pbc=(True, True, True)
     )
+
     # As the process is random, it might sometimes return an unphysical lattice.
     # If it is the case, try to get another random perturbation which leads to
     # physically valid values.
@@ -501,11 +503,12 @@ def generate_perturbed_structs(
         perturbed_struct = None
 
         # Gestion des positions des sites
-        if perturbs_dict.get("sites") is not None:
+        sites_modif = perturbs_dict.get("sites")
+        if sites_modif is not None:
             perturbed_struct = _perturb_site_positions(
                 structure=structure,
-                min=perturbs_dict["sites"].get("min"),
-                max=perturbs_dict["sites"].get("max")
+                min=sites_modif["min"],
+                max=sites_modif["max"]
             )
 
         # Gestion des paramètres de maille

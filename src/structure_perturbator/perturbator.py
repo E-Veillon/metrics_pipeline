@@ -7,64 +7,7 @@ import os
 import argparse
 
 
-def assert_args(args: argparse.Namespace) -> None:
-
-    valid_parameters = (
-        "sites", "lengths", "angles", 
-        "a", "b", "c", "alpha", "beta", "gamma"
-    )
-
-    assert os.path.isfile(args.input_file), f"{args.input_file}: no such file found."
-
-    assert args.input_file.endswith(".cif"), "Input file must be of CIF format (.cif)."
-    
-    if args.output is not None:
-        assert args.output.endswith(".cif"), "Output file must be of CIF format (.cif)."
-
-    assert all([param in valid_parameters for param in args.parameters]), (
-        "Some of the parameters given are not valid. See --help for a list of supported parameters."
-    )
-    assert len(args.parameters) == len(set(args.parameters)), (
-        "Some parameters are passed more than one time, please verify your --parameters argument."
-    )
-
-    if "lengths" in args.parameters:
-        assert all([param not in valid_parameters[5:8] for param in args.parameters]), (
-            "'lengths' parameter cannot be combined with 'a', 'b' or 'c' parameters."
-        )
-
-    if "angles" in args.parameters:
-        assert all([param not in valid_parameters[8:] for param in args.parameters]), (
-            "'angles' parameter cannot be combined with 'alpha', 'beta' or 'gamma' parameters."
-        )
-
-    if args.smallest_perturb is not None:
-        assert len(args.smallest_perturb) == len(args.parameters), (
-            "The number of values in --smallest-scale argument must match the number of parameters in --parameters."
-        )
-        assert all([val >= 0.0 for val in args.smallest_perturb]), (
-            "Minimal amplitudes must be positive or zero "
-            "(whether the perturbation will be positive or negative is random)."
-        )
-
-    if args.biggest_perturb is not None:
-        assert len(args.biggest_perturb) == len(args.parameters), (
-            "The number of values in --biggest-scale argument must match the number of parameters in --parameters."
-        )
-        assert all([val > 0.0 for val in args.biggest_perturb]), (
-            "Maximal amplitudes must be stricly positive "
-            "(whether the perturbation will be positive or negative is random)."
-        )
-    
-    assert args.sample_size >= 1, "'sample_size' argument must be strictly positive."
-
-    assert args.workers >= 1, "'workers' argument must be strictly positive."
-
-
-def main() -> None:
-    
-    # ARGUMENTS PARSING BLOCK
-
+def _get_cmd_line_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="perturbator.py",
         description=(
@@ -82,7 +25,6 @@ def main() -> None:
         ),
         formatter_class=argparse.RawTextHelpFormatter
     )
-
     parser.add_argument(
         "input_file",
         type=str,
@@ -167,64 +109,111 @@ def main() -> None:
         help="Number of parallel processes to spawn for parallelized steps.\n",
         metavar="int",
     )
-
     args = parser.parse_args()
+    return args
 
-    assert_args(args)
 
-    # Manage arguments values and set defaults
-    infile = args.input_file
+def _assert_args(args: argparse.Namespace) -> None:
+    """Assert validity of user input arguments."""
+    valid_parameters = (
+        "sites", "lengths", "angles", 
+        "a", "b", "c", "alpha", "beta", "gamma"
+    )
 
+    assert os.path.isfile(args.input_file), f"{args.input_file}: no such file found."
+
+    assert args.input_file.endswith(".cif"), "Input file must be of CIF format (.cif)."
+    
+    if args.output is not None:
+        assert args.output.endswith(".cif"), "Output file must be of CIF format (.cif)."
+
+    assert all([param in valid_parameters for param in args.parameters]), (
+        "Some of the parameters given are not valid. See --help for a list of supported parameters."
+    )
+    assert len(args.parameters) == len(set(args.parameters)), (
+        "Some parameters are passed more than one time, please verify your --parameters argument."
+    )
+
+    if "lengths" in args.parameters:
+        assert all([param not in valid_parameters[5:8] for param in args.parameters]), (
+            "'lengths' parameter cannot be combined with 'a', 'b' or 'c' parameters."
+        )
+
+    if "angles" in args.parameters:
+        assert all([param not in valid_parameters[8:] for param in args.parameters]), (
+            "'angles' parameter cannot be combined with 'alpha', 'beta' or 'gamma' parameters."
+        )
+
+    if args.smallest_perturb is not None:
+        assert len(args.smallest_perturb) == len(args.parameters), (
+            "The number of values in --smallest-scale argument must match the number of parameters in --parameters."
+        )
+        assert all([val >= 0.0 for val in args.smallest_perturb]), (
+            "Minimal amplitudes must be positive or zero "
+            "(whether the perturbation will be positive or negative is random)."
+        )
+
+    if args.biggest_perturb is not None:
+        assert len(args.biggest_perturb) == len(args.parameters), (
+            "The number of values in --biggest-scale argument must match the number of parameters in --parameters."
+        )
+        assert all([val > 0.0 for val in args.biggest_perturb]), (
+            "Maximal amplitudes must be stricly positive "
+            "(whether the perturbation will be positive or negative is random)."
+        )
+    
+    assert args.sample_size >= 1, "'sample_size' argument must be strictly positive."
+
+    assert args.workers >= 1, "'workers' argument must be strictly positive."
+
+
+def _process_args(args: argparse.Namespace) -> argparse.Namespace:
+    """Manage arguments values and set defaults."""
     if args.output is None:
-        outfile = infile.replace(".cif", "_perturb.cif")
-    else:
-        outfile = args.output
-
-    parameters = args.parameters
+        args.output = args.input_file.replace(".cif", "_perturb.cif")
 
     if args.smallest_perturb is None:
-        min_perturbs = [0.0] * len(parameters)
-    else:
-        min_perturbs =  args.smallest_perturb
+        args.smallest_perturb = [0.0] * len(args.parameters)
 
     if args.biggest_perturb is None:
-        max_perturbs = []
-        for param in parameters:
+        args.biggest_perturb = []
+        for param in args.parameters:
             match param:
                 case "sites"|"lengths"|"a"|"b"|"c":
-                    max_perturbs.append(0.1)
+                    args.biggest_perturb.append(0.1)
                 case "angles"|"alpha"|"beta"|"gamma":
-                    max_perturbs.append(1.0)
-    else:
-        max_perturbs = args.biggest_perturb
+                    args.biggest_perturb.append(1.0)
 
-    sample_size = args.sample_size
-    workers = args.workers
+    return args
 
 
-    # MAIN BLOCK
+def main() -> None:
+    args = _get_cmd_line_args()
+    _assert_args(args)
+    args = _process_args(args)
 
-    from perturb_utils import (
+    from structure_perturbator.perturb_utils import (
         get_perturbs_dict, simply_read_cif, write_cif, batch_generate_perturbed_structs
     )
 
-    perturbs_dict = get_perturbs_dict(parameters, min_perturbs, max_perturbs)
+    perturbs_dict = get_perturbs_dict(args.parameters, args.smallest_perturb, args.biggest_perturb)
 
     lattice_params = ("a", "b", "c", "alpha", "beta", "gamma")
     modified_lattice = any([perturbs_dict[param] is not None for param in lattice_params])
     
-    structures = simply_read_cif(filename=infile, workers=workers)
+    structures = simply_read_cif(filename=args.input_file, workers=args.workers)
 
     perturbed_structs = batch_generate_perturbed_structs(
         structures=structures,
-        workers=workers,
+        workers=args.workers,
         perturbs_dict=perturbs_dict,
-        sample_size=sample_size,
+        sample_size=args.sample_size,
         modified_lattice=modified_lattice,
         lattice_retries=args.retries
     )
 
-    write_cif(filename=outfile, structures=perturbed_structs, workers=workers)
+    write_cif(filename=args.output, structures=perturbed_structs, workers=args.workers)
+
 
 if __name__ == "__main__":
     main()
