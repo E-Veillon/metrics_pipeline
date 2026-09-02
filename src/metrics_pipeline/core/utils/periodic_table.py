@@ -36,8 +36,8 @@ valid chemical element symbol or Z.
 PMG_ELTS_CATEGORIES = {
     str(elt_grp.value) for elt_grp in ElementType if elt_grp != ElementType.quadrupolar
 }
-GRP_ELTS_CATEGORIES = {f"group_{i}" for i in range(1,18)}
-PRD_ELTS_CATEGORIES = {f"period_{i}" for i in range(1,7)}
+GRP_ELTS_CATEGORIES = {f"group_{i}" for i in range(1,19)}
+PRD_ELTS_CATEGORIES = {f"period_{i}" for i in range(1,8)}
 ALL_ELTS_CATEGORIES = PMG_ELTS_CATEGORIES | GRP_ELTS_CATEGORIES | PRD_ELTS_CATEGORIES
 
 

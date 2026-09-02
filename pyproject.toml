@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "metrics-pipeline"
-version = "4.0.2"
+version = "4.0.3"
 description = "Screening pipeline for metrics evaluation in Generative AI for materials"
 readme = "README.md"
 license-files = ["LICENSE"]
@@ -56,6 +56,7 @@ torch-geometric = "^2.3.0"
 materials-toolkit = { git = "https://github.com/materials-toolkits/pymaterials.git", branch = "pre-release", rev="c777b3a" }
 matminer = "^0.9.2"
 mp-api = "^0.41.2"
+emmet-core = "~0.85"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=9.1.0"
