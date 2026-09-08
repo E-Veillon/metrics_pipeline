@@ -117,35 +117,56 @@ def get_elts_in_categories(cdts_list: list[str]) -> dict[str, int]:
     return found_elts
 
 
-def has_elements(
-    structure: Structure | str, elements: list[str], format: str | None = None
-) -> bool:
+def structure_has_elements(structure: Structure, elements: list[str]) -> bool:
+    """
+    Whether the structure contains at least one of given elements.
+
+    Parameters
+    ----------
+    structure: Structure
+        The structure to search into.
+
+    elements: list[str]
+        List of element symbols to search for.
+
+    Returns
+    -------
+    bool
+        `True` if the structure contains at least one of the elements, else `False`.
+    """
+    check_type(structure, "structure", (Structure,))
+    check_type(elements, "elements", (list,))
+    for idx, elt in enumerate(elements):
+        check_type(elt, f"elements[{idx}]", (str,))
+
+    return any(elt in elements for elt in structure.composition.get_el_amt_dict().keys())
+
+
+def data_has_elements(struct_data: str, elements: list[str], format: str) -> bool:
     """
     Whether the structure data contains at least one of given elements.
 
     Parameters
     ----------
-    structure: Structure | str
+    struct_data: str
         The structure data to search into.
 
     elements: list[str]
         List of element symbols to search for.
 
-    format: str, optional
-        If `structure` is passed as a str, precise the formatting ("cif" or "poscar").
+    format: str
+        Data formatting ("cif" or "poscar").
 
     Returns
     -------
     bool
         `True` if the data contains at least one of the elements, else `False`.
     """
-    if isinstance(structure, Structure):
-        return any(elt in elements for elt in structure.composition.get_el_amt_dict().keys())
+    check_type(struct_data, "struct_data", (str,))
+    check_type(elements, "elements", (list,))
+    for idx, elt in enumerate(elements):
+        check_type(elt, f"elements[{idx}]", (str,))
 
-    if not isinstance(structure, str):
-        raise TypeError(
-            f"'data' expected a type 'Structure' or 'str', got {type(structure).__name__!r}."
-        )
     if not elements:
         return False
 
@@ -153,7 +174,7 @@ def has_elements(
         case "cif":
             # Search for any label beginning with '_chemical_formula' containing composition
             formula_line = re.compile(fr"^_chemical_formula[a-zA-Z0-9_]+\s+(.+)$", flags=re.MULTILINE)
-            for match in re.finditer(formula_line, structure):
+            for match in re.finditer(formula_line, struct_data):
                 # Extract formula from the line
                 formula = match.group(1)
                 # Next line if no formula in the line
@@ -168,14 +189,12 @@ def has_elements(
                 return False
         case "poscar":
             # Search in the POSCAR element line (VASP 5.0+ format)
-            elts = structure.split("\n", maxsplit=6)[5].split()
+            elts = struct_data.split("\n", maxsplit=6)[5].split()
             return any(elt in elements for elt in elts)
         case str():
             raise ValueError(f"Unsupported format {format!r}.")
-        case None:
-            raise ValueError("'format' must be given when passing data as a string.")
         case _:
-            raise TypeError(f"'format' expected a type 'str', got {type(format).__name__!r}.")
+            check_type(format, "format", (str,))
 
 
 @tp.overload
@@ -212,10 +231,26 @@ def filter_by_elements(
     int
         The number of filtered data.
     """
-    has_elts = ft.partial(has_elements, elements=elements, format=format)
-    filtered_structs = list(filterfalse(has_elts, structures))
-    nbr_discarded = len(structures) - len(filtered_structs)
-    return filtered_structs, nbr_discarded
+    if all(isinstance(struct, Structure) for struct in structures):
+        structures = tp.cast(list[Structure], structures)
+        has_elts = ft.partial(structure_has_elements, elements=elements)
+        filtered_structs = list(filterfalse(has_elts, structures))
+        return filtered_structs, len(structures) - len(filtered_structs)
+
+    elif all(isinstance(struct, str) for struct in structures):
+        if format is None:
+            raise ValueError(
+                "If structure data are passed as strings, the 'format' argument must be specified."
+            )
+        structures = tp.cast(list[str], structures)
+        has_elts = ft.partial(data_has_elements, elements=elements, format=format)
+        filtered_structs = list(filterfalse(has_elts, structures))
+        return filtered_structs, len(structures) - len(filtered_structs)
+
+    raise ValueError(
+        "All structures must be of the same type, either all pymatgen Structure objects "
+        "or all strings."
+    )
 
 
 def has_rare_gas(structure: SiteCollection | str) -> bool:

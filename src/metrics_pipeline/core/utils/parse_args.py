@@ -1,4 +1,3 @@
-#!/usr/bin/python
 """Parse arguments either from CLI or higher level script for all executable scripts of GenMat."""
 
 import typing as tp
@@ -14,19 +13,25 @@ def parse_input_args(
     """
     Gather and process input arguments, either from command-line or external script.
     
-    Parameters:
-        cmd_line_func (callable):       Function parsing command line arguments into attributes
-                                        of a python object (e.g. argparse.Namespace object).
+    Parameters
+    ----------
+    cmd_line_func: callable
+        Function parsing command line arguments into attributes of a python object
+        (e.g. argparse.Namespace object).
 
-        process_args_func (callable):   Function asserting and processing input arguments.
+    process_args_func: callable
+        Function asserting and processing input arguments.
 
-        standalone (bool):              Whether parsed script is used directly through
-                                        command-line (stand-alone script) or in an external
-                                        pipeline script.
+    standalone: bool
+        Whether parsed script is used directly through command-line (stand-alone script)
+        or in an external pipeline script.
 
-        kwargs:                         Input arguments values for external script calls.
+    kwargs: Any
+        Input arguments values for external script calls.
 
-    Returns:
+    Returns
+    -------
+    dict[str, Any]
         Dict of input arguments names and values.
     """
     if standalone: # Direct use of the script through command line
