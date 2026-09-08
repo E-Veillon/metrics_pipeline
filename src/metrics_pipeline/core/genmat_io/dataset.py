@@ -15,7 +15,7 @@ from .io_base import PathLike
 from .json import JsonLoader, JsonWriter
 
 from metrics_pipeline.core.utils.periodic_table import ALL_ELT_SYMBOL_TO_Z
-from metrics_pipeline.core.utils.genmat_data import GenMatPDEntry, check_genmat_name
+from metrics_pipeline.core.utils.genmat_data import GenMatPDEntry, GenMatName
 
 
 @dataclass
@@ -396,6 +396,7 @@ class GenMatPDDataset(PDDataset):
     instead of standard `PDEntry` objects.
     """
     _data: dict[str, GenMatPDEntry]
+
     def __init__(
         self,
         data: dict,
@@ -409,7 +410,7 @@ class GenMatPDDataset(PDDataset):
         compact: bool = False
     ) -> None:
         for _, entry_data in data.items():
-            check_genmat_name(entry_data[id_key])
+            entry_data[id_key] = GenMatName(entry_data[id_key])
 
         super().__init__(
             data, id_key, composition_key, formula_key, natoms_key,

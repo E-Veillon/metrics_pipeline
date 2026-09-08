@@ -20,7 +20,7 @@ from .io_base import PathLike, check_file_or_dir
 from .json import JsonLoader
 from metrics_pipeline.core.utils.common_asserts import raise_or_warn
 from metrics_pipeline.core.utils.visual_iterator import VisualIterator
-from metrics_pipeline.core.utils.genmat_data import is_genmat_name
+from metrics_pipeline.core.utils.genmat_data import GenMatName
 
 
 class VaspParsingError(Exception):
@@ -230,7 +230,7 @@ class VaspParser:
         """
         # NOTE: Here 'path' must be a Path object, do not change for os.path.
         path = Path(path)
-        return path.is_dir() and is_genmat_name(path.name)
+        return path.is_dir() and GenMatName.is_genmat_name(path.name)
 
     @property
     def all_struct_dirs(self) -> list[Path]:
@@ -438,7 +438,7 @@ class VaspParser:
         try_xdatcar: bool = False,
         try_poscar: bool = False,
         on_error: tp.Literal["raise", "warn", "ignore"] = "warn"
-    ) -> dict[str, Structure]:
+    ) -> dict[str, Structure | None]:
         """
         Parse all runs matching initialized indices into structures.
 

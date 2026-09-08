@@ -12,30 +12,48 @@ from .common_asserts import check_type
 
 
 _ELT_WITH_INDEX_REGEX = r"[A-Z][a-z]?\d*"
-_GENMAT_NAME_PATTERN = re.compile(
-    fr"^(\d+)_(?:{_ELT_WITH_INDEX_REGEX}|\((?:{_ELT_WITH_INDEX_REGEX})+\)\d*)+$"
-)
 
 
-def is_genmat_name(name: str) -> bool:
+class GenMatName(str):
     """
-    Whether given name follows GenMat naming convention.
+    A string subclass to represent GenMat names.
+    It is validated at initialization to follow GenMat naming convention.
     """
-    return isinstance(name, str) and _GENMAT_NAME_PATTERN.fullmatch(name) is not None
-
-
-def check_genmat_name(name: str) -> None:
-    """
-    Verify that given name follows GenMat naming convention.
-    Raises a `ValueError` if it does not.
-    """
-    if is_genmat_name(name):
-        return
-    raise ValueError(
-        f"{name!r} does not follow GenMat naming conventions. "
-        "Please make sure your data was preprocessed with the 'preprocess.py' "
-        "script before going further."
+    _GENMAT_NAME_PATTERN = re.compile(
+        fr"^(\d+)_({_ELT_WITH_INDEX_REGEX}|\((?:{_ELT_WITH_INDEX_REGEX})+\)\d*)+$"
     )
+
+    def __init__(self, name: str) -> None:
+        """"""
+        check_type(name, "name", (str,))
+        match = self._GENMAT_NAME_PATTERN.fullmatch(name)
+        if match is None:
+            raise ValueError(
+                f"{name!r} does not follow GenMat naming convention: '[index]_[formula]'."
+            )
+        self._name = name
+        self._index = int(match.group(1))
+        self._formula = match.group(2)
+
+    @classmethod
+    def is_genmat_name(cls, name: str) -> bool:
+        """Whether given string follows GenMat naming convention."""
+        return isinstance(name, str) and cls._GENMAT_NAME_PATTERN.fullmatch(name) is not None
+
+    @property
+    def name(self) -> str:
+        """The full GenMat name as a string."""
+        return self._name
+
+    @property
+    def index(self) -> int:
+        """The index part of the GenMat name."""
+        return self._index
+
+    @property
+    def formula(self) -> str:
+        """The formula part of the GenMat name."""
+        return self._formula
 
 
 class GenMatPDEntry(PDEntry):
@@ -48,13 +66,17 @@ class GenMatPDEntry(PDEntry):
     ----------
     composition: Composition
         The composition associated with the PDEntry.
+
     energy: float
         The energy associated with the entry.
-    name: str
+
+    name: GenMatName
         A name for the entry. This is the string shown in the phase diagrams.
         Must follow GenMat naming convention.
+
     energy_above_hull: float | None
         Computed energy above hull of the entry when compared to a `PhaseDiagram` object.
+
     attribute: MSONable
         A arbitrary attribute. Can be used to specify that the
         entry is a newly found compound, or to specify a particular label for
@@ -64,7 +86,7 @@ class GenMatPDEntry(PDEntry):
         self,
         composition: Composition,
         energy: float,
-        name: str,
+        name: GenMatName,
         energy_above_hull: float | None = None,
         attribute: object = None
     ):
@@ -82,7 +104,7 @@ class GenMatPDEntry(PDEntry):
         energy: float
             The energy associated with the entry.
 
-        name: str
+        name: GenMatName
             A name for the entry. This is the string shown in the phase diagrams.
             Must follow GenMat naming convention.
 
@@ -94,7 +116,6 @@ class GenMatPDEntry(PDEntry):
             entry is a newly found compound, or to specify a particular label for
             the entry, etc. An attribute can be anything but must be MSONable.
         """
-        check_genmat_name(name)
         super().__init__(composition, energy, name, attribute)
         check_type(energy_above_hull, "energy_above_hull", (float, type(None)))
         self._energy_above_hull = energy_above_hull
@@ -136,14 +157,14 @@ class GenMatPDEntry(PDEntry):
     
     @classmethod
     def from_pdentry(
-        cls, entry: PDEntry, name: str | None = None, energy_above_hull: float | None = None
+        cls, entry: PDEntry, name: GenMatName | None = None, energy_above_hull: float | None = None
     ) -> tpe.Self:
         """
         Build a `GenMatPDEntry` object from a standard `PDEntry` object.
         
         Parameters
         ----------
-        name: str, optional
+        name: GenMatName, optional
             The GenMat name of the entry. If not given, current name of the entry
             will be checked and kept if it follows GenMat naming convention.
 
@@ -153,7 +174,7 @@ class GenMatPDEntry(PDEntry):
         return cls(
             composition=entry.composition,
             energy=entry.energy,
-            name=name if name is not None else entry.name,
+            name=name if name is not None else GenMatName(entry.name),
             energy_above_hull=energy_above_hull,
             attribute=entry.attribute
         )
@@ -168,7 +189,7 @@ class GenMatStructure(Structure):
 
     Attributes
     ----------
-    name: str
+    name: GenMatName
         The name of the structure, following GenMat naming convention.
 
     special_keys: dict[str, Any]
@@ -191,7 +212,7 @@ class GenMatStructure(Structure):
     """
     def __init__(
         self,
-        name: str,
+        name: GenMatName,
         special_keys: dict[str, tp.Any] | None = None,
         spacegroup: Spacegroup | None = None,
         energy: float | None = None,
@@ -204,7 +225,7 @@ class GenMatStructure(Structure):
 
         Parameters
         ----------
-        name: str
+        name: GenMatName
             The name of the structure, following GenMat naming convention.
 
         special_keys: dict[str, Any], optional
@@ -229,7 +250,6 @@ class GenMatStructure(Structure):
         See the `from_structure()` method for seemless conversions safe of any structure
         data modification.
         """
-        check_genmat_name(name)
         check_type(special_keys, "special_keys", (dict, type(None)))
         check_type(spacegroup, "spacegroup", (Spacegroup, type(None)))
         check_type(energy, "energy", (float, type(None)))
@@ -245,13 +265,7 @@ class GenMatStructure(Structure):
     @property
     def name_index(self) -> int:
         """The index part of the structure name."""
-        match = _GENMAT_NAME_PATTERN.match(self.name)
-        if match is None:
-            raise RuntimeError(
-                f"Structure name {self.name!r} failed index matching. "
-                "This should never happen as names are validated at initialization."
-            )
-        return int(match.group(1))
+        return self.name.index
 
     @property
     def entry(self) -> GenMatPDEntry:
@@ -351,7 +365,7 @@ class GenMatStructure(Structure):
         return cls.from_structure(structure=structure, spacegroup=spg, **dct_copy)
 
     @classmethod
-    def from_structure(cls, name: str, structure: Structure, **kwargs) -> tpe.Self:
+    def from_structure(cls, name: GenMatName, structure: Structure, **kwargs) -> tpe.Self:
         """
         Build a `GenMatStructure` from an existing `Structure` object.
         This conversion is only meant as an extension of the original structure to
@@ -360,7 +374,7 @@ class GenMatStructure(Structure):
 
         Parameters
         ----------
-        name: str
+        name: GenMatName
             The name of the structure, following GenMat naming convention.
 
         structure: Structure
@@ -401,7 +415,7 @@ def generate_genmat_structures(
 
     genmat_structures = [
         GenMatStructure.from_structure(
-            name=f"{idx}_{structure.reduced_formula}",
+            name=GenMatName(f"{idx}_{structure.reduced_formula}"),
             structure=structure,
             special_keys={k: structure.properties.get(k) for k in special_keys}
         ) for idx, structure in enumerate(structures)

@@ -25,7 +25,7 @@ from metrics_pipeline.core.utils import (
     parse_input_args, check_type, check_num_value,
     ALL_ELTS_CATEGORIES, get_elts_from_symbol_or_z, get_elts_in_categories,
     filter_by_elements,
-    generate_genmat_structures, GenMatStructure
+    generate_genmat_structures, GenMatStructure, GenMatName
 )
 from metrics_pipeline.core.genmat_io import (
     check_file_or_dir, check_file_format, load_yaml_as_dict,
@@ -468,7 +468,7 @@ def main(standalone: bool = True, **kwargs) -> None:
             _warn_summary_location(args["relax_summary"])
 
         for name, s_data in relax_structures_dict.items():
-            init_struct = GenMatStructure(name, s_data["in_struct"])
+            init_struct = GenMatStructure(GenMatName(name), s_data["in_struct"])
             final_struct = s_data["out_struct"]
             final_struct.properties["header"] = name
             relax_structures.append((init_struct, final_struct))
