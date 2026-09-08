@@ -1,4 +1,3 @@
-#!/usr/bin/python
 """
 Functions relative to Periodic Table's (PT) elements properties.
 """
@@ -34,11 +33,13 @@ valid chemical element symbol or Z.
 """
 
 PMG_ELTS_CATEGORIES = {
-    str(elt_grp.value) for elt_grp in ElementType if elt_grp != ElementType.quadrupolar
+    str(elt_grp.value) for elt_grp in ElementType
+    if "block" not in elt_grp.value and elt_grp != ElementType.quadrupolar
 }
+BLK_ELTS_CATEGORIES = {str(elt_grp.name) for elt_grp in ElementType if "block" in elt_grp.name}
 GRP_ELTS_CATEGORIES = {f"group_{i}" for i in range(1,19)}
 PRD_ELTS_CATEGORIES = {f"period_{i}" for i in range(1,8)}
-ALL_ELTS_CATEGORIES = PMG_ELTS_CATEGORIES | GRP_ELTS_CATEGORIES | PRD_ELTS_CATEGORIES
+ALL_ELTS_CATEGORIES = PMG_ELTS_CATEGORIES | BLK_ELTS_CATEGORIES | GRP_ELTS_CATEGORIES | PRD_ELTS_CATEGORIES
 
 
 def get_elts_from_symbol_or_z(symbols_or_z: list[str | int]) -> dict[str, int]:
@@ -92,6 +93,9 @@ def get_elts_in_categories(cdts_list: list[str]) -> dict[str, int]:
 
     # Parse conditions
     pmg_cdts = list(filter(lambda cdt: cdt in PMG_ELTS_CATEGORIES, cdts_list))
+    blk_cdts = set(
+        cdt[0]
+        for cdt in filter(lambda cdt: cdt in BLK_ELTS_CATEGORIES, cdts_list))
     grps_set = {
         int(cdt.split("_")[1])
         for cdt in filter(lambda cdt: cdt in GRP_ELTS_CATEGORIES, cdts_list)
@@ -102,8 +106,8 @@ def get_elts_in_categories(cdts_list: list[str]) -> dict[str, int]:
     }
     # Embed all conditions in a single lambda
     predicate_func: Callable[[Element], bool] = lambda elt: (
-        any(getattr(elt, f"is_{cdt}")() for cdt in pmg_cdts) or
-        elt.group in grps_set or elt.row in prds_set
+        any(getattr(elt, f"is_{cdt}") for cdt in pmg_cdts) or
+        elt.block in blk_cdts or elt.group in grps_set or elt.row in prds_set
     )
     # Iterate on all elements
     all_elts = (Element(symbol) for symbol in ALL_ELT_SYMBOL_TO_Z)
